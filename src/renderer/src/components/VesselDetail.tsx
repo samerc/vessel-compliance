@@ -42,7 +42,6 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
             e.dataTransfer.dropEffect = 'copy'
         }
         if (dragOverId !== id) {
-            console.log(`Dragging over row: ${id}`)
             setDragOverId(id)
         }
     }
@@ -53,7 +52,6 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
         if (e.dataTransfer) {
             e.dataTransfer.dropEffect = 'copy'
         }
-        console.log(`Drag enter row: ${id}`)
         setDragOverId(id)
     }
 
@@ -72,7 +70,6 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
         if (files.length === 0) return
         const file = files[0]
 
-        // Use the new getFilePath API for accuracy in modern Electron
         const filePath = window.api.getFilePath(file)
 
         if (!filePath) {
@@ -80,7 +77,6 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
             return
         }
 
-        // Get existing doc or create new one
         const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
 
         const newDoc: VesselDocument = {
@@ -88,7 +84,7 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
             documentTypeId: docTypeId,
             filePath: filePath,
             sent: existing?.sent || false,
-            required: existing?.required || false,
+            required: existing ? existing.required : (docTypes.find(t => t.id === docTypeId)?.required || false),
             uploadedDate: new Date().toISOString(),
             uploadedBy: 'Current User'
         }
@@ -104,6 +100,8 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
 
     const handleToggleRequired = async (docTypeId: string) => {
         const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
+        const docType = docTypes.find(t => t.id === docTypeId)
+
         if (existing) {
             const updated = { ...existing, required: !existing.required }
             await window.api.upsertVesselDocument(updated)
@@ -113,7 +111,7 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
                 documentTypeId: docTypeId,
                 filePath: '',
                 sent: false,
-                required: true,
+                required: docType ? !docType.required : true,
                 uploadedDate: new Date().toISOString(),
                 uploadedBy: 'Default'
             }
@@ -181,7 +179,7 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
                         {docTypes.map(type => {
                             const doc = vesselDocs.find(d => d.documentTypeId === type.id)
                             const exists = fileStatus[type.id]
-                            const isRequired = doc?.required || false
+                            const isRequired = doc ? doc.required : (type.required || false)
                             const hasFile = !!(doc?.filePath)
 
                             return (

@@ -5,6 +5,7 @@ import { DocumentType } from '../../../shared/types'
 export default function AdminPanel() {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newName, setNewName] = useState('')
+    const [required, setRequired] = useState(false)
 
     useEffect(() => {
         loadDocTypes()
@@ -18,8 +19,9 @@ export default function AdminPanel() {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newName.trim()) return
-        await window.api.addDocumentType({ name: newName })
+        await window.api.addDocumentType({ name: newName, required })
         setNewName('')
+        setRequired(false)
         loadDocTypes()
     }
 
@@ -49,6 +51,15 @@ export default function AdminPanel() {
                         style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
                         placeholder="e.g. Safety Management Certificate"
                     />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                        <input
+                            type="checkbox"
+                            checked={required}
+                            onChange={e => setRequired(e.target.checked)}
+                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                        />
+                        Required by default
+                    </label>
                     <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Plus size={18} /> Add Type
                     </button>
@@ -60,6 +71,7 @@ export default function AdminPanel() {
                     <thead>
                         <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                             <th style={{ padding: '16px' }}>Document Type Name</th>
+                            <th style={{ padding: '16px' }}>Default Status</th>
                             <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                         </tr>
                     </thead>
@@ -68,6 +80,18 @@ export default function AdminPanel() {
                             <tr key={doc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                 <td style={{ padding: '16px' }}>
                                     <div style={{ fontWeight: '600' }}>{doc.name}</div>
+                                </td>
+                                <td style={{ padding: '16px' }}>
+                                    <span style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '0.75rem',
+                                        background: doc.required ? 'rgba(255, 77, 77, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                        color: doc.required ? 'var(--danger)' : 'var(--text-secondary)',
+                                        border: doc.required ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}>
+                                        {doc.required ? 'REQUIRED' : 'OPTIONAL'}
+                                    </span>
                                 </td>
                                 <td style={{ padding: '16px', textAlign: 'right' }}>
                                     <button

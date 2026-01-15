@@ -1,6 +1,7 @@
 export interface DocumentType {
   id: string
   name: string
+  required: boolean
 }
 
 export interface Fleet {

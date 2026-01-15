@@ -114,7 +114,7 @@ export const db = {
         filePath: '',
         expiryDate,
         sent: false,
-        required: false,
+        required: store.get('documentTypes').find(t => t.id === docTypeId)?.required || false,
         uploadedDate: new Date().toISOString(),
         uploadedBy: 'System'
       }
@@ -134,7 +134,7 @@ export const db = {
         documentTypeId: docTypeId,
         filePath: '',
         sent: false,
-        required: false,
+        required: store.get('documentTypes').find(t => t.id === docTypeId)?.required || false,
         receivedDate,
         uploadedDate: new Date().toISOString(),
         uploadedBy: 'System'
