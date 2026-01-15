@@ -10,6 +10,7 @@ A desktop application for managing vessel document compliance. Built with **Elec
 - **Unified Vessel Table**: Searchable, sortable, and filterable view for all vessels.
 - **Fleet Management**: CRUD for fleets and vessel reassignment.
 - **Expiry & Receipt Tracking**: Native date pickers for document expiry and receipt dates.
+- **Hierarchical Requirements**: Document types have a global "Required" default that can be overridden at the individual vessel level.
 - **Reporting**: Excel and PDF exports (filtering for mandatory documents).
 - **Responsive UI**: Glassmorphic design with scaling support.
 
@@ -27,8 +28,9 @@ A desktop application for managing vessel document compliance. Built with **Elec
 - [x] Receipt Tracking
 - [x] Excel/PDF Reports
 - [x] GitHub Deployment Scripts
+- [x] Hierarchical Document Requirements (Global + Override)
+- [x] Standalone Executable Packaging (`npm run build:win`)
 
-## Next Steps / Ideas
-- [ ] Document Expiry Notifications.
-- [ ] User Authentication/Roles.
-- [ ] Audit Trail / Change History.
+## Maintenance & Setup Notes
+- **Installation Issues**: If `npm install` fails with `EPERM` or `ReadError` on Windows, use `Remove-Item -Recurse -Force node_modules, package-lock.json; npm install`.
+- **Packaging**: Use `npm run build:win` to generate a standalone NSIS installer in the `dist` folder.
