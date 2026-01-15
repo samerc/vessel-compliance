@@ -60,20 +60,37 @@ app.whenReady().then(() => {
   ipcMain.handle('db:addDocumentType', (_, docType) => db.addDocumentType(docType))
   ipcMain.handle('db:updateDocumentType', (_, id, updates) => db.updateDocumentType(id, updates))
   ipcMain.handle('db:deleteDocumentType', (_, id) => db.deleteDocumentType(id))
-  
+
   ipcMain.handle('db:getFleets', () => db.getFleets())
   ipcMain.handle('db:addFleet', (_, fleet) => db.addFleet(fleet))
   ipcMain.handle('db:deleteFleet', (_, id) => db.deleteFleet(id))
-  
+
   ipcMain.handle('db:getVessels', () => db.getVessels())
   ipcMain.handle('db:addVessel', (_, vessel) => db.addVessel(vessel))
   ipcMain.handle('db:updateVessel', (_, id, updates) => db.updateVessel(id, updates))
   ipcMain.handle('db:deleteVessel', (_, id) => db.deleteVessel(id))
-  
+
   ipcMain.handle('db:getVesselDocuments', (_, vesselId) => db.getVesselDocuments(vesselId))
   ipcMain.handle('db:upsertVesselDocument', (_, doc) => db.upsertVesselDocument(doc))
   ipcMain.handle('db:updateVesselDocumentExpiry', (_, vesselId, docTypeId, expiryDate) => db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate))
   ipcMain.handle('db:updateVesselDocumentReceivedDate', (_, vesselId, docTypeId, receivedDate) => db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate))
+
+  // Entity IPC Handlers
+  ipcMain.handle('db:getEntities', () => db.getEntities())
+  ipcMain.handle('db:addEntity', (_, entity) => db.addEntity(entity))
+  ipcMain.handle('db:deleteEntity', (_, id) => db.deleteEntity(id))
+
+  ipcMain.handle('db:getAssuredRoles', () => db.getAssuredRoles())
+  ipcMain.handle('db:addAssuredRole', (_, role) => db.addAssuredRole(role))
+  ipcMain.handle('db:deleteAssuredRole', (_, id) => db.deleteAssuredRole(id))
+
+  ipcMain.handle('db:getVesselAssureds', (_, vesselId) => db.getVesselAssureds(vesselId))
+  ipcMain.handle('db:addVesselAssured', (_, assured) => db.addVesselAssured(assured))
+  ipcMain.handle('db:deleteVesselAssured', (_, id) => db.deleteVesselAssured(id))
+
+  ipcMain.handle('db:getEntityUBOs', (_, assuredEntityId) => db.getEntityUBOs(assuredEntityId))
+  ipcMain.handle('db:addEntityUBO', (_, ubo) => db.addEntityUBO(ubo))
+  ipcMain.handle('db:deleteEntityUBO', (_, ubo) => db.deleteEntityUBO(ubo))
 
   // File System IPC Handlers
   ipcMain.handle('fs:exists', (_, filePath) => existsSync(filePath))

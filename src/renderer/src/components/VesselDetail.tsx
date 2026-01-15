@@ -3,6 +3,7 @@ import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, ShieldAlert, 
 import { Vessel, DocumentType, VesselDocument } from '../../../shared/types'
 
 import { ReportService } from '../services/ReportService'
+import AssuredManager from './AssuredManager'
 
 interface VesselDetailProps {
     vessel: Vessel
@@ -22,7 +23,21 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
     const loadData = async () => {
         const types = await window.api.getDocumentTypes()
         const docs = await window.api.getVesselDocuments(vessel.id)
-        setDocTypes(types)
+
+        // Custom sort: Required first, then by the 'order' defined in Admin.
+        const sortedTypes = [...types].sort((a, b) => {
+            const docA = docs.find(d => d.documentTypeId === a.id)
+            const docB = docs.find(d => d.documentTypeId === b.id)
+            const isReqA = docA ? docA.required : a.required
+            const isReqB = docB ? docB.required : b.required
+
+            if (isReqA !== isReqB) {
+                return isReqA ? -1 : 1 // Required comes first
+            }
+            return a.order - b.order // Then by defined order
+        })
+
+        setDocTypes(sortedTypes)
         setVesselDocs(docs)
 
         // Check if files exist on disk
@@ -289,6 +304,8 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
                     </tbody>
                 </table>
             </div>
+
+            <AssuredManager vessel={vessel} />
         </div>
     )
 }

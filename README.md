@@ -4,11 +4,10 @@ A modern Electron-based desktop application for tracking vessel documentation, c
 
 ## Key Features
 
-- **Unified Vessel Management**: Search, sort, and filter all vessels (standalone or in fleets) from a single view.
-- **Fleet Organization**: Group vessels into custom fleets for better organizational oversight.
-- **Document Tracking**: Upload and link compliance documents via drag-and-drop.
-- **Expiry Monitoring**: Manage document expiry dates with visual status indicators.
-- **Reporting**: Export vessel and fleet compliance reports to PDF and Excel (Mandatory documents only).
+- **Compliance Center**: Dedicated page for central monitoring of missing files and upcoming document expiries.
+- **Assured & UBO Management**: Robust tracking of ownership structures, including Assured entities and Ultimate Beneficial Owners (UBOs) for each vessel.
+- **Entity Directory**: Cross-reference entities to see every vessel they are associated with (as an Assured or UBO).
+- **Advanced Sorting**: Customizable global document ordering with priority sorting (Required documents always at the top).
 - **Responsive Design**: Premium glassmorphic UI that scales to any screen size.
 
 ## Recommended IDE Setup

@@ -4,9 +4,12 @@ import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
 import AdminPanel from './components/AdminPanel'
 import FleetManager from './components/FleetManager'
+import EntityDirectory from './components/EntityDirectory'
+import ComplianceCenter from './components/ComplianceCenter'
+import { Users, ShieldAlert } from 'lucide-react'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance'>('dashboard')
 
   useEffect(() => {
     // Definitive global prevention for Electron
@@ -41,6 +44,12 @@ function App(): React.JSX.Element {
             onClick={() => setActiveTab('dashboard')}
           />
           <NavItem
+            icon={<ShieldAlert size={20} />}
+            label="Compliance Center"
+            active={activeTab === 'compliance'}
+            onClick={() => setActiveTab('compliance')}
+          />
+          <NavItem
             icon={<Ship size={20} />}
             label="Vessels"
             active={activeTab === 'vessels'}
@@ -53,6 +62,12 @@ function App(): React.JSX.Element {
             onClick={() => setActiveTab('fleets')}
           />
           <NavItem
+            icon={<Users size={20} />}
+            label="Entity Directory"
+            active={activeTab === 'entities'}
+            onClick={() => setActiveTab('entities')}
+          />
+          <NavItem
             icon={<Settings size={20} />}
             label="Admin Panel"
             active={activeTab === 'admin'}
@@ -62,10 +77,12 @@ function App(): React.JSX.Element {
       </aside>
 
       <main className="main-content">
-        {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
         {activeTab === 'vessels' && <VesselManager />}
         {activeTab === 'fleets' && <FleetManager />}
         {activeTab === 'admin' && <AdminPanel />}
+        {activeTab === 'entities' && <EntityDirectory />}
+        {activeTab === 'compliance' && <ComplianceCenter />}
       </main>
     </div>
   )

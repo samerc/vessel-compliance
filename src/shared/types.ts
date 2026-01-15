@@ -2,6 +2,7 @@ export interface DocumentType {
   id: string
   name: string
   required: boolean
+  order: number
 }
 
 export interface Fleet {
@@ -28,9 +29,37 @@ export interface VesselDocument {
   uploadedBy: string
 }
 
+export interface Entity {
+  id: string
+  name: string
+  type: 'company' | 'person'
+  identifier?: string // Optional note to distinguish between same-named entities
+}
+
+export interface AssuredRole {
+  id: string
+  name: string
+}
+
+export interface VesselAssured {
+  id: string
+  vesselId: string
+  entityId: string
+  role: string
+}
+
+export interface EntityUBO {
+  assuredEntityId: string
+  uboEntityId: string
+}
+
 export interface AppData {
   documentTypes: DocumentType[]
   fleets: Fleet[]
   vessels: Vessel[]
   vesselDocuments: VesselDocument[]
+  entities: Entity[]
+  assuredRoles: AssuredRole[]
+  vesselAssureds: VesselAssured[]
+  entityUBOs: EntityUBO[]
 }

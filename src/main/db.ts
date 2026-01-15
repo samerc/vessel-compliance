@@ -1,5 +1,5 @@
 import Store from 'electron-store'
-import { AppData, DocumentType, Fleet, Vessel, VesselDocument } from '../shared/types'
+import { AppData, DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO } from '../shared/types'
 import { v4 as uuidv4 } from 'uuid'
 
 const schema = {
@@ -18,6 +18,22 @@ const schema = {
   vesselDocuments: {
     type: 'array',
     default: []
+  },
+  entities: {
+    type: 'array',
+    default: []
+  },
+  assuredRoles: {
+    type: 'array',
+    default: []
+  },
+  vesselAssureds: {
+    type: 'array',
+    default: []
+  },
+  entityUBOs: {
+    type: 'array',
+    default: []
   }
 }
 
@@ -28,7 +44,12 @@ export const db = {
   getDocumentTypes: () => store.get('documentTypes'),
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => {
     const list = store.get('documentTypes')
-    const newItem = { ...docType, id: uuidv4() }
+    const maxOrder = list.length > 0 ? Math.max(...list.map(d => d.order || 0)) : 0
+    const newItem = {
+      ...docType,
+      id: uuidv4(),
+      order: docType.order !== undefined ? docType.order : (maxOrder || 0) + 1
+    }
     store.set('documentTypes', [...list, newItem])
     return newItem
   },
@@ -141,5 +162,69 @@ export const db = {
       }
       store.set('vesselDocuments', [...list, newDoc])
     }
+  },
+
+  // Entities (Assureds/UBOs)
+  getEntities: () => store.get('entities'),
+  addEntity: (entity: Omit<Entity, 'id'>) => {
+    const list = store.get('entities')
+    const newItem = { ...entity, id: uuidv4() }
+    store.set('entities', [...list, newItem])
+    return newItem
+  },
+  deleteEntity: (id: string) => {
+    const list = store.get('entities')
+    store.set('entities', list.filter(e => e.id !== id))
+    // Cleanup relations
+    const vAssocs = store.get('vesselAssureds')
+    store.set('vesselAssureds', vAssocs.filter(v => v.entityId !== id))
+    const uboAssocs = store.get('entityUBOs')
+    store.set('entityUBOs', uboAssocs.filter(u => u.assuredEntityId !== id && u.uboEntityId !== id))
+  },
+
+  // Assured Roles
+  getAssuredRoles: () => store.get('assuredRoles'),
+  addAssuredRole: (role: Omit<AssuredRole, 'id'>) => {
+    const list = store.get('assuredRoles')
+    const newItem = { ...role, id: uuidv4() }
+    store.set('assuredRoles', [...list, newItem])
+    return newItem
+  },
+  deleteAssuredRole: (id: string) => {
+    const list = store.get('assuredRoles')
+    store.set('assuredRoles', list.filter(r => r.id !== id))
+  },
+
+  // Vessel Assureds
+  getVesselAssureds: (vesselId?: string) => {
+    const list = store.get('vesselAssureds')
+    return vesselId ? list.filter(v => v.vesselId === vesselId) : list
+  },
+  addVesselAssured: (assured: Omit<VesselAssured, 'id'>) => {
+    const list = store.get('vesselAssureds')
+    const newItem = { ...assured, id: uuidv4() }
+    store.set('vesselAssureds', [...list, newItem])
+    return newItem
+  },
+  deleteVesselAssured: (id: string) => {
+    const list = store.get('vesselAssureds')
+    store.set('vesselAssureds', list.filter(v => v.id !== id))
+  },
+
+  // Entity UBOs (Relationship between Assured and UBO)
+  getEntityUBOs: (assuredEntityId?: string) => {
+    const list = store.get('entityUBOs')
+    return assuredEntityId ? list.filter(u => u.assuredEntityId === assuredEntityId) : list
+  },
+  addEntityUBO: (ubo: EntityUBO) => {
+    const list = store.get('entityUBOs')
+    const exists = list.some(u => u.assuredEntityId === ubo.assuredEntityId && u.uboEntityId === ubo.uboEntityId)
+    if (!exists) {
+      store.set('entityUBOs', [...list, ubo])
+    }
+  },
+  deleteEntityUBO: (ubo: EntityUBO) => {
+    const list = store.get('entityUBOs')
+    store.set('entityUBOs', list.filter(u => !(u.assuredEntityId === ubo.assuredEntityId && u.uboEntityId === ubo.uboEntityId)))
   }
 }

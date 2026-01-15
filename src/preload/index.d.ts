@@ -1,25 +1,41 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { DocumentType, Fleet, Vessel, VesselDocument } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO } from '../shared/types'
 
 export interface Api {
   getDocumentTypes: () => Promise<DocumentType[]>
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>
   updateDocumentType: (id: string, updates: Partial<DocumentType>) => Promise<void>
   deleteDocumentType: (id: string) => Promise<void>
-  
+
   getFleets: () => Promise<Fleet[]>
   addFleet: (fleet: Omit<Fleet, 'id'>) => Promise<Fleet>
   deleteFleet: (id: string) => Promise<void>
-  
+
   getVessels: () => Promise<Vessel[]>
   addVessel: (vessel: Omit<Vessel, 'id'>) => Promise<Vessel>
   updateVessel: (id: string, updates: Partial<Vessel>) => Promise<void>
   deleteVessel: (id: string) => Promise<void>
-  
+
   getVesselDocuments: (vesselId?: string) => Promise<VesselDocument[]>
   upsertVesselDocument: (doc: VesselDocument) => Promise<void>
   updateVesselDocumentExpiry: (vesselId: string, docTypeId: string, expiryDate: string) => Promise<void>
   updateVesselDocumentReceivedDate: (vesselId: string, docTypeId: string, receivedDate: string) => Promise<void>
+
+  getEntities: () => Promise<Entity[]>
+  addEntity: (entity: Omit<Entity, 'id'>) => Promise<Entity>
+  deleteEntity: (id: string) => Promise<void>
+
+  getAssuredRoles: () => Promise<AssuredRole[]>
+  addAssuredRole: (role: Omit<AssuredRole, 'id'>) => Promise<AssuredRole>
+  deleteAssuredRole: (id: string) => Promise<void>
+
+  getVesselAssureds: (vesselId?: string) => Promise<VesselAssured[]>
+  addVesselAssured: (assured: Omit<VesselAssured, 'id'>) => Promise<VesselAssured>
+  deleteVesselAssured: (id: string) => Promise<void>
+
+  getEntityUBOs: (assuredEntityId?: string) => Promise<EntityUBO[]>
+  addEntityUBO: (ubo: EntityUBO) => Promise<void>
+  deleteEntityUBO: (ubo: EntityUBO) => Promise<void>
 
   fsExists: (filePath: string) => Promise<boolean>
   fsOpen: (filePath: string) => Promise<void>
