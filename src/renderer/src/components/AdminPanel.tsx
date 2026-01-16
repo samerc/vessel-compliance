@@ -9,6 +9,8 @@ export default function AdminPanel() {
     const [newOrder, setNewOrder] = useState(0)
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [newRole, setNewRole] = useState('')
+    const [importing, setImporting] = useState(false)
+    const [importStatus, setImportStatus] = useState<string>('')
 
     useEffect(() => {
         loadData()
@@ -115,12 +117,66 @@ export default function AdminPanel() {
         }
     }
 
+    const handleImportExcel = async () => {
+        try {
+            setImporting(true)
+            setImportStatus('Opening file dialog...')
+
+            const filePath = await window.api.dialogOpenFile()
+            if (!filePath) {
+                setImportStatus('')
+                setImporting(false)
+                return
+            }
+
+            setImportStatus('Importing data from Excel...')
+            const result = await window.api.excelImport(filePath)
+
+            if (result.success) {
+                setImportStatus(`✓ ${result.message}\n\nVessels Created: ${result.stats.vesselsCreated}\nVessels Updated: ${result.stats.vesselsUpdated}\nDocuments Imported: ${result.stats.documentsImported}\nEntities Created: ${result.stats.entitiesCreated}\nAssureds Linked: ${result.stats.assuredsLinked}`)
+                await loadDocTypes()
+                setTimeout(() => setImportStatus(''), 8000)
+            } else {
+                setImportStatus(`✗ ${result.message}`)
+                setTimeout(() => setImportStatus(''), 5000)
+            }
+        } catch (error: any) {
+            setImportStatus(`✗ Error: ${error.message}`)
+            setTimeout(() => setImportStatus(''), 5000)
+        } finally {
+            setImporting(false)
+        }
+    }
+
     return (
         <div className="fade-in">
-            <header style={{ marginBottom: '32px' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Admin Panel</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Configure global document types, their display order, and assured roles.</p>
+            <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Admin Panel</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Configure global document types, their display order, and assured roles.</p>
+                </div>
+                <button
+                    onClick={handleImportExcel}
+                    disabled={importing}
+                    className="btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+                >
+                    <FileText size={18} />
+                    {importing ? 'Importing...' : 'Import from Excel'}
+                </button>
             </header>
+
+            {importStatus && (
+                <div className="glass-card" style={{
+                    padding: '16px 24px',
+                    marginBottom: '24px',
+                    background: importStatus.startsWith('✓') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                    border: importStatus.startsWith('✓') ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                    whiteSpace: 'pre-line'
+                }}>
+                    {importStatus}
+                </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '32px' }}>
                 <div>

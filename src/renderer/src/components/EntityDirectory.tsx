@@ -143,11 +143,34 @@ export default function EntityDirectory() {
                                     }}>
                                         {selectedEntity.type === 'company' ? <Building2 size={32} /> : <User size={32} />}
                                     </div>
-                                    <div>
+                                    <div style={{ flex: 1 }}>
                                         <h2 style={{ fontSize: '2rem' }}>{selectedEntity.name}</h2>
                                         <p style={{ color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
                                             {selectedEntity.type} {selectedEntity.identifier ? `• ${selectedEntity.identifier}` : ''}
                                         </p>
+                                        {selectedEntity.type === 'person' && (
+                                            <div
+                                                style={{
+                                                    marginTop: '12px',
+                                                    padding: '8px 12px',
+                                                    borderRadius: '8px',
+                                                    background: selectedEntity.passportFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                                                    border: selectedEntity.passportFilePath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    fontSize: '0.85rem',
+                                                    cursor: selectedEntity.passportFilePath ? 'pointer' : 'default'
+                                                }}
+                                                onClick={() => selectedEntity.passportFilePath && window.api.fsOpen(selectedEntity.passportFilePath)}
+                                            >
+                                                {selectedEntity.passportFilePath ? (
+                                                    <>📄 ID/Passport on file (Click to view)</>
+                                                ) : (
+                                                    <>⚠️ ID/Passport Missing</>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

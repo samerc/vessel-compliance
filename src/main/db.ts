@@ -172,6 +172,14 @@ export const db = {
     store.set('entities', [...list, newItem])
     return newItem
   },
+  updateEntity: (id: string, updates: Partial<Entity>) => {
+    const list = store.get('entities')
+    const index = list.findIndex(e => e.id === id)
+    if (index !== -1) {
+      list[index] = { ...list[index], ...updates }
+      store.set('entities', list)
+    }
+  },
   deleteEntity: (id: string) => {
     const list = store.get('entities')
     store.set('entities', list.filter(e => e.id !== id))

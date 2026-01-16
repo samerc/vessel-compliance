@@ -118,6 +118,24 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         loadData()
     }
 
+    const handleUploadPassport = async (e: React.DragEvent, entityId: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+
+        const files = e.dataTransfer.files
+        if (files.length === 0) return
+        const file = files[0]
+
+        const filePath = window.api.getFilePath(file)
+        if (!filePath) {
+            alert('Could not retrieve file path')
+            return
+        }
+
+        await window.api.updateEntity(entityId, { passportFilePath: filePath })
+        loadData()
+    }
+
     return (
         <section className="fade-in" style={{ marginTop: '32px' }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -367,11 +385,41 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                                                         {ubos.map(ubo => (
-                                                            <div key={ubo!.id} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                {ubo!.type === 'company' ? <Building2 size={12} opacity={0.5} /> : <User size={12} opacity={0.5} />}
-                                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                                    <span style={{ fontSize: '0.85rem' }}>{ubo!.name}</span>
+                                                            <div
+                                                                key={ubo!.id}
+                                                                style={{
+                                                                    background: 'rgba(255,255,255,0.05)',
+                                                                    border: '1px solid rgba(255,255,255,0.1)',
+                                                                    borderRadius: '12px',
+                                                                    padding: '8px 12px',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '8px',
+                                                                    minWidth: '200px'
+                                                                }}
+                                                            >
+                                                                {ubo!.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
+                                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                                                    <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{ubo!.name}</span>
                                                                     {ubo!.identifier && <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>{ubo!.identifier}</span>}
+                                                                    {ubo!.type === 'person' && (
+                                                                        <div
+                                                                            onDragOver={(e) => e.preventDefault()}
+                                                                            onDrop={(e) => handleUploadPassport(e, ubo!.id)}
+                                                                            style={{
+                                                                                fontSize: '0.7rem',
+                                                                                marginTop: '4px',
+                                                                                padding: '4px 6px',
+                                                                                borderRadius: '4px',
+                                                                                background: ubo!.passportFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                                border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                cursor: ubo!.passportFilePath ? 'pointer' : 'default'
+                                                                            }}
+                                                                            onClick={() => ubo!.passportFilePath && window.api.fsOpen(ubo!.passportFilePath)}
+                                                                        >
+                                                                            {ubo!.passportFilePath ? '📄 ID/Passport (Click to view)' : '📎 Drop ID/Passport here'}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                                 <button onClick={() => handleDeleteUBO(va.entityId, ubo!.id)} style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px' }} className="hover-danger">
                                                                     <Trash2 size={12} />

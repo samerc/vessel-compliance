@@ -24,6 +24,7 @@ const api = {
 
   getEntities: () => ipcRenderer.invoke('db:getEntities'),
   addEntity: (entity) => ipcRenderer.invoke('db:addEntity', entity),
+  updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),
 
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),
@@ -40,7 +41,10 @@ const api = {
 
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   fsOpen: (filePath) => ipcRenderer.invoke('fs:open', filePath),
-  getFilePath: (file: File) => webUtils.getPathForFile(file)
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
+
+  dialogOpenFile: () => ipcRenderer.invoke('dialog:openFile'),
+  excelImport: (filePath) => ipcRenderer.invoke('excel:import', filePath)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -23,6 +23,7 @@ export interface Api {
 
   getEntities: () => Promise<Entity[]>
   addEntity: (entity: Omit<Entity, 'id'>) => Promise<Entity>
+  updateEntity: (id: string, updates: Partial<Entity>) => Promise<void>
   deleteEntity: (id: string) => Promise<void>
 
   getAssuredRoles: () => Promise<AssuredRole[]>
@@ -40,6 +41,9 @@ export interface Api {
   fsExists: (filePath: string) => Promise<boolean>
   fsOpen: (filePath: string) => Promise<void>
   getFilePath: (file: File) => string
+
+  dialogOpenFile: () => Promise<string | null>
+  excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
 }
 
 declare global {

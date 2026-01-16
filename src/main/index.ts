@@ -78,6 +78,7 @@ app.whenReady().then(() => {
   // Entity IPC Handlers
   ipcMain.handle('db:getEntities', () => db.getEntities())
   ipcMain.handle('db:addEntity', (_, entity) => db.addEntity(entity))
+  ipcMain.handle('db:updateEntity', (_, id, updates) => db.updateEntity(id, updates))
   ipcMain.handle('db:deleteEntity', (_, id) => db.deleteEntity(id))
 
   ipcMain.handle('db:getAssuredRoles', () => db.getAssuredRoles())
@@ -95,6 +96,25 @@ app.whenReady().then(() => {
   // File System IPC Handlers
   ipcMain.handle('fs:exists', (_, filePath) => existsSync(filePath))
   ipcMain.handle('fs:open', (_, filePath) => shell.openPath(filePath))
+
+  // Excel Import Handlers
+  ipcMain.handle('dialog:openFile', async () => {
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('excel:import', async (_, filePath: string) => {
+    const { ExcelImporter } = await import('./excelImporter')
+    const importer = new ExcelImporter()
+    return await importer.importFromExcel(filePath)
+  })
 
   createWindow()
 
