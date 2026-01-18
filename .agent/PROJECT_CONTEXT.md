@@ -19,6 +19,9 @@ A desktop application for managing vessel document compliance. Built with **Elec
 - **Responsive UI**: Premium glassmorphic UI with 1200x850 default resolution and expanded document tables.
 - **Inline Editing**: Names and descriptions can be edited directly in Admin Panel and Vessel Details.
 - **Document Descriptions**: Each document type now supports an optional description field stored in the DB.
+- **Fleet Detail View**: Deep navigation from fleet cards into a vessel list with integrated compliance monitoring.
+- **UI Harmonization**: Consistent "glass card" design system applied across all management pages (Vessels, Fleets, Users).
+- **Navigation Polish**: Context-aware back buttons and persistent role badges for visual clarity.
 
 ## Technical Architecture
 - **Main Process**: Uses `mysql2/promise` for data persistence. Schema management in `src/main/mysql/adapter.ts` with auto-migration support.
@@ -40,6 +43,10 @@ A desktop application for managing vessel document compliance. Built with **Elec
 - [x] Custom App Icon Implementation
 - [x] Inline Editing & Descriptions
 - [x] Navigation: Clickable Vessel Names
+- [x] Fleet Detail & Deep Navigation
+- [x] Layout Harmonization (User Manager)
+- [x] Dropdown Accessibility & Readability Fixes
+- [x] Sidebar Layout Consistency
 
 ## Maintenance & Setup Notes
 - **Installation**: Requires `mysql` server access. Run `npm install` to get dependencies including `mysql2` and `bcryptjs`.

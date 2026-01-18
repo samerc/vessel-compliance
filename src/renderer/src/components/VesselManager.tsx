@@ -34,14 +34,14 @@ export default function VesselManager() {
         await window.api.addVessel({
             name: newVessel.name,
             imoNumber: newVessel.imo,
-            fleetId: newVessel.fleetId || undefined
+            fleetId: newVessel.fleetId
         })
         setNewVessel({ name: '', imo: '', fleetId: '' })
         loadData()
     }
 
     const handleUpdateFleet = async (vesselId: string, fleetId: string) => {
-        await window.api.updateVessel(vesselId, { fleetId: fleetId || undefined })
+        await window.api.updateVessel(vesselId, { fleetId: fleetId })
         loadData()
     }
 
@@ -67,7 +67,7 @@ export default function VesselManager() {
     }
 
     if (selectedVessel) {
-        return <VesselDetail vessel={selectedVessel} onBack={() => setSelectedVessel(null)} />
+        return <VesselDetail vessel={selectedVessel} backLabel="Back to Vessels" onBack={() => setSelectedVessel(null)} />
     }
 
     return (
@@ -99,11 +99,11 @@ export default function VesselManager() {
                     <select
                         value={newVessel.fleetId}
                         onChange={e => setNewVessel({ ...newVessel, fleetId: e.target.value })}
-                        style={{ flex: 1, minWidth: '150px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                        style={{ flex: 1, minWidth: '150px', background: 'white', border: '1px solid #ccc', color: 'black', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
                     >
-                        <option value="">Standalone</option>
+                        <option value="" style={{ color: 'black' }}>Standalone</option>
                         {fleets.map(f => (
-                            <option key={f.id} value={f.id}>{f.name}</option>
+                            <option key={f.id} value={f.id} style={{ color: 'black' }}>{f.name}</option>
                         ))}
                     </select>
                     <button type="submit" className="btn-primary">Register</button>
@@ -126,12 +126,12 @@ export default function VesselManager() {
                     <select
                         value={fleetFilter}
                         onChange={e => setFleetFilter(e.target.value)}
-                        style={{ padding: '10px', background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white' }}
+                        style={{ padding: '10px', background: 'white', border: '1px solid #ccc', borderRadius: '12px', color: 'black', cursor: 'pointer' }}
                     >
-                        <option value="all">All Fleets</option>
-                        <option value="">Standalone</option>
+                        <option value="all" style={{ color: 'black' }}>All Fleets</option>
+                        <option value="" style={{ color: 'black' }}>Standalone</option>
                         {fleets.map(f => (
-                            <option key={f.id} value={f.id}>{f.name}</option>
+                            <option key={f.id} value={f.id} style={{ color: 'black' }}>{f.name}</option>
                         ))}
                     </select>
                 </div>
@@ -183,11 +183,11 @@ export default function VesselManager() {
                                         <select
                                             value={v.fleetId || ''}
                                             onChange={e => handleUpdateFleet(v.id, e.target.value)}
-                                            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--accent-primary)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                            style={{ background: 'white', border: '1px solid #ccc', color: 'black', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
                                         >
-                                            <option value="">Standalone</option>
+                                            <option value="" style={{ color: 'black' }}>Standalone</option>
                                             {fleets.map(f => (
-                                                <option key={f.id} value={f.id}>{f.name}</option>
+                                                <option key={f.id} value={f.id} style={{ color: 'black' }}>{f.name}</option>
                                             ))}
                                         </select>
                                     </td>

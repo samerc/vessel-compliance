@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { User } from '../../../shared/types'
-import { Trash2, UserPlus, Shield } from 'lucide-react'
+import { Trash2, Shield } from 'lucide-react'
 
 export default function UserManager() {
     const [users, setUsers] = useState<User[]>([])
     const [loading, setLoading] = useState(true)
-    const [showAddForm, setShowAddForm] = useState(false)
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -46,7 +45,6 @@ export default function UserManager() {
         try {
             const result = await window.api.authCreateUser(formData)
             if (result.success) {
-                setShowAddForm(false)
                 setFormData({ username: '', password: '', role: 'user' })
                 loadUsers()
             } else {
@@ -58,104 +56,93 @@ export default function UserManager() {
     }
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
-                    <Shield className="w-6 h-6 text-[var(--accent-primary)]" />
-                    User Management
-                </h2>
-                <button
-                    onClick={() => setShowAddForm(!showAddForm)}
-                    className="btn-primary flex items-center gap-2"
-                >
-                    <UserPlus size={18} />
-                    {showAddForm ? 'Cancel' : 'Add User'}
-                </button>
-            </div>
+        <div className="fade-in">
+            <header style={{ marginBottom: '32px' }}>
+                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>System Access</h1>
+                <p style={{ color: 'var(--text-secondary)' }}>Manage user accounts, roles, and administrative permissions.</p>
+            </header>
 
-            {showAddForm && (
-                <div className="mb-8 glass-card p-6 fade-in">
-                    <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Add New User</h3>
-                    {error && (
-                        <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-[var(--danger)]">
-                            {error}
-                        </div>
-                    )}
-                    <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 items-end">
-                        <div className="flex-1 w-full">
-                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Username</label>
-                            <input
-                                type="text"
-                                value={formData.username}
-                                onChange={e => setFormData({ ...formData, username: e.target.value })}
-                                className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/30 focus:border-[var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] transition-colors"
-                                placeholder="Enter username"
-                            />
-                        </div>
-                        <div className="flex-1 w-full">
-                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Password</label>
-                            <input
-                                type="password"
-                                value={formData.password}
-                                onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/30 focus:border-[var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] transition-colors"
-                                placeholder="Enter password"
-                            />
-                        </div>
-                        <div className="w-full md:w-48">
-                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Role</label>
-                            <select
-                                value={formData.role}
-                                onChange={e => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' })}
-                                className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/30 focus:border-[var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] transition-colors appearance-none"
-                                style={{ backgroundColor: 'var(--bg-dark)' }}
-                            >
-                                <option value="user">User</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
-                        <button
-                            type="submit"
-                            className="btn-primary whitespace-nowrap"
-                        >
-                            Save User
-                        </button>
-                    </form>
-                </div>
-            )}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Shield size={20} color="var(--accent-primary)" /> User Registration
+                </h3>
+                {error && (
+                    <div style={{ marginBottom: '16px', borderRadius: '8px', background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.2)', padding: '12px', fontSize: '0.9rem', color: 'var(--danger)' }}>
+                        {error}
+                    </div>
+                )}
+                <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <input
+                        type="text"
+                        value={formData.username}
+                        onChange={e => setFormData({ ...formData, username: e.target.value })}
+                        style={{ flex: 2, minWidth: '200px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                        placeholder="Username"
+                    />
+                    <input
+                        type="password"
+                        value={formData.password}
+                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                        style={{ flex: 2, minWidth: '200px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                        placeholder="Password"
+                    />
+                    <select
+                        value={formData.role}
+                        onChange={e => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' })}
+                        style={{ flex: 1, minWidth: '120px', background: 'white', border: '1px solid #ccc', color: 'black', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                        <option value="user" style={{ color: 'black' }}>User</option>
+                        <option value="admin" style={{ color: 'black' }}>Admin</option>
+                    </select>
+                    <button type="submit" className="btn-primary">Create User</button>
+                </form>
+            </section>
 
             {loading ? (
-                <div className="text-[var(--text-secondary)]">Loading users...</div>
+                <div style={{ color: 'var(--text-secondary)' }}>Loading users...</div>
             ) : (
-                <div className="glass-card overflow-hidden">
-                    <table className="min-w-full divide-y divide-white/10">
-                        <thead className="bg-white/5">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Username</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Role</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Created At</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Actions</th>
+                <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                <th style={{ padding: '16px' }}>Username</th>
+                                <th style={{ padding: '16px' }}>Role</th>
+                                <th style={{ padding: '16px' }}>Created At</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/10">
+                        <tbody>
                             {users.map(user => (
-                                <tr key={user.id} className="hover:bg-white/5 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap font-medium text-[var(--text-primary)]">{user.username}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin'
-                                                ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30'
-                                                : 'bg-green-500/20 text-green-200 border border-green-500/30'
-                                            }`}>
-                                            {user.role}
+                                <tr key={user.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }} className="hover-effect">
+                                    <td style={{ padding: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '8px' }}>
+                                                <Shield size={20} color="var(--accent-primary)" />
+                                            </div>
+                                            <span style={{ fontWeight: '600' }}>{user.username}</span>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        <span style={{
+                                            padding: '4px 12px',
+                                            borderRadius: '12px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: '600',
+                                            background: user.role === 'admin' ? 'rgba(147, 51, 234, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                                            color: user.role === 'admin' ? '#d8b4fe' : '#86efac',
+                                            border: `1px solid ${user.role === 'admin' ? 'rgba(147, 51, 234, 0.2)' : 'rgba(34, 197, 94, 0.2)'}`
+                                        }}>
+                                            {user.role.toUpperCase()}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-[var(--text-secondary)]">
+                                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                                         {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>
                                         <button
                                             onClick={() => handleDelete(user.id)}
-                                            className="text-red-400 hover:text-red-300 transition-colors"
+                                            style={{ background: 'transparent', color: 'var(--danger)', padding: '8px' }}
+                                            className="hover-effect"
                                             title="Delete User"
                                         >
                                             <Trash2 size={18} />

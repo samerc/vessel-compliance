@@ -8,9 +8,10 @@ import AssuredManager from './AssuredManager'
 interface VesselDetailProps {
     vessel: Vessel
     onBack: () => void
+    backLabel?: string
 }
 
-export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
+export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels' }: VesselDetailProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
     const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -172,7 +173,7 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
     return (
         <div className="fade-in">
             <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
-                <ArrowLeft size={18} /> Back to Fleet
+                <ArrowLeft size={18} /> {backLabel}
             </button>
 
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

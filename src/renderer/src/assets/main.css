@@ -113,9 +113,11 @@ button {
 
 .sidebar {
   width: 260px;
-  padding: 24px;
+  padding: 24px 16px;
   border-right: var(--glass-border);
   background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
 }
 
 .main-content {
@@ -123,7 +125,6 @@ button {
   padding: 32px;
   overflow-y: auto;
   min-width: 0;
-  /* Allow Flex children to shrink below their content size */
   transition: padding 0.3s ease;
 }
 

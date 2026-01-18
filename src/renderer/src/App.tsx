@@ -124,7 +124,7 @@ function AppContent(): React.JSX.Element {
           )}
         </nav>
 
-        <div className="mt-auto pt-4 border-t border-gray-700">
+        <div className="mt-8 pt-4 border-t border-gray-700 opacity-50">
           <NavItem
             icon={<LogOut size={20} />}
             label="Logout"

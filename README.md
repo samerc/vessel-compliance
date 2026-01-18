@@ -10,6 +10,7 @@ A modern Electron-based desktop application for tracking vessel documentation, c
 - **Assured & UBO Management**: Robust tracking of ownership structures, including Assured entities and Ultimate Beneficial Owners (UBOs) for each vessel.
 - **Entity Directory**: Cross-reference entities to see every vessel they are associated with (as an Assured or UBO).
 - **Advanced Sorting**: Customizable global document ordering with priority sorting (Required documents always at the top).
+- **Fleet Management**: Organize vessels into fleets for better reporting and management. Includes detailed fleet views and one-click exports.
 - **Responsive Design**: Premium glassmorphic UI that scales to any screen size.
 
 ## Database Setup

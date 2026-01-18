@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { FolderPlus, Trash2, Folder, Ship, FileSpreadsheet, FileText } from 'lucide-react'
+import { FolderPlus, Trash2, Folder, Ship, FileSpreadsheet, FileText, Eye } from 'lucide-react'
 import { Fleet, Vessel, VesselDocument, DocumentType } from '../../../shared/types'
 import { ReportService } from '../services/ReportService'
+import FleetDetail from './FleetDetail'
 
 export default function FleetManager() {
     const [fleets, setFleets] = useState<Fleet[]>([])
@@ -9,6 +10,7 @@ export default function FleetManager() {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [allDocs, setAllDocs] = useState<VesselDocument[]>([])
     const [newFleetName, setNewFleetName] = useState('')
+    const [selectedFleet, setSelectedFleet] = useState<Fleet | null>(null)
 
     useEffect(() => {
         loadData()
@@ -38,6 +40,10 @@ export default function FleetManager() {
             await window.api.deleteFleet(id)
             loadData()
         }
+    }
+
+    if (selectedFleet) {
+        return <FleetDetail fleet={selectedFleet} onBack={() => setSelectedFleet(null)} />
     }
 
     return (
@@ -72,12 +78,22 @@ export default function FleetManager() {
                                 <div style={{ background: 'rgba(0, 210, 255, 0.1)', padding: '10px', borderRadius: '12px' }}>
                                     <Folder size={24} color="var(--accent-primary)" />
                                 </div>
-                                <button
-                                    onClick={() => handleDeleteFleet(fleet.id)}
-                                    style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }}
-                                >
-                                    <Trash2 size={20} />
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={() => setSelectedFleet(fleet)}
+                                        style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '4px' }}
+                                        title="View Fleet"
+                                    >
+                                        <Eye size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteFleet(fleet.id)}
+                                        style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }}
+                                        title="Delete Fleet"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
                             </div>
                             <h3 style={{ marginBottom: '8px' }}>{fleet.name}</h3>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>

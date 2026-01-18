@@ -9,6 +9,8 @@
 - [x] MySQL Migration & RBAC
 - [x] User Management UI
 - [x] App Icon & Responsiveness
+- [x] UI Harmonization (User Management)
+- [x] Fleet Detail & Navigation
 
 ## Next Phase Ideas
 - [ ] Automated Email Notifications
