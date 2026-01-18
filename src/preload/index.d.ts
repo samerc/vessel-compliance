@@ -1,7 +1,14 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User } from '../shared/types'
 
 export interface Api {
+  authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
+  authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string }>
+  getUsers: () => Promise<User[]>
+  deleteUser: (id: string) => Promise<void>
+  setupSaveConfig: (config: any) => Promise<{ success: boolean; message?: string }>
+  setupCheckConnection: () => Promise<boolean>
+  onDbStatus: (callback: (status: { connected: boolean }) => void) => void
   getDocumentTypes: () => Promise<DocumentType[]>
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>
   updateDocumentType: (id: string, updates: Partial<DocumentType>) => Promise<void>

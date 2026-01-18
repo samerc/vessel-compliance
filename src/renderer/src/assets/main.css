@@ -131,6 +131,35 @@ button {
   .main-content {
     padding: 20px;
   }
+  
+  .sidebar {
+    width: 220px;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .layout-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: var(--glass-border);
+    padding: 12px;
+  }
+
+  .sidebar nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .main-content {
+    padding: 16px;
+  }
 }
 
 .fade-in {

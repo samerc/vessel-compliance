@@ -1,0 +1,79 @@
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(36) PRIMARY KEY,
+  username VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL, -- 'admin' or 'user'
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleets (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS vessels (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  imo_number VARCHAR(20) NOT NULL,
+  fleet_id VARCHAR(36),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (fleet_id) REFERENCES fleets(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS document_types (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  required BOOLEAN DEFAULT FALSE,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS vessel_documents (
+  id VARCHAR(36) PRIMARY KEY,
+  vessel_id VARCHAR(36) NOT NULL,
+  document_type_id VARCHAR(36) NOT NULL,
+  file_path TEXT,
+  sent BOOLEAN DEFAULT FALSE,
+  required BOOLEAN DEFAULT FALSE,
+  expiry_date DATE,
+  received_date DATE,
+  uploaded_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  uploaded_by VARCHAR(255),
+  FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS entities (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL, -- 'company' or 'person'
+  identifier VARCHAR(255),
+  passport_file_path TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS assured_roles (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS vessel_assureds (
+  id VARCHAR(36) PRIMARY KEY,
+  vessel_id VARCHAR(36) NOT NULL,
+  entity_id VARCHAR(36) NOT NULL,
+  role VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+  FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS entity_ubos (
+  assured_entity_id VARCHAR(36) NOT NULL,
+  ubo_entity_id VARCHAR(36) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (assured_entity_id, ubo_entity_id),
+  FOREIGN KEY (assured_entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+  FOREIGN KEY (ubo_entity_id) REFERENCES entities(id) ON DELETE CASCADE
+);

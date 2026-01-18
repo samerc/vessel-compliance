@@ -1,9 +1,13 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
-import { existsSync } from 'fs'
+import { existsSync, writeFileSync, mkdirSync } from 'fs'
+import { dirname } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { db } from './db'
+import { db } from './mysql/adapter'
+import { auth } from './auth'
+
+const CONFIG_PATH = 'C:\\Users\\SamerCheaib\\Documents\\Coding\\vessel-compliance\\db\\db-config.json'
 
 function createWindow(): void {
   // Create the browser window.
@@ -20,7 +24,20 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
+  mainWindow.on('ready-to-show', async () => {
+    // Check DB Connection
+    const connected = await db.connect()
+
+    // If not connected, we should probably inform the renderer
+    // We can use a query param or execute JS
+    if (!connected) {
+      mainWindow.webContents.send('app:db-status', { connected: false })
+    } else {
+      await db.initSchema()
+      await auth.createInitialAdmin()
+      mainWindow.webContents.send('app:db-status', { connected: true })
+    }
+
     mainWindow.show()
   })
 
@@ -54,6 +71,38 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // Auth Handlers
+  ipcMain.handle('auth:login', async (_, { username, password }) => {
+    return await auth.login(username, password)
+  })
+
+  // Setup Handlers
+  ipcMain.handle('setup:saveConfig', async (_, config) => {
+    try {
+      const dir = dirname(CONFIG_PATH)
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true })
+      }
+      writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+
+      // Try to connect
+      const connected = await db.connect()
+      if (connected) {
+        await db.initSchema()
+        await auth.createInitialAdmin()
+        return { success: true }
+      } else {
+        return { success: false, message: 'Could not connect with these settings' }
+      }
+    } catch (error: any) {
+      return { success: false, message: error.message }
+    }
+  })
+
+  ipcMain.handle('setup:checkConnection', async () => {
+    return await db.connect()
+  })
 
   // Database IPC Handlers
   ipcMain.handle('db:getDocumentTypes', () => db.getDocumentTypes())
@@ -114,6 +163,19 @@ app.whenReady().then(() => {
     const { ExcelImporter } = await import('./excelImporter')
     const importer = new ExcelImporter()
     return await importer.importFromExcel(filePath)
+  })
+
+  // User Management
+  ipcMain.handle('auth:createUser', async (_, { username, password, role }) => {
+    return auth.createUser(username, password, role)
+  })
+
+  ipcMain.handle('db:getUsers', async () => {
+    return db.getUsers()
+  })
+
+  ipcMain.handle('db:deleteUser', async (_, id) => {
+    return db.deleteUser(id)
   })
 
   createWindow()

@@ -64,3 +64,11 @@ export interface AppData {
   vesselAssureds: VesselAssured[]
   entityUBOs: EntityUBO[]
 }
+
+export interface User {
+  id: string
+  username: string
+  passwordHash: string
+  role: 'admin' | 'user'
+  createdAt?: string
+}

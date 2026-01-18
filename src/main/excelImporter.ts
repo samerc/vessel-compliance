@@ -1,7 +1,6 @@
 import XLSX from 'xlsx'
-import { db } from './db'
+import { db } from './mysql/adapter'
 import { DocumentType, VesselDocument } from '../shared/types'
-
 
 export class ExcelImporter {
     private documentTypeMapping: { [excelColumn: string]: string } = {
@@ -49,13 +48,13 @@ export class ExcelImporter {
             }
 
             // Get or create document types
-            const existingDocTypes = db.getDocumentTypes()
+            const existingDocTypes = await db.getDocumentTypes()
             const docTypeMap = new Map<string, DocumentType>()
 
             for (const [excelName, dbName] of Object.entries(this.documentTypeMapping)) {
                 let docType = existingDocTypes.find(dt => dt.name === dbName)
                 if (!docType) {
-                    docType = db.addDocumentType({
+                    docType = await db.addDocumentType({
                         name: dbName,
                         required: false,
                         order: existingDocTypes.length + docTypeMap.size + 1
@@ -73,11 +72,11 @@ export class ExcelImporter {
                 const imoNumber = imoCol !== -1 ? row[imoCol]?.toString().trim() : ''
 
                 // Check if vessel exists
-                const existingVessels = db.getVessels()
+                const existingVessels = await db.getVessels()
                 let vessel = existingVessels.find(v => v.name === vesselName || (imoNumber && v.imoNumber === imoNumber))
 
                 if (!vessel) {
-                    vessel = db.addVessel({
+                    vessel = await db.addVessel({
                         name: vesselName,
                         imoNumber: imoNumber || 'N/A',
                         fleetId: undefined
@@ -119,7 +118,7 @@ export class ExcelImporter {
                             uploadedBy: 'Excel Import',
                             expiryDate: expiryDate
                         }
-                        db.upsertVesselDocument(vesselDoc)
+                        await db.upsertVesselDocument(vesselDoc)
                         stats.documentsImported++
                     }
                 }
@@ -166,18 +165,19 @@ export class ExcelImporter {
         type: 'company' | 'person',
         stats: any
     ) {
-        const entities = db.getEntities()
+        const entities = await db.getEntities()
         let entity = entities.find(e => e.name === name)
 
         if (!entity) {
-            entity = db.addEntity({ name, type })
+            entity = await db.addEntity({ name, type })
             stats.entitiesCreated++
         }
 
         // Link to vessel
-        const existingLink = db.getVesselAssureds(vesselId).find(va => va.entityId === entity!.id)
+        const vesselAssureds = await db.getVesselAssureds(vesselId)
+        const existingLink = vesselAssureds.find(va => va.entityId === entity!.id)
         if (!existingLink) {
-            db.addVesselAssured({
+            await db.addVesselAssured({
                 vesselId,
                 entityId: entity.id,
                 role

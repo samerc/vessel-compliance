@@ -44,7 +44,17 @@ const api = {
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 
   dialogOpenFile: () => ipcRenderer.invoke('dialog:openFile'),
-  excelImport: (filePath) => ipcRenderer.invoke('excel:import', filePath)
+  excelImport: (filePath) => ipcRenderer.invoke('excel:import', filePath),
+
+  // Auth & Setup
+  authLogin: (credentials) => ipcRenderer.invoke('auth:login', credentials),
+  authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
+  getUsers: () => ipcRenderer.invoke('db:getUsers'),
+  deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),
+
+  setupSaveConfig: (config) => ipcRenderer.invoke('setup:saveConfig', config),
+  setupCheckConnection: () => ipcRenderer.invoke('setup:checkConnection'),
+  onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status))
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

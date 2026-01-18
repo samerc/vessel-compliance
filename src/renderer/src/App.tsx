@@ -1,18 +1,41 @@
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, Ship, Settings } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog } from 'lucide-react'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
 import AdminPanel from './components/AdminPanel'
 import FleetManager from './components/FleetManager'
 import EntityDirectory from './components/EntityDirectory'
 import ComplianceCenter from './components/ComplianceCenter'
-import { Users, ShieldAlert } from 'lucide-react'
+import UserManager from './components/UserManager'
+import { SetupScreen } from './components/SetupScreen'
+import { LoginScreen } from './components/LoginScreen'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance'>('dashboard')
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  )
+}
+
+function AppContent(): React.JSX.Element {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users'>('dashboard')
+  const [dbConnected, setDbConnected] = useState<boolean | null>(null)
+  const { isAuthenticated, isAdmin, logout, user } = useAuth()
 
   useEffect(() => {
-    // Definitive global prevention for Electron
+    // Check initial connection
+    window.api.setupCheckConnection().then(setDbConnected)
+
+    // Listen for status updates
+    window.api.onDbStatus((status) => {
+      setDbConnected(status.connected)
+    })
+  }, [])
+
+  // Window drag prevention
+  useEffect(() => {
     const preventDefault = (e: DragEvent) => {
       e.preventDefault()
       if (e.dataTransfer) {
@@ -21,22 +44,36 @@ function App(): React.JSX.Element {
     }
     window.addEventListener('dragover', preventDefault, false)
     window.addEventListener('drop', preventDefault, false)
-
     return () => {
       window.removeEventListener('dragover', preventDefault)
       window.removeEventListener('drop', preventDefault)
     }
   }, [])
 
+  if (dbConnected === null) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>
+  }
+
+  if (!dbConnected) {
+    return <SetupScreen />
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />
+  }
+
   return (
     <div className="layout-container">
       <aside className="sidebar">
         <div style={{ paddingBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '8px' }}></div>
-          <h2 style={{ fontSize: '1.2rem' }}>VesselCompli</h2>
+          <div>
+            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>VesselCompli</h2>
+            <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{user?.username} ({user?.role})</div>
+          </div>
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
           <NavItem
             icon={<LayoutDashboard size={20} />}
             label="Dashboard"
@@ -67,20 +104,42 @@ function App(): React.JSX.Element {
             active={activeTab === 'entities'}
             onClick={() => setActiveTab('entities')}
           />
-          <NavItem
-            icon={<Settings size={20} />}
-            label="Admin Panel"
-            active={activeTab === 'admin'}
-            onClick={() => setActiveTab('admin')}
-          />
+
+          {isAdmin && (
+            <>
+              <div className="my-2 border-t border-gray-700 opacity-50"></div>
+              <NavItem
+                icon={<UserCog size={20} />}
+                label="User Management"
+                active={activeTab === 'users'}
+                onClick={() => setActiveTab('users')}
+              />
+              <NavItem
+                icon={<Settings size={20} />}
+                label="System Setup"
+                active={activeTab === 'admin'}
+                onClick={() => setActiveTab('admin')}
+              />
+            </>
+          )}
         </nav>
+
+        <div className="mt-auto pt-4 border-t border-gray-700">
+          <NavItem
+            icon={<LogOut size={20} />}
+            label="Logout"
+            active={false}
+            onClick={logout}
+          />
+        </div>
       </aside>
 
       <main className="main-content">
         {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
         {activeTab === 'vessels' && <VesselManager />}
         {activeTab === 'fleets' && <FleetManager />}
-        {activeTab === 'admin' && <AdminPanel />}
+        {activeTab === 'admin' && isAdmin && <AdminPanel />}
+        {activeTab === 'users' && isAdmin && <UserManager />}
         {activeTab === 'entities' && <EntityDirectory />}
         {activeTab === 'compliance' && <ComplianceCenter />}
       </main>
