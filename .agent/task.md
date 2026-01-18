@@ -6,7 +6,12 @@
 - [x] Reporting (Excel/PDF)
 - [x] GitHub Deployment
 
+- [x] MySQL Migration & RBAC
+- [x] User Management UI
+- [x] App Icon & Responsiveness
+
 ## Next Phase Ideas
 - [ ] Automated Email Notifications
-- [ ] User Permissions
 - [ ] Audit Logging
+- [ ] Document Versioning
+- [ ] Multi-fleet Dashboard View

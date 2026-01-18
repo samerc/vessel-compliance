@@ -8,7 +8,8 @@ The **Vessel Compliance Manager** is a modern Electron-based desktop application
 - **Frontend**: [React](https://reactjs.org/) with [TypeScript](https://www.typescriptlang.org/)
 - **Build Tool**: [Vite](https://vitejs.dev/) (via `electron-vite`)
 - **Icons**: [Lucide React](https://lucide.dev/)
-- **Data Persistence**: [electron-store](https://github.com/sindresorhus/electron-store)
+- **Data Persistence**: [MySQL](https://www.mysql.com/) via `mysql2/promise`.
+- **Authentication**: `bcryptjs` for secure password hashing.
 - **Reporting**: 
   - [jsPDF](https://github.com/parallax/jsPDF) and `jspdf-autotable` for PDF exports.
   - [xlsx](https://github.com/SheetJS/sheetjs) for Excel exports.
