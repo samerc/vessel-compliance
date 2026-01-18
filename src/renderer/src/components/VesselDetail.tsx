@@ -157,6 +157,18 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
         if (path) window.api.fsOpen(path)
     }
 
+    const [isEditing, setIsEditing] = useState(false)
+    const [editName, setEditName] = useState(vessel.name)
+    const [editImo, setEditImo] = useState(vessel.imoNumber)
+
+    const handleSaveVessel = async () => {
+        if (!editName.trim() || !editImo.trim()) return
+        await window.api.updateVessel(vessel.id, { name: editName, imoNumber: editImo })
+        vessel.name = editName
+        vessel.imoNumber = editImo
+        setIsEditing(false)
+    }
+
     return (
         <div className="fade-in">
             <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
@@ -165,16 +177,54 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
 
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                    <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>{vessel.name}</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
+                    {isEditing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <input
+                                type="text"
+                                value={editName}
+                                onChange={e => setEditName(e.target.value)}
+                                style={{ fontSize: '2.5rem', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 12px', borderRadius: '8px', width: '100%' }}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>IMO:</span>
+                                <input
+                                    type="text"
+                                    value={editImo}
+                                    onChange={e => setEditImo(e.target.value)}
+                                    style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>{vessel.name}</h1>
+                            <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
+                        </>
+                    )}
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={() => ReportService.exportVesselToExcel(vessel, docTypes, vesselDocs)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <FileSpreadsheet size={18} /> Excel Report
-                    </button>
-                    <button onClick={() => ReportService.exportVesselToPDF(vessel, docTypes, vesselDocs)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <FileText size={18} /> PDF Report
-                    </button>
+                    {isEditing ? (
+                        <>
+                            <button onClick={handleSaveVessel} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <CheckCircle size={18} /> Save Changes
+                            </button>
+                            <button onClick={() => { setIsEditing(false); setEditName(vessel.name); setEditImo(vessel.imoNumber); }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                Cancel
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button onClick={() => setIsEditing(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                Edit Details
+                            </button>
+                            <button onClick={() => ReportService.exportVesselToExcel(vessel, docTypes, vesselDocs)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <FileSpreadsheet size={18} /> Excel Report
+                            </button>
+                            <button onClick={() => ReportService.exportVesselToPDF(vessel, docTypes, vesselDocs)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <FileText size={18} /> PDF Report
+                            </button>
+                        </>
+                    )}
                 </div>
             </header>
 
@@ -182,12 +232,12 @@ export default function VesselDetail({ vessel, onBack }: VesselDetailProps) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
                     <thead>
                         <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                            <th style={{ padding: '16px' }}>Document Name</th>
-                            <th style={{ padding: '16px' }}>Requirement</th>
-                            <th style={{ padding: '16px' }}>File Status</th>
-                            <th style={{ padding: '16px' }}>Date of Receipt</th>
-                            <th style={{ padding: '16px' }}>Expiry Date</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                            <th style={{ padding: '18px 16px' }}>Document Name</th>
+                            <th style={{ padding: '18px 16px' }}>Requirement</th>
+                            <th style={{ padding: '18px 16px' }}>File Status</th>
+                            <th style={{ padding: '18px 16px' }}>Date of Receipt</th>
+                            <th style={{ padding: '18px 16px' }}>Expiry Date</th>
+                            <th style={{ padding: '18px 16px', textAlign: 'right' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>

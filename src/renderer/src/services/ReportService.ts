@@ -19,6 +19,7 @@ export const ReportService = {
 
         complianceData.push({
           'Document Name': type.name,
+          'Description': type.description || '',
           'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
           'Date of Receipt': doc?.receivedDate || 'N/A',
           'Expiry Date': doc?.expiryDate || 'N/A',
@@ -31,12 +32,12 @@ export const ReportService = {
     const missingCount = requiredCount - compliantCount
 
     const summaryHeader = [
-      { 'Document Name': 'VESSEL COMPLIANCE SUMMARY', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'Vessel Name', 'Status': vessel.name, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'IMO Number', 'Status': vessel.imoNumber, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'Compliance Rate', 'Status': `${complianceRate}%`, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'Compliant / Missing', 'Status': `${compliantCount} / ${missingCount}`, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' }
+      { 'Document Name': 'VESSEL COMPLIANCE SUMMARY', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
+      { 'Document Name': 'Vessel Name', 'Description': vessel.name, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
+      { 'Document Name': 'IMO Number', 'Description': vessel.imoNumber, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
+      { 'Document Name': 'Compliance Rate', 'Description': `${complianceRate}%`, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
+      { 'Document Name': 'Compliant / Missing', 'Description': `${compliantCount} / ${missingCount}`, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
+      { 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' }
     ]
 
     const ws = XLSX.utils.json_to_sheet([...summaryHeader, ...complianceData])
@@ -61,6 +62,7 @@ export const ReportService = {
 
         tableData.push([
           type.name,
+          type.description || '',
           vDoc?.filePath ? 'Compliant' : 'Missing',
           vDoc?.receivedDate || '-',
           vDoc?.expiryDate || '-'
@@ -109,12 +111,12 @@ export const ReportService = {
 
     autoTable(doc, {
       startY: 80,
-      head: [['Document Name', 'Status', 'Received', 'Expires']],
+      head: [['Document Name', 'Description', 'Status', 'Received', 'Expires']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [58, 123, 213], textColor: 255 },
       didParseCell: (data) => {
-        if (data.section === 'body' && data.column.index === 1) {
+        if (data.section === 'body' && data.column.index === 2) {
           const status = data.cell.raw
           if (status === 'Missing') {
             data.cell.styles.textColor = [255, 0, 0]
@@ -148,6 +150,7 @@ export const ReportService = {
             'Vessel': v.name,
             'IMO': v.imoNumber,
             'Document Name': type.name,
+            'Description': type.description || '',
             'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
             'Date of Receipt': doc?.receivedDate || 'N/A',
             'Expiry Date': doc?.expiryDate || 'N/A'
@@ -159,12 +162,12 @@ export const ReportService = {
     const complianceRate = totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
 
     const summaryHeader = [
-      { 'Vessel': 'FLEET COMPLIANCE SUMMARY', 'IMO': '', 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Fleet Name', 'IMO': fleet.name, 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Total Vessels', 'IMO': vessels.length.toString(), 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Fleet Compliance Rate', 'IMO': `${complianceRate}%`, 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Compliant / Missing', 'IMO': `${totalCompliant} / ${totalRequired}`, 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': '', 'IMO': '', 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' }
+      { 'Vessel': 'FLEET COMPLIANCE SUMMARY', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
+      { 'Vessel': 'Fleet Name', 'IMO': fleet.name, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
+      { 'Vessel': 'Total Vessels', 'IMO': vessels.length.toString(), 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
+      { 'Vessel': 'Fleet Compliance Rate', 'IMO': `${complianceRate}%`, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
+      { 'Vessel': 'Compliant / Missing', 'IMO': `${totalCompliant} / ${totalRequired}`, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
+      { 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' }
     ]
 
     const ws = XLSX.utils.json_to_sheet([...summaryHeader, ...data])
@@ -191,6 +194,7 @@ export const ReportService = {
           tableData.push([
             v.name,
             type.name,
+            type.description || '',
             vDoc?.filePath ? 'Compliant' : 'Missing',
             vDoc?.receivedDate || '-',
             vDoc?.expiryDate || '-'
@@ -240,12 +244,12 @@ export const ReportService = {
 
     autoTable(doc, {
       startY: 80,
-      head: [['Vessel', 'Document', 'Status', 'Received', 'Expires']],
+      head: [['Vessel', 'Document', 'Description', 'Status', 'Received', 'Expires']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [58, 123, 213], textColor: 255 },
       didParseCell: (data) => {
-        if (data.section === 'body' && data.column.index === 2) {
+        if (data.section === 'body' && data.column.index === 3) {
           const status = data.cell.raw
           if (status === 'Missing') {
             data.cell.styles.textColor = [255, 0, 0]

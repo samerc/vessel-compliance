@@ -5,6 +5,7 @@ import { DocumentType, AssuredRole } from '../../../shared/types'
 export default function AdminPanel() {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newName, setNewName] = useState('')
+    const [newDescription, setNewDescription] = useState('')
     const [required, setRequired] = useState(false)
     const [newOrder, setNewOrder] = useState(0)
     const [roles, setRoles] = useState<AssuredRole[]>([])
@@ -62,8 +63,9 @@ export default function AdminPanel() {
     const handleAddDocType = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newName.trim()) return
-        await window.api.addDocumentType({ name: newName, required, order: newOrder })
+        await window.api.addDocumentType({ name: newName, description: newDescription, required, order: newOrder })
         setNewName('')
+        setNewDescription('')
         setRequired(false)
         await loadDocTypes()
     }
@@ -148,6 +150,42 @@ export default function AdminPanel() {
         }
     }
 
+    const [editingDocId, setEditingDocId] = useState<string | null>(null)
+    const [editDocName, setEditDocName] = useState('')
+    const [editDocDescription, setEditDocDescription] = useState('')
+    const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
+    const [editRoleName, setEditRoleName] = useState('')
+
+    const startEditingDoc = (doc: DocumentType) => {
+        setEditingDocId(doc.id)
+        setEditDocName(doc.name)
+        setEditDocDescription(doc.description || '')
+    }
+
+    const saveDocEdit = async (id: string) => {
+        if (!editDocName.trim()) return
+        await window.api.updateDocumentType(id, { name: editDocName, description: editDocDescription })
+        setEditingDocId(null)
+        await loadDocTypes()
+    }
+
+    const startEditingRole = (role: AssuredRole) => {
+        setEditingRoleId(role.id)
+        setEditRoleName(role.name)
+    }
+
+    const saveRoleEdit = async (id: string) => {
+        if (!editRoleName.trim()) return
+        await window.api.updateAssuredRole(id, { name: editRoleName })
+        setEditingRoleId(null)
+        await loadRoles()
+    }
+
+    const handleToggleDocRequired = async (doc: DocumentType) => {
+        await window.api.updateDocumentType(doc.id, { required: !doc.required })
+        await loadDocTypes()
+    }
+
     return (
         <div className="fade-in">
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -178,7 +216,7 @@ export default function AdminPanel() {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 0.4fr', gap: '32px' }}>
                 <div>
                     <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                         <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -191,8 +229,15 @@ export default function AdminPanel() {
                                     type="text"
                                     value={newName}
                                     onChange={e => setNewName(e.target.value)}
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px', marginBottom: '12px' }}
                                     placeholder="e.g. Safety Management Certificate"
+                                />
+                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Description (optional)</label>
+                                <textarea
+                                    value={newDescription}
+                                    onChange={e => setNewDescription(e.target.value)}
+                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px', minHeight: '60px', resize: 'vertical' }}
+                                    placeholder="Brief description of the document purposes..."
                                 />
                             </div>
                             <div style={{ width: '80px' }}>
@@ -234,7 +279,7 @@ export default function AdminPanel() {
                             <tbody>
                                 {docTypes.map((doc, index) => (
                                     <tr key={doc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '16px' }}>
+                                        <td style={{ padding: '20px 16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                     <button
@@ -262,18 +307,49 @@ export default function AdminPanel() {
                                                 />
                                             </div>
                                         </td>
-                                        <td style={{ padding: '16px' }}>{doc.name}</td>
-                                        <td style={{ padding: '16px' }}>
-                                            <span style={{
-                                                padding: '4px 8px',
-                                                borderRadius: '4px',
-                                                fontSize: '0.75rem',
-                                                background: doc.required ? 'rgba(255, 77, 77, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                color: doc.required ? 'var(--danger)' : 'var(--text-secondary)',
-                                                border: doc.required ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid rgba(255, 255, 255, 0.1)'
-                                            }}>{doc.required ? 'REQUIRED' : 'OPTIONAL'}</span>
+                                        <td style={{ padding: '20px 16px' }}>
+                                            {editingDocId === doc.id ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={editDocName}
+                                                        onChange={e => setEditDocName(e.target.value)}
+                                                        autoFocus
+                                                        style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}
+                                                    />
+                                                    <textarea
+                                                        value={editDocDescription}
+                                                        onChange={e => setEditDocDescription(e.target.value)}
+                                                        placeholder="Description..."
+                                                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem' }}
+                                                    />
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button onClick={() => saveDocEdit(doc.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
+                                                        <button onClick={() => setEditingDocId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div onClick={() => startEditingDoc(doc)} style={{ cursor: 'pointer' }}>
+                                                    <div style={{ fontWeight: '600' }}>{doc.name}</div>
+                                                    {doc.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{doc.description}</div>}
+                                                </div>
+                                            )}
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                                        <td style={{ padding: '20px 16px' }}>
+                                            <span
+                                                onClick={() => handleToggleDocRequired(doc)}
+                                                style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.75rem',
+                                                    background: doc.required ? 'rgba(255, 77, 77, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                    color: doc.required ? 'var(--danger)' : 'var(--text-secondary)',
+                                                    border: doc.required ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >{doc.required ? 'REQUIRED' : 'OPTIONAL'}</span>
+                                        </td>
+                                        <td style={{ padding: '20px 16px', textAlign: 'right' }}>
                                             <button onClick={() => handleDeleteDocType(doc.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
                                         </td>
                                     </tr>
@@ -313,7 +389,21 @@ export default function AdminPanel() {
                             <tbody>
                                 {roles.map(role => (
                                     <tr key={role.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '16px' }}>{role.name}</td>
+                                        <td style={{ padding: '16px' }}>
+                                            {editingRoleId === role.id ? (
+                                                <input
+                                                    type="text"
+                                                    value={editRoleName}
+                                                    onChange={e => setEditRoleName(e.target.value)}
+                                                    onBlur={() => saveRoleEdit(role.id)}
+                                                    onKeyDown={e => e.key === 'Enter' && saveRoleEdit(role.id)}
+                                                    autoFocus
+                                                    style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}
+                                                />
+                                            ) : (
+                                                <span onClick={() => startEditingRole(role)} style={{ cursor: 'pointer' }}>{role.name}</span>
+                                            )}
+                                        </td>
                                         <td style={{ padding: '16px', textAlign: 'right' }}>
                                             <button onClick={() => handleDeleteRole(role.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
                                         </td>
@@ -324,6 +414,6 @@ export default function AdminPanel() {
                     </section>
                 </div>
             </div>
-        </div>
+        </div >
     )
 }

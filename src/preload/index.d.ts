@@ -35,6 +35,7 @@ export interface Api {
 
   getAssuredRoles: () => Promise<AssuredRole[]>
   addAssuredRole: (role: Omit<AssuredRole, 'id'>) => Promise<AssuredRole>
+  updateAssuredRole: (id: string, updates: Partial<AssuredRole>) => Promise<void>
   deleteAssuredRole: (id: string) => Promise<void>
 
   getVesselAssureds: (vesselId?: string) => Promise<VesselAssured[]>

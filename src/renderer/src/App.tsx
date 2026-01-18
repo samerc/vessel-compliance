@@ -68,7 +68,7 @@ function AppContent(): React.JSX.Element {
         <div style={{ paddingBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '8px' }}></div>
           <div>
-            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>VesselCompli</h2>
+            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Vessel Compliance</h2>
             <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{user?.username} ({user?.role})</div>
           </div>
         </div>

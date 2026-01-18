@@ -161,7 +161,19 @@ export default function VesselManager() {
                                             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '8px' }}>
                                                 <Ship size={20} color="var(--accent-primary)" />
                                             </div>
-                                            <span style={{ fontWeight: '600' }}>{v.name}</span>
+                                            <span
+                                                onClick={() => setSelectedVessel(v)}
+                                                style={{
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    color: 'var(--accent-primary)',
+                                                    textDecoration: 'none'
+                                                }}
+                                                onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                                onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                                            >
+                                                {v.name}
+                                            </span>
                                         </div>
                                     </td>
                                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>

@@ -29,6 +29,7 @@ const api = {
 
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),
   addAssuredRole: (role) => ipcRenderer.invoke('db:addAssuredRole', role),
+  updateAssuredRole: (id, updates) => ipcRenderer.invoke('db:updateAssuredRole', id, updates),
   deleteAssuredRole: (id) => ipcRenderer.invoke('db:deleteAssuredRole', id),
 
   getVesselAssureds: (vesselId) => ipcRenderer.invoke('db:getVesselAssureds', vesselId),

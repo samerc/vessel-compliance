@@ -3,6 +3,7 @@ export interface DocumentType {
   name: string
   required: boolean
   order: number
+  description?: string
 }
 
 export interface Fleet {

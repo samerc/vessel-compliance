@@ -12,8 +12,8 @@ const CONFIG_PATH = 'C:\\Users\\SamerCheaib\\Documents\\Coding\\vessel-complianc
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1200,
+    height: 850,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -132,6 +132,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('db:getAssuredRoles', () => db.getAssuredRoles())
   ipcMain.handle('db:addAssuredRole', (_, role) => db.addAssuredRole(role))
+  ipcMain.handle('db:updateAssuredRole', (_, id, updates) => db.updateAssuredRole(id, updates))
   ipcMain.handle('db:deleteAssuredRole', (_, id) => db.deleteAssuredRole(id))
 
   ipcMain.handle('db:getVesselAssureds', (_, vesselId) => db.getVesselAssureds(vesselId))

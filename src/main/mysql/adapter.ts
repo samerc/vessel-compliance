@@ -1,7 +1,6 @@
 import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
 import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User } from '../../shared/types'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -51,6 +50,12 @@ export class MySQLAdapter {
                     await this.pool.query(statement)
                 }
             }
+
+            // Migration: Add description to document_types if it doesn't exist
+            const [cols] = await this.pool.query('SHOW COLUMNS FROM document_types LIKE "description"')
+            if ((cols as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE document_types ADD COLUMN description TEXT AFTER name')
+            }
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -60,7 +65,7 @@ export class MySQLAdapter {
     // --- Document Types ---
     async getDocumentTypes(): Promise<DocumentType[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, required, order_index as `order` FROM document_types ORDER BY order_index ASC')
+        const [rows] = await this.pool.query('SELECT id, name, description, required, order_index as `order` FROM document_types ORDER BY order_index ASC')
         return (rows as any[]).map(r => ({ ...r, required: Boolean(r.required) }))
     }
 
@@ -68,8 +73,8 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO document_types (id, name, required, order_index) VALUES (?, ?, ?, ?)',
-            [id, docType.name, docType.required, docType.order]
+            'INSERT INTO document_types (id, name, description, required, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, docType.name, docType.description || null, docType.required, docType.order]
         )
         return { ...docType, id }
     }
@@ -80,6 +85,7 @@ export class MySQLAdapter {
         const values: any[] = []
 
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
         if (updates.required !== undefined) { fields.push('required = ?'); values.push(updates.required) }
         if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
 
@@ -293,6 +299,18 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute('INSERT INTO assured_roles (id, name) VALUES (?, ?)', [id, role.name])
         return { ...role, id }
+    }
+
+    async updateAssuredRole(id: string, updates: Partial<AssuredRole>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE assured_roles SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
     async deleteAssuredRole(id: string): Promise<void> {
