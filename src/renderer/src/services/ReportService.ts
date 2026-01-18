@@ -5,33 +5,41 @@ import { Vessel, Fleet, VesselDocument, DocumentType } from '../../../shared/typ
 
 export const ReportService = {
   exportVesselToExcel: (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[]) => {
-    const mandatoryDocs = docs.filter(d => d.required)
-    const compliantCount = mandatoryDocs.filter(d => d.filePath).length
-    const missingCount = mandatoryDocs.length - compliantCount
-    const complianceRate = mandatoryDocs.length > 0 ? ((compliantCount / mandatoryDocs.length) * 100).toFixed(1) : '0'
+    const complianceData: any[] = []
+    let compliantCount = 0
+    let requiredCount = 0
 
-    const data = mandatoryDocs.map(d => {
-      const docType = docTypes.find(t => t.id === d.documentTypeId)
-      return {
-        'Document Name': docType?.name || 'Unknown',
-        'Status': d.filePath ? 'COMPLIANT' : 'MISSING',
-        'Date of Receipt': d.receivedDate || 'N/A',
-        'Expiry Date': d.expiryDate || 'N/A',
-        'Uploaded Date': d.uploadedDate ? new Date(d.uploadedDate).toLocaleDateString() : 'N/A'
+    docTypes.forEach(type => {
+      const doc = docs.find(d => d.documentTypeId === type.id)
+      const isRequired = doc ? doc.required : type.required
+
+      if (isRequired) {
+        requiredCount++
+        if (doc?.filePath) compliantCount++
+
+        complianceData.push({
+          'Document Name': type.name,
+          'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
+          'Date of Receipt': doc?.receivedDate || 'N/A',
+          'Expiry Date': doc?.expiryDate || 'N/A',
+          'Uploaded Date': doc?.uploadedDate ? new Date(doc.uploadedDate).toLocaleDateString() : 'N/A'
+        })
       }
     })
 
-    // Add summary rows at the beginning
+    const complianceRate = requiredCount > 0 ? ((compliantCount / requiredCount) * 100).toFixed(1) : '100'
+    const missingCount = requiredCount - compliantCount
+
     const summaryHeader = [
       { 'Document Name': 'VESSEL COMPLIANCE SUMMARY', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
       { 'Document Name': 'Vessel Name', 'Status': vessel.name, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
       { 'Document Name': 'IMO Number', 'Status': vessel.imoNumber, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
       { 'Document Name': 'Compliance Rate', 'Status': `${complianceRate}%`, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
       { 'Document Name': 'Compliant / Missing', 'Status': `${compliantCount} / ${missingCount}`, 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' } // Spacer
+      { 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' }
     ]
 
-    const ws = XLSX.utils.json_to_sheet([...summaryHeader, ...data])
+    const ws = XLSX.utils.json_to_sheet([...summaryHeader, ...complianceData])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Vessel Compliance')
     XLSX.writeFile(wb, `${vessel.name}_Compliance_Report.xlsx`)
@@ -39,12 +47,31 @@ export const ReportService = {
 
   exportVesselToPDF: (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[]) => {
     const doc = new jsPDF()
-    const mandatoryDocs = docs.filter(d => d.required)
-    const compliantCount = mandatoryDocs.filter(d => d.filePath).length
-    const complianceRate = mandatoryDocs.length > 0 ? ((compliantCount / mandatoryDocs.length) * 100).toFixed(1) : '0'
+    const tableData: any[] = []
+    let compliantCount = 0
+    let requiredCount = 0
+
+    docTypes.forEach(type => {
+      const vDoc = docs.find(d => d.documentTypeId === type.id)
+      const isRequired = vDoc ? vDoc.required : type.required
+
+      if (isRequired) {
+        requiredCount++
+        if (vDoc?.filePath) compliantCount++
+
+        tableData.push([
+          type.name,
+          vDoc?.filePath ? 'Compliant' : 'Missing',
+          vDoc?.receivedDate || '-',
+          vDoc?.expiryDate || '-'
+        ])
+      }
+    })
+
+    const complianceRate = requiredCount > 0 ? ((compliantCount / requiredCount) * 100).toFixed(1) : '100'
 
     // Header
-    doc.setFillColor(15, 18, 24) // Dark BG matching app
+    doc.setFillColor(15, 18, 24)
     doc.rect(0, 0, 210, 40, 'F')
 
     doc.setTextColor(255, 255, 255)
@@ -73,22 +100,12 @@ export const ReportService = {
     doc.text('Compliance Rate', 145, 55)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(16)
-    doc.setTextColor(parseInt(complianceRate) > 80 ? 0 : 200, parseInt(complianceRate) > 80 ? 150 : 0, 0)
+    doc.setTextColor(parseFloat(complianceRate) > 80 ? 0 : 200, parseFloat(complianceRate) > 80 ? 150 : 0, 0)
     doc.text(`${complianceRate}%`, 145, 65)
 
     doc.setFontSize(9)
     doc.setTextColor(100, 100, 100)
-    doc.text(`${compliantCount} / ${mandatoryDocs.length} Docs`, 145, 70)
-
-    const tableData = mandatoryDocs.map(d => {
-      const docType = docTypes.find(t => t.id === d.documentTypeId)
-      return [
-        docType?.name || 'Unknown',
-        d.filePath ? 'Compliant' : 'Missing',
-        d.receivedDate || '-',
-        d.expiryDate || '-'
-      ]
-    })
+    doc.text(`${compliantCount} / ${requiredCount} Docs`, 145, 70)
 
     autoTable(doc, {
       startY: 80,
@@ -115,36 +132,40 @@ export const ReportService = {
 
   exportFleetToExcel: (fleet: Fleet, vessels: Vessel[], docTypes: DocumentType[], allDocs: VesselDocument[]) => {
     const data: any[] = []
+    let totalCompliant = 0
+    let totalRequired = 0
 
-    // Overall Stats
-    const fleetMandatoryDocs = allDocs.filter(d => d.required)
-    const compliantCount = fleetMandatoryDocs.filter(d => d.filePath).length
-    const missingCount = fleetMandatoryDocs.length - compliantCount
-    const complianceRate = fleetMandatoryDocs.length > 0 ? ((compliantCount / fleetMandatoryDocs.length) * 100).toFixed(1) : '0'
+    vessels.forEach(v => {
+      docTypes.forEach(type => {
+        const doc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
+        const isRequired = doc ? doc.required : type.required
+
+        if (isRequired) {
+          totalRequired++
+          if (doc?.filePath) totalCompliant++
+
+          data.push({
+            'Vessel': v.name,
+            'IMO': v.imoNumber,
+            'Document Name': type.name,
+            'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
+            'Date of Receipt': doc?.receivedDate || 'N/A',
+            'Expiry Date': doc?.expiryDate || 'N/A'
+          })
+        }
+      })
+    })
+
+    const complianceRate = totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
 
     const summaryHeader = [
       { 'Vessel': 'FLEET COMPLIANCE SUMMARY', 'IMO': '', 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
       { 'Vessel': 'Fleet Name', 'IMO': fleet.name, 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
       { 'Vessel': 'Total Vessels', 'IMO': vessels.length.toString(), 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
       { 'Vessel': 'Fleet Compliance Rate', 'IMO': `${complianceRate}%`, 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Compliant / Missing', 'IMO': `${compliantCount} / ${fleetMandatoryDocs.length}`, 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': '', 'IMO': '', 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' } // Spacer
+      { 'Vessel': 'Compliant / Missing', 'IMO': `${totalCompliant} / ${totalRequired}`, 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
+      { 'Vessel': '', 'IMO': '', 'Document Name': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' }
     ]
-
-    vessels.forEach(v => {
-      const vDocs = allDocs.filter(d => d.vesselId === v.id && d.required)
-      vDocs.forEach(d => {
-        const docType = docTypes.find(t => t.id === d.documentTypeId)
-        data.push({
-          'Vessel': v.name,
-          'IMO': v.imoNumber,
-          'Document Name': docType?.name || 'Unknown',
-          'Status': d.filePath ? 'COMPLIANT' : 'MISSING',
-          'Date of Receipt': d.receivedDate || 'N/A',
-          'Expiry Date': d.expiryDate || 'N/A'
-        })
-      })
-    })
 
     const ws = XLSX.utils.json_to_sheet([...summaryHeader, ...data])
     const wb = XLSX.utils.book_new()
@@ -154,9 +175,31 @@ export const ReportService = {
 
   exportFleetToPDF: (fleet: Fleet, vessels: Vessel[], docTypes: DocumentType[], allDocs: VesselDocument[]) => {
     const doc = new jsPDF()
-    const fleetMandatoryDocs = allDocs.filter(d => d.required)
-    const compliantCount = fleetMandatoryDocs.filter(d => d.filePath).length
-    const complianceRate = fleetMandatoryDocs.length > 0 ? ((compliantCount / fleetMandatoryDocs.length) * 100).toFixed(1) : '0'
+    const tableData: any[] = []
+    let totalCompliant = 0
+    let totalRequired = 0
+
+    vessels.forEach(v => {
+      docTypes.forEach(type => {
+        const vDoc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
+        const isRequired = vDoc ? vDoc.required : type.required
+
+        if (isRequired) {
+          totalRequired++
+          if (vDoc?.filePath) totalCompliant++
+
+          tableData.push([
+            v.name,
+            type.name,
+            vDoc?.filePath ? 'Compliant' : 'Missing',
+            vDoc?.receivedDate || '-',
+            vDoc?.expiryDate || '-'
+          ])
+        }
+      })
+    })
+
+    const complianceRate = totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
 
     // Header
     doc.setFillColor(15, 18, 24)
@@ -188,27 +231,12 @@ export const ReportService = {
     doc.text('Fleet Compliance Rate', 142, 55)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(16)
-    doc.setTextColor(parseInt(complianceRate) > 80 ? 0 : 200, parseInt(complianceRate) > 80 ? 150 : 0, 0)
+    doc.setTextColor(parseFloat(complianceRate) > 80 ? 0 : 200, parseFloat(complianceRate) > 80 ? 150 : 0, 0)
     doc.text(`${complianceRate}%`, 142, 65)
 
     doc.setFontSize(9)
     doc.setTextColor(100, 100, 100)
-    doc.text(`${compliantCount} / ${fleetMandatoryDocs.length} Docs`, 142, 70)
-
-    const tableData: any[] = []
-    vessels.forEach(v => {
-      const vDocs = allDocs.filter(d => d.vesselId === v.id && d.required)
-      vDocs.forEach(d => {
-        const docType = docTypes.find(t => t.id === d.documentTypeId)
-        tableData.push([
-          v.name,
-          docType?.name || 'Unknown',
-          d.filePath ? 'Compliant' : 'Missing',
-          d.receivedDate || '-',
-          d.expiryDate || '-'
-        ])
-      })
-    })
+    doc.text(`${totalCompliant} / ${totalRequired} Docs`, 142, 70)
 
     autoTable(doc, {
       startY: 80,
