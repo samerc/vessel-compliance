@@ -21,6 +21,10 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [newUBOName, setNewUBOName] = useState('')
     const [newUBOType, setNewUBOType] = useState<'company' | 'person'>('person')
     const [newUBOIdentifier, setNewUBOIdentifier] = useState('')
+    const [newEmail, setNewEmail] = useState('')
+    const [newPhone, setNewPhone] = useState('')
+    const [newUBOEmail, setNewUBOEmail] = useState('')
+    const [newUBOPhone, setNewUBOPhone] = useState('')
 
     const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
     const [selectedUBOId, setSelectedUBOId] = useState<string | null>(null)
@@ -60,9 +64,17 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             const entity = await window.api.addEntity({
                 name: newName,
                 type: newType,
-                identifier: newIdentifier
+                identifier: newIdentifier,
+                email: newEmail,
+                phone: newPhone
             })
             entityId = entity.id
+        }
+
+        // Auto-register role if it doesn't exist
+        const roleExists = roles.some(r => r.name.toLowerCase() === newRole.trim().toLowerCase())
+        if (!roleExists) {
+            await window.api.addAssuredRole({ name: newRole.trim() })
         }
 
         await window.api.addVesselAssured({
@@ -74,6 +86,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         setNewName('')
         setNewRole('')
         setNewIdentifier('')
+        setNewEmail('')
+        setNewPhone('')
         setNewType('company')
         setSelectedEntityId(null)
         setShowAddForm(false)
@@ -89,7 +103,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             const entity = await window.api.addEntity({
                 name: newUBOName,
                 type: newUBOType,
-                identifier: newUBOIdentifier
+                identifier: newUBOIdentifier,
+                email: newUBOEmail,
+                phone: newUBOPhone
             })
             entityId = entity.id
         }
@@ -102,6 +118,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         setNewUBOName('')
         setNewUBOType('person')
         setNewUBOIdentifier('')
+        setNewUBOEmail('')
+        setNewUBOPhone('')
         setSelectedUBOId(null)
         loadData()
     }
@@ -207,29 +225,53 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                             </div>
 
                             {!selectedEntityId && (
-                                <div style={{ display: 'flex', gap: '20px' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Distinguishing Identifier (Optional)</label>
-                                        <input
-                                            type="text"
-                                            value={newIdentifier}
-                                            onChange={e => setNewIdentifier(e.target.value)}
-                                            style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
-                                            placeholder="e.g. Greek Branch, ID Number..."
-                                        />
+                                <>
+                                    <div style={{ display: 'flex', gap: '20px' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Distinguishing Identifier (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={newIdentifier}
+                                                onChange={e => setNewIdentifier(e.target.value)}
+                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                                placeholder="e.g. Greek Branch, ID Number..."
+                                            />
+                                        </div>
+                                        <div style={{ width: '140px' }}>
+                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Entity Type</label>
+                                            <select
+                                                value={newType}
+                                                onChange={e => setNewType(e.target.value as any)}
+                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                            >
+                                                <option value="company" style={{ background: '#1a1d21' }}>Company</option>
+                                                <option value="person" style={{ background: '#1a1d21' }}>Person</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div style={{ width: '140px' }}>
-                                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Entity Type</label>
-                                        <select
-                                            value={newType}
-                                            onChange={e => setNewType(e.target.value as any)}
-                                            style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
-                                        >
-                                            <option value="company" style={{ background: '#1a1d21' }}>Company</option>
-                                            <option value="person" style={{ background: '#1a1d21' }}>Person</option>
-                                        </select>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</label>
+                                            <input
+                                                type="email"
+                                                value={newEmail}
+                                                onChange={e => setNewEmail(e.target.value)}
+                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                                placeholder="contact@entity.com"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone</label>
+                                            <input
+                                                type="text"
+                                                value={newPhone}
+                                                onChange={e => setNewPhone(e.target.value)}
+                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                                placeholder="+123..."
+                                            />
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
                         </div>
 
@@ -314,7 +356,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                         <UserCheck size={16} /> Ultimate Beneficial Owners (UBOs)
                                                     </h4>
 
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px auto', gap: '12px', marginBottom: '16px' }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px auto', gap: '12px', marginBottom: '12px' }}>
                                                         <div style={{ position: 'relative' }}>
                                                             <input
                                                                 type="text"
@@ -382,6 +424,25 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                             {selectedUBOId ? 'Link' : 'New'}
                                                         </button>
                                                     </div>
+
+                                                    {!selectedUBOId && (
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                                                            <input
+                                                                type="email"
+                                                                value={newUBOEmail}
+                                                                onChange={e => setNewUBOEmail(e.target.value)}
+                                                                placeholder="UBO Email..."
+                                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '8px 10px', color: 'white', fontSize: '0.85rem' }}
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={newUBOPhone}
+                                                                onChange={e => setNewUBOPhone(e.target.value)}
+                                                                placeholder="UBO Phone..."
+                                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '8px 10px', color: 'white', fontSize: '0.85rem' }}
+                                                            />
+                                                        </div>
+                                                    )}
 
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                                                         {ubos.map(ubo => (

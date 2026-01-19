@@ -8,6 +8,7 @@ export const SetupScreen: React.FC = () => {
         password: '',
         database: 'vessel_compliance'
     })
+    const [directory, setDirectory] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
@@ -16,13 +17,24 @@ export const SetupScreen: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: value }))
     }
 
+    const handleSelectDir = async () => {
+        const path = await window.api.setupSelectDirectory()
+        if (path) setDirectory(path)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
+
+        if (!directory) {
+            setError('Please select a storage directory for the configuration.')
+            return
+        }
+
         setLoading(true)
 
         try {
-            const result = await window.api.setupSaveConfig(formData)
+            const result = await window.api.setupSaveConfig(formData, directory)
             if (!result.success) {
                 setError(result.message || 'Failed to save configuration')
             }
@@ -34,86 +46,108 @@ export const SetupScreen: React.FC = () => {
     }
 
     return (
-        <div className="flex h-screen items-center justify-center bg-gray-100">
-            <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg">
-                <h2 className="mb-6 text-center text-2xl font-bold text-gray-800">Database Setup</h2>
-                <p className="mb-6 text-center text-sm text-gray-600">
-                    Please configure the MySQL connection. <br />
-                    This will be saved to the shared configuration file.
+        <div className="flex h-screen items-center justify-center" style={{ background: 'var(--bg-dark)' }}>
+            <div className="w-full max-w-md glass-card p-8 shadow-2xl border" style={{ borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}>
+                <h2 className="mb-2 text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>System Setup</h2>
+                <p className="mb-8 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    Configure your MySQL database and <br /> choose a storage location for settings.
                 </p>
 
                 {error && (
-                    <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600 border border-red-200">
+                    <div className="mb-6 rounded-lg p-3 text-sm border" style={{ background: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)', borderColor: 'rgba(255, 77, 77, 0.2)' }}>
                         {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Host</label>
-                        <input
-                            type="text"
-                            name="host"
-                            value={formData.host}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            required
-                        />
+                        <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Config Storage Directory</label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                readOnly
+                                value={directory}
+                                placeholder="Select a folder..."
+                                className="block w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={handleSelectDir}
+                                className="px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20 transition-all border border-white/10"
+                            >
+                                Browse
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="col-span-3">
+                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Host</label>
+                            <input
+                                type="text"
+                                name="host"
+                                value={formData.host}
+                                onChange={handleChange}
+                                className="block w-full"
+                                required
+                            />
+                        </div>
+                        <div className="col-span-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Port</label>
+                            <input
+                                type="number"
+                                name="port"
+                                value={formData.port}
+                                onChange={handleChange}
+                                className="block w-full"
+                                required
+                            />
+                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Port</label>
-                        <input
-                            type="number"
-                            name="port"
-                            value={formData.port}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Database Name</label>
+                        <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Database Name</label>
                         <input
                             type="text"
                             name="database"
                             value={formData.database}
                             onChange={handleChange}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="block w-full"
                             required
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">User</label>
-                        <input
-                            type="text"
-                            name="user"
-                            value={formData.user}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Password</label>
-                        <input
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>User</label>
+                            <input
+                                type="text"
+                                name="user"
+                                value={formData.user}
+                                onChange={handleChange}
+                                className="block w-full"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Password</label>
+                            <input
+                                type="password"
+                                name="password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                className="block w-full"
+                            />
+                        </div>
                     </div>
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                        className="w-full mt-4 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-3 text-sm font-bold text-white shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
                     >
-                        {loading ? 'Connecting...' : 'Save & Connect'}
+                        {loading ? 'Testing Connection...' : 'Save & Initialize System'}
                     </button>
                 </form>
             </div>

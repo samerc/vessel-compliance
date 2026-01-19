@@ -173,6 +173,30 @@ export default function EntityDirectory() {
                                         )}
                                     </div>
                                 </div>
+
+                                {(selectedEntity.email || selectedEntity.phone) && (
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '20px',
+                                        marginTop: '24px',
+                                        paddingTop: '20px',
+                                        borderTop: '1px solid rgba(255,255,255,0.1)'
+                                    }}>
+                                        {selectedEntity.email && (
+                                            <div>
+                                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email Address</div>
+                                                <div style={{ fontWeight: '500' }}>{selectedEntity.email}</div>
+                                            </div>
+                                        )}
+                                        {selectedEntity.phone && (
+                                            <div>
+                                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone Number</div>
+                                                <div style={{ fontWeight: '500' }}>{selectedEntity.phone}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>

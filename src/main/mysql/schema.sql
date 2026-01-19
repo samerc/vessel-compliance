@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS entities (
   name VARCHAR(255) NOT NULL,
   type VARCHAR(50) NOT NULL, -- 'company' or 'person'
   identifier VARCHAR(255),
+  email VARCHAR(255),
+  phone VARCHAR(50),
   passport_file_path TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

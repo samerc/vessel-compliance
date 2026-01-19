@@ -1,19 +1,44 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { existsSync, writeFileSync, mkdirSync } from 'fs'
-import { dirname } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
 import { auth } from './auth'
+import Store from 'electron-store'
 
-const CONFIG_PATH = 'C:\\Users\\SamerCheaib\\Documents\\Coding\\vessel-compliance\\db\\db-config.json'
+const store = new Store()
+
+const getConfigPath = () => {
+  // 1. Portable Mode: Check next to executable or in project root (dev)
+  const portablePath = is.dev 
+    ? join(process.cwd(), 'db-config.json')
+    : join(dirname(process.execPath), 'db-config.json')
+  
+  if (existsSync(portablePath)) {
+    console.log('Using portable config at:', portablePath)
+    return portablePath
+  }
+
+  // 2. Local Memory: Check electron-store
+  const configDir = store.get('dbConfigDir') as string
+  return configDir ? join(configDir, 'db-config.json') : null
+}
 
 function createWindow(): void {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  const windowState = store.get('windowState', {
     width: 1200,
     height: 850,
+    x: undefined,
+    y: undefined
+  }) as { width: number, height: number, x?: number, y?: number }
+
+  // Create the browser window.
+  const mainWindow = new BrowserWindow({
+    width: windowState.width,
+    height: windowState.height,
+    x: windowState.x,
+    y: windowState.y,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -24,8 +49,21 @@ function createWindow(): void {
     }
   })
 
+  // Save window state on change
+  const saveState = () => {
+    const bounds = mainWindow.getBounds()
+    store.set('windowState', bounds)
+  }
+
+  mainWindow.on('resize', saveState)
+  mainWindow.on('move', saveState)
+
   mainWindow.on('ready-to-show', async () => {
     // Check DB Connection
+    const configPath = getConfigPath()
+    if (configPath) {
+      db.setConfigPath(configPath)
+    }
     const connected = await db.connect()
 
     // If not connected, we should probably inform the renderer
@@ -74,17 +112,48 @@ app.whenReady().then(() => {
 
   // Auth Handlers
   ipcMain.handle('auth:login', async (_, { username, password }) => {
-    return await auth.login(username, password)
+    const result = await auth.login(username, password)
+    if (result.success && result.user) {
+      store.set('currentUser', result.user)
+    }
+    return result
+  })
+
+  ipcMain.handle('auth:getSession', async () => {
+    return store.get('currentUser') || null
+  })
+
+  ipcMain.handle('auth:logout', async () => {
+    store.delete('currentUser')
   })
 
   // Setup Handlers
-  ipcMain.handle('setup:saveConfig', async (_, config) => {
+  ipcMain.handle('theme:get', () => {
+    return store.get('theme', 'dark')
+  })
+
+  ipcMain.handle('theme:set', (_, theme: 'light' | 'dark') => {
+    store.set('theme', theme)
+  })
+
+  ipcMain.handle('setup:selectDirectory', async () => {
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('setup:saveConfig', async (_, { config, directory }) => {
     try {
-      const dir = dirname(CONFIG_PATH)
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true })
+      const configPath = join(directory, 'db-config.json')
+      if (!existsSync(directory)) {
+        mkdirSync(directory, { recursive: true })
       }
-      writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+      writeFileSync(configPath, JSON.stringify(config, null, 2))
+      
+      store.set('dbConfigDir', directory)
+      db.setConfigPath(configPath)
 
       // Try to connect
       const connected = await db.connect()

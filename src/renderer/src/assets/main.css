@@ -3,6 +3,7 @@
 
   /* Colors */
   --bg-dark: #0f1218;
+  --bg-sidebar: rgba(0, 0, 0, 0.4);
   --bg-card: rgba(255, 255, 255, 0.05);
   --bg-card-hover: rgba(255, 255, 255, 0.08);
   --accent-primary: #00d2ff;
@@ -13,11 +14,37 @@
   --success: #00ff88;
   --warning: #ffcc00;
 
+  /* Inputs & Tables */
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: rgba(255, 255, 255, 0.1);
+  --input-text: #ffffff;
+  --table-header-bg: rgba(255, 255, 255, 0.02);
+  --table-border: rgba(255, 255, 255, 0.1);
+
   /* Effects */
   --glass-blur: blur(16px);
   --glass-border: 1px solid rgba(255, 255, 255, 0.1);
   --shadow-lg: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.light {
+  --bg-dark: #f0f2f5;
+  --bg-sidebar: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.7);
+  --bg-card-hover: rgba(255, 255, 255, 0.9);
+  --accent-primary: #1a73e8;
+  --accent-secondary: #0d47a1;
+  --text-primary: #1c1e21;
+  --text-secondary: #606770;
+  --glass-border: 1px solid rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  --input-bg: #ffffff;
+  --input-border: rgba(0, 0, 0, 0.15);
+  --input-text: #1c1e21;
+  --table-header-bg: rgba(0, 0, 0, 0.02);
+  --table-border: rgba(0, 0, 0, 0.1);
 }
 
 * {
@@ -68,6 +95,26 @@ button {
   font-family: var(--font-family);
 }
 
+input,
+select,
+textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  padding: 10px;
+  border-radius: 8px;
+  font-family: var(--font-family);
+  transition: var(--transition);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(0, 210, 255, 0.2);
+}
+
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   color: white;
@@ -79,13 +126,13 @@ button {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: var(--glass-border);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--bg-card-hover);
 }
 
 /* Scrollbar */
@@ -115,7 +162,7 @@ button {
   width: 260px;
   padding: 24px 16px;
   border-right: var(--glass-border);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-sidebar);
   display: flex;
   flex-direction: column;
 }
@@ -132,7 +179,7 @@ button {
   .main-content {
     padding: 20px;
   }
-  
+
   .sidebar {
     width: 220px;
     padding: 16px;
@@ -180,6 +227,6 @@ button {
 }
 
 .hover-effect:hover {
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: white !important;
+  background: var(--bg-card-hover) !important;
+  color: var(--text-primary) !important;
 }

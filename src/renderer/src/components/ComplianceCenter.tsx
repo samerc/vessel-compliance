@@ -90,7 +90,7 @@ export default function ComplianceCenter() {
                     <p style={{ color: 'var(--text-secondary)' }}>Centralized monitoring for all vessel document alerts and expiries.</p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px' }}>
                     <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={getAllAlerts().length} />
                     <FilterButton active={filter === 'missing'} onClick={() => setFilter('missing')} label="Missing" color="var(--danger)" />
                     <FilterButton active={filter === 'expired'} onClick={() => setFilter('expired')} label="Expired" color="#ff4d4d" />
@@ -101,7 +101,7 @@ export default function ComplianceCenter() {
             <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                        <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                             <th style={{ padding: '16px' }}>Vessel</th>
                             <th style={{ padding: '16px' }}>Document Type</th>
                             <th style={{ padding: '16px' }}>Alert Type</th>
@@ -111,7 +111,7 @@ export default function ComplianceCenter() {
                     </thead>
                     <tbody>
                         {alerts.map(alert => (
-                            <tr key={alert.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
                                 <td style={{ padding: '16px', fontWeight: '600' }}>{alert.vessel}</td>
                                 <td style={{ padding: '16px' }}>{alert.document}</td>
                                 <td style={{ padding: '16px' }}>
@@ -167,8 +167,8 @@ function FilterButton({ active, onClick, label, color, count }: any) {
                 padding: '6px 16px',
                 borderRadius: '6px',
                 border: 'none',
-                background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
-                color: active ? 'white' : 'var(--text-secondary)',
+                background: active ? 'var(--bg-card-hover)' : 'transparent',
+                color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 fontSize: '0.85rem',
                 display: 'flex',

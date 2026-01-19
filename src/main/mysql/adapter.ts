@@ -5,20 +5,23 @@ import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, Vesse
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
 
-const CONFIG_PATH = 'C:\\Users\\SamerCheaib\\Documents\\Coding\\vessel-compliance\\db\\db-config.json'
-
 export class MySQLAdapter {
     pool: Pool | null = null
+    private configPath: string = ''
+
+    setConfigPath(path: string) {
+        this.configPath = path
+    }
 
     async connect(): Promise<boolean> {
         if (this.pool) return true
 
-        if (!existsSync(CONFIG_PATH)) {
+        if (!this.configPath || !existsSync(this.configPath)) {
             return false
         }
 
         try {
-            const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8'))
+            const config = JSON.parse(readFileSync(this.configPath, 'utf-8'))
             this.pool = createPool({
                 host: config.host,
                 port: config.port,
@@ -55,6 +58,15 @@ export class MySQLAdapter {
             const [cols] = await this.pool.query('SHOW COLUMNS FROM document_types LIKE "description"')
             if ((cols as any[]).length === 0) {
                 await this.pool.query('ALTER TABLE document_types ADD COLUMN description TEXT AFTER name')
+            }
+            // Migration: Add email and phone to entities if they don't exist
+            const [entityCols] = await this.pool.query('SHOW COLUMNS FROM entities')
+            const entityColNames = (entityCols as any[]).map(c => c.Field)
+            if (!entityColNames.includes('email')) {
+                await this.pool.query('ALTER TABLE entities ADD COLUMN email VARCHAR(255) AFTER identifier')
+            }
+            if (!entityColNames.includes('phone')) {
+                await this.pool.query('ALTER TABLE entities ADD COLUMN phone VARCHAR(50) AFTER email')
             }
         } catch (error) {
             console.error('Schema initialization failed:', error)
@@ -253,7 +265,7 @@ export class MySQLAdapter {
     // --- Entities ---
     async getEntities(): Promise<Entity[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, type, identifier, passport_file_path as passportFilePath FROM entities')
+        const [rows] = await this.pool.query('SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath FROM entities')
         return rows as Entity[]
     }
 
@@ -261,8 +273,8 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO entities (id, name, type, identifier, passport_file_path) VALUES (?, ?, ?, ?, ?)',
-            [id, entity.name, entity.type, entity.identifier || null, entity.passportFilePath || null]
+            'INSERT INTO entities (id, name, type, identifier, email, phone, passport_file_path) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, entity.name, entity.type, entity.identifier || null, entity.email || null, entity.phone || null, entity.passportFilePath || null]
         )
         return { ...entity, id }
     }
@@ -275,6 +287,8 @@ export class MySQLAdapter {
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.type !== undefined) { fields.push('type = ?'); values.push(updates.type) }
         if (updates.identifier !== undefined) { fields.push('identifier = ?'); values.push(updates.identifier) }
+        if (updates.email !== undefined) { fields.push('email = ?'); values.push(updates.email) }
+        if (updates.phone !== undefined) { fields.push('phone = ?'); values.push(updates.phone) }
         if (updates.passportFilePath !== undefined) { fields.push('passport_file_path = ?'); values.push(updates.passportFilePath) }
 
         if (fields.length === 0) return

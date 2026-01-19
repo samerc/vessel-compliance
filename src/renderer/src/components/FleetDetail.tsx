@@ -75,7 +75,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                 <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
                         <thead>
-                            <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                 <th style={{ padding: '16px' }}>Vessel Name</th>
                                 <th style={{ padding: '16px' }}>IMO Number</th>
                                 <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
@@ -90,10 +90,10 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                 </tr>
                             ) : (
                                 vessels.map(v => (
-                                    <tr key={v.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }} className="hover-effect">
+                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '8px' }}>
+                                                <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
                                                     <Ship size={20} color="var(--accent-primary)" />
                                                 </div>
                                                 <span

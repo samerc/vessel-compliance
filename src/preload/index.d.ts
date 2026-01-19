@@ -3,10 +3,13 @@ import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, Vesse
 
 export interface Api {
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
+  authGetSession: () => Promise<Omit<User, 'passwordHash'> | null>
+  authLogout: () => Promise<void>
   authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string }>
   getUsers: () => Promise<User[]>
   deleteUser: (id: string) => Promise<void>
-  setupSaveConfig: (config: any) => Promise<{ success: boolean; message?: string }>
+  setupSelectDirectory: () => Promise<string | null>
+  setupSaveConfig: (config: any, directory: string) => Promise<{ success: boolean; message?: string }>
   setupCheckConnection: () => Promise<boolean>
   onDbStatus: (callback: (status: { connected: boolean }) => void) => void
   getDocumentTypes: () => Promise<DocumentType[]>
@@ -52,6 +55,9 @@ export interface Api {
 
   dialogOpenFile: () => Promise<string | null>
   excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
+
+  themeGet: () => Promise<'light' | 'dark'>
+  themeSet: (theme: 'light' | 'dark') => Promise<void>
 }
 
 declare global {

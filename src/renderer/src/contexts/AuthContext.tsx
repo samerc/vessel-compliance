@@ -13,6 +13,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<Omit<User, 'passwordHash'> | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const checkSession = async () => {
+            try {
+                const session = await window.api.authGetSession()
+                if (session) {
+                    setUser(session)
+                }
+            } catch (err) {
+                console.error('Failed to restore session:', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        checkSession()
+    }, [])
 
     const login = async (credentials: { username: string; password: string }) => {
         const result = await window.api.authLogin(credentials)
@@ -22,8 +39,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return result
     }
 
-    const logout = () => {
+    const logout = async () => {
+        await window.api.authLogout()
         setUser(null)
+    }
+
+    if (loading) {
+        return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading...</div>
     }
 
     return (

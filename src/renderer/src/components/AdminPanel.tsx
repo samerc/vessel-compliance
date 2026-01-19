@@ -229,14 +229,14 @@ export default function AdminPanel() {
                                     type="text"
                                     value={newName}
                                     onChange={e => setNewName(e.target.value)}
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px', marginBottom: '12px' }}
+                                    style={{ width: '100%', marginBottom: '12px' }}
                                     placeholder="e.g. Safety Management Certificate"
                                 />
                                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Description (optional)</label>
                                 <textarea
                                     value={newDescription}
                                     onChange={e => setNewDescription(e.target.value)}
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px', minHeight: '60px', resize: 'vertical' }}
+                                    style={{ width: '100%', minHeight: '60px', resize: 'vertical' }}
                                     placeholder="Brief description of the document purposes..."
                                 />
                             </div>
@@ -246,7 +246,7 @@ export default function AdminPanel() {
                                     type="number"
                                     value={newOrder}
                                     onChange={e => setNewOrder(parseInt(e.target.value))}
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                    style={{ width: '100%' }}
                                 />
                             </div>
                             <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%', marginTop: '12px' }}>
@@ -269,7 +269,7 @@ export default function AdminPanel() {
                     <section className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                     <th style={{ padding: '16px', width: '80px' }}>Order</th>
                                     <th style={{ padding: '16px' }}>Document Type</th>
                                     <th style={{ padding: '16px' }}>Status</th>
@@ -278,7 +278,7 @@ export default function AdminPanel() {
                             </thead>
                             <tbody>
                                 {docTypes.map((doc, index) => (
-                                    <tr key={doc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <tr key={doc.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
                                         <td style={{ padding: '20px 16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -303,7 +303,7 @@ export default function AdminPanel() {
                                                     type="number"
                                                     value={doc.order}
                                                     onChange={(e) => handleUpdateOrder(doc.id, e.target.value)}
-                                                    style={{ width: '40px', background: 'transparent', border: 'none', color: 'white', textAlign: 'center', fontSize: '0.9rem' }}
+                                                    style={{ width: '40px', background: 'transparent', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: '0.9rem' }}
                                                 />
                                             </div>
                                         </td>
@@ -315,13 +315,13 @@ export default function AdminPanel() {
                                                         value={editDocName}
                                                         onChange={e => setEditDocName(e.target.value)}
                                                         autoFocus
-                                                        style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}
+                                                        style={{ width: '100%' }}
                                                     />
                                                     <textarea
                                                         value={editDocDescription}
                                                         onChange={e => setEditDocDescription(e.target.value)}
                                                         placeholder="Description..."
-                                                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem' }}
+                                                        style={{ width: '100%', minHeight: '60px', borderRadius: '8px' }}
                                                     />
                                                     <div style={{ display: 'flex', gap: '8px' }}>
                                                         <button onClick={() => saveDocEdit(doc.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
@@ -342,9 +342,9 @@ export default function AdminPanel() {
                                                     padding: '4px 8px',
                                                     borderRadius: '4px',
                                                     fontSize: '0.75rem',
-                                                    background: doc.required ? 'rgba(255, 77, 77, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                    background: doc.required ? 'rgba(255, 77, 77, 0.1)' : 'var(--table-header-bg)',
                                                     color: doc.required ? 'var(--danger)' : 'var(--text-secondary)',
-                                                    border: doc.required ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                                    border: doc.required ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid var(--table-border)',
                                                     cursor: 'pointer'
                                                 }}
                                             >{doc.required ? 'REQUIRED' : 'OPTIONAL'}</span>
@@ -381,14 +381,14 @@ export default function AdminPanel() {
                     <section className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                     <th style={{ padding: '16px' }}>Role</th>
                                     <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {roles.map(role => (
-                                    <tr key={role.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <tr key={role.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
                                         <td style={{ padding: '16px' }}>
                                             {editingRoleId === role.id ? (
                                                 <input
@@ -398,7 +398,7 @@ export default function AdminPanel() {
                                                     onBlur={() => saveRoleEdit(role.id)}
                                                     onKeyDown={e => e.key === 'Enter' && saveRoleEdit(role.id)}
                                                     autoFocus
-                                                    style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}
+                                                    style={{ width: '100%' }}
                                                 />
                                             ) : (
                                                 <span onClick={() => startEditingRole(role)} style={{ cursor: 'pointer' }}>{role.name}</span>

@@ -35,6 +35,8 @@ export interface Entity {
   name: string
   type: 'company' | 'person'
   identifier?: string // Optional note to distinguish between same-named entities
+  email?: string
+  phone?: string
   passportFilePath?: string // Path to ID/passport document (for persons)
 }
 

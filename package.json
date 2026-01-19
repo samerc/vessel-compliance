@@ -23,6 +23,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/uuid": "^9.0.7",
     "bcryptjs": "^3.0.3",
     "electron-store": "^8.1.0",

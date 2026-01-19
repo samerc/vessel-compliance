@@ -38,7 +38,10 @@ A desktop application for managing vessel document compliance. Built with **Elec
 - [x] UI Refactoring & Responsiveness
 - [x] Fleet & Vessel Management
 - [x] Excel/PDF Reports (with Descriptions)
+- [x] Multi-fleet Dashboard View
 - [x] GitHub Deployment Scripts
+- [x] Initial DB Configuration Folder Selector View
+- [x] Light/Dark Mode Implementation & Persistence
 - [x] Hierarchical Document Requirements
 - [x] Custom App Icon Implementation
 - [x] Inline Editing & Descriptions

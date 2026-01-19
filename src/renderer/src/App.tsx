@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog, Sun, Moon } from 'lucide-react'
+import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
 import AdminPanel from './components/AdminPanel'
@@ -23,6 +24,7 @@ function AppContent(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   useEffect(() => {
     // Check initial connection
@@ -124,7 +126,13 @@ function AppContent(): React.JSX.Element {
           )}
         </nav>
 
-        <div className="mt-8 pt-4 border-t border-gray-700 opacity-50">
+        <div className="mt-8 pt-4 border-t border-gray-700 opacity-50 flex flex-col gap-2">
+          <NavItem
+            icon={theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+            label={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            active={false}
+            onClick={toggleTheme}
+          />
           <NavItem
             icon={<LogOut size={20} />}
             label="Logout"

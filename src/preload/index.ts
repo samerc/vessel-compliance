@@ -49,13 +49,19 @@ const api = {
 
   // Auth & Setup
   authLogin: (credentials) => ipcRenderer.invoke('auth:login', credentials),
+  authGetSession: () => ipcRenderer.invoke('auth:getSession'),
+  authLogout: () => ipcRenderer.invoke('auth:logout'),
   authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),
 
-  setupSaveConfig: (config) => ipcRenderer.invoke('setup:saveConfig', config),
+  setupSelectDirectory: () => ipcRenderer.invoke('setup:selectDirectory'),
+  setupSaveConfig: (config: any, directory: string) => ipcRenderer.invoke('setup:saveConfig', { config, directory }),
   setupCheckConnection: () => ipcRenderer.invoke('setup:checkConnection'),
-  onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status))
+  onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status)),
+
+  themeGet: () => ipcRenderer.invoke('theme:get'),
+  themeSet: (theme) => ipcRenderer.invoke('theme:set', theme)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

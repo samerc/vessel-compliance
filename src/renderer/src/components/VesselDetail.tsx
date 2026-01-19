@@ -184,7 +184,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 type="text"
                                 value={editName}
                                 onChange={e => setEditName(e.target.value)}
-                                style={{ fontSize: '2.5rem', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 12px', borderRadius: '8px', width: '100%' }}
+                                style={{ fontSize: '2.5rem', width: '100%' }}
                             />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>IMO:</span>
@@ -192,7 +192,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     type="text"
                                     value={editImo}
                                     onChange={e => setEditImo(e.target.value)}
-                                    style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent-primary)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}
+                                    style={{ padding: '4px 8px', borderRadius: '4px' }}
                                 />
                             </div>
                         </div>
@@ -232,7 +232,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
                     <thead>
-                        <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                             <th style={{ padding: '18px 16px' }}>Document Name</th>
                             <th style={{ padding: '18px 16px' }}>Requirement</th>
                             <th style={{ padding: '18px 16px' }}>File Status</th>
@@ -252,10 +252,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 <tr
                                     key={type.id}
                                     style={{
-                                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                        borderBottom: '1px solid var(--table-border)',
                                         background: dragOverId === type.id
                                             ? 'rgba(0, 210, 255, 0.2)'
-                                            : (isRequired && !hasFile) ? 'rgba(255, 77, 77, 0.05)' : 'transparent',
+                                            : (isRequired && !hasFile) ? 'rgba(255, 77, 77, 0.1)' : 'transparent',
                                         outline: dragOverId === type.id ? '2px dashed var(--accent-primary)' : 'none',
                                         outlineOffset: '-2px',
                                         transition: 'all 0.2s ease',
@@ -274,7 +274,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             onClick={() => handleToggleRequired(type.id)}
                                             style={{
                                                 background: 'transparent',
-                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                border: '1px solid var(--table-border)',
                                                 padding: '4px 8px',
                                                 borderRadius: '20px',
                                                 display: 'flex',
@@ -308,9 +308,6 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             value={doc?.receivedDate || ''}
                                             onChange={e => handleUpdateReceivedDate(type.id, e.target.value)}
                                             style={{
-                                                background: 'rgba(255,255,255,0.05)',
-                                                border: '1px solid rgba(255,255,255,0.1)',
-                                                color: 'white',
                                                 padding: '4px 8px',
                                                 borderRadius: '4px',
                                                 fontSize: '0.85rem'
@@ -325,9 +322,6 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 value={doc?.expiryDate || ''}
                                                 onChange={e => handleUpdateExpiry(type.id, e.target.value)}
                                                 style={{
-                                                    background: 'rgba(255,255,255,0.05)',
-                                                    border: '1px solid rgba(255,255,255,0.1)',
-                                                    color: 'white',
                                                     padding: '4px 8px',
                                                     borderRadius: '4px',
                                                     fontSize: '0.85rem'

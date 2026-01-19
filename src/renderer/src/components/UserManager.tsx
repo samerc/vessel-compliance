@@ -76,23 +76,23 @@ export default function UserManager() {
                         type="text"
                         value={formData.username}
                         onChange={e => setFormData({ ...formData, username: e.target.value })}
-                        style={{ flex: 2, minWidth: '200px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                        style={{ flex: 2, minWidth: '200px' }}
                         placeholder="Username"
                     />
                     <input
                         type="password"
                         value={formData.password}
                         onChange={e => setFormData({ ...formData, password: e.target.value })}
-                        style={{ flex: 2, minWidth: '200px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                        style={{ flex: 2, minWidth: '200px' }}
                         placeholder="Password"
                     />
                     <select
                         value={formData.role}
                         onChange={e => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' })}
-                        style={{ flex: 1, minWidth: '120px', background: 'white', border: '1px solid #ccc', color: 'black', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+                        style={{ flex: 1, minWidth: '120px' }}
                     >
-                        <option value="user" style={{ color: 'black' }}>User</option>
-                        <option value="admin" style={{ color: 'black' }}>Admin</option>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
                     </select>
                     <button type="submit" className="btn-primary">Create User</button>
                 </form>
@@ -104,7 +104,7 @@ export default function UserManager() {
                 <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
                         <thead>
-                            <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                 <th style={{ padding: '16px' }}>Username</th>
                                 <th style={{ padding: '16px' }}>Role</th>
                                 <th style={{ padding: '16px' }}>Created At</th>
@@ -113,10 +113,10 @@ export default function UserManager() {
                         </thead>
                         <tbody>
                             {users.map(user => (
-                                <tr key={user.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }} className="hover-effect">
+                                <tr key={user.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
                                     <td style={{ padding: '16px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '8px' }}>
+                                            <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
                                                 <Shield size={20} color="var(--accent-primary)" />
                                             </div>
                                             <span style={{ fontWeight: '600' }}>{user.username}</span>

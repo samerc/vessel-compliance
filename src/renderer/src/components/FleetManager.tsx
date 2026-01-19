@@ -62,7 +62,7 @@ export default function FleetManager() {
                         type="text"
                         value={newFleetName}
                         onChange={e => setNewFleetName(e.target.value)}
-                        style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                        style={{ flex: 1 }}
                         placeholder="e.g. Tanker Division"
                     />
                     <button type="submit" className="btn-primary">Add Fleet</button>
@@ -75,7 +75,7 @@ export default function FleetManager() {
                     return (
                         <div key={fleet.id} className="glass-card" style={{ padding: '24px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                <div style={{ background: 'rgba(0, 210, 255, 0.1)', padding: '10px', borderRadius: '12px' }}>
+                                <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '12px' }}>
                                     <Folder size={24} color="var(--accent-primary)" />
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
