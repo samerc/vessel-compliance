@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User } from 'lucide-react'
+import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react'
 import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO } from '../../../shared/types'
+import { OfacService } from '../services/OfacService'
 
 interface AssuredManagerProps {
     vessel: Vessel
@@ -34,16 +35,20 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     }, [vessel.id])
 
     const loadData = async () => {
-        const [e, r, va, eu] = await Promise.all([
-            window.api.getEntities(),
-            window.api.getAssuredRoles(),
-            window.api.getVesselAssureds(vessel.id),
-            window.api.getEntityUBOs()
-        ])
-        setEntities(e)
-        setRoles(r)
-        setVesselAssureds(va)
-        setEntityUBOs(eu)
+        try {
+            const [e, r, va, eu] = await Promise.all([
+                window.api.getEntities(),
+                window.api.getAssuredRoles(),
+                window.api.getVesselAssureds(vessel.id),
+                window.api.getEntityUBOs()
+            ])
+            setEntities(e || [])
+            setRoles(r || [])
+            setVesselAssureds(va || [])
+            setEntityUBOs(eu || [])
+        } catch (error) {
+            console.error('Failed to load assured data:', error)
+        }
     }
 
     const matchingEntities = entities.filter(ent =>
@@ -61,12 +66,18 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         let entityId = selectedEntityId
 
         if (!entityId) {
+            // Check OFAC list
+            const scanResult = await OfacService.checkSanctions(newName)
+
             const entity = await window.api.addEntity({
                 name: newName,
                 type: newType,
                 identifier: newIdentifier,
                 email: newEmail,
-                phone: newPhone
+                phone: newPhone,
+                ofacCheckedAt: scanResult.timestamp,
+                ofacMatchFound: scanResult.matchFound,
+                ofacStatus: scanResult.status
             })
             entityId = entity.id
         }
@@ -100,12 +111,18 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         let entityId = selectedUBOId
 
         if (!entityId) {
+            // Check OFAC list
+            const scanResult = await OfacService.checkSanctions(newUBOName)
+
             const entity = await window.api.addEntity({
                 name: newUBOName,
                 type: newUBOType,
                 identifier: newUBOIdentifier,
                 email: newUBOEmail,
-                phone: newUBOPhone
+                phone: newUBOPhone,
+                ofacCheckedAt: scanResult.timestamp,
+                ofacMatchFound: scanResult.matchFound,
+                ofacStatus: scanResult.status
             })
             entityId = entity.id
         }
@@ -152,6 +169,56 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
         await window.api.updateEntity(entityId, { passportFilePath: filePath })
         loadData()
+    }
+    const handleOfacRecheck = async (entity: Entity) => {
+        const result = await OfacService.checkSanctions(entity.name)
+        await window.api.updateEntity(entity.id, {
+            ofacCheckedAt: result.timestamp,
+            ofacMatchFound: result.matchFound,
+            ofacStatus: result.status
+        })
+        loadData()
+    }
+
+    const OfacBadge = ({ entity }: { entity: Entity }) => {
+        const isMatch = entity.ofacStatus === 'MATCH'
+        const isError = entity.ofacStatus === 'ERROR'
+        const isPending = !entity.ofacStatus || entity.ofacStatus === 'PENDING'
+
+        const config = {
+            background: isPending ? 'rgba(255, 255, 255, 0.05)' : (isError ? 'rgba(255, 153, 0, 0.1)' : (isMatch ? 'rgba(255, 77, 77, 0.1)' : 'rgba(0, 255, 136, 0.1)')),
+            border: isPending ? '1px solid rgba(255, 255, 255, 0.1)' : (isError ? '1px solid rgba(255, 153, 0, 0.3)' : (isMatch ? '1px solid rgba(255, 77, 77, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)')),
+            color: isPending ? 'var(--text-secondary)' : (isError ? '#ff9900' : (isMatch ? '#ff4d4d' : '#00ff88')),
+            text: isPending ? 'NOT CHECKED' : (isError ? 'CHECK FAILED' : (isMatch ? 'MATCH FOUND' : 'OFAC CLEARED')),
+            icon: isPending ? <Shield size={12} opacity={0.5} /> : (isError ? <Shield size={12} /> : (isMatch ? <ShieldAlert size={12} /> : <ShieldCheck size={12} />))
+        }
+
+        return (
+            <div
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    background: config.background,
+                    border: config.border,
+                    color: config.color,
+                    cursor: 'default'
+                }}
+                title={isError ? 'API request failed. Click refresh to try again.' : `Last checked: ${entity.ofacCheckedAt ? new Date(entity.ofacCheckedAt).toLocaleString() : 'Never'}`}
+            >
+                {config.icon}
+                <span style={{ whiteSpace: 'nowrap' }}>{config.text}</span>
+                <RefreshCw
+                    size={10}
+                    style={{ marginLeft: '4px', cursor: 'pointer', opacity: 0.6 }}
+                    className="hover-spin"
+                    onClick={(e) => { e.stopPropagation(); handleOfacRecheck(entity); }}
+                />
+            </div>
+        )
     }
 
     return (
@@ -326,7 +393,10 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {entity?.type === 'company' ? <Building2 size={16} opacity={0.5} /> : <User size={16} opacity={0.5} />}
                                                 <div>
-                                                    <div style={{ fontWeight: '600' }}>{entity?.name}</div>
+                                                    <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        {entity?.name}
+                                                        {entity && <OfacBadge entity={entity} />}
+                                                    </div>
                                                     {entity?.identifier && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entity.identifier}</div>}
                                                 </div>
                                             </div>
@@ -461,7 +531,10 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                             >
                                                                 {ubo!.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
                                                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                                    <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{ubo!.name}</span>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                        <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{ubo!.name}</span>
+                                                                        <OfacBadge entity={ubo!} />
+                                                                    </div>
                                                                     {ubo!.identifier && <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>{ubo!.identifier}</span>}
                                                                     {ubo!.type === 'person' && (
                                                                         <div

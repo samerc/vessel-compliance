@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown } from 'lucide-react'
+import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react'
 import { Vessel, Fleet } from '../../../shared/types'
+import { OfacService } from '../services/OfacService'
 import VesselDetail from './VesselDetail'
 
 export default function VesselManager() {
@@ -31,10 +32,17 @@ export default function VesselManager() {
     const handleAddVessel = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newVessel.name || !newVessel.imo) return
+
+        // Scan OFAC
+        const scanResult = await OfacService.checkSanctions(newVessel.name)
+
         await window.api.addVessel({
             name: newVessel.name,
             imoNumber: newVessel.imo,
-            fleetId: newVessel.fleetId
+            fleetId: newVessel.fleetId,
+            ofacCheckedAt: scanResult.timestamp,
+            ofacMatchFound: scanResult.matchFound,
+            ofacStatus: scanResult.status
         })
         setNewVessel({ name: '', imo: '', fleetId: '' })
         loadData()
@@ -64,6 +72,57 @@ export default function VesselManager() {
             setSortField(field)
             setSortOrder('asc')
         }
+    }
+
+    const handleOfacRecheck = async (vessel: Vessel) => {
+        const result = await OfacService.checkSanctions(vessel.name)
+        await window.api.updateVessel(vessel.id, {
+            ofacCheckedAt: result.timestamp,
+            ofacMatchFound: result.matchFound,
+            ofacStatus: result.status
+        })
+        loadData()
+    }
+
+    const OfacBadge = ({ vessel }: { vessel: Vessel }) => {
+        const isMatch = vessel.ofacStatus === 'MATCH'
+        const isError = vessel.ofacStatus === 'ERROR'
+        const isPending = !vessel.ofacStatus || vessel.ofacStatus === 'PENDING'
+
+        const config = {
+            background: isPending ? 'rgba(255, 255, 255, 0.05)' : (isError ? 'rgba(255, 153, 0, 0.1)' : (isMatch ? 'rgba(255, 77, 77, 0.1)' : 'rgba(0, 255, 136, 0.1)')),
+            border: isPending ? '1px solid rgba(255, 255, 255, 0.1)' : (isError ? '1px solid rgba(255, 153, 0, 0.3)' : (isMatch ? '1px solid rgba(255, 77, 77, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)')),
+            color: isPending ? 'var(--text-secondary)' : (isError ? '#ff9900' : (isMatch ? '#ff4d4d' : '#00ff88')),
+            text: isPending ? 'NOT CHECKED' : (isError ? 'CHECK FAILED' : (isMatch ? 'MATCH' : 'CLEARED')),
+            icon: isPending ? <Shield size={12} opacity={0.5} /> : (isError ? <Shield size={12} /> : (isMatch ? <ShieldAlert size={12} /> : <ShieldCheck size={12} />))
+        }
+
+        return (
+            <div
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    background: config.background,
+                    border: config.border,
+                    color: config.color,
+                    cursor: 'default'
+                }}
+                title={isError ? 'API request failed. Click refresh to try again.' : `Last checked: ${vessel.ofacCheckedAt ? new Date(vessel.ofacCheckedAt).toLocaleString() : 'Never'}`}
+            >
+                {config.icon}
+                {config.text}
+                <RefreshCw
+                    size={10}
+                    style={{ marginLeft: '4px', cursor: 'pointer', opacity: 0.6 }}
+                    className="hover-spin"
+                    onClick={(e) => { e.stopPropagation(); handleOfacRecheck(vessel); }}
+                />
+            </div>
+        )
     }
 
     if (selectedVessel) {
@@ -167,12 +226,16 @@ export default function VesselManager() {
                                                     fontWeight: '600',
                                                     cursor: 'pointer',
                                                     color: 'var(--accent-primary)',
-                                                    textDecoration: 'none'
+                                                    textDecoration: 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px'
                                                 }}
                                                 onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
                                                 onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
                                             >
                                                 {v.name}
+                                                <OfacBadge vessel={v} />
                                             </span>
                                         </div>
                                     </td>

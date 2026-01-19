@@ -16,6 +16,9 @@ export interface Vessel {
   name: string
   imoNumber: string
   fleetId?: string
+  ofacCheckedAt?: string
+  ofacMatchFound?: boolean
+  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING'
 }
 
 export interface VesselDocument {
@@ -38,6 +41,9 @@ export interface Entity {
   email?: string
   phone?: string
   passportFilePath?: string // Path to ID/passport document (for persons)
+  ofacCheckedAt?: string
+  ofacMatchFound?: boolean
+  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING'
 }
 
 export interface AssuredRole {

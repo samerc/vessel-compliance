@@ -68,6 +68,28 @@ export class MySQLAdapter {
             if (!entityColNames.includes('phone')) {
                 await this.pool.query('ALTER TABLE entities ADD COLUMN phone VARCHAR(50) AFTER email')
             }
+            if (!entityColNames.includes('ofac_checked_at')) {
+                await this.pool.query('ALTER TABLE entities ADD COLUMN ofac_checked_at DATETIME AFTER passport_file_path')
+            }
+            if (!entityColNames.includes('ofac_match_found')) {
+                await this.pool.query('ALTER TABLE entities ADD COLUMN ofac_match_found BOOLEAN DEFAULT FALSE AFTER ofac_checked_at')
+            }
+            if (!entityColNames.includes('ofac_status')) {
+                await this.pool.query("ALTER TABLE entities ADD COLUMN ofac_status VARCHAR(20) DEFAULT 'PENDING' AFTER ofac_match_found")
+            }
+
+            // Migration: Add OFAC columns to vessels if they don't exist
+            const [vesselCols] = await this.pool.query('SHOW COLUMNS FROM vessels')
+            const vesselColNames = (vesselCols as any[]).map(c => c.Field)
+            if (!vesselColNames.includes('ofac_checked_at')) {
+                await this.pool.query('ALTER TABLE vessels ADD COLUMN ofac_checked_at DATETIME AFTER fleet_id')
+            }
+            if (!vesselColNames.includes('ofac_match_found')) {
+                await this.pool.query('ALTER TABLE vessels ADD COLUMN ofac_match_found BOOLEAN DEFAULT FALSE AFTER ofac_checked_at')
+            }
+            if (!vesselColNames.includes('ofac_status')) {
+                await this.pool.query("ALTER TABLE vessels ADD COLUMN ofac_status VARCHAR(20) DEFAULT 'PENDING' AFTER ofac_match_found")
+            }
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -134,16 +156,16 @@ export class MySQLAdapter {
     // --- Vessels ---
     async getVessels(): Promise<Vessel[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId FROM vessels')
-        return rows as Vessel[]
+        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM vessels')
+        return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
     }
 
     async addVessel(vessel: Omit<Vessel, 'id'>): Promise<Vessel> {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO vessels (id, name, imo_number, fleet_id) VALUES (?, ?, ?, ?)',
-            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null]
+            'INSERT INTO vessels (id, name, imo_number, fleet_id, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null, vessel.ofacCheckedAt || null, vessel.ofacMatchFound || false, vessel.ofacStatus || 'PENDING']
         )
         return { ...vessel, id }
     }
@@ -156,6 +178,9 @@ export class MySQLAdapter {
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.imoNumber !== undefined) { fields.push('imo_number = ?'); values.push(updates.imoNumber) }
         if (updates.fleetId !== undefined) { fields.push('fleet_id = ?'); values.push(updates.fleetId || null) }
+        if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(updates.ofacCheckedAt || null) }
+        if (updates.ofacMatchFound !== undefined) { fields.push('ofac_match_found = ?'); values.push(updates.ofacMatchFound || false) }
+        if (updates.ofacStatus !== undefined) { fields.push('ofac_status = ?'); values.push(updates.ofacStatus) }
 
         if (fields.length === 0) return
         values.push(id)
@@ -265,16 +290,16 @@ export class MySQLAdapter {
     // --- Entities ---
     async getEntities(): Promise<Entity[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath FROM entities')
-        return rows as Entity[]
+        const [rows] = await this.pool.query('SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM entities')
+        return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
     }
 
     async addEntity(entity: Omit<Entity, 'id'>): Promise<Entity> {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO entities (id, name, type, identifier, email, phone, passport_file_path) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [id, entity.name, entity.type, entity.identifier || null, entity.email || null, entity.phone || null, entity.passportFilePath || null]
+            'INSERT INTO entities (id, name, type, identifier, email, phone, passport_file_path, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, entity.name, entity.type, entity.identifier || null, entity.email || null, entity.phone || null, entity.passportFilePath || null, entity.ofacCheckedAt || null, entity.ofacMatchFound || false, entity.ofacStatus || 'PENDING']
         )
         return { ...entity, id }
     }
@@ -290,6 +315,9 @@ export class MySQLAdapter {
         if (updates.email !== undefined) { fields.push('email = ?'); values.push(updates.email) }
         if (updates.phone !== undefined) { fields.push('phone = ?'); values.push(updates.phone) }
         if (updates.passportFilePath !== undefined) { fields.push('passport_file_path = ?'); values.push(updates.passportFilePath) }
+        if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(updates.ofacCheckedAt || null) }
+        if (updates.ofacMatchFound !== undefined) { fields.push('ofac_match_found = ?'); values.push(updates.ofacMatchFound || false) }
+        if (updates.ofacStatus !== undefined) { fields.push('ofac_status = ?'); values.push(updates.ofacStatus) }
 
         if (fields.length === 0) return
         values.push(id)

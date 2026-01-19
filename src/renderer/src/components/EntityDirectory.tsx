@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Search, User, Ship, ChevronRight, Shield, Building2 } from 'lucide-react'
+import { Search, User, Ship, ChevronRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react'
 import { Entity, Vessel, VesselAssured, EntityUBO } from '../../../shared/types'
+import { OfacService } from '../services/OfacService'
 
 export default function EntityDirectory() {
     const [entities, setEntities] = useState<Entity[]>([])
@@ -52,6 +53,68 @@ export default function EntityDirectory() {
             })
             return { ...v, roles, viaAssureds }
         })
+    }
+
+    const handleOfacRecheck = async (entity: Entity) => {
+        const result = await OfacService.checkSanctions(entity.name)
+        await window.api.updateEntity(entity.id, {
+            ofacCheckedAt: result.timestamp,
+            ofacMatchFound: result.matchFound,
+            ofacStatus: result.status
+        })
+        loadData()
+    }
+
+    const handleVesselOfacRecheck = async (vessel: Vessel) => {
+        const result = await OfacService.checkSanctions(vessel.name)
+        await window.api.updateVessel(vessel.id, {
+            ofacCheckedAt: result.timestamp,
+            ofacMatchFound: result.matchFound,
+            ofacStatus: result.status
+        })
+        loadData()
+    }
+
+    const OfacBadge = ({ entity, vessel, onRecheck }: { entity?: Entity, vessel?: Vessel, onRecheck: () => void }) => {
+        const target = entity || vessel
+        const isMatch = target?.ofacStatus === 'MATCH'
+        const isError = target?.ofacStatus === 'ERROR'
+        const isPending = !target?.ofacStatus || target.ofacStatus === 'PENDING'
+
+        const config = {
+            background: isPending ? 'rgba(255, 255, 255, 0.05)' : (isError ? 'rgba(255, 153, 0, 0.1)' : (isMatch ? 'rgba(255, 77, 77, 0.1)' : 'rgba(0, 255, 136, 0.1)')),
+            border: isPending ? '1px solid rgba(255, 255, 255, 0.1)' : (isError ? '1px solid rgba(255, 153, 0, 0.3)' : (isMatch ? '1px solid rgba(255, 77, 77, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)')),
+            color: isPending ? 'var(--text-secondary)' : (isError ? '#ff9900' : (isMatch ? '#ff4d4d' : '#00ff88')),
+            text: isPending ? 'NOT CHECKED' : (isError ? 'CHECK FAILED' : (isMatch ? 'MATCH FOUND' : 'CLEARED')),
+            icon: isPending ? <Shield size={12} opacity={0.5} /> : (isError ? <Shield size={12} /> : (isMatch ? <ShieldAlert size={12} /> : <ShieldCheck size={12} />))
+        }
+
+        return (
+            <div
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    background: config.background,
+                    border: config.border,
+                    color: config.color,
+                    cursor: 'default'
+                }}
+                title={isError ? 'API request failed. Click refresh to try again.' : `Last checked: ${target?.ofacCheckedAt ? new Date(target.ofacCheckedAt).toLocaleString() : 'Never'}`}
+            >
+                {config.icon}
+                {config.text}
+                <RefreshCw
+                    size={10}
+                    style={{ marginLeft: '4px', cursor: 'pointer', opacity: 0.6 }}
+                    className="hover-spin"
+                    onClick={(e) => { e.stopPropagation(); onRecheck(); }}
+                />
+            </div>
+        )
     }
 
     return (
@@ -113,7 +176,10 @@ export default function EntityDirectory() {
                                     {entity.type === 'company' ? <Building2 size={18} /> : <User size={18} />}
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: '600' }}>{entity.name}</div>
+                                    <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {entity.name}
+                                        <OfacBadge entity={entity} onRecheck={() => handleOfacRecheck(entity)} />
+                                    </div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
                                         <span>{getAssociatedVessels(entity.id).length} Vessels</span>
                                         {entity.identifier && <span style={{ color: 'var(--accent-primary)' }}>{entity.identifier}</span>}
@@ -144,7 +210,10 @@ export default function EntityDirectory() {
                                         {selectedEntity.type === 'company' ? <Building2 size={32} /> : <User size={32} />}
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <h2 style={{ fontSize: '2rem' }}>{selectedEntity.name}</h2>
+                                        <h2 style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            {selectedEntity.name}
+                                            <OfacBadge entity={selectedEntity} onRecheck={() => handleOfacRecheck(selectedEntity)} />
+                                        </h2>
                                         <p style={{ color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
                                             {selectedEntity.type} {selectedEntity.identifier ? `• ${selectedEntity.identifier}` : ''}
                                         </p>
@@ -206,7 +275,10 @@ export default function EntityDirectory() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
                                 {getAssociatedVessels(selectedEntity.id).map(vessel => (
                                     <div key={vessel.id} className="glass-card" style={{ padding: '20px' }}>
-                                        <div style={{ fontWeight: '600', fontSize: '1.2rem', marginBottom: '4px' }}>{vessel.name}</div>
+                                        <div style={{ fontWeight: '600', fontSize: '1.2rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            {vessel.name}
+                                            <OfacBadge vessel={vessel} onRecheck={() => handleVesselOfacRecheck(vessel)} />
+                                        </div>
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>IMO: {vessel.imoNumber}</div>
 
                                         {vessel.roles.length > 0 && (
