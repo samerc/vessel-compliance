@@ -61,7 +61,10 @@ const api = {
   onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status)),
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
-  themeSet: (theme) => ipcRenderer.invoke('theme:set', theme)
+  themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
+
+  // OFAC/Sanctions Check
+  checkSanctions: (name: string) => ipcRenderer.invoke('ofac:checkSanctions', name)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

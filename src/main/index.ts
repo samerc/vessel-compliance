@@ -248,6 +248,42 @@ app.whenReady().then(() => {
     return db.deleteUser(id)
   })
 
+  // OFAC/Sanctions Check Handler
+  ipcMain.handle('ofac:checkSanctions', async (_, name: string) => {
+    try {
+      const response = await fetch('https://api.sanctions.network/rpc/search_sanctions', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name })
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`)
+      }
+
+      const results = await response.json()
+      const matchFound = Array.isArray(results) && results.length > 0
+
+      return {
+        status: matchFound ? 'POTENTIAL_MATCH' : 'CLEARED',
+        matchFound,
+        timestamp: new Date().toISOString(),
+        matches: matchFound ? results : []
+      }
+    } catch (error) {
+      console.error('OFAC check failed:', error)
+      return {
+        status: 'ERROR',
+        matchFound: false,
+        timestamp: new Date().toISOString(),
+        matches: []
+      }
+    }
+  })
+
   createWindow()
 
   app.on('activate', function () {

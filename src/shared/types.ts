@@ -18,7 +18,7 @@ export interface Vessel {
   fleetId?: string
   ofacCheckedAt?: string
   ofacMatchFound?: boolean
-  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING'
+  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
 }
 
 export interface VesselDocument {
@@ -43,7 +43,7 @@ export interface Entity {
   passportFilePath?: string // Path to ID/passport document (for persons)
   ofacCheckedAt?: string
   ofacMatchFound?: boolean
-  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING'
+  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
 }
 
 export interface AssuredRole {
@@ -80,4 +80,16 @@ export interface User {
   passwordHash: string
   role: 'admin' | 'user'
   createdAt?: string
+}
+
+export interface SanctionsMatch {
+  id: string
+  target_type: string
+  source: string
+  source_id: string
+  names: string[]
+  positions: string[]
+  remarks: string | null
+  listed_on: string | null
+  created_at: string
 }

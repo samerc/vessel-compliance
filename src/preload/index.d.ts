@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch } from '../shared/types'
 
 export interface Api {
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -58,6 +58,13 @@ export interface Api {
 
   themeGet: () => Promise<'light' | 'dark'>
   themeSet: (theme: 'light' | 'dark') => Promise<void>
+
+  checkSanctions: (name: string) => Promise<{
+    status: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
+    matchFound: boolean
+    timestamp: string
+    matches: SanctionsMatch[]
+  }>
 }
 
 declare global {

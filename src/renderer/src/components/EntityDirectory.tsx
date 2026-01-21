@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Search, User, Ship, ChevronRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react'
-import { Entity, Vessel, VesselAssured, EntityUBO } from '../../../shared/types'
+import { Entity, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
+import SanctionsModal from './SanctionsModal'
 
 export default function EntityDirectory() {
     const [entities, setEntities] = useState<Entity[]>([])
@@ -10,6 +11,15 @@ export default function EntityDirectory() {
     const [entityUBOs, setEntityUBOs] = useState<EntityUBO[]>([])
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
+
+    // Sanctions modal state
+    const [sanctionsModal, setSanctionsModal] = useState<{
+        show: boolean
+        searchedName: string
+        matches: SanctionsMatch[]
+        entityId?: string
+        vesselId?: string
+    }>({ show: false, searchedName: '', matches: [] })
 
     useEffect(() => {
         loadData()
@@ -63,6 +73,10 @@ export default function EntityDirectory() {
             ofacStatus: result.status
         })
         loadData()
+
+        if (result.matchFound && result.matches.length > 0) {
+            setSanctionsModal({ show: true, searchedName: entity.name, matches: result.matches, entityId: entity.id })
+        }
     }
 
     const handleVesselOfacRecheck = async (vessel: Vessel) => {
@@ -73,20 +87,102 @@ export default function EntityDirectory() {
             ofacStatus: result.status
         })
         loadData()
+
+        if (result.matchFound && result.matches.length > 0) {
+            setSanctionsModal({ show: true, searchedName: vessel.name, matches: result.matches, vesselId: vessel.id })
+        }
+    }
+
+    const handleMarkClean = async () => {
+        if (sanctionsModal.entityId) {
+            await window.api.updateEntity(sanctionsModal.entityId, { ofacStatus: 'CLEARED', ofacMatchFound: false })
+        } else if (sanctionsModal.vesselId) {
+            await window.api.updateVessel(sanctionsModal.vesselId, { ofacStatus: 'CLEARED', ofacMatchFound: false })
+        }
+        setSanctionsModal({ show: false, searchedName: '', matches: [] })
+        loadData()
+    }
+
+    const handleConfirmMatch = async () => {
+        if (sanctionsModal.entityId) {
+            await window.api.updateEntity(sanctionsModal.entityId, { ofacStatus: 'MATCH', ofacMatchFound: true })
+        } else if (sanctionsModal.vesselId) {
+            await window.api.updateVessel(sanctionsModal.vesselId, { ofacStatus: 'MATCH', ofacMatchFound: true })
+        }
+        setSanctionsModal({ show: false, searchedName: '', matches: [] })
+        loadData()
+    }
+
+    const handleViewPotentialMatch = async (entity?: Entity, vessel?: Vessel) => {
+        const name = entity?.name || vessel?.name || ''
+        const result = await OfacService.checkSanctions(name)
+        if (result.matches.length > 0) {
+            setSanctionsModal({
+                show: true,
+                searchedName: name,
+                matches: result.matches,
+                entityId: entity?.id,
+                vesselId: vessel?.id
+            })
+        }
     }
 
     const OfacBadge = ({ entity, vessel, onRecheck }: { entity?: Entity, vessel?: Vessel, onRecheck: () => void }) => {
         const target = entity || vessel
         const isMatch = target?.ofacStatus === 'MATCH'
+        const isPotentialMatch = target?.ofacStatus === 'POTENTIAL_MATCH'
         const isError = target?.ofacStatus === 'ERROR'
         const isPending = !target?.ofacStatus || target.ofacStatus === 'PENDING'
 
-        const config = {
-            background: isPending ? 'rgba(255, 255, 255, 0.05)' : (isError ? 'rgba(255, 153, 0, 0.1)' : (isMatch ? 'rgba(255, 77, 77, 0.1)' : 'rgba(0, 255, 136, 0.1)')),
-            border: isPending ? '1px solid rgba(255, 255, 255, 0.1)' : (isError ? '1px solid rgba(255, 153, 0, 0.3)' : (isMatch ? '1px solid rgba(255, 77, 77, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)')),
-            color: isPending ? 'var(--text-secondary)' : (isError ? '#ff9900' : (isMatch ? '#ff4d4d' : '#00ff88')),
-            text: isPending ? 'NOT CHECKED' : (isError ? 'CHECK FAILED' : (isMatch ? 'MATCH FOUND' : 'CLEARED')),
-            icon: isPending ? <Shield size={12} opacity={0.5} /> : (isError ? <Shield size={12} /> : (isMatch ? <ShieldAlert size={12} /> : <ShieldCheck size={12} />))
+        let config: { background: string; border: string; color: string; text: string; icon: React.ReactNode }
+
+        if (isPending) {
+            config = {
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: 'var(--text-secondary)',
+                text: 'NOT CHECKED',
+                icon: <Shield size={12} opacity={0.5} />
+            }
+        } else if (isError) {
+            config = {
+                background: 'rgba(255, 153, 0, 0.1)',
+                border: '1px solid rgba(255, 153, 0, 0.3)',
+                color: '#ff9900',
+                text: 'CHECK FAILED',
+                icon: <Shield size={12} />
+            }
+        } else if (isMatch) {
+            config = {
+                background: 'rgba(255, 77, 77, 0.1)',
+                border: '1px solid rgba(255, 77, 77, 0.3)',
+                color: '#ff4d4d',
+                text: 'SANCTIONED',
+                icon: <ShieldAlert size={12} />
+            }
+        } else if (isPotentialMatch) {
+            config = {
+                background: 'rgba(255, 193, 7, 0.1)',
+                border: '1px solid rgba(255, 193, 7, 0.3)',
+                color: '#ffc107',
+                text: 'POSSIBLE MATCH',
+                icon: <ShieldAlert size={12} />
+            }
+        } else {
+            config = {
+                background: 'rgba(0, 255, 136, 0.1)',
+                border: '1px solid rgba(0, 255, 136, 0.3)',
+                color: '#00ff88',
+                text: 'CLEARED',
+                icon: <ShieldCheck size={12} />
+            }
+        }
+
+        const handleBadgeClick = (e: React.MouseEvent) => {
+            e.stopPropagation()
+            if (isPotentialMatch) {
+                handleViewPotentialMatch(entity, vessel)
+            }
         }
 
         return (
@@ -101,9 +197,14 @@ export default function EntityDirectory() {
                     background: config.background,
                     border: config.border,
                     color: config.color,
-                    cursor: 'default'
+                    cursor: isPotentialMatch ? 'pointer' : 'default'
                 }}
-                title={isError ? 'API request failed. Click refresh to try again.' : `Last checked: ${target?.ofacCheckedAt ? new Date(target.ofacCheckedAt).toLocaleString() : 'Never'}`}
+                title={
+                    isError ? 'API request failed. Click refresh to try again.' :
+                    isPotentialMatch ? 'Click to review potential matches' :
+                    `Last checked: ${target?.ofacCheckedAt ? new Date(target.ofacCheckedAt).toLocaleString() : 'Never'}`
+                }
+                onClick={handleBadgeClick}
             >
                 {config.icon}
                 {config.text}
@@ -324,6 +425,16 @@ export default function EntityDirectory() {
                     )}
                 </div>
             </div>
+
+            {sanctionsModal.show && (
+                <SanctionsModal
+                    searchedName={sanctionsModal.searchedName}
+                    matches={sanctionsModal.matches}
+                    onClose={() => setSanctionsModal({ show: false, searchedName: '', matches: [] })}
+                    onMarkClean={handleMarkClean}
+                    onConfirmMatch={handleConfirmMatch}
+                />
+            )}
         </div>
     )
 }
