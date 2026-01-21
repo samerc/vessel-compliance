@@ -23,18 +23,35 @@ function App(): React.JSX.Element {
 function AppContent(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
+  const [configPath, setConfigPath] = useState<string | null>(null)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
 
   useEffect(() => {
     // Check initial connection
     window.api.setupCheckConnection().then(setDbConnected)
+    window.api.setupGetConfigPath().then(setConfigPath)
 
     // Listen for status updates
     window.api.onDbStatus((status) => {
       setDbConnected(status.connected)
+      if (status.connected) {
+        window.api.setupGetConfigPath().then(setConfigPath)
+      }
     })
   }, [])
+
+  const handleConfigChange = async () => {
+    const dir = await window.api.setupSelectDirectory()
+    if (dir) {
+      const result = await window.api.setupLoadConfigFromDir(dir)
+      if (result.success) {
+        window.location.reload()
+      } else {
+        alert(result.message || 'Failed to load configuration')
+      }
+    }
+  }
 
   // Window drag prevention
   useEffect(() => {
@@ -139,6 +156,16 @@ function AppContent(): React.JSX.Element {
             active={false}
             onClick={logout}
           />
+        </div>
+
+        <div className="mt-auto pt-4 px-2 pb-2 border-t border-gray-700/30">
+          <div className="flex items-center justify-between mb-1 px-2">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-500">DB Configuration</span>
+            <button onClick={handleConfigChange} className="hover:text-blue-400 text-[10px] uppercase font-bold tracking-wider text-gray-400 transition-colors">Change</button>
+          </div>
+          <div className="px-2 py-1.5 bg-black/20 rounded text-[10px] text-gray-400 break-all font-mono leading-tight border border-white/5">
+            {configPath || 'Portable / Default'}
+          </div>
         </div>
       </aside>
 

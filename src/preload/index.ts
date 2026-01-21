@@ -58,6 +58,8 @@ const api = {
   setupSelectDirectory: () => ipcRenderer.invoke('setup:selectDirectory'),
   setupSaveConfig: (config: any, directory: string) => ipcRenderer.invoke('setup:saveConfig', { config, directory }),
   setupCheckConnection: () => ipcRenderer.invoke('setup:checkConnection'),
+  setupGetConfigPath: () => ipcRenderer.invoke('setup:getConfigPath'),
+  setupLoadConfigFromDir: (directory: string) => ipcRenderer.invoke('setup:loadConfigFromDir', directory),
   onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status)),
 
   themeGet: () => ipcRenderer.invoke('theme:get'),

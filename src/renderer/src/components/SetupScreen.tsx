@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 export const SetupScreen: React.FC = () => {
     const [formData, setFormData] = useState({
@@ -11,6 +11,11 @@ export const SetupScreen: React.FC = () => {
     const [directory, setDirectory] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+    const [currentConfigPath, setCurrentConfigPath] = useState<string | null>(null)
+
+    useEffect(() => {
+        window.api.setupGetConfigPath().then(setCurrentConfigPath)
+    }, [])
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target
@@ -20,6 +25,25 @@ export const SetupScreen: React.FC = () => {
     const handleSelectDir = async () => {
         const path = await window.api.setupSelectDirectory()
         if (path) setDirectory(path)
+    }
+
+    const handleLoadExisting = async () => {
+        const path = await window.api.setupSelectDirectory()
+        if (path) {
+            setLoading(true)
+            try {
+                const result = await window.api.setupLoadConfigFromDir(path)
+                if (result.success) {
+                    window.location.reload()
+                } else {
+                    setError(result.message || 'Failed to load configuration')
+                }
+            } catch (err: any) {
+                setError(err.message)
+            } finally {
+                setLoading(false)
+            }
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -58,6 +82,35 @@ export const SetupScreen: React.FC = () => {
                         {error}
                     </div>
                 )}
+
+                <div className="mb-6 flex flex-col gap-2">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Current Configuration File</div>
+                    <div className="px-3 py-2 bg-black/20 rounded text-xs text-gray-300 font-mono border border-white/5 break-all">
+                        {currentConfigPath || 'Not set'}
+                    </div>
+                </div>
+
+                <div className="mb-8 p-4 rounded-lg border border-white/10 bg-white/5">
+                    <h3 className="text-sm font-bold mb-2 text-white">Have an existing configuration?</h3>
+                    <button
+                        type="button"
+                        onClick={handleLoadExisting}
+                        disabled={loading}
+                        className="w-full px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-sm transition-all"
+                    >
+                        Load from Directory
+                    </button>
+                    <p className="mt-2 text-xs text-center text-gray-500">Select a folder containing a valid db-config.json</p>
+                </div>
+
+                <div className="relative mb-8">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-700"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-[#0f1218] px-2 text-gray-500">Or configure new</span>
+                    </div>
+                </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div>

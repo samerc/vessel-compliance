@@ -11,6 +11,8 @@ export interface Api {
   setupSelectDirectory: () => Promise<string | null>
   setupSaveConfig: (config: any, directory: string) => Promise<{ success: boolean; message?: string }>
   setupCheckConnection: () => Promise<boolean>
+  setupGetConfigPath: () => Promise<string | null>
+  setupLoadConfigFromDir: (directory: string) => Promise<{ success: boolean; message?: string }>
   onDbStatus: (callback: (status: { connected: boolean }) => void) => void
   getDocumentTypes: () => Promise<DocumentType[]>
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>

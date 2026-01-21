@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
@@ -11,10 +11,10 @@ const store = new Store()
 
 const getConfigPath = () => {
   // 1. Portable Mode: Check next to executable or in project root (dev)
-  const portablePath = is.dev 
+  const portablePath = is.dev
     ? join(process.cwd(), 'db-config.json')
     : join(dirname(process.execPath), 'db-config.json')
-  
+
   if (existsSync(portablePath)) {
     console.log('Using portable config at:', portablePath)
     return portablePath
@@ -151,7 +151,7 @@ app.whenReady().then(() => {
         mkdirSync(directory, { recursive: true })
       }
       writeFileSync(configPath, JSON.stringify(config, null, 2))
-      
+
       store.set('dbConfigDir', directory)
       db.setConfigPath(configPath)
 
@@ -171,6 +171,41 @@ app.whenReady().then(() => {
 
   ipcMain.handle('setup:checkConnection', async () => {
     return await db.connect()
+  })
+
+  ipcMain.handle('setup:getConfigPath', () => {
+    return getConfigPath()
+  })
+
+  ipcMain.handle('setup:loadConfigFromDir', async (_, directory: string) => {
+    try {
+      const configPath = join(directory, 'db-config.json')
+      if (!existsSync(configPath)) {
+        return { success: false, message: 'No db-config.json found in this directory' }
+      }
+
+      // Update store
+      store.set('dbConfigDir', directory)
+      db.setConfigPath(configPath)
+
+      // Try to connect
+      const connected = await db.connect()
+      if (connected) {
+        await db.initSchema()
+        await auth.createInitialAdmin()
+
+        // Notify windows of connection status
+        BrowserWindow.getAllWindows().forEach(win => {
+          win.webContents.send('app:db-status', { connected: true })
+        })
+
+        return { success: true }
+      } else {
+        return { success: false, message: 'Could not connect with these settings' }
+      }
+    } catch (error: any) {
+      return { success: false, message: error.message }
+    }
   })
 
   // Database IPC Handlers
