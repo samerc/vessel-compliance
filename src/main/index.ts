@@ -251,13 +251,33 @@ app.whenReady().then(() => {
   // OFAC/Sanctions Check Handler
   ipcMain.handle('ofac:checkSanctions', async (_, name: string) => {
     try {
+      // Common words to strip for better search precision
+      const stopWords = [
+        'shipping', 'maritime', 'marine', 'vessel', 'ship', 'tanker', 'cargo',
+        'ltd', 'limited', 'inc', 'incorporated', 'corp', 'corporation', 'co',
+        'llc', 'plc', 'sa', 'ag', 'gmbh', 'bv', 'nv', 'pte', 'pvt', 'private',
+        'international', 'intl', 'global', 'worldwide', 'group', 'holdings',
+        'the', 'and', 'of', 'for'
+      ]
+
+      // Clean the search term
+      const cleanName = name
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(word => !stopWords.includes(word.replace(/[.,]/g, '')))
+        .join(' ')
+        .trim()
+
+      // Use cleaned name if it has content, otherwise use original
+      const searchTerm = cleanName.length >= 2 ? cleanName : name
+
       const response = await fetch('https://api.sanctions.network/rpc/search_sanctions', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name: searchTerm })
       })
 
       if (!response.ok) {
@@ -265,13 +285,26 @@ app.whenReady().then(() => {
       }
 
       const results = await response.json()
-      const matchFound = Array.isArray(results) && results.length > 0
+
+      // Filter results by relevance - check if any result name contains our search words
+      const searchWords = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length >= 2)
+      const filteredResults = Array.isArray(results) ? results.filter((result: any) => {
+        const resultNames = (result.names || []).map((n: string) => n.toLowerCase())
+        // Check if any search word appears in any of the result's names
+        return searchWords.some(searchWord =>
+          resultNames.some((resultName: string) =>
+            resultName.includes(searchWord) || searchWord.includes(resultName.split(/\s+/)[0])
+          )
+        )
+      }).slice(0, 20) : [] // Limit to 20 most relevant results
+
+      const matchFound = filteredResults.length > 0
 
       return {
         status: matchFound ? 'POTENTIAL_MATCH' : 'CLEARED',
         matchFound,
         timestamp: new Date().toISOString(),
-        matches: matchFound ? results : []
+        matches: filteredResults
       }
     } catch (error) {
       console.error('OFAC check failed:', error)
