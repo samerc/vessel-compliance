@@ -91,6 +91,13 @@ export class MySQLAdapter {
             if (!vesselColNames.includes('ofac_status')) {
                 await this.pool.query("ALTER TABLE vessels ADD COLUMN ofac_status VARCHAR(20) DEFAULT 'PENDING' AFTER ofac_match_found")
             }
+
+            // Migration: Add theme_preference to users if it doesn't exist
+            const [userCols] = await this.pool.query('SHOW COLUMNS FROM users')
+            const userColNames = (userCols as any[]).map(c => c.Field)
+            if (!userColNames.includes('theme_preference')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN theme_preference VARCHAR(10) DEFAULT 'dark' AFTER role")
+            }
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -443,7 +450,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, created_at as createdAt FROM users WHERE username = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, created_at as createdAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -466,7 +473,7 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, created_at as createdAt FROM users ORDER BY username ASC'
+            'SELECT id, username, role, theme_preference as themePreference, created_at as createdAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
@@ -475,6 +482,14 @@ export class MySQLAdapter {
     async deleteUser(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM users WHERE id = ?', [id])
+    }
+
+    async updateUserTheme(userId: string, theme: 'light' | 'dark'): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE users SET theme_preference = ? WHERE id = ?',
+            [theme, userId]
+        )
     }
 
     // Settings Management

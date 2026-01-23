@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X, Database } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings } from '../../../shared/types'
 
 export default function AdminPanel() {
@@ -16,11 +16,18 @@ export default function AdminPanel() {
     const [newAllowedExt, setNewAllowedExt] = useState('')
     const [newBlockedExt, setNewBlockedExt] = useState('')
     const [fileTypeStatus, setFileTypeStatus] = useState('')
+    const [configPath, setConfigPath] = useState<string | null>(null)
 
     useEffect(() => {
         loadData()
         loadFileTypeSettings()
+        loadConfigPath()
     }, [])
+
+    const loadConfigPath = async () => {
+        const path = await window.api.setupGetConfigPath()
+        setConfigPath(path)
+    }
 
     const loadData = async () => {
         await loadDocTypes()
@@ -266,6 +273,30 @@ export default function AdminPanel() {
         setFileTypeSettings(saved)
         setFileTypeStatus('✓ Blocked extension removed')
         setTimeout(() => setFileTypeStatus(''), 3000)
+    }
+
+    const handleBrowseConfigFile = async () => {
+        const filePath = await window.api.setupSelectConfigFile()
+        if (filePath) {
+            const result = await window.api.setupLoadConfigFromFile(filePath)
+            if (result.success) {
+                window.location.reload()
+            } else {
+                alert(result.message || 'Failed to load configuration')
+            }
+        }
+    }
+
+    const handleBrowseConfigDir = async () => {
+        const dir = await window.api.setupSelectDirectory()
+        if (dir) {
+            const result = await window.api.setupLoadConfigFromDir(dir)
+            if (result.success) {
+                window.location.reload()
+            } else {
+                alert(result.message || 'Failed to load configuration')
+            }
+        }
     }
 
     return (
@@ -645,6 +676,46 @@ export default function AdminPanel() {
                             )}
                         </div>
                     </div>
+                </div>
+            </section>
+
+            {/* Database Configuration Section */}
+            <section className="glass-card" style={{ padding: '24px', marginTop: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Database size={20} color="var(--accent-primary)" /> Database Configuration
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    View and manage the MySQL database connection settings.
+                </p>
+
+                <div style={{ marginBottom: '24px' }}>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Current Configuration File</div>
+                    <div className="px-4 py-3 bg-black/20 rounded-lg text-sm text-gray-300 font-mono border border-white/5 break-all">
+                        {configPath || 'Not configured'}
+                    </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <button
+                        onClick={handleBrowseConfigFile}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                        <Database size={18} />
+                        Browse for Config File
+                    </button>
+                    <button
+                        onClick={handleBrowseConfigDir}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(100, 100, 255, 0.2)' }}
+                    >
+                        <Database size={18} />
+                        Load from Directory
+                    </button>
+                </div>
+
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    ⚠️ Changing database configuration will reload the application. Make sure all work is saved.
                 </div>
             </section>
         </div >

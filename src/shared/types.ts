@@ -79,6 +79,7 @@ export interface User {
   username: string
   passwordHash: string
   role: 'admin' | 'user'
+  themePreference?: 'light' | 'dark'
   createdAt?: string
 }
 

@@ -186,13 +186,32 @@ app.whenReady().then(() => {
     }
   })
 
-  // Setup Handlers
-  ipcMain.handle('theme:get', () => {
-    return store.get('theme', 'dark')
+  // Theme Handlers (user-specific)
+  ipcMain.handle('theme:get', async (event) => {
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (!windowId) return 'dark'
+
+    const sessionId = windowSessions.get(windowId)
+    const user = auth.getCurrentUser(sessionId)
+    return user?.themePreference || 'dark'
   })
 
-  ipcMain.handle('theme:set', (_, theme: 'light' | 'dark') => {
-    store.set('theme', theme)
+  ipcMain.handle('theme:set', async (event, theme: 'light' | 'dark') => {
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (!windowId) return
+
+    const sessionId = windowSessions.get(windowId)
+    const user = auth.getCurrentUser(sessionId)
+    if (user) {
+      await db.updateUserTheme(user.id, theme)
+      // Update session with new theme preference
+      const session = auth.getSessionData(sessionId)
+      if (session) {
+        session.user.themePreference = theme
+      }
+    }
   })
 
   // File Type Settings Handlers

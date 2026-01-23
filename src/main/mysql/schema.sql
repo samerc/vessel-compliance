@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(255) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(50) NOT NULL, -- 'admin' or 'user'
+  theme_preference VARCHAR(10) DEFAULT 'dark', -- 'light' or 'dark'
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

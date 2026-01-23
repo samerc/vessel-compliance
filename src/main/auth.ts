@@ -35,6 +35,11 @@ export class AuthService {
         return session.user
     }
 
+    getSessionData(sessionId?: string): { user: Omit<User, 'passwordHash'>; timestamp: number } | null {
+        if (!sessionId) return null
+        return this.sessions.get(sessionId) || null
+    }
+
     isAdmin(sessionId?: string): boolean {
         const user = this.getCurrentUser(sessionId)
         return user?.role === 'admin'
