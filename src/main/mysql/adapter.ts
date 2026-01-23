@@ -14,6 +14,10 @@ export class MySQLAdapter {
         this.configPath = path
     }
 
+    isConnected(): boolean {
+        return this.pool !== null
+    }
+
     async connect(): Promise<boolean> {
         if (this.pool) return true
 

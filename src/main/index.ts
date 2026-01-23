@@ -29,6 +29,15 @@ function isAdminRequest(event: Electron.IpcMainInvokeEvent): boolean {
   return auth.isAdmin(sessionId)
 }
 
+// Security: Allow setup operations during initial setup or for admins
+function isSetupAllowed(event: Electron.IpcMainInvokeEvent): boolean {
+  // Allow during initial setup (no database connection)
+  if (!db.isConnected()) return true
+
+  // Otherwise, require admin authentication
+  return isAdminRequest(event)
+}
+
 // Security: Validate database configuration structure
 interface DbConfig {
   host: string
@@ -272,8 +281,8 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('setup:selectDirectory', async (event) => {
-    // Security: Only admins can change database configuration
-    if (!isAdminRequest(event)) {
+    // Security: Allow during initial setup or for admins only
+    if (!isSetupAllowed(event)) {
       console.error('Unauthorized attempt to select database directory')
       return null
     }
@@ -286,8 +295,8 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('setup:saveConfig', async (event, { config, directory }) => {
-    // Security: Only admins can change database configuration
-    if (!isAdminRequest(event)) {
+    // Security: Allow during initial setup or for admins only
+    if (!isSetupAllowed(event)) {
       console.error('Unauthorized attempt to save database configuration')
       return { success: false, message: 'Unauthorized: Admin access required' }
     }
@@ -486,8 +495,8 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('setup:selectConfigFile', async (event) => {
-    // Security: Only admins can change database configuration
-    if (!isAdminRequest(event)) {
+    // Security: Allow during initial setup or for admins only
+    if (!isSetupAllowed(event)) {
       console.error('Unauthorized attempt to select database config file')
       return null
     }
@@ -514,8 +523,8 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('setup:loadConfigFromFile', async (event, filePath: string) => {
-    // Security: Only admins can change database configuration
-    if (!isAdminRequest(event)) {
+    // Security: Allow during initial setup or for admins only
+    if (!isSetupAllowed(event)) {
       console.error('Unauthorized attempt to load database configuration from file')
       return { success: false, message: 'Unauthorized: Admin access required' }
     }
