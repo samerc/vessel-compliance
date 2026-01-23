@@ -13,7 +13,7 @@ interface LoginAttempt {
 export class AuthService {
     private sessions: Map<string, { user: Omit<User, 'passwordHash'>; timestamp: number }> = new Map()
     private loginAttempts: Map<string, LoginAttempt> = new Map()
-    private readonly SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+    private readonly SESSION_TIMEOUT = 2 * 60 * 60 * 1000 // 2 hours
     private readonly MAX_LOGIN_ATTEMPTS = 5
     private readonly LOCKOUT_DURATION = 15 * 60 * 1000 // 15 minutes
     private readonly ATTEMPT_WINDOW = 15 * 60 * 1000 // 15 minutes window to track attempts

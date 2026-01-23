@@ -22,13 +22,13 @@ await window.api.setupSaveConfig({...}, '/some/directory')
 
 #### Session Management (`src/main/auth.ts`)
 - Added server-side session tracking with Map-based storage
-- Sessions expire after 30 minutes of inactivity
+- Sessions expire after 2 hours of inactivity
 - Session IDs stored per window in main process
 - Added `getCurrentUser()`, `isAdmin()`, `createSession()`, `clearSession()` methods
 
 ```typescript
 private sessions: Map<string, { user: Omit<User, 'passwordHash'>; timestamp: number }>
-private readonly SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+private readonly SESSION_TIMEOUT = 2 * 60 * 60 * 1000 // 2 hours
 ```
 
 #### Authentication Helper (`src/main/index.ts`)
@@ -251,7 +251,7 @@ await window.api.updateEntity('test-id', { passportFilePath: '/path/malware.exe'
 ### Test 4: Session Timeout
 ```bash
 1. Login as admin
-2. Wait 31 minutes
+2. Wait 2 hours and 1 minute without any activity
 3. Attempt to call setup:selectDirectory
 Expected: Returns null (session expired, not admin)
 ```
@@ -271,7 +271,7 @@ Expected: Returns null (session expired, not admin)
 - ✅ File validation enforced at database layer
 - ✅ Maximum 5 login attempts per 15 minutes
 - ✅ 15-minute lockout after failed attempts
-- ✅ Session management with 30-minute timeout
+- ✅ Session management with 2-hour inactivity timeout
 - ✅ Username enumeration protection
 - ✅ Comprehensive logging of security events
 
