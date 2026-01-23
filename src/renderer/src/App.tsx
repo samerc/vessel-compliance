@@ -158,15 +158,17 @@ function AppContent(): React.JSX.Element {
           />
         </div>
 
-        <div className="mt-auto pt-4 px-2 pb-2 border-t border-gray-700/30">
-          <div className="flex items-center justify-between mb-1 px-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-500">DB Configuration</span>
-            <button onClick={handleConfigChange} className="hover:text-blue-400 text-[10px] uppercase font-bold tracking-wider text-gray-400 transition-colors">Change</button>
+        {isAdmin && (
+          <div className="mt-auto pt-4 px-2 pb-2 border-t border-gray-700/30">
+            <div className="flex items-center justify-between mb-1 px-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-gray-500">DB Configuration</span>
+              <button onClick={handleConfigChange} className="hover:text-blue-400 text-[10px] uppercase font-bold tracking-wider text-gray-400 transition-colors">Change</button>
+            </div>
+            <div className="px-2 py-1.5 bg-black/20 rounded text-[10px] text-gray-400 break-all font-mono leading-tight border border-white/5">
+              {configPath || 'Portable / Default'}
+            </div>
           </div>
-          <div className="px-2 py-1.5 bg-black/20 rounded text-[10px] text-gray-400 break-all font-mono leading-tight border border-white/5">
-            {configPath || 'Portable / Default'}
-          </div>
-        </div>
+        )}
       </aside>
 
       <main className="main-content">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Shield } from 'lucide-react'
 
@@ -10,23 +10,6 @@ export const LoginScreen: React.FC = () => {
     })
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
-    const [configPath, setConfigPath] = useState<string | null>(null)
-
-    useEffect(() => {
-        window.api.setupGetConfigPath().then(setConfigPath)
-    }, [])
-
-    const handleConfigChange = async () => {
-        const dir = await window.api.setupSelectDirectory()
-        if (dir) {
-            const result = await window.api.setupLoadConfigFromDir(dir)
-            if (result.success) {
-                window.location.reload()
-            } else {
-                setError(result.message || 'Failed to load configuration')
-            }
-        }
-    }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target
@@ -152,49 +135,6 @@ export const LoginScreen: React.FC = () => {
                         {loading ? 'Signing In...' : 'Sign In'}
                     </button>
                 </form>
-            </div>
-
-            <div style={{
-                position: 'fixed',
-                bottom: '1rem',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.5rem',
-                opacity: 0.6,
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>DB Configuration</span>
-                    <button onClick={handleConfigChange} style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--accent-primary)',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: 'inherit',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                    }}>
-                        Change
-                    </button>
-                </div>
-                <div style={{
-                    fontFamily: 'monospace',
-                    background: 'rgba(0,0,0,0.2)',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '0.25rem',
-                    maxWidth: '80vw',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                }}>
-                    {configPath || 'Portable / Default'}
-                </div>
             </div>
         </div >
     )
