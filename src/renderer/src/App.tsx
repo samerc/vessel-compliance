@@ -10,17 +10,9 @@ import ComplianceCenter from './components/ComplianceCenter'
 import UserManager from './components/UserManager'
 import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { useAuth } from './contexts/AuthContext'
 
 function App(): React.JSX.Element {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  )
-}
-
-function AppContent(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
