@@ -46,6 +46,19 @@ This is an Electron desktop application for maritime vessel compliance managemen
 - **IPC**: All database operations exposed through preload's `window.api` interface
 - **Types**: Shared interfaces in `src/shared/types.ts`
 
+### Authentication & Security
+- **Session Management**: Window-based sessions in main process with 2-hour timeout and activity refresh
+- **Rate Limiting**: 5 login attempts per 15-minute window before 15-minute account lockout
+- **Admin Protection**: Setup and configuration IPC handlers require admin session validation
+- **File Validation**: Backend validation of file extensions against admin-configured allowlists/blocklists
+- **Password Security**: bcrypt hashing with salt rounds, no plaintext storage
+
+### Theme System
+- **User-Specific Themes**: Each user's theme preference (light/dark) is stored in the database (`users.theme_preference`)
+- **Context Integration**: `ThemeContext` watches for user changes via `AuthContext` to reload themes on login/logout
+- **CSS Variables**: Theme styles use CSS custom properties (`var(--text-primary)`, `var(--bg-primary)`, etc.) that adapt to current theme
+- **Light Mode**: Activated by adding `.light` class to document.body, all components use theme-aware variables
+
 ### Sanctions Screening
 The app integrates with sanctions.network API for OFAC/UN/EU sanctions checking:
 - **API calls in main process** (`src/main/index.ts` - `ofac:checkSanctions` handler) to avoid CORS

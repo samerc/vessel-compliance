@@ -90,7 +90,7 @@ export const LoginScreen: React.FC = () => {
                                 borderRadius: '0.5rem',
                                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                                color: 'white',
+                                color: 'var(--text-primary)',
                                 outline: 'none'
                             }}
                             placeholder="Enter your username"
@@ -111,7 +111,7 @@ export const LoginScreen: React.FC = () => {
                                 borderRadius: '0.5rem',
                                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                                color: 'white',
+                                color: 'var(--text-primary)',
                                 outline: 'none'
                             }}
                             placeholder="••••••••"

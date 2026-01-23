@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { useAuth } from './AuthContext'
 
 type Theme = 'light' | 'dark'
 
@@ -12,6 +13,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [theme, setTheme] = useState<Theme>('dark')
     const [loading, setLoading] = useState(true)
+    const { user, isAuthenticated } = useAuth()
 
     useEffect(() => {
         const loadTheme = async () => {
@@ -27,6 +29,28 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
         loadTheme()
     }, [])
+
+    // Reload theme when user changes (login/logout)
+    useEffect(() => {
+        if (!isAuthenticated) {
+            // Reset to dark theme on logout
+            setTheme('dark')
+            applyTheme('dark')
+            return
+        }
+
+        // Reload theme when user logs in or changes
+        const reloadTheme = async () => {
+            try {
+                const savedTheme = await window.api.themeGet()
+                setTheme(savedTheme)
+                applyTheme(savedTheme)
+            } catch (err) {
+                console.error('Failed to reload theme:', err)
+            }
+        }
+        reloadTheme()
+    }, [user?.id, isAuthenticated])
 
     const applyTheme = (t: Theme) => {
         if (t === 'light') {
