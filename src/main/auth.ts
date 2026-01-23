@@ -3,7 +3,53 @@ import { v4 as uuidv4 } from 'uuid'
 import { db } from './mysql/adapter'
 import { User } from '../shared/types'
 
+interface LoginAttempt {
+    count: number
+    firstAttempt: number
+    lastAttempt: number
+    lockedUntil?: number
+}
+
 export class AuthService {
+    private sessions: Map<string, { user: Omit<User, 'passwordHash'>; timestamp: number }> = new Map()
+    private loginAttempts: Map<string, LoginAttempt> = new Map()
+    private readonly SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+    private readonly MAX_LOGIN_ATTEMPTS = 5
+    private readonly LOCKOUT_DURATION = 15 * 60 * 1000 // 15 minutes
+    private readonly ATTEMPT_WINDOW = 15 * 60 * 1000 // 15 minutes window to track attempts
+
+    getCurrentUser(sessionId?: string): Omit<User, 'passwordHash'> | null {
+        if (!sessionId) return null
+
+        const session = this.sessions.get(sessionId)
+        if (!session) return null
+
+        // Check if session is expired
+        if (Date.now() - session.timestamp > this.SESSION_TIMEOUT) {
+            this.sessions.delete(sessionId)
+            return null
+        }
+
+        // Update timestamp on activity
+        session.timestamp = Date.now()
+        return session.user
+    }
+
+    isAdmin(sessionId?: string): boolean {
+        const user = this.getCurrentUser(sessionId)
+        return user?.role === 'admin'
+    }
+
+    createSession(user: Omit<User, 'passwordHash'>): string {
+        const sessionId = require('uuid').v4()
+        this.sessions.set(sessionId, { user, timestamp: Date.now() })
+        return sessionId
+    }
+
+    clearSession(sessionId: string): void {
+        this.sessions.delete(sessionId)
+    }
+
     async createInitialAdmin(): Promise<boolean> {
         const count = await db.getUserCount()
         if (count === 0) {
@@ -20,21 +66,86 @@ export class AuthService {
         return false
     }
 
-    async login(username: string, password: string): Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }> {
+    async login(username: string, password: string): Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; sessionId?: string; message?: string }> {
+        const now = Date.now()
+
+        // Security: Check if account is locked
+        const attempt = this.loginAttempts.get(username)
+        if (attempt?.lockedUntil && attempt.lockedUntil > now) {
+            const remainingMinutes = Math.ceil((attempt.lockedUntil - now) / 60000)
+            return {
+                success: false,
+                message: `Account temporarily locked. Try again in ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`
+            }
+        }
+
         const user = await db.getUser(username)
 
         if (!user) {
-            return { success: false, message: 'User not found' }
+            // Security: Record failed attempt even for non-existent users (prevent enumeration)
+            this.recordFailedAttempt(username)
+            return { success: false, message: 'Invalid username or password' }
         }
 
         const match = await bcrypt.compare(password, user.passwordHash)
         if (!match) {
-            return { success: false, message: 'Invalid password' }
+            // Security: Record failed attempt
+            this.recordFailedAttempt(username)
+            const currentAttempt = this.loginAttempts.get(username)
+            const remaining = this.MAX_LOGIN_ATTEMPTS - (currentAttempt?.count || 0)
+
+            if (remaining <= 0) {
+                return {
+                    success: false,
+                    message: 'Account locked due to too many failed attempts. Please try again in 15 minutes.'
+                }
+            } else if (remaining <= 2) {
+                return {
+                    success: false,
+                    message: `Invalid password. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining before account lockout.`
+                }
+            }
+
+            return { success: false, message: 'Invalid username or password' }
         }
 
-        // Return user without hash
+        // Security: Clear failed attempts on successful login
+        this.loginAttempts.delete(username)
+
+        // Return user without hash and create session
         const { passwordHash, ...safeUser } = user
-        return { success: true, user: safeUser }
+        const sessionId = this.createSession(safeUser)
+        return { success: true, user: safeUser, sessionId }
+    }
+
+    private recordFailedAttempt(username: string): void {
+        const now = Date.now()
+        const attempt = this.loginAttempts.get(username)
+
+        if (!attempt || now - attempt.firstAttempt > this.ATTEMPT_WINDOW) {
+            // Start new attempt window
+            this.loginAttempts.set(username, {
+                count: 1,
+                firstAttempt: now,
+                lastAttempt: now
+            })
+        } else {
+            // Increment existing attempts
+            attempt.count++
+            attempt.lastAttempt = now
+
+            // Lock account if max attempts reached
+            if (attempt.count >= this.MAX_LOGIN_ATTEMPTS) {
+                attempt.lockedUntil = now + this.LOCKOUT_DURATION
+                console.warn(`Account locked for username: ${username} due to ${attempt.count} failed login attempts`)
+            }
+
+            this.loginAttempts.set(username, attempt)
+        }
+    }
+
+    logout(sessionId: string): void {
+        this.clearSession(sessionId)
     }
 
     async createUser(username: string, password: string, role: 'admin' | 'user'): Promise<{ success: boolean; message?: string }> {

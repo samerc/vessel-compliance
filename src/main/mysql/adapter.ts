@@ -1,6 +1,7 @@
 import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
+import { extname } from 'path'
 import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User } from '../../shared/types'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -218,6 +219,14 @@ export class MySQLAdapter {
     async upsertVesselDocument(doc: VesselDocument): Promise<void> {
         if (!this.pool) return
 
+        // Security: Validate file extension
+        if (doc.filePath) {
+            const validation = await this.validateFileExtension(doc.filePath)
+            if (!validation.valid) {
+                throw new Error(`File validation failed: ${validation.reason}`)
+            }
+        }
+
         const [existing]: any[] = await this.pool.query(
             'SELECT id FROM vessel_documents WHERE vessel_id = ? AND document_type_id = ?',
             [doc.vesselId, doc.documentTypeId]
@@ -306,6 +315,15 @@ export class MySQLAdapter {
 
     async updateEntity(id: string, updates: Partial<Entity>): Promise<void> {
         if (!this.pool) return
+
+        // Security: Validate file extension if passport file path is being updated
+        if (updates.passportFilePath !== undefined && updates.passportFilePath) {
+            const validation = await this.validateFileExtension(updates.passportFilePath)
+            if (!validation.valid) {
+                throw new Error(`File validation failed: ${validation.reason}`)
+            }
+        }
+
         const fields: string[] = []
         const values: any[] = []
 
@@ -503,6 +521,32 @@ export class MySQLAdapter {
 
     async setFileTypeSettings(settings: { allowedExtensions: string[]; blockedExtensions: string[] }, updatedBy?: string): Promise<void> {
         await this.setSetting('fileTypeSettings', JSON.stringify(settings), updatedBy)
+    }
+
+    // Security: Validate file extension against settings
+    async validateFileExtension(filePath: string): Promise<{ valid: boolean; reason?: string }> {
+        if (!filePath) return { valid: true } // Empty path is valid (optional files)
+
+        const settings = await this.getFileTypeSettings()
+        const ext = extname(filePath).toLowerCase()
+
+        // Check if blocked
+        if (settings.blockedExtensions.includes(ext)) {
+            return {
+                valid: false,
+                reason: `File type '${ext}' is blocked by administrator`
+            }
+        }
+
+        // Check if allowed (only if allowed list has items)
+        if (settings.allowedExtensions.length > 0 && !settings.allowedExtensions.includes(ext)) {
+            return {
+                valid: false,
+                reason: `File type '${ext}' is not in the allowed list`
+            }
+        }
+
+        return { valid: true }
     }
 }
 

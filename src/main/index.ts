@@ -13,8 +13,21 @@ const store = new Store()
 // Security: Track dialog-selected config files to prevent path injection
 const allowedConfigPaths = new Set<string>()
 
+// Security: Track session IDs by window
+const windowSessions = new Map<number, string>()
+
 // Security: Prevent concurrent setup operations
 let setupInProgress = false
+
+// Security: Helper to check if request is from an admin
+function isAdminRequest(event: Electron.IpcMainInvokeEvent): boolean {
+  const webContents = event.sender
+  const windowId = BrowserWindow.fromWebContents(webContents)?.id
+  if (!windowId) return false
+
+  const sessionId = windowSessions.get(windowId)
+  return auth.isAdmin(sessionId)
+}
 
 // Security: Validate database configuration structure
 interface DbConfig {
@@ -139,20 +152,38 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   // Auth Handlers
-  ipcMain.handle('auth:login', async (_, { username, password }) => {
+  ipcMain.handle('auth:login', async (event, { username, password }) => {
     const result = await auth.login(username, password)
-    if (result.success && result.user) {
-      store.set('currentUser', result.user)
+    if (result.success && result.sessionId) {
+      // Store session ID for this window
+      const webContents = event.sender
+      const windowId = BrowserWindow.fromWebContents(webContents)?.id
+      if (windowId) {
+        windowSessions.set(windowId, result.sessionId)
+      }
     }
     return result
   })
 
-  ipcMain.handle('auth:getSession', async () => {
-    return store.get('currentUser') || null
+  ipcMain.handle('auth:getSession', async (event) => {
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (!windowId) return null
+
+    const sessionId = windowSessions.get(windowId)
+    return auth.getCurrentUser(sessionId)
   })
 
-  ipcMain.handle('auth:logout', async () => {
-    store.delete('currentUser')
+  ipcMain.handle('auth:logout', async (event) => {
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (windowId) {
+      const sessionId = windowSessions.get(windowId)
+      if (sessionId) {
+        auth.logout(sessionId)
+        windowSessions.delete(windowId)
+      }
+    }
   })
 
   // Setup Handlers
@@ -165,11 +196,21 @@ app.whenReady().then(() => {
   })
 
   // File Type Settings Handlers
-  ipcMain.handle('fileTypes:getSettings', async () => {
+  ipcMain.handle('fileTypes:getSettings', async (event) => {
+    // Security: Only admins can view file type settings
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to get file type settings')
+      return { allowedExtensions: [], blockedExtensions: [] }
+    }
     return await db.getFileTypeSettings()
   })
 
-  ipcMain.handle('fileTypes:setSettings', async (_, settings: { allowedExtensions: string[]; blockedExtensions: string[] }) => {
+  ipcMain.handle('fileTypes:setSettings', async (event, settings: { allowedExtensions: string[]; blockedExtensions: string[] }) => {
+    // Security: Only admins can change file type settings
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to set file type settings')
+      return { allowedExtensions: [], blockedExtensions: [] }
+    }
     // Normalize extensions to lowercase and ensure they start with a dot
     const normalizeExtensions = (exts: string[]) => {
       return exts.map(ext => {
@@ -211,7 +252,13 @@ app.whenReady().then(() => {
     return { valid: true }
   })
 
-  ipcMain.handle('setup:selectDirectory', async () => {
+  ipcMain.handle('setup:selectDirectory', async (event) => {
+    // Security: Only admins can change database configuration
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to select database directory')
+      return null
+    }
+
     const { dialog } = require('electron')
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory']
@@ -219,7 +266,13 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePaths[0]
   })
 
-  ipcMain.handle('setup:saveConfig', async (_, { config, directory }) => {
+  ipcMain.handle('setup:saveConfig', async (event, { config, directory }) => {
+    // Security: Only admins can change database configuration
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to save database configuration')
+      return { success: false, message: 'Unauthorized: Admin access required' }
+    }
+
     // Security: Prevent concurrent setup operations
     if (setupInProgress) {
       return { success: false, message: 'Setup operation already in progress' }
@@ -305,7 +358,13 @@ app.whenReady().then(() => {
     return getConfigPath()
   })
 
-  ipcMain.handle('setup:loadConfigFromDir', async (_, directory: string) => {
+  ipcMain.handle('setup:loadConfigFromDir', async (event, directory: string) => {
+    // Security: Only admins can change database configuration
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to load database configuration from directory')
+      return { success: false, message: 'Unauthorized: Admin access required' }
+    }
+
     // Security: Prevent concurrent setup operations
     if (setupInProgress) {
       return { success: false, message: 'Setup operation already in progress' }
@@ -407,7 +466,13 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('setup:selectConfigFile', async () => {
+  ipcMain.handle('setup:selectConfigFile', async (event) => {
+    // Security: Only admins can change database configuration
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to select database config file')
+      return null
+    }
+
     const { dialog } = require('electron')
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
@@ -429,7 +494,13 @@ app.whenReady().then(() => {
     return null
   })
 
-  ipcMain.handle('setup:loadConfigFromFile', async (_, filePath: string) => {
+  ipcMain.handle('setup:loadConfigFromFile', async (event, filePath: string) => {
+    // Security: Only admins can change database configuration
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to load database configuration from file')
+      return { success: false, message: 'Unauthorized: Admin access required' }
+    }
+
     // Security: Prevent concurrent setup operations
     if (setupInProgress) {
       return { success: false, message: 'Setup operation already in progress' }
