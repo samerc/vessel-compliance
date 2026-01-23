@@ -56,14 +56,21 @@ const api = {
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),
 
   setupSelectDirectory: () => ipcRenderer.invoke('setup:selectDirectory'),
+  setupSelectConfigFile: () => ipcRenderer.invoke('setup:selectConfigFile'),
   setupSaveConfig: (config: any, directory: string) => ipcRenderer.invoke('setup:saveConfig', { config, directory }),
   setupCheckConnection: () => ipcRenderer.invoke('setup:checkConnection'),
   setupGetConfigPath: () => ipcRenderer.invoke('setup:getConfigPath'),
   setupLoadConfigFromDir: (directory: string) => ipcRenderer.invoke('setup:loadConfigFromDir', directory),
+  setupLoadConfigFromFile: (filePath: string) => ipcRenderer.invoke('setup:loadConfigFromFile', filePath),
   onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status)),
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
+
+  // File Type Settings
+  fileTypesGetSettings: () => ipcRenderer.invoke('fileTypes:getSettings'),
+  fileTypesSetSettings: (settings) => ipcRenderer.invoke('fileTypes:setSettings', settings),
+  fileTypesValidateFile: (filePath) => ipcRenderer.invoke('fileTypes:validateFile', filePath),
 
   // OFAC/Sanctions Check
   checkSanctions: (name: string) => ipcRenderer.invoke('ofac:checkSanctions', name)

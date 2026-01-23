@@ -176,6 +176,13 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             return
         }
 
+        // Security: Validate file type
+        const validation = await window.api.fileTypesValidateFile(filePath)
+        if (!validation.valid) {
+            alert(`File rejected: ${validation.reason}`)
+            return
+        }
+
         await window.api.updateEntity(entityId, { passportFilePath: filePath })
         loadData()
     }

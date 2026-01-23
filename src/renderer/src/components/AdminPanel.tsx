@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown } from 'lucide-react'
-import { DocumentType, AssuredRole } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings } from '../../../shared/types'
 
 export default function AdminPanel() {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
@@ -12,9 +12,14 @@ export default function AdminPanel() {
     const [newRole, setNewRole] = useState('')
     const [importing, setImporting] = useState(false)
     const [importStatus, setImportStatus] = useState<string>('')
+    const [fileTypeSettings, setFileTypeSettings] = useState<FileTypeSettings>({ allowedExtensions: [], blockedExtensions: [] })
+    const [newAllowedExt, setNewAllowedExt] = useState('')
+    const [newBlockedExt, setNewBlockedExt] = useState('')
+    const [fileTypeStatus, setFileTypeStatus] = useState('')
 
     useEffect(() => {
         loadData()
+        loadFileTypeSettings()
     }, [])
 
     const loadData = async () => {
@@ -184,6 +189,83 @@ export default function AdminPanel() {
     const handleToggleDocRequired = async (doc: DocumentType) => {
         await window.api.updateDocumentType(doc.id, { required: !doc.required })
         await loadDocTypes()
+    }
+
+    const loadFileTypeSettings = async () => {
+        const settings = await window.api.fileTypesGetSettings()
+        setFileTypeSettings(settings)
+    }
+
+    const handleAddAllowedExt = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newAllowedExt.trim()) return
+
+        const ext = newAllowedExt.trim().toLowerCase().startsWith('.') ? newAllowedExt.trim().toLowerCase() : `.${newAllowedExt.trim().toLowerCase()}`
+
+        if (fileTypeSettings.allowedExtensions.includes(ext)) {
+            setFileTypeStatus('Extension already in allowed list')
+            setTimeout(() => setFileTypeStatus(''), 3000)
+            return
+        }
+
+        const updated = {
+            ...fileTypeSettings,
+            allowedExtensions: [...fileTypeSettings.allowedExtensions, ext]
+        }
+
+        const saved = await window.api.fileTypesSetSettings(updated)
+        setFileTypeSettings(saved)
+        setNewAllowedExt('')
+        setFileTypeStatus('✓ Allowed extension added')
+        setTimeout(() => setFileTypeStatus(''), 3000)
+    }
+
+    const handleAddBlockedExt = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newBlockedExt.trim()) return
+
+        const ext = newBlockedExt.trim().toLowerCase().startsWith('.') ? newBlockedExt.trim().toLowerCase() : `.${newBlockedExt.trim().toLowerCase()}`
+
+        if (fileTypeSettings.blockedExtensions.includes(ext)) {
+            setFileTypeStatus('Extension already in blocked list')
+            setTimeout(() => setFileTypeStatus(''), 3000)
+            return
+        }
+
+        const updated = {
+            ...fileTypeSettings,
+            blockedExtensions: [...fileTypeSettings.blockedExtensions, ext]
+        }
+
+        const saved = await window.api.fileTypesSetSettings(updated)
+        setFileTypeSettings(saved)
+        setNewBlockedExt('')
+        setFileTypeStatus('✓ Blocked extension added')
+        setTimeout(() => setFileTypeStatus(''), 3000)
+    }
+
+    const handleRemoveAllowedExt = async (ext: string) => {
+        const updated = {
+            ...fileTypeSettings,
+            allowedExtensions: fileTypeSettings.allowedExtensions.filter(e => e !== ext)
+        }
+
+        const saved = await window.api.fileTypesSetSettings(updated)
+        setFileTypeSettings(saved)
+        setFileTypeStatus('✓ Allowed extension removed')
+        setTimeout(() => setFileTypeStatus(''), 3000)
+    }
+
+    const handleRemoveBlockedExt = async (ext: string) => {
+        const updated = {
+            ...fileTypeSettings,
+            blockedExtensions: fileTypeSettings.blockedExtensions.filter(e => e !== ext)
+        }
+
+        const saved = await window.api.fileTypesSetSettings(updated)
+        setFileTypeSettings(saved)
+        setFileTypeStatus('✓ Blocked extension removed')
+        setTimeout(() => setFileTypeStatus(''), 3000)
     }
 
     return (
@@ -414,6 +496,157 @@ export default function AdminPanel() {
                     </section>
                 </div>
             </div>
+
+            {/* File Type Settings Section */}
+            <section className="glass-card" style={{ padding: '24px', marginTop: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Shield size={20} color="var(--accent-primary)" /> File Upload Security
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    Control which file types users can upload for vessel documents and passport/ID files.
+                </p>
+
+                {fileTypeStatus && (
+                    <div style={{
+                        padding: '12px 16px',
+                        marginBottom: '16px',
+                        background: fileTypeStatus.startsWith('✓') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                        border: fileTypeStatus.startsWith('✓') ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem'
+                    }}>
+                        {fileTypeStatus}
+                    </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                    {/* Allowed Extensions */}
+                    <div>
+                        <h4 style={{ marginBottom: '12px', fontSize: '1rem', color: 'var(--success)' }}>
+                            ✓ Allowed File Types
+                        </h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                            Only these file types can be uploaded. Leave empty to allow all (except blocked).
+                        </p>
+
+                        <form onSubmit={handleAddAllowedExt} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                            <input
+                                type="text"
+                                value={newAllowedExt}
+                                onChange={e => setNewAllowedExt(e.target.value)}
+                                placeholder=".pdf or pdf"
+                                style={{ flex: 1 }}
+                            />
+                            <button type="submit" className="btn-primary" style={{ padding: '0 16px' }}>
+                                <Plus size={16} />
+                            </button>
+                        </form>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {fileTypeSettings.allowedExtensions.map(ext => (
+                                <div
+                                    key={ext}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 12px',
+                                        background: 'rgba(0, 255, 136, 0.1)',
+                                        border: '1px solid rgba(0, 255, 136, 0.3)',
+                                        borderRadius: '6px',
+                                        fontSize: '0.85rem',
+                                        fontFamily: 'monospace'
+                                    }}
+                                >
+                                    <span>{ext}</span>
+                                    <button
+                                        onClick={() => handleRemoveAllowedExt(ext)}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {fileTypeSettings.allowedExtensions.length === 0 && (
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                    All file types allowed (except blocked)
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Blocked Extensions */}
+                    <div>
+                        <h4 style={{ marginBottom: '12px', fontSize: '1rem', color: 'var(--danger)' }}>
+                            ✗ Blocked File Types
+                        </h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                            These file types are always rejected, even if in allowed list.
+                        </p>
+
+                        <form onSubmit={handleAddBlockedExt} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                            <input
+                                type="text"
+                                value={newBlockedExt}
+                                onChange={e => setNewBlockedExt(e.target.value)}
+                                placeholder=".exe or exe"
+                                style={{ flex: 1 }}
+                            />
+                            <button type="submit" className="btn-primary" style={{ padding: '0 16px', background: 'var(--danger)' }}>
+                                <Plus size={16} />
+                            </button>
+                        </form>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {fileTypeSettings.blockedExtensions.map(ext => (
+                                <div
+                                    key={ext}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 12px',
+                                        background: 'rgba(255, 77, 77, 0.1)',
+                                        border: '1px solid rgba(255, 77, 77, 0.3)',
+                                        borderRadius: '6px',
+                                        fontSize: '0.85rem',
+                                        fontFamily: 'monospace'
+                                    }}
+                                >
+                                    <span>{ext}</span>
+                                    <button
+                                        onClick={() => handleRemoveBlockedExt(ext)}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {fileTypeSettings.blockedExtensions.length === 0 && (
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                    No blocked file types
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div >
     )
 }

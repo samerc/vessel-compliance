@@ -80,3 +80,10 @@ CREATE TABLE IF NOT EXISTS entity_ubos (
   FOREIGN KEY (assured_entity_id) REFERENCES entities(id) ON DELETE CASCADE,
   FOREIGN KEY (ubo_entity_id) REFERENCES entities(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  setting_key VARCHAR(100) PRIMARY KEY,
+  setting_value TEXT NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_by VARCHAR(255)
+);

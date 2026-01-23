@@ -12,6 +12,7 @@ export const SetupScreen: React.FC = () => {
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const [currentConfigPath, setCurrentConfigPath] = useState<string | null>(null)
+    const [selectedConfigFile, setSelectedConfigFile] = useState<string | null>(null)
 
     useEffect(() => {
         window.api.setupGetConfigPath().then(setCurrentConfigPath)
@@ -27,22 +28,30 @@ export const SetupScreen: React.FC = () => {
         if (path) setDirectory(path)
     }
 
-    const handleLoadExisting = async () => {
-        const path = await window.api.setupSelectDirectory()
-        if (path) {
-            setLoading(true)
-            try {
-                const result = await window.api.setupLoadConfigFromDir(path)
-                if (result.success) {
-                    window.location.reload()
-                } else {
-                    setError(result.message || 'Failed to load configuration')
-                }
-            } catch (err: any) {
-                setError(err.message)
-            } finally {
-                setLoading(false)
+    const handleBrowseConfigFile = async () => {
+        const filePath = await window.api.setupSelectConfigFile()
+        if (filePath) {
+            setSelectedConfigFile(filePath)
+            setError('')
+        }
+    }
+
+    const handleLoadConfigFile = async () => {
+        if (!selectedConfigFile) return
+
+        setLoading(true)
+        setError('')
+        try {
+            const result = await window.api.setupLoadConfigFromFile(selectedConfigFile)
+            if (result.success) {
+                window.location.reload()
+            } else {
+                setError(result.message || 'Failed to load configuration')
             }
+        } catch (err: any) {
+            setError(err.message)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -74,7 +83,7 @@ export const SetupScreen: React.FC = () => {
             <div className="w-full max-w-md glass-card p-8 shadow-2xl border" style={{ borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}>
                 <h2 className="mb-2 text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>System Setup</h2>
                 <p className="mb-8 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    Configure your MySQL database and <br /> choose a storage location for settings.
+                    Browse for an existing config file or create a new database connection.
                 </p>
 
                 {error && (
@@ -90,17 +99,31 @@ export const SetupScreen: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="mb-8 p-4 rounded-lg border border-white/10 bg-white/5">
-                    <h3 className="text-sm font-bold mb-2 text-white">Have an existing configuration?</h3>
+                <div className="mb-8 p-4 rounded-lg border-2 border-blue-500/30 bg-blue-600/10">
+                    <h3 className="text-sm font-bold mb-3 text-white">Load Existing Configuration</h3>
                     <button
                         type="button"
-                        onClick={handleLoadExisting}
+                        onClick={handleBrowseConfigFile}
                         disabled={loading}
-                        className="w-full px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-sm transition-all"
+                        className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg text-sm transition-all shadow-lg hover:shadow-blue-500/20"
                     >
-                        Load from Directory
+                        Browse for db-config.json
                     </button>
-                    <p className="mt-2 text-xs text-center text-gray-500">Select a folder containing a valid db-config.json</p>
+
+                    {selectedConfigFile && (
+                        <div className="mt-3 p-3 bg-black/30 rounded-lg border border-white/10">
+                            <div className="text-xs text-gray-400 mb-1">Selected file:</div>
+                            <div className="text-xs text-white font-mono break-all mb-3">{selectedConfigFile}</div>
+                            <button
+                                type="button"
+                                onClick={handleLoadConfigFile}
+                                disabled={loading}
+                                className="w-full px-4 py-2 bg-green-600/80 hover:bg-green-600 text-white font-semibold rounded-lg text-sm transition-all"
+                            >
+                                {loading ? 'Loading...' : 'Load Configuration'}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="relative mb-8">
@@ -108,7 +131,7 @@ export const SetupScreen: React.FC = () => {
                         <div className="w-full border-t border-gray-700"></div>
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-[#0f1218] px-2 text-gray-500">Or configure new</span>
+                        <span className="bg-[#0f1218] px-2 text-gray-500">Or configure manually</span>
                     </div>
                 </div>
 

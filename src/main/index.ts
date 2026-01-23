@@ -1,13 +1,41 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join, dirname } from 'path'
-import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'fs'
+import { join, dirname, resolve, normalize, extname } from 'path'
+import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
 import { auth } from './auth'
 import Store from 'electron-store'
+import { createPool } from 'mysql2/promise'
 
 const store = new Store()
+
+// Security: Track dialog-selected config files to prevent path injection
+const allowedConfigPaths = new Set<string>()
+
+// Security: Prevent concurrent setup operations
+let setupInProgress = false
+
+// Security: Validate database configuration structure
+interface DbConfig {
+  host: string
+  port: number
+  user: string
+  password: string
+  database: string
+}
+
+function isValidDbConfig(obj: any): obj is DbConfig {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.host === 'string' && obj.host.length > 0 &&
+    typeof obj.port === 'number' && obj.port > 0 && obj.port < 65536 &&
+    typeof obj.user === 'string' && obj.user.length > 0 &&
+    typeof obj.password === 'string' &&
+    typeof obj.database === 'string' && obj.database.length > 0
+  )
+}
 
 const getConfigPath = () => {
   // 1. Portable Mode: Check next to executable or in project root (dev)
@@ -136,6 +164,53 @@ app.whenReady().then(() => {
     store.set('theme', theme)
   })
 
+  // File Type Settings Handlers
+  ipcMain.handle('fileTypes:getSettings', async () => {
+    return await db.getFileTypeSettings()
+  })
+
+  ipcMain.handle('fileTypes:setSettings', async (_, settings: { allowedExtensions: string[]; blockedExtensions: string[] }) => {
+    // Normalize extensions to lowercase and ensure they start with a dot
+    const normalizeExtensions = (exts: string[]) => {
+      return exts.map(ext => {
+        ext = ext.toLowerCase().trim()
+        return ext.startsWith('.') ? ext : `.${ext}`
+      })
+    }
+
+    const normalized = {
+      allowedExtensions: normalizeExtensions(settings.allowedExtensions),
+      blockedExtensions: normalizeExtensions(settings.blockedExtensions)
+    }
+
+    // Save to database (centralized storage for all users)
+    await db.setFileTypeSettings(normalized)
+    return normalized
+  })
+
+  ipcMain.handle('fileTypes:validateFile', async (_, filePath: string) => {
+    const settings = await db.getFileTypeSettings()
+    const ext = extname(filePath).toLowerCase()
+
+    // Check if blocked
+    if (settings.blockedExtensions.includes(ext)) {
+      return {
+        valid: false,
+        reason: `File type '${ext}' is blocked by administrator`
+      }
+    }
+
+    // Check if allowed (only if allowed list has items)
+    if (settings.allowedExtensions.length > 0 && !settings.allowedExtensions.includes(ext)) {
+      return {
+        valid: false,
+        reason: `File type '${ext}' is not in the allowed list. Allowed types: ${settings.allowedExtensions.join(', ')}`
+      }
+    }
+
+    return { valid: true }
+  })
+
   ipcMain.handle('setup:selectDirectory', async () => {
     const { dialog } = require('electron')
     const result = await dialog.showOpenDialog({
@@ -145,27 +220,80 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('setup:saveConfig', async (_, { config, directory }) => {
+    // Security: Prevent concurrent setup operations
+    if (setupInProgress) {
+      return { success: false, message: 'Setup operation already in progress' }
+    }
+
+    setupInProgress = true
+
     try {
+      // Security: Validate config structure
+      if (!isValidDbConfig(config)) {
+        return { success: false, message: 'Invalid configuration format' }
+      }
+
+      // Security: Validate directory path
+      if (typeof directory !== 'string' || !directory) {
+        return { success: false, message: 'Invalid directory path' }
+      }
+
+      // Security: Test connection BEFORE saving to disk
+      const testPool = createPool({
+        host: config.host,
+        port: config.port,
+        user: config.user,
+        password: config.password,
+        database: config.database,
+        waitForConnections: true,
+        connectionLimit: 1,
+        connectTimeout: 10000
+      })
+
+      try {
+        // Test the connection
+        const connection = await testPool.getConnection()
+        connection.release()
+        await testPool.end()
+      } catch (error) {
+        await testPool.end().catch(() => {})
+        console.error('Database connection test failed:', error)
+        return { success: false, message: 'Could not connect to database with provided settings' }
+      }
+
+      // Connection successful - NOW save to disk and update state
       const configPath = join(directory, 'db-config.json')
+
       if (!existsSync(directory)) {
         mkdirSync(directory, { recursive: true })
       }
-      writeFileSync(configPath, JSON.stringify(config, null, 2))
+
+      writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 })
 
       store.set('dbConfigDir', directory)
       db.setConfigPath(configPath)
 
-      // Try to connect
+      // Connect with main adapter
       const connected = await db.connect()
       if (connected) {
         await db.initSchema()
         await auth.createInitialAdmin()
         return { success: true }
       } else {
-        return { success: false, message: 'Could not connect with these settings' }
+        // Rollback: delete created file and state
+        try {
+          const { unlinkSync } = require('fs')
+          unlinkSync(configPath)
+        } catch {}
+        store.delete('dbConfigDir')
+        return { success: false, message: 'Database connection failed' }
       }
     } catch (error: any) {
-      return { success: false, message: error.message }
+      // Security: Sanitize error messages
+      console.error('Config save error:', error)
+      return { success: false, message: 'Failed to save configuration' }
+    } finally {
+      setupInProgress = false
     }
   })
 
@@ -178,17 +306,82 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('setup:loadConfigFromDir', async (_, directory: string) => {
+    // Security: Prevent concurrent setup operations
+    if (setupInProgress) {
+      return { success: false, message: 'Setup operation already in progress' }
+    }
+
+    setupInProgress = true
+
     try {
+      // Security: Validate directory input
+      if (typeof directory !== 'string' || !directory) {
+        return { success: false, message: 'Invalid directory path' }
+      }
+
       const configPath = join(directory, 'db-config.json')
+
       if (!existsSync(configPath)) {
         return { success: false, message: 'No db-config.json found in this directory' }
       }
 
-      // Update store
+      // Security: Check file size
+      try {
+        const stats = statSync(configPath)
+        if (stats.size > 1024 * 1024) {
+          return { success: false, message: 'Configuration file is too large' }
+        }
+        if (stats.size === 0) {
+          return { success: false, message: 'Configuration file is empty' }
+        }
+      } catch (error) {
+        console.error('Error reading file stats:', error)
+        return { success: false, message: 'Cannot read configuration file' }
+      }
+
+      // Parse and validate configuration
+      let config: DbConfig
+      try {
+        const content = readFileSync(configPath, 'utf-8')
+        const parsed = JSON.parse(content)
+
+        // Security: Validate configuration schema
+        if (!isValidDbConfig(parsed)) {
+          return { success: false, message: 'Invalid configuration file format' }
+        }
+
+        config = parsed
+      } catch (error) {
+        console.error('JSON parse error:', error)
+        return { success: false, message: 'Invalid JSON configuration file' }
+      }
+
+      // Security: Test connection BEFORE saving state
+      const testPool = createPool({
+        host: config.host,
+        port: config.port,
+        user: config.user,
+        password: config.password,
+        database: config.database,
+        waitForConnections: true,
+        connectionLimit: 1,
+        connectTimeout: 10000
+      })
+
+      try {
+        const connection = await testPool.getConnection()
+        connection.release()
+        await testPool.end()
+      } catch (error) {
+        await testPool.end().catch(() => {})
+        console.error('Database connection test failed:', error)
+        return { success: false, message: 'Could not connect to database with provided settings' }
+      }
+
+      // Connection successful - NOW update state
       store.set('dbConfigDir', directory)
       db.setConfigPath(configPath)
 
-      // Try to connect
       const connected = await db.connect()
       if (connected) {
         await db.initSchema()
@@ -201,10 +394,166 @@ app.whenReady().then(() => {
 
         return { success: true }
       } else {
-        return { success: false, message: 'Could not connect with these settings' }
+        // Rollback state changes
+        store.delete('dbConfigDir')
+        return { success: false, message: 'Database connection failed' }
       }
     } catch (error: any) {
-      return { success: false, message: error.message }
+      // Security: Sanitize error messages
+      console.error('Config load error:', error)
+      return { success: false, message: 'Failed to load configuration' }
+    } finally {
+      setupInProgress = false
+    }
+  })
+
+  ipcMain.handle('setup:selectConfigFile', async () => {
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'JSON Config Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+
+    if (!result.canceled && result.filePaths[0]) {
+      const selectedPath = result.filePaths[0]
+      // Security: Track this path as allowed for subsequent loading
+      allowedConfigPaths.add(selectedPath)
+      // Auto-expire after 5 minutes to prevent stale paths
+      setTimeout(() => allowedConfigPaths.delete(selectedPath), 5 * 60 * 1000)
+      return selectedPath
+    }
+
+    return null
+  })
+
+  ipcMain.handle('setup:loadConfigFromFile', async (_, filePath: string) => {
+    // Security: Prevent concurrent setup operations
+    if (setupInProgress) {
+      return { success: false, message: 'Setup operation already in progress' }
+    }
+
+    setupInProgress = true
+
+    try {
+      // Security: Validate input is a string
+      if (typeof filePath !== 'string' || !filePath) {
+        return { success: false, message: 'Invalid file path' }
+      }
+
+      // Security: Validate path was selected via dialog
+      if (!allowedConfigPaths.has(filePath)) {
+        console.error('Attempted to load config from unauthorized path:', filePath)
+        return { success: false, message: 'Unauthorized file path' }
+      }
+
+      // Security: Remove from allowed set (one-time use)
+      allowedConfigPaths.delete(filePath)
+
+      // Security: Validate path doesn't contain traversal
+      const normalizedPath = normalize(filePath)
+      const resolvedPath = resolve(filePath)
+      if (normalizedPath !== filePath && resolvedPath !== filePath) {
+        console.error('Path traversal attempt detected:', filePath)
+        return { success: false, message: 'Invalid file path' }
+      }
+
+      // Security: Validate file extension
+      const ext = extname(filePath).toLowerCase()
+      if (ext !== '.json') {
+        return { success: false, message: 'Configuration file must be a .json file' }
+      }
+
+      // Check file exists
+      if (!existsSync(filePath)) {
+        return { success: false, message: 'Configuration file not found' }
+      }
+
+      // Security: Check file size (limit to 1MB)
+      try {
+        const stats = statSync(filePath)
+        if (stats.size > 1024 * 1024) {
+          return { success: false, message: 'Configuration file is too large' }
+        }
+        if (stats.size === 0) {
+          return { success: false, message: 'Configuration file is empty' }
+        }
+      } catch (error) {
+        console.error('Error reading file stats:', error)
+        return { success: false, message: 'Cannot read configuration file' }
+      }
+
+      // Parse and validate JSON structure
+      let config: DbConfig
+      try {
+        const content = readFileSync(filePath, 'utf-8')
+        const parsed = JSON.parse(content)
+
+        // Security: Validate configuration schema
+        if (!isValidDbConfig(parsed)) {
+          return { success: false, message: 'Invalid configuration file format' }
+        }
+
+        config = parsed
+      } catch (error) {
+        console.error('JSON parse error:', error)
+        return { success: false, message: 'Invalid JSON configuration file' }
+      }
+
+      // Security: Test connection BEFORE saving state
+      // This prevents corrupting the stored config on failed connections
+      const testPool = createPool({
+        host: config.host,
+        port: config.port,
+        user: config.user,
+        password: config.password,
+        database: config.database,
+        waitForConnections: true,
+        connectionLimit: 1,
+        connectTimeout: 10000
+      })
+
+      try {
+        // Test the connection
+        const connection = await testPool.getConnection()
+        connection.release()
+        await testPool.end()
+      } catch (error) {
+        await testPool.end().catch(() => {})
+        console.error('Database connection test failed:', error)
+        return { success: false, message: 'Could not connect to database with provided settings' }
+      }
+
+      // Connection successful - NOW update persistent state
+      const directory = dirname(filePath)
+      store.set('dbConfigDir', directory)
+      db.setConfigPath(filePath)
+
+      // Connect with main adapter
+      const connected = await db.connect()
+      if (connected) {
+        await db.initSchema()
+        await auth.createInitialAdmin()
+
+        // Notify windows of connection status
+        BrowserWindow.getAllWindows().forEach(win => {
+          win.webContents.send('app:db-status', { connected: true })
+        })
+
+        return { success: true }
+      } else {
+        // Rollback state changes
+        store.delete('dbConfigDir')
+        return { success: false, message: 'Database connection failed' }
+      }
+    } catch (error: any) {
+      // Security: Sanitize error messages - don't expose internal details
+      console.error('Config load error:', error)
+      return { success: false, message: 'Failed to load configuration' }
+    } finally {
+      setupInProgress = false
     }
   })
 

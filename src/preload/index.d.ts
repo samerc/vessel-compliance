@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings } from '../shared/types'
 
 export interface Api {
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -9,10 +9,12 @@ export interface Api {
   getUsers: () => Promise<User[]>
   deleteUser: (id: string) => Promise<void>
   setupSelectDirectory: () => Promise<string | null>
+  setupSelectConfigFile: () => Promise<string | null>
   setupSaveConfig: (config: any, directory: string) => Promise<{ success: boolean; message?: string }>
   setupCheckConnection: () => Promise<boolean>
   setupGetConfigPath: () => Promise<string | null>
   setupLoadConfigFromDir: (directory: string) => Promise<{ success: boolean; message?: string }>
+  setupLoadConfigFromFile: (filePath: string) => Promise<{ success: boolean; message?: string }>
   onDbStatus: (callback: (status: { connected: boolean }) => void) => void
   getDocumentTypes: () => Promise<DocumentType[]>
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>
@@ -60,6 +62,10 @@ export interface Api {
 
   themeGet: () => Promise<'light' | 'dark'>
   themeSet: (theme: 'light' | 'dark') => Promise<void>
+
+  fileTypesGetSettings: () => Promise<FileTypeSettings>
+  fileTypesSetSettings: (settings: FileTypeSettings) => Promise<FileTypeSettings>
+  fileTypesValidateFile: (filePath: string) => Promise<{ valid: boolean; reason?: string }>
 
   checkSanctions: (name: string) => Promise<{
     status: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'

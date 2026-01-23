@@ -93,3 +93,8 @@ export interface SanctionsMatch {
   listed_on: string | null
   created_at: string
 }
+
+export interface FileTypeSettings {
+  allowedExtensions: string[] // e.g., ['.pdf', '.jpg', '.zip']
+  blockedExtensions: string[] // e.g., ['.exe', '.bat', '.sh']
+}

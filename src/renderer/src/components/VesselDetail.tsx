@@ -93,6 +93,13 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             return
         }
 
+        // Security: Validate file type
+        const validation = await window.api.fileTypesValidateFile(filePath)
+        if (!validation.valid) {
+            alert(`File rejected: ${validation.reason}`)
+            return
+        }
+
         const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
 
         const newDoc: VesselDocument = {

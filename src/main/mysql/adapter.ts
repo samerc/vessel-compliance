@@ -458,6 +458,52 @@ export class MySQLAdapter {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM users WHERE id = ?', [id])
     }
+
+    // Settings Management
+    async getSetting(key: string): Promise<string | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.execute(
+            'SELECT setting_value FROM app_settings WHERE setting_key = ?',
+            [key]
+        )
+        const result = rows as any[]
+        return result.length > 0 ? result[0].setting_value : null
+    }
+
+    async setSetting(key: string, value: string, updatedBy?: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            `INSERT INTO app_settings (setting_key, setting_value, updated_by)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP`,
+            [key, value, updatedBy || 'system', value, updatedBy || 'system']
+        )
+    }
+
+    async getFileTypeSettings(): Promise<{ allowedExtensions: string[]; blockedExtensions: string[] }> {
+        const defaultSettings = {
+            allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip'],
+            blockedExtensions: ['.exe', '.bat', '.sh', '.cmd', '.app', '.msi', '.dll', '.so', '.dylib', '.vbs', '.ps1']
+        }
+
+        const settingValue = await this.getSetting('fileTypeSettings')
+        if (!settingValue) {
+            // Initialize with defaults
+            await this.setSetting('fileTypeSettings', JSON.stringify(defaultSettings))
+            return defaultSettings
+        }
+
+        try {
+            return JSON.parse(settingValue)
+        } catch {
+            // If parsing fails, return defaults
+            return defaultSettings
+        }
+    }
+
+    async setFileTypeSettings(settings: { allowedExtensions: string[]; blockedExtensions: string[] }, updatedBy?: string): Promise<void> {
+        await this.setSetting('fileTypeSettings', JSON.stringify(settings), updatedBy)
+    }
 }
 
 export const db = new MySQLAdapter()
