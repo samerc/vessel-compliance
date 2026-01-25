@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog, Sun, Moon, ClipboardList } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -8,12 +8,13 @@ import FleetManager from './components/FleetManager'
 import EntityDirectory from './components/EntityDirectory'
 import ComplianceCenter from './components/ComplianceCenter'
 import UserManager from './components/UserManager'
+import SurveyorDirectory from './components/SurveyorDirectory'
 import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
 import { useAuth } from './contexts/AuthContext'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users' | 'surveyors'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -98,6 +99,12 @@ function App(): React.JSX.Element {
             active={activeTab === 'entities'}
             onClick={() => setActiveTab('entities')}
           />
+          <NavItem
+            icon={<ClipboardList size={20} />}
+            label="Surveyor Directory"
+            active={activeTab === 'surveyors'}
+            onClick={() => setActiveTab('surveyors')}
+          />
 
           {isAdmin && (
             <>
@@ -141,6 +148,7 @@ function App(): React.JSX.Element {
         {activeTab === 'admin' && isAdmin && <AdminPanel />}
         {activeTab === 'users' && isAdmin && <UserManager />}
         {activeTab === 'entities' && <EntityDirectory />}
+        {activeTab === 'surveyors' && <SurveyorDirectory />}
         {activeTab === 'compliance' && <ComplianceCenter />}
       </main>
     </div>

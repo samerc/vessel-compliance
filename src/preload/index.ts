@@ -46,6 +46,8 @@ const api = {
 
   dialogOpenFile: () => ipcRenderer.invoke('dialog:openFile'),
   excelImport: (filePath) => ipcRenderer.invoke('excel:import', filePath),
+  dialogOpenFileWord: () => ipcRenderer.invoke('dialog:openFileWord'),
+  importDefectsFromWord: (surveyId, filePath) => ipcRenderer.invoke('word:importDefects', surveyId, filePath),
 
   // Auth & Setup
   authLogin: (credentials) => ipcRenderer.invoke('auth:login', credentials),
@@ -67,13 +69,40 @@ const api = {
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
 
+  // Window Preferences
+  windowGetPreferences: () => ipcRenderer.invoke('window:getPreferences'),
+  windowSavePreferences: () => ipcRenderer.invoke('window:savePreferences'),
+
   // File Type Settings
   fileTypesGetSettings: () => ipcRenderer.invoke('fileTypes:getSettings'),
   fileTypesSetSettings: (settings) => ipcRenderer.invoke('fileTypes:setSettings', settings),
   fileTypesValidateFile: (filePath) => ipcRenderer.invoke('fileTypes:validateFile', filePath),
 
   // OFAC/Sanctions Check
-  checkSanctions: (name: string) => ipcRenderer.invoke('ofac:checkSanctions', name)
+  checkSanctions: (name: string) => ipcRenderer.invoke('ofac:checkSanctions', name),
+
+  // Surveyors
+  getSurveyors: () => ipcRenderer.invoke('db:getSurveyors'),
+  addSurveyor: (surveyor) => ipcRenderer.invoke('db:addSurveyor', surveyor),
+  updateSurveyor: (id, updates) => ipcRenderer.invoke('db:updateSurveyor', id, updates),
+  deleteSurveyor: (id) => ipcRenderer.invoke('db:deleteSurveyor', id),
+
+  // Condition Surveys
+  getConditionSurveys: (vesselId) => ipcRenderer.invoke('db:getConditionSurveys', vesselId),
+  addConditionSurvey: (survey) => ipcRenderer.invoke('db:addConditionSurvey', survey),
+  updateConditionSurvey: (id, updates) => ipcRenderer.invoke('db:updateConditionSurvey', id, updates),
+  deleteConditionSurvey: (id) => ipcRenderer.invoke('db:deleteConditionSurvey', id),
+  getSurveyDefects: (surveyId) => ipcRenderer.invoke('db:getSurveyDefects', surveyId),
+  addSurveyDefect: (defect) => ipcRenderer.invoke('db:addSurveyDefect', defect),
+  updateSurveyDefect: (id, updates) => ipcRenderer.invoke('db:updateSurveyDefect', id, updates),
+  deleteSurveyDefect: (id) => ipcRenderer.invoke('db:deleteSurveyDefect', id),
+  closeDefect: (id, closedBy, closureNotes) => ipcRenderer.invoke('db:closeDefect', id, closedBy, closureNotes),
+  reopenDefect: (id) => ipcRenderer.invoke('db:reopenDefect', id),
+  getSurveyAttachments: (surveyId) => ipcRenderer.invoke('db:getSurveyAttachments', surveyId),
+  addSurveyAttachment: (attachment) => ipcRenderer.invoke('db:addSurveyAttachment', attachment),
+  deleteSurveyAttachment: (id) => ipcRenderer.invoke('db:deleteSurveyAttachment', id),
+  getOpenDefectsByVessel: () => ipcRenderer.invoke('db:getOpenDefectsByVessel'),
+  getSurveyHistory: (vesselId) => ipcRenderer.invoke('db:getSurveyHistory', vesselId)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

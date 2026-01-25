@@ -186,6 +186,81 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         await window.api.updateEntity(entityId, { passportFilePath: filePath })
         loadData()
     }
+
+    const handleUploadCertificateOfIncorporation = async (e: React.DragEvent, entityId: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+
+        const files = e.dataTransfer.files
+        if (files.length === 0) return
+        const file = files[0]
+
+        const filePath = window.api.getFilePath(file)
+        if (!filePath) {
+            alert('Could not retrieve file path')
+            return
+        }
+
+        // Security: Validate file type
+        const validation = await window.api.fileTypesValidateFile(filePath)
+        if (!validation.valid) {
+            alert(`File rejected: ${validation.reason}`)
+            return
+        }
+
+        await window.api.updateEntity(entityId, { certificateOfIncorporationPath: filePath })
+        loadData()
+    }
+
+    const handleUploadArticlesOfAssociation = async (e: React.DragEvent, entityId: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+
+        const files = e.dataTransfer.files
+        if (files.length === 0) return
+        const file = files[0]
+
+        const filePath = window.api.getFilePath(file)
+        if (!filePath) {
+            alert('Could not retrieve file path')
+            return
+        }
+
+        // Security: Validate file type
+        const validation = await window.api.fileTypesValidateFile(filePath)
+        if (!validation.valid) {
+            alert(`File rejected: ${validation.reason}`)
+            return
+        }
+
+        await window.api.updateEntity(entityId, { articlesOfAssociationPath: filePath })
+        loadData()
+    }
+
+    const handleUploadKYC = async (e: React.DragEvent, entityId: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+
+        const files = e.dataTransfer.files
+        if (files.length === 0) return
+        const file = files[0]
+
+        const filePath = window.api.getFilePath(file)
+        if (!filePath) {
+            alert('Could not retrieve file path')
+            return
+        }
+
+        // Security: Validate file type
+        const validation = await window.api.fileTypesValidateFile(filePath)
+        if (!validation.valid) {
+            alert(`File rejected: ${validation.reason}`)
+            return
+        }
+
+        await window.api.updateEntity(entityId, { kycFilePath: filePath })
+        loadData()
+    }
     const handleOfacRecheck = async (entity: Entity) => {
         const result = await OfacService.checkSanctions(entity.name)
         await window.api.updateEntity(entity.id, {
@@ -348,7 +423,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                     type="text"
                                     value={newName}
                                     onChange={e => { setNewName(e.target.value); setSelectedEntityId(null); }}
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                    style={{ width: '100%' }}
                                     placeholder="Type name to find or create..."
                                     required
                                 />
@@ -364,8 +439,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                         padding: '8px',
                                         maxHeight: '200px',
                                         overflowY: 'auto',
-                                        background: '#1a1d21', // Solid dark background
-                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        background: 'var(--bg-card)',
+                                        border: '1px solid var(--input-border)',
                                         borderRadius: '8px',
                                         boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                                     }}>
@@ -402,7 +477,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                 type="text"
                                                 value={newIdentifier}
                                                 onChange={e => setNewIdentifier(e.target.value)}
-                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                                style={{ width: '100%' }}
                                                 placeholder="e.g. Greek Branch, ID Number..."
                                             />
                                         </div>
@@ -411,10 +486,10 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             <select
                                                 value={newType}
                                                 onChange={e => setNewType(e.target.value as any)}
-                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                                style={{ width: '100%' }}
                                             >
-                                                <option value="company" style={{ background: '#1a1d21' }}>Company</option>
-                                                <option value="person" style={{ background: '#1a1d21' }}>Person</option>
+                                                <option value="company">Company</option>
+                                                <option value="person">Person</option>
                                             </select>
                                         </div>
                                     </div>
@@ -425,7 +500,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                 type="email"
                                                 value={newEmail}
                                                 onChange={e => setNewEmail(e.target.value)}
-                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                                style={{ width: '100%' }}
                                                 placeholder="contact@entity.com"
                                             />
                                         </div>
@@ -435,7 +510,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                 type="text"
                                                 value={newPhone}
                                                 onChange={e => setNewPhone(e.target.value)}
-                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                                style={{ width: '100%' }}
                                                 placeholder="+123..."
                                             />
                                         </div>
@@ -452,7 +527,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                     type="text"
                                     value={newRole}
                                     onChange={e => setNewRole(e.target.value)}
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                    style={{ width: '100%' }}
                                     placeholder="Select or type role..."
                                     required
                                 />
@@ -524,6 +599,82 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                         <tr style={{ background: 'rgba(0, 0, 0, 0.1)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td colSpan={4} style={{ padding: '16px 32px' }}>
                                                 <div style={{ padding: '16px', borderLeft: '2px solid var(--accent-primary)', background: 'rgba(255,255,255,0.02)' }}>
+                                                    {entity?.type === 'company' && (
+                                                        <div style={{ marginBottom: '20px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                                                            <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Company Documents</h4>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                                                <div
+                                                                    onDragOver={(e) => e.preventDefault()}
+                                                                    onDrop={(e) => handleUploadCertificateOfIncorporation(e, entity.id)}
+                                                                    style={{
+                                                                        padding: '10px',
+                                                                        borderRadius: '6px',
+                                                                        background: entity.certificateOfIncorporationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                        border: '1px dashed rgba(255,255,255,0.2)',
+                                                                        cursor: entity.certificateOfIncorporationPath ? 'pointer' : 'default',
+                                                                        fontSize: '0.8rem',
+                                                                        textAlign: 'center'
+                                                                    }}
+                                                                    onClick={() => entity.certificateOfIncorporationPath && window.api.fsOpen(entity.certificateOfIncorporationPath)}
+                                                                >
+                                                                    {entity.certificateOfIncorporationPath ? '📄 Certificate of Incorporation (Click to view)' : '📎 Drop Certificate of Incorporation here'}
+                                                                </div>
+                                                                <div
+                                                                    onDragOver={(e) => e.preventDefault()}
+                                                                    onDrop={(e) => handleUploadArticlesOfAssociation(e, entity.id)}
+                                                                    style={{
+                                                                        padding: '10px',
+                                                                        borderRadius: '6px',
+                                                                        background: entity.articlesOfAssociationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                        border: '1px dashed rgba(255,255,255,0.2)',
+                                                                        cursor: entity.articlesOfAssociationPath ? 'pointer' : 'default',
+                                                                        fontSize: '0.8rem',
+                                                                        textAlign: 'center'
+                                                                    }}
+                                                                    onClick={() => entity.articlesOfAssociationPath && window.api.fsOpen(entity.articlesOfAssociationPath)}
+                                                                >
+                                                                    {entity.articlesOfAssociationPath ? '📄 Articles of Association (Click to view)' : '📎 Drop Articles of Association here'}
+                                                                </div>
+                                                                <div
+                                                                    onDragOver={(e) => e.preventDefault()}
+                                                                    onDrop={(e) => handleUploadKYC(e, entity.id)}
+                                                                    style={{
+                                                                        padding: '10px',
+                                                                        borderRadius: '6px',
+                                                                        background: entity.kycFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                        border: '1px dashed rgba(255,255,255,0.2)',
+                                                                        cursor: entity.kycFilePath ? 'pointer' : 'default',
+                                                                        fontSize: '0.8rem',
+                                                                        textAlign: 'center'
+                                                                    }}
+                                                                    onClick={() => entity.kycFilePath && window.api.fsOpen(entity.kycFilePath)}
+                                                                >
+                                                                    {entity.kycFilePath ? '📄 KYC (Click to view)' : '📎 Drop KYC here'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {entity?.type === 'person' && (
+                                                        <div style={{ marginBottom: '20px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                                                            <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Identity Documents</h4>
+                                                            <div
+                                                                onDragOver={(e) => e.preventDefault()}
+                                                                onDrop={(e) => handleUploadPassport(e, entity.id)}
+                                                                style={{
+                                                                    padding: '10px',
+                                                                    borderRadius: '6px',
+                                                                    background: entity.passportFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                    cursor: entity.passportFilePath ? 'pointer' : 'default',
+                                                                    fontSize: '0.8rem',
+                                                                    textAlign: 'center'
+                                                                }}
+                                                                onClick={() => entity.passportFilePath && window.api.fsOpen(entity.passportFilePath)}
+                                                            >
+                                                                {entity.passportFilePath ? '📄 ID/Passport (Click to view)' : '📎 Drop ID/Passport here'}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     <h4 style={{ fontSize: '0.9rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         <UserCheck size={16} /> Ultimate Beneficial Owners (UBOs)
                                                     </h4>
@@ -535,7 +686,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 value={newUBOName}
                                                                 onChange={e => { setNewUBOName(e.target.value); setSelectedUBOId(null); }}
                                                                 placeholder="UBO Name..."
-                                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '8px 10px', color: 'white', fontSize: '0.85rem' }}
+                                                                style={{ width: '100%' }}
                                                             />
                                                             {newUBOName && !selectedUBOId && matchingUBOs.length > 0 && (
                                                                 <div style={{
@@ -548,8 +699,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     padding: '8px',
                                                                     maxHeight: '150px',
                                                                     overflowY: 'auto',
-                                                                    background: '#1a1d21',
-                                                                    border: '1px solid rgba(255,255,255,0.1)',
+                                                                    background: 'var(--bg-card)',
+                                                                    border: '1px solid var(--input-border)',
                                                                     borderRadius: '8px',
                                                                     boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                                                                 }}>
@@ -577,7 +728,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     value={newUBOIdentifier}
                                                                     onChange={e => setNewUBOIdentifier(e.target.value)}
                                                                     placeholder="UBO Identifier..."
-                                                                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '8px 10px', color: 'white', fontSize: '0.85rem' }}
+                                                                    style={{ width: '100%' }}
                                                                 />
                                                             )}
                                                             {selectedUBOId && <div style={{ padding: '8px', fontSize: '0.8rem', color: 'var(--success)' }}><Check size={14} /> Linked</div>}
@@ -586,7 +737,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                             <select
                                                                 value={newUBOType}
                                                                 onChange={e => setNewUBOType(e.target.value as any)}
-                                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px', fontSize: '0.85rem' }}
+                                                                style={{ width: '100%' }}
                                                             >
                                                                 <option value="company">Company</option>
                                                                 <option value="person">Person</option>
@@ -604,14 +755,14 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 value={newUBOEmail}
                                                                 onChange={e => setNewUBOEmail(e.target.value)}
                                                                 placeholder="UBO Email..."
-                                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '8px 10px', color: 'white', fontSize: '0.85rem' }}
+                                                                style={{ width: '100%' }}
                                                             />
                                                             <input
                                                                 type="text"
                                                                 value={newUBOPhone}
                                                                 onChange={e => setNewUBOPhone(e.target.value)}
                                                                 placeholder="UBO Phone..."
-                                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '8px 10px', color: 'white', fontSize: '0.85rem' }}
+                                                                style={{ width: '100%' }}
                                                             />
                                                         </div>
                                                     )}
@@ -654,6 +805,55 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                             onClick={() => ubo!.passportFilePath && window.api.fsOpen(ubo!.passportFilePath)}
                                                                         >
                                                                             {ubo!.passportFilePath ? '📄 ID/Passport (Click to view)' : '📎 Drop ID/Passport here'}
+                                                                        </div>
+                                                                    )}
+                                                                    {ubo!.type === 'company' && (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                                                                            <div
+                                                                                onDragOver={(e) => e.preventDefault()}
+                                                                                onDrop={(e) => handleUploadCertificateOfIncorporation(e, ubo!.id)}
+                                                                                style={{
+                                                                                    fontSize: '0.7rem',
+                                                                                    padding: '4px 6px',
+                                                                                    borderRadius: '4px',
+                                                                                    background: ubo!.certificateOfIncorporationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                    cursor: ubo!.certificateOfIncorporationPath ? 'pointer' : 'default'
+                                                                                }}
+                                                                                onClick={() => ubo!.certificateOfIncorporationPath && window.api.fsOpen(ubo!.certificateOfIncorporationPath)}
+                                                                            >
+                                                                                {ubo!.certificateOfIncorporationPath ? '📄 COI (Click to view)' : '📎 Drop Cert. of Inc.'}
+                                                                            </div>
+                                                                            <div
+                                                                                onDragOver={(e) => e.preventDefault()}
+                                                                                onDrop={(e) => handleUploadArticlesOfAssociation(e, ubo!.id)}
+                                                                                style={{
+                                                                                    fontSize: '0.7rem',
+                                                                                    padding: '4px 6px',
+                                                                                    borderRadius: '4px',
+                                                                                    background: ubo!.articlesOfAssociationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                    cursor: ubo!.articlesOfAssociationPath ? 'pointer' : 'default'
+                                                                                }}
+                                                                                onClick={() => ubo!.articlesOfAssociationPath && window.api.fsOpen(ubo!.articlesOfAssociationPath)}
+                                                                            >
+                                                                                {ubo!.articlesOfAssociationPath ? '📄 AOA (Click to view)' : '📎 Drop Art. of Assoc.'}
+                                                                            </div>
+                                                                            <div
+                                                                                onDragOver={(e) => e.preventDefault()}
+                                                                                onDrop={(e) => handleUploadKYC(e, ubo!.id)}
+                                                                                style={{
+                                                                                    fontSize: '0.7rem',
+                                                                                    padding: '4px 6px',
+                                                                                    borderRadius: '4px',
+                                                                                    background: ubo!.kycFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                    cursor: ubo!.kycFilePath ? 'pointer' : 'default'
+                                                                                }}
+                                                                                onClick={() => ubo!.kycFilePath && window.api.fsOpen(ubo!.kycFilePath)}
+                                                                            >
+                                                                                {ubo!.kycFilePath ? '📄 KYC (Click to view)' : '📎 Drop KYC here'}
+                                                                            </div>
                                                                         </div>
                                                                     )}
                                                                 </div>

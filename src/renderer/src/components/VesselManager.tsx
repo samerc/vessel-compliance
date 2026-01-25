@@ -263,7 +263,7 @@ export default function VesselManager() {
                     <select
                         value={newVessel.fleetId}
                         onChange={e => setNewVessel({ ...newVessel, fleetId: e.target.value })}
-                        style={{ flex: 1, minWidth: '150px' }}
+                        style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
                     >
                         <option value="">Standalone</option>
                         {fleets.map(f => (
@@ -290,7 +290,7 @@ export default function VesselManager() {
                     <select
                         value={fleetFilter}
                         onChange={e => setFleetFilter(e.target.value)}
-                        style={{ padding: '10px', borderRadius: '12px' }}
+                        style={{ padding: '10px', borderRadius: '12px', color: 'var(--text-primary)' }}
                     >
                         <option value="all">All Fleets</option>
                         <option value="">Standalone</option>
@@ -351,7 +351,7 @@ export default function VesselManager() {
                                         <select
                                             value={v.fleetId || ''}
                                             onChange={e => handleUpdateFleet(v.id, e.target.value)}
-                                            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}
                                         >
                                             <option value="">Standalone</option>
                                             {fleets.map(f => (

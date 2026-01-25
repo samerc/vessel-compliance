@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor } from '../../shared/types'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
 
@@ -101,6 +101,151 @@ export class MySQLAdapter {
             const userColNames = (userCols as any[]).map(c => c.Field)
             if (!userColNames.includes('theme_preference')) {
                 await this.pool.query("ALTER TABLE users ADD COLUMN theme_preference VARCHAR(10) DEFAULT 'dark' AFTER role")
+            }
+
+            // Migration: Add window preferences to users
+            if (!userColNames.includes('window_width')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN window_width INT DEFAULT NULL AFTER theme_preference")
+            }
+            if (!userColNames.includes('window_height')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN window_height INT DEFAULT NULL AFTER window_width")
+            }
+            if (!userColNames.includes('window_x')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN window_x INT DEFAULT NULL AFTER window_height")
+            }
+            if (!userColNames.includes('window_y')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN window_y INT DEFAULT NULL AFTER window_x")
+            }
+
+            // Migration: Add surveyors table
+            const [surveyorsTables] = await this.pool.query("SHOW TABLES LIKE 'surveyors'")
+            if ((surveyorsTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS surveyors (
+                    id VARCHAR(36) PRIMARY KEY,
+                    company_name VARCHAR(255) NOT NULL,
+                    country VARCHAR(100) NOT NULL,
+                    contact_person VARCHAR(255),
+                    contact_details TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_company_name (company_name),
+                    INDEX idx_country (country)
+                )`)
+            }
+
+            // Migration: Add contact_person column to surveyors
+            const [contactPersonCol] = await this.pool.query(
+                "SHOW COLUMNS FROM surveyors LIKE 'contact_person'"
+            )
+            if ((contactPersonCol as any[]).length === 0) {
+                await this.pool.query(
+                    `ALTER TABLE surveyors ADD COLUMN contact_person VARCHAR(255) AFTER country`
+                )
+            }
+
+            // Migration: Add corporate document columns to entities
+            const [coiCol] = await this.pool.query(
+                "SHOW COLUMNS FROM entities LIKE 'certificate_of_incorporation_path'"
+            )
+            if ((coiCol as any[]).length === 0) {
+                await this.pool.query(
+                    `ALTER TABLE entities ADD COLUMN certificate_of_incorporation_path TEXT AFTER passport_file_path`
+                )
+            }
+
+            const [aoaCol] = await this.pool.query(
+                "SHOW COLUMNS FROM entities LIKE 'articles_of_association_path'"
+            )
+            if ((aoaCol as any[]).length === 0) {
+                await this.pool.query(
+                    `ALTER TABLE entities ADD COLUMN articles_of_association_path TEXT AFTER certificate_of_incorporation_path`
+                )
+            }
+
+            // Migration: Add kyc_file_path column to entities
+            const [kycCol] = await this.pool.query(
+                "SHOW COLUMNS FROM entities LIKE 'kyc_file_path'"
+            )
+            if ((kycCol as any[]).length === 0) {
+                await this.pool.query(
+                    `ALTER TABLE entities ADD COLUMN kyc_file_path TEXT AFTER articles_of_association_path`
+                )
+            }
+
+            // Migration: Add condition surveys tables
+            const [csTables] = await this.pool.query("SHOW TABLES LIKE 'condition_surveys'")
+            if ((csTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS condition_surveys (
+                    id VARCHAR(36) PRIMARY KEY,
+                    vessel_id VARCHAR(36) NOT NULL,
+                    survey_date DATE NOT NULL,
+                    surveyor_id VARCHAR(36) NOT NULL,
+                    survey_type VARCHAR(100) NOT NULL,
+                    location VARCHAR(255),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by VARCHAR(255),
+                    FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+                    FOREIGN KEY (surveyor_id) REFERENCES surveyors(id) ON DELETE RESTRICT,
+                    INDEX idx_vessel_date (vessel_id, survey_date DESC)
+                )`)
+
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS survey_defects (
+                    id VARCHAR(36) PRIMARY KEY,
+                    survey_id VARCHAR(36) NOT NULL,
+                    defect_number VARCHAR(50) NOT NULL,
+                    description TEXT NOT NULL,
+                    severity VARCHAR(20) NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+                    due_date DATE,
+                    closed_at DATETIME,
+                    closed_by VARCHAR(255),
+                    closure_notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (survey_id) REFERENCES condition_surveys(id) ON DELETE CASCADE,
+                    INDEX idx_survey_status (survey_id, status),
+                    INDEX idx_due_date (due_date)
+                )`)
+
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS survey_attachments (
+                    id VARCHAR(36) PRIMARY KEY,
+                    survey_id VARCHAR(36) NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_name VARCHAR(255) NOT NULL,
+                    file_type VARCHAR(50),
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    uploaded_by VARCHAR(255),
+                    FOREIGN KEY (survey_id) REFERENCES condition_surveys(id) ON DELETE CASCADE
+                )`)
+            } else {
+                // Migration: Update existing condition_surveys table to use surveyor_id
+                const [columns] = await this.pool.query(
+                    "SHOW COLUMNS FROM condition_surveys LIKE 'surveyor_name'"
+                )
+                if ((columns as any[]).length > 0) {
+                    // Old schema detected - migrate data
+                    // First, create a default "Unknown" surveyor for existing surveys
+                    const unknownSurveyorId = '00000000-0000-0000-0000-000000000000'
+                    await this.pool.query(
+                        `INSERT IGNORE INTO surveyors (id, company_name, country) VALUES (?, 'Unknown', 'Unknown')`,
+                        [unknownSurveyorId]
+                    )
+
+                    // Add surveyor_id column
+                    await this.pool.query(
+                        `ALTER TABLE condition_surveys ADD COLUMN surveyor_id VARCHAR(36) DEFAULT ?`,
+                        [unknownSurveyorId]
+                    )
+
+                    // Update constraint
+                    await this.pool.query(
+                        `ALTER TABLE condition_surveys ADD FOREIGN KEY (surveyor_id) REFERENCES surveyors(id) ON DELETE RESTRICT`
+                    )
+
+                    // Drop old columns
+                    await this.pool.query(`ALTER TABLE condition_surveys DROP COLUMN surveyor_name`)
+                    await this.pool.query(`ALTER TABLE condition_surveys DROP COLUMN surveyor_company`)
+                }
             }
         } catch (error) {
             console.error('Schema initialization failed:', error)
@@ -310,7 +455,7 @@ export class MySQLAdapter {
     // --- Entities ---
     async getEntities(): Promise<Entity[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM entities')
+        const [rows] = await this.pool.query('SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, certificate_of_incorporation_path as certificateOfIncorporationPath, articles_of_association_path as articlesOfAssociationPath, kyc_file_path as kycFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM entities')
         return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
     }
 
@@ -318,8 +463,8 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO entities (id, name, type, identifier, email, phone, passport_file_path, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, entity.name, entity.type, entity.identifier || null, entity.email || null, entity.phone || null, entity.passportFilePath || null, entity.ofacCheckedAt || null, entity.ofacMatchFound || false, entity.ofacStatus || 'PENDING']
+            'INSERT INTO entities (id, name, type, identifier, email, phone, passport_file_path, certificate_of_incorporation_path, articles_of_association_path, kyc_file_path, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, entity.name, entity.type, entity.identifier || null, entity.email || null, entity.phone || null, entity.passportFilePath || null, entity.certificateOfIncorporationPath || null, entity.articlesOfAssociationPath || null, entity.kycFilePath || null, entity.ofacCheckedAt || null, entity.ofacMatchFound || false, entity.ofacStatus || 'PENDING']
         )
         return { ...entity, id }
     }
@@ -327,9 +472,27 @@ export class MySQLAdapter {
     async updateEntity(id: string, updates: Partial<Entity>): Promise<void> {
         if (!this.pool) return
 
-        // Security: Validate file extension if passport file path is being updated
+        // Security: Validate file extensions for any file paths being updated
         if (updates.passportFilePath !== undefined && updates.passportFilePath) {
             const validation = await this.validateFileExtension(updates.passportFilePath)
+            if (!validation.valid) {
+                throw new Error(`File validation failed: ${validation.reason}`)
+            }
+        }
+        if (updates.certificateOfIncorporationPath !== undefined && updates.certificateOfIncorporationPath) {
+            const validation = await this.validateFileExtension(updates.certificateOfIncorporationPath)
+            if (!validation.valid) {
+                throw new Error(`File validation failed: ${validation.reason}`)
+            }
+        }
+        if (updates.articlesOfAssociationPath !== undefined && updates.articlesOfAssociationPath) {
+            const validation = await this.validateFileExtension(updates.articlesOfAssociationPath)
+            if (!validation.valid) {
+                throw new Error(`File validation failed: ${validation.reason}`)
+            }
+        }
+        if (updates.kycFilePath !== undefined && updates.kycFilePath) {
+            const validation = await this.validateFileExtension(updates.kycFilePath)
             if (!validation.valid) {
                 throw new Error(`File validation failed: ${validation.reason}`)
             }
@@ -344,6 +507,9 @@ export class MySQLAdapter {
         if (updates.email !== undefined) { fields.push('email = ?'); values.push(updates.email) }
         if (updates.phone !== undefined) { fields.push('phone = ?'); values.push(updates.phone) }
         if (updates.passportFilePath !== undefined) { fields.push('passport_file_path = ?'); values.push(updates.passportFilePath) }
+        if (updates.certificateOfIncorporationPath !== undefined) { fields.push('certificate_of_incorporation_path = ?'); values.push(updates.certificateOfIncorporationPath) }
+        if (updates.articlesOfAssociationPath !== undefined) { fields.push('articles_of_association_path = ?'); values.push(updates.articlesOfAssociationPath) }
+        if (updates.kycFilePath !== undefined) { fields.push('kyc_file_path = ?'); values.push(updates.kycFilePath) }
         if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(updates.ofacCheckedAt || null) }
         if (updates.ofacMatchFound !== undefined) { fields.push('ofac_match_found = ?'); values.push(updates.ofacMatchFound || false) }
         if (updates.ofacStatus !== undefined) { fields.push('ofac_status = ?'); values.push(updates.ofacStatus) }
@@ -454,7 +620,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, created_at as createdAt FROM users WHERE username = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -477,7 +643,7 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, theme_preference as themePreference, created_at as createdAt FROM users ORDER BY username ASC'
+            'SELECT id, username, role, theme_preference as themePreference, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
@@ -493,6 +659,14 @@ export class MySQLAdapter {
         await this.pool.execute(
             'UPDATE users SET theme_preference = ? WHERE id = ?',
             [theme, userId]
+        )
+    }
+
+    async updateUserWindowPreferences(userId: string, width: number, height: number, x?: number, y?: number): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE users SET window_width = ?, window_height = ?, window_x = ?, window_y = ? WHERE id = ?',
+            [width, height, x !== undefined ? x : null, y !== undefined ? y : null, userId]
         )
     }
 
@@ -566,6 +740,245 @@ export class MySQLAdapter {
         }
 
         return { valid: true }
+    }
+
+    // --- Surveyors ---
+    async getSurveyors(): Promise<Surveyor[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, company_name as companyName, country, contact_person as contactPerson,
+             contact_details as contactDetails, notes, created_at as createdAt
+             FROM surveyors ORDER BY company_name ASC`
+        )
+        return rows as Surveyor[]
+    }
+
+    async addSurveyor(surveyor: Omit<Surveyor, 'id'>): Promise<Surveyor> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO surveyors (id, company_name, country, contact_person, contact_details, notes)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [id, surveyor.companyName, surveyor.country, surveyor.contactPerson || null,
+             surveyor.contactDetails || null, surveyor.notes || null]
+        )
+        return { ...surveyor, id }
+    }
+
+    async updateSurveyor(id: string, updates: Partial<Surveyor>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.companyName !== undefined) { fields.push('company_name = ?'); values.push(updates.companyName) }
+        if (updates.country !== undefined) { fields.push('country = ?'); values.push(updates.country) }
+        if (updates.contactPerson !== undefined) { fields.push('contact_person = ?'); values.push(updates.contactPerson) }
+        if (updates.contactDetails !== undefined) { fields.push('contact_details = ?'); values.push(updates.contactDetails) }
+        if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE surveyors SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteSurveyor(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM surveyors WHERE id = ?', [id])
+    }
+
+    // --- Condition Surveys ---
+    async getConditionSurveys(vesselId?: string): Promise<ConditionSurvey[]> {
+        if (!this.pool) return []
+        let sql = `SELECT id, vessel_id as vesselId, survey_date as surveyDate,
+                   surveyor_id as surveyorId, survey_type as surveyType, location, notes,
+                   created_at as createdAt, created_by as createdBy
+                   FROM condition_surveys`
+        const params: any[] = []
+        if (vesselId) {
+            sql += ' WHERE vessel_id = ? ORDER BY survey_date DESC'
+            params.push(vesselId)
+        } else {
+            sql += ' ORDER BY survey_date DESC'
+        }
+        const [rows] = await this.pool.query(sql, params)
+        return rows as ConditionSurvey[]
+    }
+
+    async addConditionSurvey(survey: Omit<ConditionSurvey, 'id'>): Promise<ConditionSurvey> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO condition_surveys
+             (id, vessel_id, survey_date, surveyor_id, survey_type, location, notes, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, survey.vesselId, survey.surveyDate, survey.surveyorId,
+             survey.surveyType, survey.location || null,
+             survey.notes || null, survey.createdBy || 'System']
+        )
+        return { ...survey, id }
+    }
+
+    async updateConditionSurvey(id: string, updates: Partial<ConditionSurvey>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.surveyDate !== undefined) { fields.push('survey_date = ?'); values.push(updates.surveyDate) }
+        if (updates.surveyorId !== undefined) { fields.push('surveyor_id = ?'); values.push(updates.surveyorId) }
+        if (updates.surveyType !== undefined) { fields.push('survey_type = ?'); values.push(updates.surveyType) }
+        if (updates.location !== undefined) { fields.push('location = ?'); values.push(updates.location) }
+        if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE condition_surveys SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteConditionSurvey(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM condition_surveys WHERE id = ?', [id])
+    }
+
+    // --- Survey Defects ---
+    async getSurveyDefects(surveyId?: string): Promise<SurveyDefect[]> {
+        if (!this.pool) return []
+        let sql = `SELECT id, survey_id as surveyId, defect_number as defectNumber,
+                   description, severity, status, due_date as dueDate,
+                   closed_at as closedAt, closed_by as closedBy, closure_notes as closureNotes,
+                   created_at as createdAt
+                   FROM survey_defects`
+        const params: any[] = []
+        if (surveyId) {
+            sql += ' WHERE survey_id = ? ORDER BY defect_number ASC'
+            params.push(surveyId)
+        }
+        const [rows] = await this.pool.query(sql, params)
+        return rows as SurveyDefect[]
+    }
+
+    async addSurveyDefect(defect: Omit<SurveyDefect, 'id'>): Promise<SurveyDefect> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO survey_defects
+             (id, survey_id, defect_number, description, severity, status, due_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, defect.surveyId, defect.defectNumber, defect.description,
+             defect.severity, defect.status || 'OPEN', defect.dueDate || null]
+        )
+        return { ...defect, id }
+    }
+
+    async updateSurveyDefect(id: string, updates: Partial<SurveyDefect>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.defectNumber !== undefined) { fields.push('defect_number = ?'); values.push(updates.defectNumber) }
+        if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
+        if (updates.severity !== undefined) { fields.push('severity = ?'); values.push(updates.severity) }
+        if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
+        if (updates.dueDate !== undefined) { fields.push('due_date = ?'); values.push(updates.dueDate) }
+        if (updates.closedAt !== undefined) { fields.push('closed_at = ?'); values.push(updates.closedAt) }
+        if (updates.closedBy !== undefined) { fields.push('closed_by = ?'); values.push(updates.closedBy) }
+        if (updates.closureNotes !== undefined) { fields.push('closure_notes = ?'); values.push(updates.closureNotes) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE survey_defects SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteSurveyDefect(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM survey_defects WHERE id = ?', [id])
+    }
+
+    async closeDefect(id: string, closedBy: string, closureNotes?: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE survey_defects SET status = "CLOSED", closed_at = NOW(), closed_by = ?, closure_notes = ? WHERE id = ?',
+            [closedBy, closureNotes || null, id]
+        )
+    }
+
+    async reopenDefect(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE survey_defects SET status = "OPEN", closed_at = NULL, closed_by = NULL, closure_notes = NULL WHERE id = ?',
+            [id]
+        )
+    }
+
+    // --- Survey Attachments ---
+    async getSurveyAttachments(surveyId?: string): Promise<SurveyAttachment[]> {
+        if (!this.pool) return []
+        let sql = `SELECT id, survey_id as surveyId, file_path as filePath,
+                   file_name as fileName, file_type as fileType,
+                   uploaded_at as uploadedAt, uploaded_by as uploadedBy
+                   FROM survey_attachments`
+        const params: any[] = []
+        if (surveyId) {
+            sql += ' WHERE survey_id = ? ORDER BY uploaded_at DESC'
+            params.push(surveyId)
+        }
+        const [rows] = await this.pool.query(sql, params)
+        return rows as SurveyAttachment[]
+    }
+
+    async addSurveyAttachment(attachment: Omit<SurveyAttachment, 'id'>): Promise<SurveyAttachment> {
+        if (!this.pool) throw new Error('DB Not connected')
+        if (attachment.filePath) {
+            const validation = await this.validateFileExtension(attachment.filePath)
+            if (!validation.valid) {
+                throw new Error(`File validation failed: ${validation.reason}`)
+            }
+        }
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO survey_attachments
+             (id, survey_id, file_path, file_name, file_type, uploaded_by)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [id, attachment.surveyId, attachment.filePath, attachment.fileName,
+             attachment.fileType || 'other', attachment.uploadedBy || 'System']
+        )
+        return { ...attachment, id }
+    }
+
+    async deleteSurveyAttachment(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM survey_attachments WHERE id = ?', [id])
+    }
+
+    // --- Reports ---
+    async getOpenDefectsByVessel(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT
+                v.id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
+                cs.id as surveyId, cs.survey_date as surveyDate, cs.surveyor_name as surveyorName,
+                sd.id as defectId, sd.defect_number as defectNumber, sd.description,
+                sd.severity, sd.due_date as dueDate, sd.created_at as createdAt
+            FROM vessels v
+            INNER JOIN condition_surveys cs ON cs.vessel_id = v.id
+            INNER JOIN survey_defects sd ON sd.survey_id = cs.id
+            WHERE sd.status = 'OPEN'
+            ORDER BY v.name ASC, sd.severity DESC, sd.due_date ASC
+        `)
+        return rows as any[]
+    }
+
+    async getSurveyHistory(vesselId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT
+                cs.id as surveyId, cs.survey_date as surveyDate,
+                s.company_name as surveyorName, s.country as surveyorCompany,
+                cs.survey_type as surveyType, cs.location,
+                COUNT(CASE WHEN sd.status = 'OPEN' THEN 1 END) as openDefects,
+                COUNT(CASE WHEN sd.status = 'CLOSED' THEN 1 END) as closedDefects,
+                COUNT(sd.id) as totalDefects
+            FROM condition_surveys cs
+            LEFT JOIN surveyors s ON s.id = cs.surveyor_id
+            LEFT JOIN survey_defects sd ON sd.survey_id = cs.id
+            WHERE cs.vessel_id = ?
+            GROUP BY cs.id
+            ORDER BY cs.survey_date DESC
+        `, [vesselId])
+        return rows as any[]
     }
 }
 

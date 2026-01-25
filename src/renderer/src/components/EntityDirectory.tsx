@@ -341,6 +341,70 @@ export default function EntityDirectory() {
                                                 )}
                                             </div>
                                         )}
+                                        {selectedEntity.type === 'company' && (
+                                            <div style={{ marginTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                                <div
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        borderRadius: '8px',
+                                                        background: selectedEntity.certificateOfIncorporationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                                                        border: selectedEntity.certificateOfIncorporationPath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        fontSize: '0.85rem',
+                                                        cursor: selectedEntity.certificateOfIncorporationPath ? 'pointer' : 'default'
+                                                    }}
+                                                    onClick={() => selectedEntity.certificateOfIncorporationPath && window.api.fsOpen(selectedEntity.certificateOfIncorporationPath)}
+                                                >
+                                                    {selectedEntity.certificateOfIncorporationPath ? (
+                                                        <>📄 Certificate of Incorporation (Click to view)</>
+                                                    ) : (
+                                                        <>⚠️ Certificate of Incorporation Missing</>
+                                                    )}
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        borderRadius: '8px',
+                                                        background: selectedEntity.articlesOfAssociationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                                                        border: selectedEntity.articlesOfAssociationPath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        fontSize: '0.85rem',
+                                                        cursor: selectedEntity.articlesOfAssociationPath ? 'pointer' : 'default'
+                                                    }}
+                                                    onClick={() => selectedEntity.articlesOfAssociationPath && window.api.fsOpen(selectedEntity.articlesOfAssociationPath)}
+                                                >
+                                                    {selectedEntity.articlesOfAssociationPath ? (
+                                                        <>📄 Articles of Association (Click to view)</>
+                                                    ) : (
+                                                        <>⚠️ Articles of Association Missing</>
+                                                    )}
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        borderRadius: '8px',
+                                                        background: selectedEntity.kycFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                                                        border: selectedEntity.kycFilePath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        fontSize: '0.85rem',
+                                                        cursor: selectedEntity.kycFilePath ? 'pointer' : 'default'
+                                                    }}
+                                                    onClick={() => selectedEntity.kycFilePath && window.api.fsOpen(selectedEntity.kycFilePath)}
+                                                >
+                                                    {selectedEntity.kycFilePath ? (
+                                                        <>📄 KYC (Click to view)</>
+                                                    ) : (
+                                                        <>⚠️ KYC Missing</>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

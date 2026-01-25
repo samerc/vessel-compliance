@@ -41,6 +41,9 @@ export interface Entity {
   email?: string
   phone?: string
   passportFilePath?: string // Path to ID/passport document (for persons)
+  certificateOfIncorporationPath?: string // Path to Certificate of Incorporation (for companies)
+  articlesOfAssociationPath?: string // Path to Articles of Association (for companies)
+  kycFilePath?: string // Path to KYC document (for all entities)
   ofacCheckedAt?: string
   ofacMatchFound?: boolean
   ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
@@ -80,6 +83,10 @@ export interface User {
   passwordHash: string
   role: 'admin' | 'user'
   themePreference?: 'light' | 'dark'
+  windowWidth?: number
+  windowHeight?: number
+  windowX?: number
+  windowY?: number
   createdAt?: string
 }
 
@@ -98,4 +105,50 @@ export interface SanctionsMatch {
 export interface FileTypeSettings {
   allowedExtensions: string[] // e.g., ['.pdf', '.jpg', '.zip']
   blockedExtensions: string[] // e.g., ['.exe', '.bat', '.sh']
+}
+
+export interface ConditionSurvey {
+  id: string
+  vesselId: string
+  surveyDate: string
+  surveyorId: string
+  surveyType: string
+  location?: string
+  notes?: string
+  createdAt?: string
+  createdBy?: string
+}
+
+export interface SurveyDefect {
+  id: string
+  surveyId: string
+  defectNumber: string
+  description: string
+  severity?: 'Critical' | 'Major' | 'Minor' | 'Observation'
+  status: 'OPEN' | 'CLOSED'
+  dueDate?: string
+  closedAt?: string
+  closedBy?: string
+  closureNotes?: string
+  createdAt?: string
+}
+
+export interface SurveyAttachment {
+  id: string
+  surveyId: string
+  filePath: string
+  fileName: string
+  fileType?: 'report' | 'photo' | 'certificate' | 'other'
+  uploadedAt?: string
+  uploadedBy?: string
+}
+
+export interface Surveyor {
+  id: string
+  companyName: string
+  country: string
+  contactPerson?: string
+  contactDetails?: string
+  notes?: string
+  createdAt?: string
 }

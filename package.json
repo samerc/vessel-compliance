@@ -1,6 +1,6 @@
 {
   "name": "vessel-compliance",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -30,7 +30,9 @@
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.562.0",
+    "mammoth": "^1.11.0",
     "mysql2": "^3.16.1",
+    "pdf-parse": "^1.1.1",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"
   },

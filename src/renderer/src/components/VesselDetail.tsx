@@ -4,6 +4,7 @@ import { Vessel, DocumentType, VesselDocument } from '../../../shared/types'
 
 import { ReportService } from '../services/ReportService'
 import AssuredManager from './AssuredManager'
+import ConditionSurveyManager from './ConditionSurveyManager'
 
 interface VesselDetailProps {
     vessel: Vessel
@@ -109,7 +110,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             sent: existing?.sent || false,
             required: existing ? existing.required : (docTypes.find(t => t.id === docTypeId)?.required || false),
             uploadedDate: new Date().toISOString(),
-            uploadedBy: 'Current User'
+            uploadedBy: 'Current User',
+            receivedDate: new Date().toISOString().split('T')[0]
         }
 
         if (!newDoc.filePath) {
@@ -145,11 +147,6 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
     const handleUpdateExpiry = async (docTypeId: string, expiryDate: string) => {
         await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, expiryDate)
-        loadData()
-    }
-
-    const handleUpdateReceivedDate = async (docTypeId: string, receivedDate: string) => {
-        await window.api.updateVesselDocumentReceivedDate(vessel.id, docTypeId, receivedDate)
         loadData()
     }
 
@@ -310,16 +307,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         )}
                                     </td>
                                     <td style={{ padding: '16px' }}>
-                                        <input
-                                            type="date"
-                                            value={doc?.receivedDate || ''}
-                                            onChange={e => handleUpdateReceivedDate(type.id, e.target.value)}
-                                            style={{
-                                                padding: '4px 8px',
-                                                borderRadius: '4px',
-                                                fontSize: '0.85rem'
-                                            }}
-                                        />
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                            {doc?.receivedDate ? new Date(doc.receivedDate).toLocaleDateString() : '-'}
+                                        </span>
                                     </td>
                                     <td style={{ padding: '16px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -358,6 +348,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             </div>
 
             <AssuredManager vessel={vessel} />
+
+            <ConditionSurveyManager vessel={vessel} />
         </div>
     )
 }

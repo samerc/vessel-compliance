@@ -107,6 +107,17 @@ textarea {
   transition: var(--transition);
 }
 
+select option {
+  background-color: #ffffff !important;
+  color: #1c1e21 !important;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #e0e0e0 !important;
+  color: #1c1e21 !important;
+}
+
 input:focus,
 select:focus,
 textarea:focus {

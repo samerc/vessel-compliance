@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor } from '../shared/types'
 
 export interface Api {
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -59,9 +59,14 @@ export interface Api {
 
   dialogOpenFile: () => Promise<string | null>
   excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
+  dialogOpenFileWord: () => Promise<string | null>
+  importDefectsFromWord: (surveyId: string, filePath: string) => Promise<{ success: boolean; message?: string; count: number }>
 
   themeGet: () => Promise<'light' | 'dark'>
   themeSet: (theme: 'light' | 'dark') => Promise<void>
+
+  windowGetPreferences: () => Promise<{ width: number; height: number; x?: number; y?: number } | null>
+  windowSavePreferences: () => Promise<void>
 
   fileTypesGetSettings: () => Promise<FileTypeSettings>
   fileTypesSetSettings: (settings: FileTypeSettings) => Promise<FileTypeSettings>
@@ -73,6 +78,29 @@ export interface Api {
     timestamp: string
     matches: SanctionsMatch[]
   }>
+
+  // Surveyors
+  getSurveyors: () => Promise<Surveyor[]>
+  addSurveyor: (surveyor: Omit<Surveyor, 'id'>) => Promise<Surveyor>
+  updateSurveyor: (id: string, updates: Partial<Surveyor>) => Promise<void>
+  deleteSurveyor: (id: string) => Promise<void>
+
+  // Condition Surveys
+  getConditionSurveys: (vesselId?: string) => Promise<ConditionSurvey[]>
+  addConditionSurvey: (survey: Omit<ConditionSurvey, 'id'>) => Promise<ConditionSurvey>
+  updateConditionSurvey: (id: string, updates: Partial<ConditionSurvey>) => Promise<void>
+  deleteConditionSurvey: (id: string) => Promise<void>
+  getSurveyDefects: (surveyId?: string) => Promise<SurveyDefect[]>
+  addSurveyDefect: (defect: Omit<SurveyDefect, 'id'>) => Promise<SurveyDefect>
+  updateSurveyDefect: (id: string, updates: Partial<SurveyDefect>) => Promise<void>
+  deleteSurveyDefect: (id: string) => Promise<void>
+  closeDefect: (id: string, closedBy: string, closureNotes?: string) => Promise<void>
+  reopenDefect: (id: string) => Promise<void>
+  getSurveyAttachments: (surveyId?: string) => Promise<SurveyAttachment[]>
+  addSurveyAttachment: (attachment: Omit<SurveyAttachment, 'id'>) => Promise<SurveyAttachment>
+  deleteSurveyAttachment: (id: string) => Promise<void>
+  getOpenDefectsByVessel: () => Promise<any[]>
+  getSurveyHistory: (vesselId: string) => Promise<any[]>
 }
 
 declare global {

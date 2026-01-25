@@ -67,6 +67,26 @@ The app integrates with sanctions.network API for OFAC/UN/EU sanctions checking:
 - **Status flow**: `PENDING` → `POTENTIAL_MATCH` (yellow, needs review) → `CLEARED` or `MATCH` (user decision)
 - Each component with sanctions badges (VesselManager, AssuredManager, EntityDirectory) has its own `OfacBadge` component that must handle all statuses
 
+### Condition Surveys
+Vessel inspection tracking with defects management:
+- **Surveyors**: Directory of surveyor companies (`SurveyorDirectory.tsx`) with company name, country, contact info
+- **Surveys**: Condition surveys attached to vessels (`ConditionSurveyManager.tsx`) with date, surveyor, type, location
+- **Defects**: Each survey can have multiple defects (`DefectManager.tsx`) with severity (optional), status (OPEN/CLOSED), due dates
+- **Attachments**: Multiple file attachments per survey (reports, photos, certificates)
+- **Survey Status**: Automatically shows "SURVEY CLOSED" when all defects are closed
+- **Closure Tracking**: Defects track who closed them, when, and optional closure notes
+
+### Entity Documents
+Required documents vary by entity type:
+- **Companies**: Certificate of Incorporation, Articles of Association, KYC
+- **Persons**: ID/Passport only (no KYC required)
+- **UBOs**: Same document requirements based on their type (company or person)
+
+### Window Preferences
+- **Per-User Storage**: Window size and position stored in database per user (`users.window_width`, `window_height`, `window_x`, `window_y`)
+- **Auto-Save**: Window bounds saved on resize/move when user is logged in
+- **Auto-Restore**: User's window preferences applied on login via `setBounds`
+
 ### Code Style
 - Prettier: Single quotes, no semicolons, 100 char width, no trailing commas
 - Path alias: `@renderer/*` maps to `src/renderer/src/*`
