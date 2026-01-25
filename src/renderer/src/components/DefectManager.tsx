@@ -191,6 +191,7 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
             <select
               value={newSeverity}
               onChange={(e) => setNewSeverity(e.target.value as any)}
+              style={{ color: 'var(--text-primary)' }}
             >
               <option value="">Not Set</option>
               <option value="Critical">Critical</option>
@@ -254,6 +255,7 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                           <select
                             value={editSeverity}
                             onChange={(e) => setEditSeverity(e.target.value as any)}
+                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="">Not Set</option>
                             <option value="Critical">Critical</option>

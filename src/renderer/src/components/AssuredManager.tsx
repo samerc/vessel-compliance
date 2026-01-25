@@ -486,7 +486,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             <select
                                                 value={newType}
                                                 onChange={e => setNewType(e.target.value as any)}
-                                                style={{ width: '100%' }}
+                                                style={{ width: '100%', color: 'var(--text-primary)' }}
                                             >
                                                 <option value="company">Company</option>
                                                 <option value="person">Person</option>
@@ -737,7 +737,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                             <select
                                                                 value={newUBOType}
                                                                 onChange={e => setNewUBOType(e.target.value as any)}
-                                                                style={{ width: '100%' }}
+                                                                style={{ width: '100%', color: 'var(--text-primary)' }}
                                                             >
                                                                 <option value="company">Company</option>
                                                                 <option value="person">Person</option>

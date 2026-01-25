@@ -91,3 +91,9 @@ release/
 # System Files
 .DS_Store
 Thumbs.db
+
+# Test/Debug Files
+analyze-excel.js
+read_sheet.js
+*.pdf
+*.docx

@@ -329,6 +329,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 setShowNewSurveyorForm(e.target.value === 'new')
               }}
               required
+              style={{ color: 'var(--text-primary)' }}
             >
               <option value="">-- Select Surveyor --</option>
               {surveyors.map(s => (
@@ -529,6 +530,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                             value={editSurveyorId}
                             onChange={(e) => setEditSurveyorId(e.target.value)}
                             required
+                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="">-- Select Surveyor --</option>
                             {surveyors.map(s => (

@@ -89,7 +89,7 @@ export default function UserManager() {
                     <select
                         value={formData.role}
                         onChange={e => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' })}
-                        style={{ flex: 1, minWidth: '120px' }}
+                        style={{ flex: 1, minWidth: '120px', color: 'var(--text-primary)' }}
                     >
                         <option value="user">User</option>
                         <option value="admin">Admin</option>
