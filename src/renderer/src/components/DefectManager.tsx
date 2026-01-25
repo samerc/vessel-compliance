@@ -28,6 +28,7 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
   const [editDescription, setEditDescription] = useState('')
   const [editSeverity, setEditSeverity] = useState<'Critical' | 'Major' | 'Minor' | 'Observation' | ''>('')
   const [editDueDate, setEditDueDate] = useState('')
+  const [editNotes, setEditNotes] = useState('')
 
   useEffect(() => {
     loadDefects()
@@ -76,6 +77,7 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
     setEditDescription(defect.description)
     setEditSeverity(defect.severity || '')
     setEditDueDate(defect.dueDate || '')
+    setEditNotes(defect.notes || '')
   }
 
   const handleSaveEdit = async (defectId: string) => {
@@ -85,7 +87,8 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
       defectNumber: editNumber,
       description: editDescription,
       severity: editSeverity ? (editSeverity as 'Critical' | 'Major' | 'Minor' | 'Observation') : undefined,
-      dueDate: editDueDate || undefined
+      dueDate: editDueDate || undefined,
+      notes: editNotes || undefined
     })
 
     setEditingDefectId(null)
@@ -270,6 +273,15 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                             onChange={(e) => setEditDueDate(e.target.value)}
                           />
                         </div>
+                        <div style={{ marginBottom: '10px' }}>
+                          <textarea
+                            placeholder="Notes (optional)"
+                            value={editNotes}
+                            onChange={(e) => setEditNotes(e.target.value)}
+                            rows={2}
+                            style={{ width: '100%', resize: 'vertical' }}
+                          />
+                        </div>
                         <div style={{ display: 'flex', gap: '10px' }}>
                           <button
                             onClick={() => handleSaveEdit(defect.id)}
@@ -313,7 +325,8 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                           <button
                             onClick={() => handleEditDefect(defect)}
-                            style={{ padding: '6px 12px', background: 'var(--primary-color)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
+                            className="btn-primary"
+                            style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
                             title="Edit defect"
                           >
                             <Edit size={14} />

@@ -127,6 +127,7 @@ export interface SurveyDefect {
   severity?: 'Critical' | 'Major' | 'Minor' | 'Observation'
   status: 'OPEN' | 'CLOSED'
   dueDate?: string
+  notes?: string
   closedAt?: string
   closedBy?: string
   closureNotes?: string

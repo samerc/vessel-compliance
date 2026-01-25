@@ -247,6 +247,12 @@ export class MySQLAdapter {
                     await this.pool.query(`ALTER TABLE condition_surveys DROP COLUMN surveyor_company`)
                 }
             }
+
+            // Migration: Add notes column to survey_defects
+            const [defectCols] = await this.pool.query("SHOW COLUMNS FROM survey_defects LIKE 'notes'")
+            if ((defectCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE survey_defects ADD COLUMN notes TEXT AFTER due_date")
+            }
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -839,7 +845,7 @@ export class MySQLAdapter {
     async getSurveyDefects(surveyId?: string): Promise<SurveyDefect[]> {
         if (!this.pool) return []
         let sql = `SELECT id, survey_id as surveyId, defect_number as defectNumber,
-                   description, severity, status, due_date as dueDate,
+                   description, severity, status, due_date as dueDate, notes,
                    closed_at as closedAt, closed_by as closedBy, closure_notes as closureNotes,
                    created_at as createdAt
                    FROM survey_defects`
@@ -857,10 +863,10 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute(
             `INSERT INTO survey_defects
-             (id, survey_id, defect_number, description, severity, status, due_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (id, survey_id, defect_number, description, severity, status, due_date, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, defect.surveyId, defect.defectNumber, defect.description,
-             defect.severity, defect.status || 'OPEN', defect.dueDate || null]
+             defect.severity, defect.status || 'OPEN', defect.dueDate || null, defect.notes || null]
         )
         return { ...defect, id }
     }
@@ -874,6 +880,7 @@ export class MySQLAdapter {
         if (updates.severity !== undefined) { fields.push('severity = ?'); values.push(updates.severity) }
         if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
         if (updates.dueDate !== undefined) { fields.push('due_date = ?'); values.push(updates.dueDate) }
+        if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes) }
         if (updates.closedAt !== undefined) { fields.push('closed_at = ?'); values.push(updates.closedAt) }
         if (updates.closedBy !== undefined) { fields.push('closed_by = ?'); values.push(updates.closedBy) }
         if (updates.closureNotes !== undefined) { fields.push('closure_notes = ?'); values.push(updates.closureNotes) }
