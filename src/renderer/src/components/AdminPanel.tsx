@@ -383,7 +383,7 @@ export default function AdminPanel() {
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th style={{ padding: '16px', width: '80px' }}>Order</th>
+                                    <th style={{ padding: '16px', width: '90px' }}>Order</th>
                                     <th style={{ padding: '16px' }}>Document Type</th>
                                     <th style={{ padding: '16px' }}>Status</th>
                                     <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
