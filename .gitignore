@@ -97,3 +97,5 @@ analyze-excel.js
 read_sheet.js
 *.pdf
 *.docx
+
+db-config.json
