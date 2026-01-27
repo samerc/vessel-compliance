@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X, Database } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X, Database, Clock, Play, Loader2 } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings } from '../../../shared/types'
+import { useToast } from '../contexts/ToastContext'
 
 export default function AdminPanel() {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
@@ -17,17 +18,71 @@ export default function AdminPanel() {
     const [newBlockedExt, setNewBlockedExt] = useState('')
     const [fileTypeStatus, setFileTypeStatus] = useState('')
     const [configPath, setConfigPath] = useState<string | null>(null)
+    const { showSuccess, showError } = useToast()
+
+    // Compliance schedule state
+    const [complianceSettings, setComplianceSettings] = useState<ComplianceScheduleSettings>({
+        enabled: false,
+        dayOfWeek: 1,
+        timeOfDay: '09:00',
+        threshold: 85,
+        includeVessels: true,
+        skipCleared: true
+    })
+    const [savingCompliance, setSavingCompliance] = useState(false)
+    const [runningManualCheck, setRunningManualCheck] = useState(false)
 
     useEffect(() => {
         loadData()
         loadFileTypeSettings()
         loadConfigPath()
+        loadComplianceSettings()
     }, [])
 
     const loadConfigPath = async () => {
         const path = await window.api.setupGetConfigPath()
         setConfigPath(path)
     }
+
+    const loadComplianceSettings = async () => {
+        const settings = await window.api.complianceGetScheduleSettings()
+        setComplianceSettings(settings)
+    }
+
+    const handleSaveComplianceSettings = async () => {
+        setSavingCompliance(true)
+        try {
+            const result = await window.api.complianceSetScheduleSettings(complianceSettings)
+            if (result.success) {
+                showSuccess('Compliance schedule settings saved')
+                loadComplianceSettings()
+            } else {
+                showError(result.message || 'Failed to save settings')
+            }
+        } catch (error: any) {
+            showError(error.message || 'Failed to save settings')
+        } finally {
+            setSavingCompliance(false)
+        }
+    }
+
+    const handleRunManualCheck = async () => {
+        setRunningManualCheck(true)
+        try {
+            const result = await window.api.complianceRunManualCheck()
+            if (result.success) {
+                showSuccess('Compliance check started. You will be notified when complete.')
+            } else {
+                showError(result.message || 'Failed to start compliance check')
+            }
+        } catch (error: any) {
+            showError(error.message || 'Failed to start compliance check')
+        } finally {
+            setRunningManualCheck(false)
+        }
+    }
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
     const loadData = async () => {
         await loadDocTypes()
@@ -716,6 +771,145 @@ export default function AdminPanel() {
 
                 <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     ⚠️ Changing database configuration will reload the application. Make sure all work is saved.
+                </div>
+            </section>
+
+            {/* Compliance Schedule Section */}
+            <section className="glass-card" style={{ padding: '24px', marginTop: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={20} color="var(--accent-primary)" /> Scheduled Compliance Check
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    Automatically check all entities and vessels against sanctions lists on a weekly schedule.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                    {/* Schedule Settings */}
+                    <div>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={complianceSettings.enabled}
+                                    onChange={e => setComplianceSettings({ ...complianceSettings, enabled: e.target.checked })}
+                                    style={{ width: '20px', height: '20px', accentColor: 'var(--accent-primary)' }}
+                                />
+                                <span style={{ fontWeight: '600' }}>Enable Weekly Compliance Check</span>
+                            </label>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Day of Week</label>
+                                <select
+                                    value={complianceSettings.dayOfWeek}
+                                    onChange={e => setComplianceSettings({ ...complianceSettings, dayOfWeek: parseInt(e.target.value) })}
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                                    disabled={!complianceSettings.enabled}
+                                >
+                                    {dayNames.map((day, i) => (
+                                        <option key={i} value={i}>{day}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Time</label>
+                                <input
+                                    type="time"
+                                    value={complianceSettings.timeOfDay}
+                                    onChange={e => setComplianceSettings({ ...complianceSettings, timeOfDay: e.target.value })}
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                                    disabled={!complianceSettings.enabled}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                Match Score Threshold: {complianceSettings.threshold}%
+                            </label>
+                            <input
+                                type="range"
+                                min="50"
+                                max="100"
+                                step="5"
+                                value={complianceSettings.threshold}
+                                onChange={e => setComplianceSettings({ ...complianceSettings, threshold: parseInt(e.target.value) })}
+                                style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+                                disabled={!complianceSettings.enabled}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                <span>50% (More matches)</span>
+                                <span>100% (Exact only)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Options and Status */}
+                    <div>
+                        <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '12px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={complianceSettings.includeVessels}
+                                    onChange={e => setComplianceSettings({ ...complianceSettings, includeVessels: e.target.checked })}
+                                    style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                    disabled={!complianceSettings.enabled}
+                                />
+                                <span>Include vessels in check</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={complianceSettings.skipCleared}
+                                    onChange={e => setComplianceSettings({ ...complianceSettings, skipCleared: e.target.checked })}
+                                    style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                    disabled={!complianceSettings.enabled}
+                                />
+                                <span>Skip already cleared/confirmed entities</span>
+                            </label>
+                        </div>
+
+                        {complianceSettings.lastRunAt && (
+                            <div style={{ padding: '12px', background: 'rgba(0, 210, 255, 0.1)', border: '1px solid rgba(0, 210, 255, 0.2)', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem' }}>
+                                <div style={{ marginBottom: '4px' }}>
+                                    <strong>Last run:</strong> {new Date(complianceSettings.lastRunAt).toLocaleString()}
+                                </div>
+                                {complianceSettings.nextRunAt && (
+                                    <div>
+                                        <strong>Next run:</strong> {new Date(complianceSettings.nextRunAt).toLocaleString()}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={handleSaveComplianceSettings}
+                                disabled={savingCompliance}
+                                className="btn-primary"
+                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                            >
+                                {savingCompliance && <Loader2 size={16} className="spinner" />}
+                                Save Settings
+                            </button>
+                            <button
+                                onClick={handleRunManualCheck}
+                                disabled={runningManualCheck}
+                                className="btn-secondary"
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                            >
+                                {runningManualCheck ? <Loader2 size={16} className="spinner" /> : <Play size={16} />}
+                                Run Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(0, 255, 136, 0.1)', border: '1px solid rgba(0, 255, 136, 0.2)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <strong>How it works:</strong> The system will check all entities{complianceSettings.includeVessels ? ' and vessels' : ''} against sanctions lists.
+                    Matches above {complianceSettings.threshold}% confidence will be flagged as "Potential Match" for review.
+                    Results can be viewed in the Compliance Center.
                 </div>
             </section>
         </div >

@@ -187,7 +187,7 @@ export class MySQLAdapter {
                     created_by VARCHAR(255),
                     FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
                     FOREIGN KEY (surveyor_id) REFERENCES surveyors(id) ON DELETE RESTRICT,
-                    INDEX idx_vessel_date (vessel_id, survey_date DESC)
+                    INDEX idx_vessel_date (vessel_id, survey_date)
                 )`)
 
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS survey_defects (
@@ -253,6 +253,37 @@ export class MySQLAdapter {
             if ((defectCols as any[]).length === 0) {
                 await this.pool.query("ALTER TABLE survey_defects ADD COLUMN notes TEXT AFTER due_date")
             }
+
+            // Create compliance check logs table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS compliance_check_logs (
+                id VARCHAR(36) PRIMARY KEY,
+                run_at TIMESTAMP NOT NULL,
+                total_checked INT NOT NULL DEFAULT 0,
+                matches_found INT NOT NULL DEFAULT 0,
+                status VARCHAR(20) NOT NULL DEFAULT 'running',
+                error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_run_at (run_at)
+            )`)
+
+            // Create compliance check results table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS compliance_check_results (
+                id VARCHAR(36) PRIMARY KEY,
+                log_id VARCHAR(36) NOT NULL,
+                entity_type VARCHAR(20) NOT NULL,
+                entity_id VARCHAR(36) NOT NULL,
+                entity_name VARCHAR(255) NOT NULL,
+                match_score DECIMAL(5,2) NOT NULL,
+                match_details TEXT,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending_review',
+                reviewed_by VARCHAR(255),
+                reviewed_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (log_id) REFERENCES compliance_check_logs(id) ON DELETE CASCADE,
+                INDEX idx_log_id (log_id),
+                INDEX idx_status (status),
+                INDEX idx_entity (entity_type, entity_id)
+            )`)
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -986,6 +1017,129 @@ export class MySQLAdapter {
             ORDER BY cs.survey_date DESC
         `, [vesselId])
         return rows as any[]
+    }
+
+    // --- Compliance Schedule ---
+    async getComplianceScheduleSettings(): Promise<any> {
+        const defaultSettings = {
+            enabled: false,
+            dayOfWeek: 1, // Monday
+            timeOfDay: '09:00',
+            threshold: 85,
+            includeVessels: true,
+            skipCleared: true,
+            lastRunAt: null,
+            nextRunAt: null
+        }
+
+        const settingValue = await this.getSetting('complianceSchedule')
+        if (!settingValue) {
+            return defaultSettings
+        }
+
+        try {
+            return { ...defaultSettings, ...JSON.parse(settingValue) }
+        } catch {
+            return defaultSettings
+        }
+    }
+
+    async setComplianceScheduleSettings(settings: any, updatedBy?: string): Promise<void> {
+        await this.setSetting('complianceSchedule', JSON.stringify(settings), updatedBy)
+    }
+
+    // --- Compliance Check Logs ---
+    async createComplianceCheckLog(log: { totalChecked: number; status: string }): Promise<string> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO compliance_check_logs (id, run_at, total_checked, matches_found, status)
+             VALUES (?, NOW(), ?, 0, ?)`,
+            [id, log.totalChecked, log.status]
+        )
+        return id
+    }
+
+    async updateComplianceCheckLog(id: string, updates: { matchesFound?: number; status?: string; error?: string }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.matchesFound !== undefined) { fields.push('matches_found = ?'); values.push(updates.matchesFound) }
+        if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
+        if (updates.error !== undefined) { fields.push('error = ?'); values.push(updates.error) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE compliance_check_logs SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async getComplianceCheckLogs(limit: number = 20): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, run_at as runAt, total_checked as totalChecked, matches_found as matchesFound,
+             status, error, created_at as createdAt
+             FROM compliance_check_logs ORDER BY run_at DESC LIMIT ?`,
+            [limit]
+        )
+        return rows as any[]
+    }
+
+    async getLatestComplianceCheckLog(): Promise<any | null> {
+        if (!this.pool) return null
+        const [rows]: any[] = await this.pool.query(
+            `SELECT id, run_at as runAt, total_checked as totalChecked, matches_found as matchesFound,
+             status, error, created_at as createdAt
+             FROM compliance_check_logs ORDER BY run_at DESC LIMIT 1`
+        )
+        return rows.length > 0 ? rows[0] : null
+    }
+
+    // --- Compliance Check Results ---
+    async addComplianceCheckResult(result: {
+        logId: string
+        entityType: 'entity' | 'vessel'
+        entityId: string
+        entityName: string
+        matchScore: number
+        matchDetails: string
+    }): Promise<void> {
+        if (!this.pool) return
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO compliance_check_results
+             (id, log_id, entity_type, entity_id, entity_name, match_score, match_details, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_review')`,
+            [id, result.logId, result.entityType, result.entityId, result.entityName, result.matchScore, result.matchDetails]
+        )
+    }
+
+    async getComplianceCheckResults(logId?: string, status?: string): Promise<any[]> {
+        if (!this.pool) return []
+        let sql = `SELECT id, log_id as logId, entity_type as entityType, entity_id as entityId,
+                   entity_name as entityName, match_score as matchScore, match_details as matchDetails,
+                   status, reviewed_by as reviewedBy, reviewed_at as reviewedAt, created_at as createdAt
+                   FROM compliance_check_results`
+        const conditions: string[] = []
+        const params: any[] = []
+        if (logId) { conditions.push('log_id = ?'); params.push(logId) }
+        if (status) { conditions.push('status = ?'); params.push(status) }
+        if (conditions.length > 0) {
+            sql += ' WHERE ' + conditions.join(' AND ')
+        }
+        sql += ' ORDER BY match_score DESC, created_at DESC'
+        const [rows] = await this.pool.query(sql, params)
+        return rows as any[]
+    }
+
+    async getPendingComplianceResults(): Promise<any[]> {
+        return this.getComplianceCheckResults(undefined, 'pending_review')
+    }
+
+    async markComplianceResultReviewed(id: string, reviewedBy: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            `UPDATE compliance_check_results SET status = 'reviewed', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
+            [reviewedBy, id]
+        )
     }
 }
 

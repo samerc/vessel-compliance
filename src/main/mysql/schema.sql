@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(36) PRIMARY KEY,
-  username VARCHAR(255) NOT NULL UNIQUE,
+  username VARCHAR(191) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(50) NOT NULL, -- 'admin' or 'user'
   theme_preference VARCHAR(10) DEFAULT 'dark', -- 'light' or 'dark'

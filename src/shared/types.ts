@@ -100,6 +100,7 @@ export interface SanctionsMatch {
   remarks: string | null
   listed_on: string | null
   created_at: string
+  score?: number
 }
 
 export interface FileTypeSettings {
@@ -151,5 +152,40 @@ export interface Surveyor {
   contactPerson?: string
   contactDetails?: string
   notes?: string
+  createdAt?: string
+}
+
+export interface ComplianceScheduleSettings {
+  enabled: boolean
+  dayOfWeek: number // 0 = Sunday, 1 = Monday, etc.
+  timeOfDay: string // HH:mm format
+  threshold: number // Match score threshold (0-100)
+  includeVessels: boolean
+  skipCleared: boolean // Skip entities already marked as CLEARED
+  lastRunAt?: string
+  nextRunAt?: string
+}
+
+export interface ComplianceCheckLog {
+  id: string
+  runAt: string
+  totalChecked: number
+  matchesFound: number
+  status: 'completed' | 'failed' | 'running'
+  error?: string
+  createdAt?: string
+}
+
+export interface ComplianceCheckResult {
+  id: string
+  logId: string
+  entityType: 'entity' | 'vessel'
+  entityId: string
+  entityName: string
+  matchScore: number
+  matchDetails: string // JSON string of SanctionsMatch[]
+  status: 'pending_review' | 'reviewed'
+  reviewedBy?: string
+  reviewedAt?: string
   createdAt?: string
 }

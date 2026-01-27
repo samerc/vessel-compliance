@@ -241,3 +241,38 @@ textarea:focus {
   background: var(--bg-card-hover) !important;
   color: var(--text-primary) !important;
 }
+
+/* Toast animations */
+.toast-enter {
+  animation: toastSlideIn 0.3s ease-out;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Spinner animation */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hover spin for refresh icons */
+.hover-spin:hover {
+  animation: spin 0.5s ease-in-out;
+}

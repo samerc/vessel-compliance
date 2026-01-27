@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react'
+import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
 import { Vessel, Fleet, SanctionsMatch } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
+import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 import VesselDetail from './VesselDetail'
 import SanctionsModal from './SanctionsModal'
 
@@ -9,6 +11,9 @@ export default function VesselManager() {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
+    const { showError, showSuccess } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     // UI State
     const [searchTerm, setSearchTerm] = useState('')
@@ -18,6 +23,10 @@ export default function VesselManager() {
 
     // Add Mode
     const [newVessel, setNewVessel] = useState({ name: '', imo: '', fleetId: '' })
+    const [isAdding, setIsAdding] = useState(false)
+
+    // Sanctions checking state
+    const [checkingVesselId, setCheckingVesselId] = useState<string | null>(null)
 
     // Sanctions modal state
     const [sanctionsModal, setSanctionsModal] = useState<{
@@ -42,28 +51,36 @@ export default function VesselManager() {
         e.preventDefault()
         if (!newVessel.name || !newVessel.imo) return
 
-        // Scan OFAC
-        const scanResult = await OfacService.checkSanctions(newVessel.name)
+        setIsAdding(true)
+        try {
+            // Scan OFAC
+            const scanResult = await OfacService.checkSanctions(newVessel.name)
 
-        const vessel = await window.api.addVessel({
-            name: newVessel.name,
-            imoNumber: newVessel.imo,
-            fleetId: newVessel.fleetId,
-            ofacCheckedAt: scanResult.timestamp,
-            ofacMatchFound: scanResult.matchFound,
-            ofacStatus: scanResult.status
-        })
-        setNewVessel({ name: '', imo: '', fleetId: '' })
-        loadData()
-
-        // Show modal if potential matches found
-        if (scanResult.matchFound && scanResult.matches.length > 0) {
-            setSanctionsModal({
-                show: true,
-                searchedName: newVessel.name,
-                matches: scanResult.matches,
-                vesselId: vessel.id
+            const vessel = await window.api.addVessel({
+                name: newVessel.name,
+                imoNumber: newVessel.imo,
+                fleetId: newVessel.fleetId,
+                ofacCheckedAt: scanResult.timestamp,
+                ofacMatchFound: scanResult.matchFound,
+                ofacStatus: scanResult.status
             })
+            setNewVessel({ name: '', imo: '', fleetId: '' })
+            showSuccess(`Vessel "${vessel.name}" registered successfully`)
+            loadData()
+
+            // Show modal if potential matches found
+            if (scanResult.matchFound && scanResult.matches.length > 0) {
+                setSanctionsModal({
+                    show: true,
+                    searchedName: newVessel.name,
+                    matches: scanResult.matches,
+                    vesselId: vessel.id
+                })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Failed to register vessel. Please try again.')
+        } finally {
+            setIsAdding(false)
         }
     }
 
@@ -94,21 +111,28 @@ export default function VesselManager() {
     }
 
     const handleOfacRecheck = async (vessel: Vessel) => {
-        const result = await OfacService.checkSanctions(vessel.name)
-        await window.api.updateVessel(vessel.id, {
-            ofacCheckedAt: result.timestamp,
-            ofacMatchFound: result.matchFound,
-            ofacStatus: result.status
-        })
-        loadData()
-
-        if (result.matchFound && result.matches.length > 0) {
-            setSanctionsModal({
-                show: true,
-                searchedName: vessel.name,
-                matches: result.matches,
-                vesselId: vessel.id
+        setCheckingVesselId(vessel.id)
+        try {
+            const result = await OfacService.checkSanctions(vessel.name)
+            await window.api.updateVessel(vessel.id, {
+                ofacCheckedAt: result.timestamp,
+                ofacMatchFound: result.matchFound,
+                ofacStatus: result.status
             })
+            loadData()
+
+            if (result.matchFound && result.matches.length > 0) {
+                setSanctionsModal({
+                    show: true,
+                    searchedName: vessel.name,
+                    matches: result.matches,
+                    vesselId: vessel.id
+                })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Sanctions check failed. Please try again.')
+        } finally {
+            setCheckingVesselId(null)
         }
     }
 
@@ -129,62 +153,92 @@ export default function VesselManager() {
     }
 
     const handleViewPotentialMatch = async (vessel: Vessel) => {
-        const result = await OfacService.checkSanctions(vessel.name)
-        if (result.matches.length > 0) {
-            setSanctionsModal({
-                show: true,
-                searchedName: vessel.name,
-                matches: result.matches,
-                vesselId: vessel.id
-            })
+        setCheckingVesselId(vessel.id)
+        try {
+            const result = await OfacService.checkSanctions(vessel.name)
+            if (result.matches.length > 0) {
+                setSanctionsModal({
+                    show: true,
+                    searchedName: vessel.name,
+                    matches: result.matches,
+                    vesselId: vessel.id
+                })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Failed to load sanctions data. Please try again.')
+        } finally {
+            setCheckingVesselId(null)
         }
     }
 
     const OfacBadge = ({ vessel }: { vessel: Vessel }) => {
+        const isChecking = checkingVesselId === vessel.id
         const isMatch = vessel.ofacStatus === 'MATCH'
         const isPotentialMatch = vessel.ofacStatus === 'POTENTIAL_MATCH'
         const isError = vessel.ofacStatus === 'ERROR'
         const isPending = !vessel.ofacStatus || vessel.ofacStatus === 'PENDING'
 
+        // Show checking state
+        if (isChecking) {
+            return (
+                <div
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '2px 10px',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        background: isLight ? 'rgba(0, 150, 200, 0.15)' : 'rgba(0, 210, 255, 0.1)',
+                        border: isLight ? '1px solid rgba(0, 150, 200, 0.4)' : '1px solid rgba(0, 210, 255, 0.3)',
+                        color: isLight ? '#0077a3' : '#00d2ff'
+                    }}
+                >
+                    <Loader2 size={12} className="spinner" />
+                    CHECKING...
+                </div>
+            )
+        }
+
         let config: { background: string; border: string; color: string; text: string; icon: React.ReactNode }
 
         if (isPending) {
             config = {
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+                border: isLight ? '1px solid rgba(0, 0, 0, 0.15)' : '1px solid rgba(255, 255, 255, 0.1)',
                 color: 'var(--text-secondary)',
                 text: 'NOT CHECKED',
                 icon: <Shield size={12} opacity={0.5} />
             }
         } else if (isError) {
             config = {
-                background: 'rgba(255, 153, 0, 0.1)',
-                border: '1px solid rgba(255, 153, 0, 0.3)',
-                color: '#ff9900',
+                background: isLight ? 'rgba(200, 120, 0, 0.15)' : 'rgba(255, 153, 0, 0.1)',
+                border: isLight ? '1px solid rgba(200, 120, 0, 0.4)' : '1px solid rgba(255, 153, 0, 0.3)',
+                color: isLight ? '#b36b00' : '#ff9900',
                 text: 'CHECK FAILED',
                 icon: <Shield size={12} />
             }
         } else if (isMatch) {
             config = {
-                background: 'rgba(255, 77, 77, 0.1)',
-                border: '1px solid rgba(255, 77, 77, 0.3)',
-                color: '#ff4d4d',
+                background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
+                border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
+                color: isLight ? '#c00000' : '#ff4d4d',
                 text: 'SANCTIONED',
                 icon: <ShieldAlert size={12} />
             }
         } else if (isPotentialMatch) {
             config = {
-                background: 'rgba(255, 193, 7, 0.1)',
-                border: '1px solid rgba(255, 193, 7, 0.3)',
-                color: '#ffc107',
+                background: isLight ? 'rgba(180, 140, 0, 0.15)' : 'rgba(255, 193, 7, 0.1)',
+                border: isLight ? '1px solid rgba(180, 140, 0, 0.4)' : '1px solid rgba(255, 193, 7, 0.3)',
+                color: isLight ? '#997a00' : '#ffc107',
                 text: 'POSSIBLE MATCH',
                 icon: <ShieldAlert size={12} />
             }
         } else {
             config = {
-                background: 'rgba(0, 255, 136, 0.1)',
-                border: '1px solid rgba(0, 255, 136, 0.3)',
-                color: '#00ff88',
+                background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
+                border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
+                color: isLight ? '#008c46' : '#00ff88',
                 text: 'CLEARED',
                 icon: <ShieldCheck size={12} />
             }
@@ -249,8 +303,8 @@ export default function VesselManager() {
                     <input
                         type="text"
                         value={newVessel.name}
-                        onChange={e => setNewVessel({ ...newVessel, name: e.target.value })}
-                        style={{ flex: 2, minWidth: '200px' }}
+                        onChange={e => setNewVessel({ ...newVessel, name: e.target.value.toUpperCase() })}
+                        style={{ flex: 2, minWidth: '200px', textTransform: 'uppercase' }}
                         placeholder="Vessel Name"
                     />
                     <input
@@ -270,7 +324,10 @@ export default function VesselManager() {
                             <option key={f.id} value={f.id}>{f.name}</option>
                         ))}
                     </select>
-                    <button type="submit" className="btn-primary">Register</button>
+                    <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {isAdding && <Loader2 size={16} className="spinner" />}
+                        {isAdding ? 'Registering...' : 'Register'}
+                    </button>
                 </form>
             </section>
 

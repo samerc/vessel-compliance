@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react'
+import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
 import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
+import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
 
 interface AssuredManagerProps {
@@ -13,6 +15,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [vesselAssureds, setVesselAssureds] = useState<VesselAssured[]>([])
     const [entityUBOs, setEntityUBOs] = useState<EntityUBO[]>([])
+    const { showError, showSuccess } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     const [showAddForm, setShowAddForm] = useState(false)
     const [newName, setNewName] = useState('')
@@ -30,6 +35,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
     const [selectedUBOId, setSelectedUBOId] = useState<string | null>(null)
+
+    // Loading states
+    const [isAddingAssured, setIsAddingAssured] = useState(false)
+    const [isAddingUBO, setIsAddingUBO] = useState(false)
+    const [checkingId, setCheckingId] = useState<string | null>(null)
 
     // Sanctions modal state
     const [sanctionsModal, setSanctionsModal] = useState<{
@@ -72,82 +82,98 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         e.preventDefault()
         if (!newName.trim() || !newRole.trim()) return
 
-        let entityId = selectedEntityId
+        setIsAddingAssured(true)
+        try {
+            let entityId = selectedEntityId
 
-        if (!entityId) {
-            // Check OFAC list
-            const scanResult = await OfacService.checkSanctions(newName)
+            if (!entityId) {
+                // Check OFAC list
+                const scanResult = await OfacService.checkSanctions(newName)
 
-            const entity = await window.api.addEntity({
-                name: newName,
-                type: newType,
-                identifier: newIdentifier,
-                email: newEmail,
-                phone: newPhone,
-                ofacCheckedAt: scanResult.timestamp,
-                ofacMatchFound: scanResult.matchFound,
-                ofacStatus: scanResult.status
+                const entity = await window.api.addEntity({
+                    name: newName,
+                    type: newType,
+                    identifier: newIdentifier,
+                    email: newEmail,
+                    phone: newPhone,
+                    ofacCheckedAt: scanResult.timestamp,
+                    ofacMatchFound: scanResult.matchFound,
+                    ofacStatus: scanResult.status
+                })
+                entityId = entity.id
+            }
+
+            // Auto-register role if it doesn't exist
+            const roleExists = roles.some(r => r.name.toLowerCase() === newRole.trim().toLowerCase())
+            if (!roleExists) {
+                await window.api.addAssuredRole({ name: newRole.trim() })
+            }
+
+            await window.api.addVesselAssured({
+                vesselId: vessel.id,
+                entityId: entityId,
+                role: newRole
             })
-            entityId = entity.id
+
+            setNewName('')
+            setNewRole('')
+            setNewIdentifier('')
+            setNewEmail('')
+            setNewPhone('')
+            setNewType('company')
+            setSelectedEntityId(null)
+            setShowAddForm(false)
+            showSuccess('Assured added successfully')
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to add assured. Please try again.')
+        } finally {
+            setIsAddingAssured(false)
         }
-
-        // Auto-register role if it doesn't exist
-        const roleExists = roles.some(r => r.name.toLowerCase() === newRole.trim().toLowerCase())
-        if (!roleExists) {
-            await window.api.addAssuredRole({ name: newRole.trim() })
-        }
-
-        await window.api.addVesselAssured({
-            vesselId: vessel.id,
-            entityId: entityId,
-            role: newRole
-        })
-
-        setNewName('')
-        setNewRole('')
-        setNewIdentifier('')
-        setNewEmail('')
-        setNewPhone('')
-        setNewType('company')
-        setSelectedEntityId(null)
-        setShowAddForm(false)
-        loadData()
     }
 
     const handleAddUBO = async (assuredEntityId: string) => {
         if (!newUBOName.trim()) return
 
-        let entityId = selectedUBOId
+        setIsAddingUBO(true)
+        try {
+            let entityId = selectedUBOId
 
-        if (!entityId) {
-            // Check OFAC list
-            const scanResult = await OfacService.checkSanctions(newUBOName)
+            if (!entityId) {
+                // Check OFAC list
+                const scanResult = await OfacService.checkSanctions(newUBOName)
 
-            const entity = await window.api.addEntity({
-                name: newUBOName,
-                type: newUBOType,
-                identifier: newUBOIdentifier,
-                email: newUBOEmail,
-                phone: newUBOPhone,
-                ofacCheckedAt: scanResult.timestamp,
-                ofacMatchFound: scanResult.matchFound,
-                ofacStatus: scanResult.status
+                const entity = await window.api.addEntity({
+                    name: newUBOName,
+                    type: newUBOType,
+                    identifier: newUBOIdentifier,
+                    email: newUBOEmail,
+                    phone: newUBOPhone,
+                    ofacCheckedAt: scanResult.timestamp,
+                    ofacMatchFound: scanResult.matchFound,
+                    ofacStatus: scanResult.status
+                })
+                entityId = entity.id
+            }
+
+            await window.api.addEntityUBO({
+                assuredEntityId,
+                uboEntityId: entityId
             })
-            entityId = entity.id
+
+            setNewUBOName('')
+            setNewUBOType('person')
+            setNewUBOIdentifier('')
+            setNewUBOEmail('')
+            setNewUBOPhone('')
+            setSelectedUBOId(null)
+            showSuccess('UBO added successfully')
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to add UBO. Please try again.')
+        } finally {
+            setIsAddingUBO(false)
         }
-
-        await window.api.addEntityUBO({
-            assuredEntityId,
-            uboEntityId: entityId
-        })
-
-        setNewUBOName('')
-        setNewUBOType('person')
-        setNewUBOIdentifier('')
-        setNewUBOEmail('')
-        setNewUBOPhone('')
-        setSelectedUBOId(null)
-        loadData()
     }
 
     const handleDeleteAssured = async (id: string) => {
@@ -172,18 +198,19 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
         const filePath = window.api.getFilePath(file)
         if (!filePath) {
-            alert('Could not retrieve file path')
+            showError('Could not retrieve file path')
             return
         }
 
         // Security: Validate file type
         const validation = await window.api.fileTypesValidateFile(filePath)
         if (!validation.valid) {
-            alert(`File rejected: ${validation.reason}`)
+            showError(`File rejected: ${validation.reason}`)
             return
         }
 
         await window.api.updateEntity(entityId, { passportFilePath: filePath })
+        showSuccess('ID/Passport uploaded successfully')
         loadData()
     }
 
@@ -197,18 +224,19 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
         const filePath = window.api.getFilePath(file)
         if (!filePath) {
-            alert('Could not retrieve file path')
+            showError('Could not retrieve file path')
             return
         }
 
         // Security: Validate file type
         const validation = await window.api.fileTypesValidateFile(filePath)
         if (!validation.valid) {
-            alert(`File rejected: ${validation.reason}`)
+            showError(`File rejected: ${validation.reason}`)
             return
         }
 
         await window.api.updateEntity(entityId, { certificateOfIncorporationPath: filePath })
+        showSuccess('Certificate of Incorporation uploaded successfully')
         loadData()
     }
 
@@ -222,18 +250,19 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
         const filePath = window.api.getFilePath(file)
         if (!filePath) {
-            alert('Could not retrieve file path')
+            showError('Could not retrieve file path')
             return
         }
 
         // Security: Validate file type
         const validation = await window.api.fileTypesValidateFile(filePath)
         if (!validation.valid) {
-            alert(`File rejected: ${validation.reason}`)
+            showError(`File rejected: ${validation.reason}`)
             return
         }
 
         await window.api.updateEntity(entityId, { articlesOfAssociationPath: filePath })
+        showSuccess('Articles of Association uploaded successfully')
         loadData()
     }
 
@@ -247,36 +276,44 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
         const filePath = window.api.getFilePath(file)
         if (!filePath) {
-            alert('Could not retrieve file path')
+            showError('Could not retrieve file path')
             return
         }
 
         // Security: Validate file type
         const validation = await window.api.fileTypesValidateFile(filePath)
         if (!validation.valid) {
-            alert(`File rejected: ${validation.reason}`)
+            showError(`File rejected: ${validation.reason}`)
             return
         }
 
         await window.api.updateEntity(entityId, { kycFilePath: filePath })
+        showSuccess('KYC uploaded successfully')
         loadData()
     }
     const handleOfacRecheck = async (entity: Entity) => {
-        const result = await OfacService.checkSanctions(entity.name)
-        await window.api.updateEntity(entity.id, {
-            ofacCheckedAt: result.timestamp,
-            ofacMatchFound: result.matchFound,
-            ofacStatus: result.status
-        })
-        loadData()
-
-        if (result.matchFound && result.matches.length > 0) {
-            setSanctionsModal({
-                show: true,
-                searchedName: entity.name,
-                matches: result.matches,
-                entityId: entity.id
+        setCheckingId(entity.id)
+        try {
+            const result = await OfacService.checkSanctions(entity.name)
+            await window.api.updateEntity(entity.id, {
+                ofacCheckedAt: result.timestamp,
+                ofacMatchFound: result.matchFound,
+                ofacStatus: result.status
             })
+            loadData()
+
+            if (result.matchFound && result.matches.length > 0) {
+                setSanctionsModal({
+                    show: true,
+                    searchedName: entity.name,
+                    matches: result.matches,
+                    entityId: entity.id
+                })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Sanctions check failed. Please try again.')
+        } finally {
+            setCheckingId(null)
         }
     }
 
@@ -297,62 +334,92 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     }
 
     const handleViewPotentialMatch = async (entity: Entity) => {
-        const result = await OfacService.checkSanctions(entity.name)
-        if (result.matches.length > 0) {
-            setSanctionsModal({
-                show: true,
-                searchedName: entity.name,
-                matches: result.matches,
-                entityId: entity.id
-            })
+        setCheckingId(entity.id)
+        try {
+            const result = await OfacService.checkSanctions(entity.name)
+            if (result.matches.length > 0) {
+                setSanctionsModal({
+                    show: true,
+                    searchedName: entity.name,
+                    matches: result.matches,
+                    entityId: entity.id
+                })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Failed to load sanctions data. Please try again.')
+        } finally {
+            setCheckingId(null)
         }
     }
 
     const OfacBadge = ({ entity }: { entity: Entity }) => {
+        const isChecking = checkingId === entity.id
         const isMatch = entity.ofacStatus === 'MATCH'
         const isPotentialMatch = entity.ofacStatus === 'POTENTIAL_MATCH'
         const isError = entity.ofacStatus === 'ERROR'
         const isPending = !entity.ofacStatus || entity.ofacStatus === 'PENDING'
 
+        // Show checking state
+        if (isChecking) {
+            return (
+                <div
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '2px 10px',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        background: isLight ? 'rgba(0, 150, 200, 0.15)' : 'rgba(0, 210, 255, 0.1)',
+                        border: isLight ? '1px solid rgba(0, 150, 200, 0.4)' : '1px solid rgba(0, 210, 255, 0.3)',
+                        color: isLight ? '#0077a3' : '#00d2ff'
+                    }}
+                >
+                    <Loader2 size={12} className="spinner" />
+                    CHECKING...
+                </div>
+            )
+        }
+
         let config: { background: string; border: string; color: string; text: string; icon: React.ReactNode }
 
         if (isPending) {
             config = {
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+                border: isLight ? '1px solid rgba(0, 0, 0, 0.15)' : '1px solid rgba(255, 255, 255, 0.1)',
                 color: 'var(--text-secondary)',
                 text: 'NOT CHECKED',
                 icon: <Shield size={12} opacity={0.5} />
             }
         } else if (isError) {
             config = {
-                background: 'rgba(255, 153, 0, 0.1)',
-                border: '1px solid rgba(255, 153, 0, 0.3)',
-                color: '#ff9900',
+                background: isLight ? 'rgba(200, 120, 0, 0.15)' : 'rgba(255, 153, 0, 0.1)',
+                border: isLight ? '1px solid rgba(200, 120, 0, 0.4)' : '1px solid rgba(255, 153, 0, 0.3)',
+                color: isLight ? '#b36b00' : '#ff9900',
                 text: 'CHECK FAILED',
                 icon: <Shield size={12} />
             }
         } else if (isMatch) {
             config = {
-                background: 'rgba(255, 77, 77, 0.1)',
-                border: '1px solid rgba(255, 77, 77, 0.3)',
-                color: '#ff4d4d',
+                background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
+                border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
+                color: isLight ? '#c00000' : '#ff4d4d',
                 text: 'SANCTIONED',
                 icon: <ShieldAlert size={12} />
             }
         } else if (isPotentialMatch) {
             config = {
-                background: 'rgba(255, 193, 7, 0.1)',
-                border: '1px solid rgba(255, 193, 7, 0.3)',
-                color: '#ffc107',
+                background: isLight ? 'rgba(180, 140, 0, 0.15)' : 'rgba(255, 193, 7, 0.1)',
+                border: isLight ? '1px solid rgba(180, 140, 0, 0.4)' : '1px solid rgba(255, 193, 7, 0.3)',
+                color: isLight ? '#997a00' : '#ffc107',
                 text: 'POSSIBLE MATCH',
                 icon: <ShieldAlert size={12} />
             }
         } else {
             config = {
-                background: 'rgba(0, 255, 136, 0.1)',
-                border: '1px solid rgba(0, 255, 136, 0.3)',
-                color: '#00ff88',
+                background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
+                border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
+                color: isLight ? '#008c46' : '#00ff88',
                 text: 'CLEARED',
                 icon: <ShieldCheck size={12} />
             }
@@ -535,8 +602,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                     {roles.map(r => <option key={r.id} value={r.name} />)}
                                 </datalist>
                             </div>
-                            <button type="submit" className="btn-primary" style={{ padding: '10px 32px' }}>
-                                {selectedEntityId ? 'Link Existing Assured' : 'Register & Add New Assured'}
+                            <button type="submit" className="btn-primary" disabled={isAddingAssured} style={{ padding: '10px 32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {isAddingAssured && <Loader2 size={16} className="spinner" />}
+                                {isAddingAssured ? 'Adding...' : selectedEntityId ? 'Link Existing Assured' : 'Register & Add New Assured'}
                             </button>
                         </div>
                     </form>
@@ -743,8 +811,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 <option value="person">Person</option>
                                                             </select>
                                                         ) : <div />}
-                                                        <button onClick={() => handleAddUBO(va.entityId)} className="btn-secondary" style={{ padding: '0 20px', fontSize: '0.8rem' }}>
-                                                            {selectedUBOId ? 'Link' : 'New'}
+                                                        <button onClick={() => handleAddUBO(va.entityId)} className="btn-secondary" disabled={isAddingUBO} style={{ padding: '0 20px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            {isAddingUBO && <Loader2 size={14} className="spinner" />}
+                                                            {isAddingUBO ? 'Adding...' : selectedUBOId ? 'Link' : 'New'}
                                                         </button>
                                                     </div>
 

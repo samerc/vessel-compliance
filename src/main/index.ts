@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Notification } from 'electron'
 import { join, dirname, resolve, normalize, extname } from 'path'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -45,6 +45,7 @@ interface DbConfig {
   user: string
   password: string
   database: string
+  sanctionsApiKey?: string
 }
 
 function isValidDbConfig(obj: any): obj is DbConfig {
@@ -73,6 +74,18 @@ const getConfigPath = () => {
   // 2. Local Memory: Check electron-store
   const configDir = store.get('dbConfigDir') as string
   return configDir ? join(configDir, 'db-config.json') : null
+}
+
+const getSanctionsApiKey = (): string | null => {
+  const configPath = getConfigPath()
+  if (!configPath || !existsSync(configPath)) return null
+
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'))
+    return config.sanctionsApiKey || null
+  } catch {
+    return null
+  }
 }
 
 function createWindow(): void {
@@ -149,6 +162,274 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+// Compliance Scheduler
+let complianceCheckTimer: NodeJS.Timeout | null = null
+
+function calculateNextRunTime(dayOfWeek: number, timeOfDay: string): string {
+  const now = new Date()
+  const [hours, minutes] = timeOfDay.split(':').map(Number)
+
+  // Find next occurrence of the specified day
+  let daysUntilNext = dayOfWeek - now.getDay()
+  if (daysUntilNext < 0) daysUntilNext += 7
+  if (daysUntilNext === 0) {
+    // Same day - check if time has passed
+    const targetTime = new Date(now)
+    targetTime.setHours(hours, minutes, 0, 0)
+    if (now >= targetTime) {
+      daysUntilNext = 7 // Next week
+    }
+  }
+
+  const nextRun = new Date(now)
+  nextRun.setDate(nextRun.getDate() + daysUntilNext)
+  nextRun.setHours(hours, minutes, 0, 0)
+
+  return nextRun.toISOString()
+}
+
+async function runComplianceCheck(): Promise<void> {
+  console.log('Starting scheduled compliance check...')
+
+  const settings = await db.getComplianceScheduleSettings()
+  if (!settings.enabled) {
+    console.log('Compliance check is disabled, skipping')
+    return
+  }
+
+  const apiKey = getSanctionsApiKey()
+  if (!apiKey) {
+    console.error('Sanctions API key not configured, skipping compliance check')
+    return
+  }
+
+  // Get all entities and optionally vessels
+  const entities = await db.getEntities()
+  const vessels = settings.includeVessels ? await db.getVessels() : []
+
+  // Filter out already cleared if skipCleared is enabled
+  const entitiesToCheck = settings.skipCleared
+    ? entities.filter((e: any) => e.ofacStatus !== 'CLEARED' && e.ofacStatus !== 'MATCH')
+    : entities
+  const vesselsToCheck = settings.skipCleared
+    ? vessels.filter((v: any) => v.ofacStatus !== 'CLEARED' && v.ofacStatus !== 'MATCH')
+    : vessels
+
+  const totalToCheck = entitiesToCheck.length + vesselsToCheck.length
+
+  // Create log entry
+  const logId = await db.createComplianceCheckLog({
+    totalChecked: totalToCheck,
+    status: 'running'
+  })
+
+  let matchesFound = 0
+  const threshold = settings.threshold / 100 // Convert to decimal
+
+  try {
+    // Check entities
+    for (const entity of entitiesToCheck) {
+      try {
+        const params = new URLSearchParams({
+          q: entity.name,
+          mode: 'both',
+          threshold: '0.6',
+          limit: '10'
+        })
+
+        const response = await fetch(`https://sanctions.fancyshark.com/api/search?${params}`, {
+          headers: { 'X-API-Key': apiKey }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const highScoreMatches = (data.results || []).filter((r: any) => r.score >= threshold)
+
+          if (highScoreMatches.length > 0) {
+            matchesFound++
+            const bestScore = Math.max(...highScoreMatches.map((r: any) => r.score))
+
+            // Update entity status
+            await db.updateEntity(entity.id, {
+              ofacCheckedAt: new Date().toISOString(),
+              ofacMatchFound: true,
+              ofacStatus: 'POTENTIAL_MATCH'
+            })
+
+            // Save result
+            await db.addComplianceCheckResult({
+              logId,
+              entityType: 'entity',
+              entityId: entity.id,
+              entityName: entity.name,
+              matchScore: bestScore * 100,
+              matchDetails: JSON.stringify(highScoreMatches.map((r: any) => ({
+                id: r.entity?.source_id || '',
+                target_type: r.entity?.entity_type || 'unknown',
+                source: r.entity?.source || 'unknown',
+                source_id: r.entity?.source_id || '',
+                names: [r.entity?.name, ...(r.entity?.aliases || [])].filter(Boolean),
+                score: r.score
+              })))
+            })
+          } else {
+            // No high-score matches - update as cleared
+            await db.updateEntity(entity.id, {
+              ofacCheckedAt: new Date().toISOString(),
+              ofacMatchFound: false,
+              ofacStatus: 'CLEARED'
+            })
+          }
+        }
+
+        // Rate limiting - wait between requests
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } catch (error) {
+        console.error(`Error checking entity ${entity.name}:`, error)
+      }
+    }
+
+    // Check vessels
+    for (const vessel of vesselsToCheck) {
+      try {
+        const params = new URLSearchParams({
+          q: vessel.name,
+          mode: 'both',
+          threshold: '0.6',
+          limit: '10'
+        })
+
+        const response = await fetch(`https://sanctions.fancyshark.com/api/search?${params}`, {
+          headers: { 'X-API-Key': apiKey }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const highScoreMatches = (data.results || []).filter((r: any) => r.score >= threshold)
+
+          if (highScoreMatches.length > 0) {
+            matchesFound++
+            const bestScore = Math.max(...highScoreMatches.map((r: any) => r.score))
+
+            // Update vessel status
+            await db.updateVessel(vessel.id, {
+              ofacCheckedAt: new Date().toISOString(),
+              ofacMatchFound: true,
+              ofacStatus: 'POTENTIAL_MATCH'
+            })
+
+            // Save result
+            await db.addComplianceCheckResult({
+              logId,
+              entityType: 'vessel',
+              entityId: vessel.id,
+              entityName: vessel.name,
+              matchScore: bestScore * 100,
+              matchDetails: JSON.stringify(highScoreMatches.map((r: any) => ({
+                id: r.entity?.source_id || '',
+                target_type: r.entity?.entity_type || 'unknown',
+                source: r.entity?.source || 'unknown',
+                source_id: r.entity?.source_id || '',
+                names: [r.entity?.name, ...(r.entity?.aliases || [])].filter(Boolean),
+                score: r.score
+              })))
+            })
+          } else {
+            // No high-score matches - update as cleared
+            await db.updateVessel(vessel.id, {
+              ofacCheckedAt: new Date().toISOString(),
+              ofacMatchFound: false,
+              ofacStatus: 'CLEARED'
+            })
+          }
+        }
+
+        // Rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } catch (error) {
+        console.error(`Error checking vessel ${vessel.name}:`, error)
+      }
+    }
+
+    // Update log as completed
+    await db.updateComplianceCheckLog(logId, {
+      matchesFound,
+      status: 'completed'
+    })
+
+    // Update schedule settings with last run time
+    settings.lastRunAt = new Date().toISOString()
+    settings.nextRunAt = calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
+    await db.setComplianceScheduleSettings(settings)
+
+    // Show notification if matches found
+    if (matchesFound > 0 && Notification.isSupported()) {
+      new Notification({
+        title: 'Compliance Check Complete',
+        body: `Found ${matchesFound} potential sanctions match${matchesFound > 1 ? 'es' : ''} requiring review.`
+      }).show()
+    }
+
+    console.log(`Compliance check completed: ${totalToCheck} checked, ${matchesFound} matches found`)
+
+  } catch (error: any) {
+    console.error('Compliance check failed:', error)
+    await db.updateComplianceCheckLog(logId, {
+      status: 'failed',
+      error: error.message
+    })
+  }
+}
+
+async function startComplianceScheduler(): Promise<void> {
+  // Clear existing timer
+  if (complianceCheckTimer) {
+    clearTimeout(complianceCheckTimer)
+    complianceCheckTimer = null
+  }
+
+  if (!db.isConnected()) {
+    console.log('Database not connected, scheduler will start after connection')
+    return
+  }
+
+  const settings = await db.getComplianceScheduleSettings()
+  if (!settings.enabled) {
+    console.log('Compliance scheduler is disabled')
+    return
+  }
+
+  const nextRunAt = settings.nextRunAt || calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
+  const nextRunTime = new Date(nextRunAt)
+  const now = new Date()
+  const msUntilNextRun = nextRunTime.getTime() - now.getTime()
+
+  if (msUntilNextRun <= 0) {
+    // Run immediately and schedule next
+    console.log('Scheduled compliance check is overdue, running now...')
+    await runComplianceCheck()
+    startComplianceScheduler() // Reschedule
+    return
+  }
+
+  // Cap at 24 hours to avoid timer overflow issues
+  const maxDelay = 24 * 60 * 60 * 1000
+  const delay = Math.min(msUntilNextRun, maxDelay)
+
+  console.log(`Next compliance check scheduled for ${nextRunTime.toLocaleString()} (in ${Math.round(delay / 1000 / 60)} minutes)`)
+
+  complianceCheckTimer = setTimeout(async () => {
+    if (msUntilNextRun > maxDelay) {
+      // Haven't reached the target time yet, reschedule
+      startComplianceScheduler()
+    } else {
+      // Time to run
+      await runComplianceCheck()
+      startComplianceScheduler() // Schedule next run
+    }
+  }, delay)
 }
 
 // This method will be called when Electron has finished
@@ -1237,60 +1518,61 @@ app.whenReady().then(() => {
   // OFAC/Sanctions Check Handler
   ipcMain.handle('ofac:checkSanctions', async (_, name: string) => {
     try {
-      // Common words to strip for better search precision
-      const stopWords = [
-        'shipping', 'maritime', 'marine', 'vessel', 'ship', 'tanker', 'cargo',
-        'ltd', 'limited', 'inc', 'incorporated', 'corp', 'corporation', 'co',
-        'llc', 'plc', 'sa', 'ag', 'gmbh', 'bv', 'nv', 'pte', 'pvt', 'private',
-        'international', 'intl', 'global', 'worldwide', 'group', 'holdings',
-        'the', 'and', 'of', 'for'
-      ]
+      const apiKey = getSanctionsApiKey()
+      if (!apiKey) {
+        console.error('Sanctions API key not configured')
+        return {
+          status: 'ERROR',
+          matchFound: false,
+          timestamp: new Date().toISOString(),
+          matches: [],
+          error: 'Sanctions API key not configured. Add sanctionsApiKey to db-config.json'
+        }
+      }
 
-      // Clean the search term
-      const cleanName = name
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(word => !stopWords.includes(word.replace(/[.,]/g, '')))
-        .join(' ')
-        .trim()
+      const params = new URLSearchParams({
+        q: name,
+        mode: 'both',
+        threshold: '0.6',
+        limit: '20'
+      })
 
-      // Use cleaned name if it has content, otherwise use original
-      const searchTerm = cleanName.length >= 2 ? cleanName : name
-
-      const response = await fetch('https://api.sanctions.network/rpc/search_sanctions', {
-        method: 'POST',
+      const response = await fetch(`https://sanctions.fancyshark.com/api/search?${params}`, {
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name: searchTerm })
+          'X-API-Key': apiKey
+        }
       })
 
       if (!response.ok) {
         throw new Error(`API error: ${response.statusText}`)
       }
 
-      const results = await response.json()
+      const data = await response.json()
 
-      // Filter results by relevance - check if any result name contains our search words
-      const searchWords = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length >= 2)
-      const filteredResults = Array.isArray(results) ? results.filter((result: any) => {
-        const resultNames = (result.names || []).map((n: string) => n.toLowerCase())
-        // Check if any search word appears in any of the result's names
-        return searchWords.some(searchWord =>
-          resultNames.some((resultName: string) =>
-            resultName.includes(searchWord) || searchWord.includes(resultName.split(/\s+/)[0])
-          )
-        )
-      }).slice(0, 20) : [] // Limit to 20 most relevant results
+      // Transform results to match existing SanctionsMatch interface
+      const matches = (data.results || []).map((result: any) => ({
+        id: result.entity?.source_id || '',
+        target_type: result.entity?.entity_type || 'unknown',
+        source: result.entity?.source || 'unknown',
+        source_id: result.entity?.source_id || '',
+        names: [
+          result.entity?.name,
+          ...(result.entity?.aliases || [])
+        ].filter(Boolean),
+        positions: result.entity?.programs || [],
+        remarks: result.entity?.addresses?.join(', ') || null,
+        listed_on: null,
+        created_at: new Date().toISOString(),
+        score: result.score
+      }))
 
-      const matchFound = filteredResults.length > 0
+      const matchFound = matches.length > 0
 
       return {
         status: matchFound ? 'POTENTIAL_MATCH' : 'CLEARED',
         matchFound,
         timestamp: new Date().toISOString(),
-        matches: filteredResults
+        matches
       }
     } catch (error) {
       console.error('OFAC check failed:', error)
@@ -1303,7 +1585,74 @@ app.whenReady().then(() => {
     }
   })
 
+  // Compliance Schedule Handlers
+  ipcMain.handle('compliance:getScheduleSettings', async (event) => {
+    if (!isAdminRequest(event)) {
+      return { enabled: false, dayOfWeek: 1, timeOfDay: '09:00', threshold: 85, includeVessels: true, skipCleared: true }
+    }
+    return await db.getComplianceScheduleSettings()
+  })
+
+  ipcMain.handle('compliance:setScheduleSettings', async (event, settings) => {
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to set compliance schedule settings')
+      return { success: false, message: 'Unauthorized' }
+    }
+
+    // Calculate next run time
+    const nextRunAt = calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
+    settings.nextRunAt = nextRunAt
+
+    await db.setComplianceScheduleSettings(settings)
+
+    // Restart scheduler with new settings
+    startComplianceScheduler()
+
+    return { success: true }
+  })
+
+  ipcMain.handle('compliance:getCheckLogs', async () => {
+    return await db.getComplianceCheckLogs()
+  })
+
+  ipcMain.handle('compliance:getCheckResults', async (_, logId?: string, status?: string) => {
+    return await db.getComplianceCheckResults(logId, status)
+  })
+
+  ipcMain.handle('compliance:getPendingResults', async () => {
+    return await db.getPendingComplianceResults()
+  })
+
+  ipcMain.handle('compliance:markResultReviewed', async (event, resultId: string) => {
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (!windowId) return
+
+    const sessionId = windowSessions.get(windowId)
+    const user = auth.getCurrentUser(sessionId)
+    if (user) {
+      await db.markComplianceResultReviewed(resultId, user.username)
+    }
+  })
+
+  ipcMain.handle('compliance:runManualCheck', async (event) => {
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to run manual compliance check')
+      return { success: false, message: 'Unauthorized' }
+    }
+
+    try {
+      await runComplianceCheck()
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, message: error.message }
+    }
+  })
+
   createWindow()
+
+  // Start the compliance scheduler after window is created
+  startComplianceScheduler()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

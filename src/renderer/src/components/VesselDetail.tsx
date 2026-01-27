@@ -187,8 +187,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             <input
                                 type="text"
                                 value={editName}
-                                onChange={e => setEditName(e.target.value)}
-                                style={{ fontSize: '2.5rem', width: '100%' }}
+                                onChange={e => setEditName(e.target.value.toUpperCase())}
+                                style={{ fontSize: '2.5rem', width: '100%', textTransform: 'uppercase' }}
                             />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>IMO:</span>

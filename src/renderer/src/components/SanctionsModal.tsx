@@ -129,7 +129,21 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                     ID: {match.source_id}
                   </span>
-                  {match.listed_on && (
+                  {match.score !== undefined && (
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: match.score >= 0.9 ? 'rgba(255, 77, 77, 0.2)' : match.score >= 0.7 ? 'rgba(255, 193, 7, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                        color: match.score >= 0.9 ? '#ff6b6b' : match.score >= 0.7 ? '#ffc107' : 'var(--text-secondary)',
+                        marginLeft: 'auto'
+                      }}
+                    >
+                      {Math.round(match.score * 100)}% match
+                    </span>
+                  )}
+                  {match.listed_on && !match.score && (
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
                       Listed: {new Date(match.listed_on).toLocaleDateString()}
                     </span>
@@ -197,7 +211,7 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
             <Shield size={14} />
-            <span>Data from sanctions.network (OFAC, UN, EU)</span>
+            <span>Data from Sanctions API (OFAC, UN, EU)</span>
           </div>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button

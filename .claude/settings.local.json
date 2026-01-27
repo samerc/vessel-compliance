@@ -1,7 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nsecurity: restrict database configuration access to admins only\n\n- Hide DB configuration section in sidebar from regular users\n- Remove DB configuration display from login screen \\(unauthenticated access\\)\n- Database settings now only accessible to authenticated administrators\n- Prevents unauthorized database connection changes\n\nSecurity Impact:\n- Unauthenticated users can no longer see or change DB config\n- Regular users cannot modify database connections\n- Only admins can view and switch database configurations\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git commit:*)",
+      "Bash(npm run typecheck:web:*)",
+      "Bash(npm run build:win)",
+      "Bash(npm run typecheck:node:*)",
+      "Bash(npm run build:*)",
+      "Bash(node -e:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "Bash(node test-parser.js:*)",
+      "Bash(node test-ousbrave.js:*)",
+      "Bash(node test-actual-parser.js:*)",
+      "Bash(where:*)",
+      "Bash(npx:*)",
+      "Bash(ls:*)",
+      "Bash(done)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

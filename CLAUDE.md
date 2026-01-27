@@ -42,9 +42,18 @@ This is an Electron desktop application for maritime vessel compliance managemen
 
 ### Key Patterns
 - **Database**: Auto-migrating schema in `src/main/mysql/adapter.ts` with schema defined in `schema.sql`
-- **State**: React Context for auth (`AuthContext.tsx`) and theme (`ThemeContext.tsx`)
+- **State**: React Context for auth (`AuthContext.tsx`), theme (`ThemeContext.tsx`), and notifications (`ToastContext.tsx`)
 - **IPC**: All database operations exposed through preload's `window.api` interface
 - **Types**: Shared interfaces in `src/shared/types.ts`
+
+### Toast Notifications
+Global notification system for user feedback:
+- **ToastContext** (`src/renderer/src/contexts/ToastContext.tsx`): Provides `showToast`, `showError`, `showSuccess` functions
+- **Usage**: `const { showError, showSuccess } = useToast()` in any component
+- **Types**: `success` (green), `error` (red), `warning` (yellow), `info` (blue)
+- **Auto-dismiss**: Toasts disappear after 5 seconds, can also be manually dismissed
+- **Styling**: Theme-aware colors, slide-in animation (`.toast-enter` CSS class)
+- **Position**: Fixed bottom-right corner with stacking support
 
 ### Authentication & Security
 - **Session Management**: Window-based sessions in main process with 2-hour timeout and activity refresh
@@ -66,6 +75,19 @@ The app integrates with sanctions.network API for OFAC/UN/EU sanctions checking:
 - **SanctionsModal** (`src/renderer/src/components/SanctionsModal.tsx`) - displays potential matches
 - **Status flow**: `PENDING` → `POTENTIAL_MATCH` (yellow, needs review) → `CLEARED` or `MATCH` (user decision)
 - Each component with sanctions badges (VesselManager, AssuredManager, EntityDirectory) has its own `OfacBadge` component that must handle all statuses
+- **Loading States**: OfacBadge shows "CHECKING..." spinner during API calls
+- **Theme-Aware Colors**: Badge colors adapt for light/dark mode (darker colors in light mode for readability)
+
+### Scheduled Compliance Checks
+Automated weekly sanctions screening for all entities and vessels:
+- **Scheduler** (`src/main/index.ts`): Background timer runs compliance checks on configured schedule
+- **Settings** (Admin Panel): Enable/disable, day of week, time, match threshold (50-100%), include vessels, skip cleared
+- **Match Threshold**: Only matches above configured score (default 85%) are flagged as `POTENTIAL_MATCH`
+- **Results Storage**: `compliance_check_logs` table stores run history, `compliance_check_results` stores individual matches
+- **Review Workflow**: Pending results shown in Compliance Center → Sanctions Screening tab
+- **Desktop Notifications**: System notification when matches are found (if supported)
+- **Manual Trigger**: "Run Now" button in Admin Panel for immediate check
+- **IPC Handlers**: `compliance:getScheduleSettings`, `compliance:setScheduleSettings`, `compliance:runManualCheck`, `compliance:getCheckLogs`, `compliance:getCheckResults`, `compliance:getPendingResults`, `compliance:markResultReviewed`
 
 ### Condition Surveys
 Vessel inspection tracking with defects management:
@@ -87,10 +109,29 @@ Required documents vary by entity type:
 - **Auto-Save**: Window bounds saved on resize/move when user is logged in
 - **Auto-Restore**: User's window preferences applied on login via `setBounds`
 
+### Compliance Center
+Centralized compliance monitoring with two tabs:
+- **Document Alerts Tab**: Missing required files, expired documents, expiring soon (30 days)
+- **Sanctions Screening Tab**:
+  - Pending reviews table with expandable match details
+  - Mark as reviewed action updates result status
+  - Check history sidebar showing all compliance runs with status/counts
+
 ### Code Style
 - Prettier: Single quotes, no semicolons, 100 char width, no trailing commas
 - Path alias: `@renderer/*` maps to `src/renderer/src/*`
+- **Vessel Names**: Always uppercase (enforced via `toUpperCase()` on input and `textTransform: uppercase` CSS)
 
 ## Database Setup
 
 On first launch, admin enters MySQL credentials which are saved to `db-config.json`. Default admin credentials are `admin/admin123`. The schema auto-migrates on startup.
+
+### Key Tables
+- `users` - User accounts with auth, theme, window preferences
+- `vessels`, `fleets` - Vessel registry and fleet grouping
+- `entities`, `vessel_assureds`, `entity_ubos` - Assured parties and beneficial owners
+- `document_types`, `vessel_documents` - Document requirements and uploads
+- `surveyors`, `condition_surveys`, `survey_defects`, `survey_attachments` - Survey management
+- `compliance_check_logs` - History of scheduled/manual compliance runs
+- `compliance_check_results` - Individual sanctions matches pending review
+- `settings` - Key-value store for app settings (file types, compliance schedule, etc.)

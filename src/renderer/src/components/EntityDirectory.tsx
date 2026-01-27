@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Search, User, Ship, ChevronRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react'
+import { Search, User, Ship, ChevronRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
 import { Entity, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
+import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
 
 export default function EntityDirectory() {
@@ -11,6 +13,12 @@ export default function EntityDirectory() {
     const [entityUBOs, setEntityUBOs] = useState<EntityUBO[]>([])
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
+    const { showError } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+
+    // Sanctions checking state
+    const [checkingId, setCheckingId] = useState<string | null>(null)
 
     // Sanctions modal state
     const [sanctionsModal, setSanctionsModal] = useState<{
@@ -66,30 +74,44 @@ export default function EntityDirectory() {
     }
 
     const handleOfacRecheck = async (entity: Entity) => {
-        const result = await OfacService.checkSanctions(entity.name)
-        await window.api.updateEntity(entity.id, {
-            ofacCheckedAt: result.timestamp,
-            ofacMatchFound: result.matchFound,
-            ofacStatus: result.status
-        })
-        loadData()
+        setCheckingId(entity.id)
+        try {
+            const result = await OfacService.checkSanctions(entity.name)
+            await window.api.updateEntity(entity.id, {
+                ofacCheckedAt: result.timestamp,
+                ofacMatchFound: result.matchFound,
+                ofacStatus: result.status
+            })
+            loadData()
 
-        if (result.matchFound && result.matches.length > 0) {
-            setSanctionsModal({ show: true, searchedName: entity.name, matches: result.matches, entityId: entity.id })
+            if (result.matchFound && result.matches.length > 0) {
+                setSanctionsModal({ show: true, searchedName: entity.name, matches: result.matches, entityId: entity.id })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Sanctions check failed. Please try again.')
+        } finally {
+            setCheckingId(null)
         }
     }
 
     const handleVesselOfacRecheck = async (vessel: Vessel) => {
-        const result = await OfacService.checkSanctions(vessel.name)
-        await window.api.updateVessel(vessel.id, {
-            ofacCheckedAt: result.timestamp,
-            ofacMatchFound: result.matchFound,
-            ofacStatus: result.status
-        })
-        loadData()
+        setCheckingId(vessel.id)
+        try {
+            const result = await OfacService.checkSanctions(vessel.name)
+            await window.api.updateVessel(vessel.id, {
+                ofacCheckedAt: result.timestamp,
+                ofacMatchFound: result.matchFound,
+                ofacStatus: result.status
+            })
+            loadData()
 
-        if (result.matchFound && result.matches.length > 0) {
-            setSanctionsModal({ show: true, searchedName: vessel.name, matches: result.matches, vesselId: vessel.id })
+            if (result.matchFound && result.matches.length > 0) {
+                setSanctionsModal({ show: true, searchedName: vessel.name, matches: result.matches, vesselId: vessel.id })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Sanctions check failed. Please try again.')
+        } finally {
+            setCheckingId(null)
         }
     }
 
@@ -114,65 +136,96 @@ export default function EntityDirectory() {
     }
 
     const handleViewPotentialMatch = async (entity?: Entity, vessel?: Vessel) => {
+        const id = entity?.id || vessel?.id
         const name = entity?.name || vessel?.name || ''
-        const result = await OfacService.checkSanctions(name)
-        if (result.matches.length > 0) {
-            setSanctionsModal({
-                show: true,
-                searchedName: name,
-                matches: result.matches,
-                entityId: entity?.id,
-                vesselId: vessel?.id
-            })
+        if (id) setCheckingId(id)
+        try {
+            const result = await OfacService.checkSanctions(name)
+            if (result.matches.length > 0) {
+                setSanctionsModal({
+                    show: true,
+                    searchedName: name,
+                    matches: result.matches,
+                    entityId: entity?.id,
+                    vesselId: vessel?.id
+                })
+            }
+        } catch (error: any) {
+            showError(error.message || 'Failed to load sanctions data. Please try again.')
+        } finally {
+            setCheckingId(null)
         }
     }
 
     const OfacBadge = ({ entity, vessel, onRecheck }: { entity?: Entity, vessel?: Vessel, onRecheck: () => void }) => {
         const target = entity || vessel
+        const isChecking = checkingId === target?.id
         const isMatch = target?.ofacStatus === 'MATCH'
         const isPotentialMatch = target?.ofacStatus === 'POTENTIAL_MATCH'
         const isError = target?.ofacStatus === 'ERROR'
         const isPending = !target?.ofacStatus || target.ofacStatus === 'PENDING'
 
+        // Show checking state
+        if (isChecking) {
+            return (
+                <div
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '2px 10px',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        background: isLight ? 'rgba(0, 150, 200, 0.15)' : 'rgba(0, 210, 255, 0.1)',
+                        border: isLight ? '1px solid rgba(0, 150, 200, 0.4)' : '1px solid rgba(0, 210, 255, 0.3)',
+                        color: isLight ? '#0077a3' : '#00d2ff'
+                    }}
+                >
+                    <Loader2 size={12} className="spinner" />
+                    CHECKING...
+                </div>
+            )
+        }
+
         let config: { background: string; border: string; color: string; text: string; icon: React.ReactNode }
 
         if (isPending) {
             config = {
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+                border: isLight ? '1px solid rgba(0, 0, 0, 0.15)' : '1px solid rgba(255, 255, 255, 0.1)',
                 color: 'var(--text-secondary)',
                 text: 'NOT CHECKED',
                 icon: <Shield size={12} opacity={0.5} />
             }
         } else if (isError) {
             config = {
-                background: 'rgba(255, 153, 0, 0.1)',
-                border: '1px solid rgba(255, 153, 0, 0.3)',
-                color: '#ff9900',
+                background: isLight ? 'rgba(200, 120, 0, 0.15)' : 'rgba(255, 153, 0, 0.1)',
+                border: isLight ? '1px solid rgba(200, 120, 0, 0.4)' : '1px solid rgba(255, 153, 0, 0.3)',
+                color: isLight ? '#b36b00' : '#ff9900',
                 text: 'CHECK FAILED',
                 icon: <Shield size={12} />
             }
         } else if (isMatch) {
             config = {
-                background: 'rgba(255, 77, 77, 0.1)',
-                border: '1px solid rgba(255, 77, 77, 0.3)',
-                color: '#ff4d4d',
+                background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
+                border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
+                color: isLight ? '#c00000' : '#ff4d4d',
                 text: 'SANCTIONED',
                 icon: <ShieldAlert size={12} />
             }
         } else if (isPotentialMatch) {
             config = {
-                background: 'rgba(255, 193, 7, 0.1)',
-                border: '1px solid rgba(255, 193, 7, 0.3)',
-                color: '#ffc107',
+                background: isLight ? 'rgba(180, 140, 0, 0.15)' : 'rgba(255, 193, 7, 0.1)',
+                border: isLight ? '1px solid rgba(180, 140, 0, 0.4)' : '1px solid rgba(255, 193, 7, 0.3)',
+                color: isLight ? '#997a00' : '#ffc107',
                 text: 'POSSIBLE MATCH',
                 icon: <ShieldAlert size={12} />
             }
         } else {
             config = {
-                background: 'rgba(0, 255, 136, 0.1)',
-                border: '1px solid rgba(0, 255, 136, 0.3)',
-                color: '#00ff88',
+                background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
+                border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
+                color: isLight ? '#008c46' : '#00ff88',
                 text: 'CLEARED',
                 icon: <ShieldCheck size={12} />
             }

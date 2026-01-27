@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react'
+import { Plus, Edit, Trash2, Save, X, Search, Loader2 } from 'lucide-react'
 import { Surveyor } from '../../../shared/types'
+import { useToast } from '../contexts/ToastContext'
 
 export default function SurveyorDirectory() {
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
@@ -10,6 +11,8 @@ export default function SurveyorDirectory() {
   const [filterCountry, setFilterCountry] = useState('')
   const [sortBy, setSortBy] = useState<'name' | 'country'>('name')
   const [searchTerm, setSearchTerm] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
+  const { showError, showSuccess } = useToast()
 
   // Form state
   const [formCompanyName, setFormCompanyName] = useState('')
@@ -70,17 +73,25 @@ export default function SurveyorDirectory() {
     e.preventDefault()
     if (!formCompanyName.trim() || !formCountry.trim()) return
 
-    await window.api.addSurveyor({
-      companyName: formCompanyName,
-      country: formCountry,
-      contactPerson: formContactPerson || undefined,
-      contactDetails: formContactDetails || undefined,
-      notes: formNotes || undefined
-    })
+    setIsAdding(true)
+    try {
+      await window.api.addSurveyor({
+        companyName: formCompanyName,
+        country: formCountry,
+        contactPerson: formContactPerson || undefined,
+        contactDetails: formContactDetails || undefined,
+        notes: formNotes || undefined
+      })
 
-    resetForm()
-    setShowAddForm(false)
-    loadSurveyors()
+      resetForm()
+      setShowAddForm(false)
+      showSuccess('Surveyor added successfully')
+      loadSurveyors()
+    } catch (error: any) {
+      showError(error.message || 'Failed to add surveyor. Please try again.')
+    } finally {
+      setIsAdding(false)
+    }
   }
 
   const handleEdit = (surveyor: Surveyor) => {
@@ -95,26 +106,32 @@ export default function SurveyorDirectory() {
   const handleSaveEdit = async (id: string) => {
     if (!formCompanyName.trim() || !formCountry.trim()) return
 
-    await window.api.updateSurveyor(id, {
-      companyName: formCompanyName,
-      country: formCountry,
-      contactPerson: formContactPerson || undefined,
-      contactDetails: formContactDetails || undefined,
-      notes: formNotes || undefined
-    })
+    try {
+      await window.api.updateSurveyor(id, {
+        companyName: formCompanyName,
+        country: formCountry,
+        contactPerson: formContactPerson || undefined,
+        contactDetails: formContactDetails || undefined,
+        notes: formNotes || undefined
+      })
 
-    resetForm()
-    setEditingId(null)
-    loadSurveyors()
+      resetForm()
+      setEditingId(null)
+      showSuccess('Surveyor updated successfully')
+      loadSurveyors()
+    } catch (error: any) {
+      showError(error.message || 'Failed to update surveyor. Please try again.')
+    }
   }
 
   const handleDelete = async (surveyor: Surveyor) => {
     if (confirm(`Delete ${surveyor.companyName}? This will fail if they are referenced in any surveys.`)) {
       try {
         await window.api.deleteSurveyor(surveyor.id)
+        showSuccess('Surveyor deleted successfully')
         loadSurveyors()
-      } catch (error) {
-        alert('Cannot delete surveyor: They are referenced in existing surveys.')
+      } catch (error: any) {
+        showError(error.message || 'Cannot delete surveyor: They are referenced in existing surveys.')
       }
     }
   }

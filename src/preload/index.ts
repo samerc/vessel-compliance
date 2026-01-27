@@ -81,6 +81,15 @@ const api = {
   // OFAC/Sanctions Check
   checkSanctions: (name: string) => ipcRenderer.invoke('ofac:checkSanctions', name),
 
+  // Compliance Schedule
+  complianceGetScheduleSettings: () => ipcRenderer.invoke('compliance:getScheduleSettings'),
+  complianceSetScheduleSettings: (settings) => ipcRenderer.invoke('compliance:setScheduleSettings', settings),
+  complianceGetCheckLogs: () => ipcRenderer.invoke('compliance:getCheckLogs'),
+  complianceGetCheckResults: (logId?: string, status?: string) => ipcRenderer.invoke('compliance:getCheckResults', logId, status),
+  complianceGetPendingResults: () => ipcRenderer.invoke('compliance:getPendingResults'),
+  complianceMarkResultReviewed: (resultId: string) => ipcRenderer.invoke('compliance:markResultReviewed', resultId),
+  complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
+
   // Surveyors
   getSurveyors: () => ipcRenderer.invoke('db:getSurveyors'),
   addSurveyor: (surveyor) => ipcRenderer.invoke('db:addSurveyor', surveyor),
