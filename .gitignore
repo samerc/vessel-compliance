@@ -93,9 +93,9 @@ release/
 Thumbs.db
 
 # Test/Debug Files
-analyze-excel.js
-read_sheet.js
 *.pdf
 *.docx
 
+# Project Specific
+*.md
 db/db-config.json
