@@ -98,4 +98,4 @@ read_sheet.js
 *.pdf
 *.docx
 
-db-config.json
+db/db-config.json
