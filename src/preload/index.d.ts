@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult } from '../shared/types'
 
 export interface Api {
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -78,6 +78,16 @@ export interface Api {
     timestamp: string
     matches: SanctionsMatch[]
   }>
+
+  // Compliance Schedule
+  complianceGetScheduleSettings: () => Promise<ComplianceScheduleSettings>
+  complianceSetScheduleSettings: (settings: ComplianceScheduleSettings) => Promise<{ success: boolean; message?: string }>
+  complianceGetCheckLogs: () => Promise<ComplianceCheckLog[]>
+  complianceGetCheckResults: (logId?: string, status?: string) => Promise<ComplianceCheckResult[]>
+  complianceGetPendingResults: () => Promise<ComplianceCheckResult[]>
+  complianceMarkResultReviewed: (resultId: string) => Promise<void>
+  complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => Promise<{ success: boolean, message?: string }>
+  complianceRunManualCheck: () => Promise<{ success: boolean; message?: string }>
 
   // Surveyors
   getSurveyors: () => Promise<Surveyor[]>

@@ -677,7 +677,7 @@ app.whenReady().then(() => {
         connection.release()
         await testPool.end()
       } catch (error) {
-        await testPool.end().catch(() => {})
+        await testPool.end().catch(() => { })
         console.error('Database connection test failed:', error)
         return { success: false, message: 'Could not connect to database with provided settings' }
       }
@@ -705,7 +705,7 @@ app.whenReady().then(() => {
         try {
           const { unlinkSync } = require('fs')
           unlinkSync(configPath)
-        } catch {}
+        } catch { }
         store.delete('dbConfigDir')
         return { success: false, message: 'Database connection failed' }
       }
@@ -800,7 +800,7 @@ app.whenReady().then(() => {
         connection.release()
         await testPool.end()
       } catch (error) {
-        await testPool.end().catch(() => {})
+        await testPool.end().catch(() => { })
         console.error('Database connection test failed:', error)
         return { success: false, message: 'Could not connect to database with provided settings' }
       }
@@ -960,7 +960,7 @@ app.whenReady().then(() => {
         connection.release()
         await testPool.end()
       } catch (error) {
-        await testPool.end().catch(() => {})
+        await testPool.end().catch(() => { })
         console.error('Database connection test failed:', error)
         return { success: false, message: 'Could not connect to database with provided settings' }
       }
@@ -1195,10 +1195,10 @@ app.whenReady().then(() => {
 
         // Skip headers and non-relevant lines (but allow short numbers in deficiencies or beforeItemsNotSurveyed)
         if (line.includes('Vessel') || line.includes('Date') || line.includes('Place of Survey') ||
-            line.includes('Master') || line.includes('Surveyor') || line.includes('Superintendent') ||
-            line.includes('BJ EXPRESS') || line.includes('Istanbul') || line.includes('DEFICIENCIES & RECOMMENDATIONS') ||
-            line.includes('If the defects') || line.includes('Capt.') ||
-            line.includes('This section is for')) {
+          line.includes('Master') || line.includes('Surveyor') || line.includes('Superintendent') ||
+          line.includes('BJ EXPRESS') || line.includes('Istanbul') || line.includes('DEFICIENCIES & RECOMMENDATIONS') ||
+          line.includes('If the defects') || line.includes('Capt.') ||
+          line.includes('This section is for')) {
           continue
         }
         // Allow short lines if they could be defect numbers (in deficiencies or beforeItemsNotSurveyed sections)
@@ -1259,8 +1259,8 @@ app.whenReady().then(() => {
           for (let j = i + 1; j < lines.length; j++) {
             const nextLine = lines[j].trim()
             if (nextLine && !nextLine.match(/^[\d\.\/]+$/) &&
-                !nextLine.includes('Vessel') && !nextLine.includes('Master') &&
-                !nextLine.startsWith('-') && nextLine.length > 10) {
+              !nextLine.includes('Vessel') && !nextLine.includes('Master') &&
+              !nextLine.startsWith('-') && nextLine.length > 10) {
               let description = nextLine
 
               // Collect multi-line descriptions
@@ -1393,10 +1393,10 @@ app.whenReady().then(() => {
           for (let j = i + 1; j < lines.length; j++) {
             const nextLine = lines[j].trim()
             if (nextLine.includes('ITEMS NOT SURVEYED') ||
-                nextLine.includes('This section is for') ||
-                nextLine.includes('Vessel\'s Master') ||
-                nextLine.match(/^\d+\.?\d*\/?/) ||
-                !nextLine) {
+              nextLine.includes('This section is for') ||
+              nextLine.includes('Vessel\'s Master') ||
+              nextLine.match(/^\d+\.?\d*\/?/) ||
+              !nextLine) {
               break
             }
             observationText += ' ' + nextLine
@@ -1420,9 +1420,9 @@ app.whenReady().then(() => {
 
         // Collect potential standalone descriptions (for PDF with separated layout)
         if (!line.match(/^\d+/) && line.length > 15 &&
-            line.endsWith('.') &&
-            !line.includes('rectified') &&
-            !line.includes('Insurer')) {
+          line.endsWith('.') &&
+          !line.includes('rectified') &&
+          !line.includes('Insurer')) {
           descriptions.push(line)
         }
       }
@@ -1633,6 +1633,20 @@ app.whenReady().then(() => {
     if (user) {
       await db.markComplianceResultReviewed(resultId, user.username)
     }
+  })
+
+  ipcMain.handle('compliance:decideResult', async (event, resultId: string, decision: 'sanctioned' | 'cleared') => {
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (!windowId) return { success: false, message: 'Invalid window context' }
+
+    const sessionId = windowSessions.get(windowId)
+    const user = auth.getCurrentUser(sessionId)
+    if (user) {
+      await db.decideComplianceResult(resultId, decision, user.username)
+      return { success: true }
+    }
+    return { success: false, message: 'Unauthorized' }
   })
 
   ipcMain.handle('compliance:runManualCheck', async (event) => {

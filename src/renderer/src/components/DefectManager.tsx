@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, ChevronDown, ChevronUp } from 'lucide-react'
 import { SurveyDefect, ConditionSurvey } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface DefectManagerProps {
   survey: ConditionSurvey
@@ -16,6 +17,8 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
   const [closureNotes, setClosureNotes] = useState('')
   const [editingDefectId, setEditingDefectId] = useState<string | null>(null)
   const [expandedClosureIds, setExpandedClosureIds] = useState<Set<string>>(new Set())
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
 
   // New defect form
   const [newNumber, setNewNumber] = useState('')
@@ -315,10 +318,45 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                         </span>
                       </td>
                       <td style={{ padding: '12px' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: defect.status === 'OPEN' ? 'var(--warning)' : 'var(--success)' }}>
-                          {defect.status === 'OPEN' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-                          {defect.status}
-                        </span>
+                        {defect.status === 'OPEN' ? (
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
+                              border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
+                              color: isLight ? '#c00000' : '#ff4d4d',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            <AlertCircle size={14} />
+                            OPEN
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
+                              border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
+                              color: isLight ? '#008c46' : '#00ff88',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            <CheckCircle size={14} />
+                            CLOSED
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '12px', color: 'var(--text-primary)' }}>{defect.dueDate || 'N/A'}</td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>

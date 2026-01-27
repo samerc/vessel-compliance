@@ -18,7 +18,7 @@ export interface Vessel {
   fleetId?: string
   ofacCheckedAt?: string
   ofacMatchFound?: boolean
-  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
+  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
 }
 
 export interface VesselDocument {
@@ -46,7 +46,7 @@ export interface Entity {
   kycFilePath?: string // Path to KYC document (for all entities)
   ofacCheckedAt?: string
   ofacMatchFound?: boolean
-  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
+  ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
 }
 
 export interface AssuredRole {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText, X, Download, FileUp, Edit, Save } from 'lucide-react'
+import { useTheme } from '../contexts/ThemeContext'
 import { Vessel, ConditionSurvey, SurveyAttachment, Surveyor } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import DefectManager from './DefectManager'
@@ -19,6 +20,8 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const [dragOverSurveyId, setDragOverSurveyId] = useState<string | null>(null)
   const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null)
   const [showNewSurveyorForm, setShowNewSurveyorForm] = useState(false)
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
 
   // Defect counts per survey
   const [defectCounts, setDefectCounts] = useState<Record<string, { open: number; closed: number }>>({})
@@ -439,10 +442,12 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                         <span style={{
                           padding: '4px 10px',
                           borderRadius: '6px',
-                          background: 'var(--success)',
-                          color: '#000',
-                          fontSize: '12px',
-                          fontWeight: 'bold'
+                          background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
+                          border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
+                          color: isLight ? '#008c46' : '#00ff88',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          textTransform: 'uppercase'
                         }}>
                           SURVEY CLOSED
                         </span>
@@ -571,56 +576,56 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                             Import from Word/PDF
                           </button>
                         </div>
-                      <div
-                        onDragOver={(e) => handleDragOver(e, survey.id)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, survey.id)}
-                        style={{
-                          border: '2px dashed var(--input-border)',
-                          borderRadius: '8px',
-                          padding: '20px',
-                          textAlign: 'center',
-                          background: isDragOver ? 'var(--bg-card-hover)' : 'var(--input-bg)',
-                          marginBottom: '15px',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <Upload size={32} color="var(--text-secondary)" style={{ margin: '0 auto 10px' }} />
-                        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Drag and drop files here (multiple files supported)</p>
-                      </div>
-                      {surveyAttachments.length === 0 ? (
-                        <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No attachments</p>
-                      ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
-                          {surveyAttachments.map((attachment) => (
-                            <div
-                              key={attachment.id}
-                              className="glass-card"
-                              style={{
-                                padding: '12px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                              }}
-                            >
-                              <span
-                                onClick={() => handleOpenFile(attachment.filePath)}
-                                style={{ color: 'var(--accent-primary)', cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}
-                                title={attachment.fileName}
-                              >
-                                {attachment.fileName}
-                              </span>
-                              <button
-                                onClick={() => handleDeleteAttachment(attachment.id)}
-                                style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                title="Delete attachment"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          ))}
+                        <div
+                          onDragOver={(e) => handleDragOver(e, survey.id)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, survey.id)}
+                          style={{
+                            border: '2px dashed var(--input-border)',
+                            borderRadius: '8px',
+                            padding: '20px',
+                            textAlign: 'center',
+                            background: isDragOver ? 'var(--bg-card-hover)' : 'var(--input-bg)',
+                            marginBottom: '15px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <Upload size={32} color="var(--text-secondary)" style={{ margin: '0 auto 10px' }} />
+                          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Drag and drop files here (multiple files supported)</p>
                         </div>
-                      )}
+                        {surveyAttachments.length === 0 ? (
+                          <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No attachments</p>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+                            {surveyAttachments.map((attachment) => (
+                              <div
+                                key={attachment.id}
+                                className="glass-card"
+                                style={{
+                                  padding: '12px',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <span
+                                  onClick={() => handleOpenFile(attachment.filePath)}
+                                  style={{ color: 'var(--accent-primary)', cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}
+                                  title={attachment.fileName}
+                                >
+                                  {attachment.fileName}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteAttachment(attachment.id)}
+                                  style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Delete attachment"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 

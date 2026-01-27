@@ -1,7 +1,7 @@
 import { SanctionsMatch } from '../../../shared/types'
 
 export interface OfacCheckResult {
-    status: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
+    status: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
     matchFound: boolean
     timestamp: string
     matches: SanctionsMatch[]

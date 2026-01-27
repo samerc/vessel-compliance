@@ -88,6 +88,7 @@ const api = {
   complianceGetCheckResults: (logId?: string, status?: string) => ipcRenderer.invoke('compliance:getCheckResults', logId, status),
   complianceGetPendingResults: () => ipcRenderer.invoke('compliance:getPendingResults'),
   complianceMarkResultReviewed: (resultId: string) => ipcRenderer.invoke('compliance:markResultReviewed', resultId),
+  complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => ipcRenderer.invoke('compliance:decideResult', resultId, decision),
   complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
 
   // Surveyors

@@ -276,6 +276,7 @@ export class MySQLAdapter {
                 match_score DECIMAL(5,2) NOT NULL,
                 match_details TEXT,
                 status VARCHAR(20) NOT NULL DEFAULT 'pending_review',
+                decision VARCHAR(20),
                 reviewed_by VARCHAR(255),
                 reviewed_at TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -284,6 +285,13 @@ export class MySQLAdapter {
                 INDEX idx_status (status),
                 INDEX idx_entity (entity_type, entity_id)
             )`)
+
+            // Add decision column if it doesn't exist
+            const [resultCols]: any[] = await this.pool.query('SHOW COLUMNS FROM compliance_check_results')
+            const resultColNames = resultCols.map((c: any) => c.Field)
+            if (!resultColNames.includes('decision')) {
+                await this.pool.query("ALTER TABLE compliance_check_results ADD COLUMN decision VARCHAR(20) AFTER status")
+            }
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -797,7 +805,7 @@ export class MySQLAdapter {
             `INSERT INTO surveyors (id, company_name, country, contact_person, contact_details, notes)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [id, surveyor.companyName, surveyor.country, surveyor.contactPerson || null,
-             surveyor.contactDetails || null, surveyor.notes || null]
+                surveyor.contactDetails || null, surveyor.notes || null]
         )
         return { ...surveyor, id }
     }
@@ -847,8 +855,8 @@ export class MySQLAdapter {
              (id, vessel_id, survey_date, surveyor_id, survey_type, location, notes, created_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, survey.vesselId, survey.surveyDate, survey.surveyorId,
-             survey.surveyType, survey.location || null,
-             survey.notes || null, survey.createdBy || 'System']
+                survey.surveyType, survey.location || null,
+                survey.notes || null, survey.createdBy || 'System']
         )
         return { ...survey, id }
     }
@@ -897,7 +905,7 @@ export class MySQLAdapter {
              (id, survey_id, defect_number, description, severity, status, due_date, notes)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, defect.surveyId, defect.defectNumber, defect.description,
-             defect.severity, defect.status || 'OPEN', defect.dueDate || null, defect.notes || null]
+                defect.severity, defect.status || 'OPEN', defect.dueDate || null, defect.notes || null]
         )
         return { ...defect, id }
     }
@@ -971,7 +979,7 @@ export class MySQLAdapter {
              (id, survey_id, file_path, file_name, file_type, uploaded_by)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [id, attachment.surveyId, attachment.filePath, attachment.fileName,
-             attachment.fileType || 'other', attachment.uploadedBy || 'System']
+                attachment.fileType || 'other', attachment.uploadedBy || 'System']
         )
         return { ...attachment, id }
     }
@@ -1116,7 +1124,7 @@ export class MySQLAdapter {
         if (!this.pool) return []
         let sql = `SELECT id, log_id as logId, entity_type as entityType, entity_id as entityId,
                    entity_name as entityName, match_score as matchScore, match_details as matchDetails,
-                   status, reviewed_by as reviewedBy, reviewed_at as reviewedAt, created_at as createdAt
+                   status, decision, reviewed_by as reviewedBy, reviewed_at as reviewedAt, created_at as createdAt
                    FROM compliance_check_results`
         const conditions: string[] = []
         const params: any[] = []
@@ -1140,6 +1148,50 @@ export class MySQLAdapter {
             `UPDATE compliance_check_results SET status = 'reviewed', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
             [reviewedBy, id]
         )
+    }
+
+    async decideComplianceResult(id: string, decision: 'sanctioned' | 'cleared', reviewedBy: string): Promise<void> {
+        if (!this.pool) return
+
+        // 1. Get the result to know the entity/vessel
+        const [results]: any[] = await this.pool.query(
+            'SELECT entity_type as entityType, entity_id as entityId FROM compliance_check_results WHERE id = ?',
+            [id]
+        )
+        if (results.length === 0) return
+        const { entityType, entityId } = results[0]
+
+        // 2. Update the result status and decision
+        await this.pool.execute(
+            `UPDATE compliance_check_results SET status = 'reviewed', decision = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
+            [decision, reviewedBy, id]
+        )
+
+        // 3. Update the related vessel or entity
+        if (decision === 'sanctioned') {
+            const table = entityType === 'vessel' ? 'vessels' : 'entities'
+            await this.pool.execute(
+                `UPDATE ${table} SET ofac_status = 'SANCTIONED', ofac_match_found = 1 WHERE id = ?`,
+                [entityId]
+            )
+        } else {
+            // Decision is 'cleared'
+            // We only clear the record if there are no OTHER pending or sanctioned matches for this entity
+            const [otherMatches]: any[] = await this.pool.query(
+                `SELECT id FROM compliance_check_results 
+                 WHERE entity_type = ? AND entity_id = ? AND id != ? 
+                 AND (status = 'pending_review' OR (status = 'reviewed' AND decision = 'sanctioned'))`,
+                [entityType, entityId, id]
+            )
+
+            if (otherMatches.length === 0) {
+                const table = entityType === 'vessel' ? 'vessels' : 'entities'
+                await this.pool.execute(
+                    `UPDATE ${table} SET ofac_status = 'CLEARED', ofac_match_found = 0 WHERE id = ?`,
+                    [entityId]
+                )
+            }
+        }
     }
 }
 

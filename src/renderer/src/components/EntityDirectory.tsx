@@ -160,7 +160,7 @@ export default function EntityDirectory() {
     const OfacBadge = ({ entity, vessel, onRecheck }: { entity?: Entity, vessel?: Vessel, onRecheck: () => void }) => {
         const target = entity || vessel
         const isChecking = checkingId === target?.id
-        const isMatch = target?.ofacStatus === 'MATCH'
+        const isMatch = target?.ofacStatus === 'MATCH' || target?.ofacStatus === 'SANCTIONED'
         const isPotentialMatch = target?.ofacStatus === 'POTENTIAL_MATCH'
         const isError = target?.ofacStatus === 'ERROR'
         const isPending = !target?.ofacStatus || target.ofacStatus === 'PENDING'
@@ -254,8 +254,8 @@ export default function EntityDirectory() {
                 }}
                 title={
                     isError ? 'API request failed. Click refresh to try again.' :
-                    isPotentialMatch ? 'Click to review potential matches' :
-                    `Last checked: ${target?.ofacCheckedAt ? new Date(target.ofacCheckedAt).toLocaleString() : 'Never'}`
+                        isPotentialMatch ? 'Click to review potential matches' :
+                            `Last checked: ${target?.ofacCheckedAt ? new Date(target.ofacCheckedAt).toLocaleString() : 'Never'}`
                 }
                 onClick={handleBadgeClick}
             >

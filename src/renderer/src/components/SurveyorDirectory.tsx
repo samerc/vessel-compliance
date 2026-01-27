@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Save, X, Search, Loader2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react'
 import { Surveyor } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
@@ -8,10 +8,10 @@ export default function SurveyorDirectory() {
   const [filteredSurveyors, setFilteredSurveyors] = useState<Surveyor[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isAdding, setIsAdding] = useState(false)
   const [filterCountry, setFilterCountry] = useState('')
   const [sortBy, setSortBy] = useState<'name' | 'country'>('name')
   const [searchTerm, setSearchTerm] = useState('')
-  const [isAdding, setIsAdding] = useState(false)
   const { showError, showSuccess } = useToast()
 
   // Form state
@@ -267,8 +267,8 @@ export default function SurveyorDirectory() {
               style={{ resize: 'vertical', width: '100%' }}
             />
           </div>
-          <button type="submit" className="btn-primary">
-            Add Surveyor
+          <button type="submit" className="btn-primary" disabled={isAdding}>
+            {isAdding ? 'Adding...' : 'Add Surveyor'}
           </button>
         </form>
       )}

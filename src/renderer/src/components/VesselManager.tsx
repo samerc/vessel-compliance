@@ -173,7 +173,7 @@ export default function VesselManager() {
 
     const OfacBadge = ({ vessel }: { vessel: Vessel }) => {
         const isChecking = checkingVesselId === vessel.id
-        const isMatch = vessel.ofacStatus === 'MATCH'
+        const isMatch = vessel.ofacStatus === 'MATCH' || vessel.ofacStatus === 'SANCTIONED'
         const isPotentialMatch = vessel.ofacStatus === 'POTENTIAL_MATCH'
         const isError = vessel.ofacStatus === 'ERROR'
         const isPending = !vessel.ofacStatus || vessel.ofacStatus === 'PENDING'
@@ -267,8 +267,8 @@ export default function VesselManager() {
                 }}
                 title={
                     isError ? 'API request failed. Click refresh to try again.' :
-                    isPotentialMatch ? 'Click to review potential matches' :
-                    `Last checked: ${vessel.ofacCheckedAt ? new Date(vessel.ofacCheckedAt).toLocaleString() : 'Never'}`
+                        isPotentialMatch ? 'Click to review potential matches' :
+                            `Last checked: ${vessel.ofacCheckedAt ? new Date(vessel.ofacCheckedAt).toLocaleString() : 'Never'}`
                 }
                 onClick={handleBadgeClick}
             >

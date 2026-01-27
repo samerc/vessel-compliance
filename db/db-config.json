@@ -3,5 +3,6 @@
   "port": 3306,
   "user": "vessel_compliance_user",
   "password": "/V!D7-VJQU(W2iXb",
-  "database": "vessel_compliance"
+  "database": "vessel_compliance",
+  "sanctionsApiKey": "1563e33cb96b7eeb06e7c05140a02809ff1647fab5999f4a"
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, ShieldAlert, ShieldCheck, Calendar, FileSpreadsheet, FileText } from 'lucide-react'
+import { useTheme } from '../contexts/ThemeContext'
 import { Vessel, DocumentType, VesselDocument } from '../../../shared/types'
 
 import { ReportService } from '../services/ReportService'
@@ -17,6 +18,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
     const [dragOverId, setDragOverId] = useState<string | null>(null)
     const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     useEffect(() => {
         loadData()
@@ -296,13 +299,62 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <td style={{ padding: '16px' }}>
                                         {hasFile ? (
                                             exists ? (
-                                                <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={16} /> Linked</span>
+                                                <div
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '600',
+                                                        background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
+                                                        border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
+                                                        color: isLight ? '#008c46' : '#00ff88',
+                                                        textTransform: 'uppercase'
+                                                    }}
+                                                >
+                                                    <CheckCircle size={14} />
+                                                    LINKED
+                                                </div>
                                             ) : (
-                                                <span style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertCircle size={16} /> Missing</span>
+                                                <div
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '600',
+                                                        background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
+                                                        border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
+                                                        color: isLight ? '#c00000' : '#ff4d4d',
+                                                        textTransform: 'uppercase'
+                                                    }}
+                                                >
+                                                    <AlertCircle size={14} />
+                                                    MISSING
+                                                </div>
                                             )
                                         ) : (
-                                            <div style={{ color: 'var(--accent-primary)', opacity: 0.6, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', border: '1px dashed rgba(0, 210, 255, 0.3)', padding: '4px 8px', borderRadius: '4px' }}>
-                                                <Upload size={14} /> Drop File Here
+                                            <div
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '500',
+                                                    background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(0, 210, 255, 0.05)',
+                                                    border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(0, 210, 255, 0.3)'}`,
+                                                    color: isLight ? '#0077a3' : '#00d2ff',
+                                                    textTransform: 'uppercase'
+                                                }}
+                                            >
+                                                <Upload size={14} />
+                                                DROP FILE HERE
                                             </div>
                                         )}
                                     </td>

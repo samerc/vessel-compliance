@@ -354,7 +354,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const OfacBadge = ({ entity }: { entity: Entity }) => {
         const isChecking = checkingId === entity.id
-        const isMatch = entity.ofacStatus === 'MATCH'
+        const isMatch = entity.ofacStatus === 'MATCH' || entity.ofacStatus === 'SANCTIONED'
         const isPotentialMatch = entity.ofacStatus === 'POTENTIAL_MATCH'
         const isError = entity.ofacStatus === 'ERROR'
         const isPending = !entity.ofacStatus || entity.ofacStatus === 'PENDING'
@@ -448,8 +448,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                 }}
                 title={
                     isError ? 'API request failed. Click refresh to try again.' :
-                    isPotentialMatch ? 'Click to review potential matches' :
-                    `Last checked: ${entity.ofacCheckedAt ? new Date(entity.ofacCheckedAt).toLocaleString() : 'Never'}`
+                        isPotentialMatch ? 'Click to review potential matches' :
+                            `Last checked: ${entity.ofacCheckedAt ? new Date(entity.ofacCheckedAt).toLocaleString() : 'Never'}`
                 }
                 onClick={handleBadgeClick}
             >
