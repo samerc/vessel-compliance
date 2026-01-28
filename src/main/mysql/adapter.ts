@@ -110,11 +110,11 @@ export class MySQLAdapter {
             if (!userColNames.includes('window_height')) {
                 await this.pool.query("ALTER TABLE users ADD COLUMN window_height INT DEFAULT NULL AFTER window_width")
             }
-            if (!userColNames.includes('window_x')) {
-                await this.pool.query("ALTER TABLE users ADD COLUMN window_x INT DEFAULT NULL AFTER window_height")
-            }
             if (!userColNames.includes('window_y')) {
                 await this.pool.query("ALTER TABLE users ADD COLUMN window_y INT DEFAULT NULL AFTER window_x")
+            }
+            if (!userColNames.includes('sanctions_threshold')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN sanctions_threshold INT DEFAULT 60 AFTER theme_preference")
             }
 
             // Migration: Add surveyors table
@@ -665,7 +665,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE username = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -688,7 +688,7 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, theme_preference as themePreference, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users ORDER BY username ASC'
+            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
@@ -712,6 +712,14 @@ export class MySQLAdapter {
         await this.pool.execute(
             'UPDATE users SET window_width = ?, window_height = ?, window_x = ?, window_y = ? WHERE id = ?',
             [width, height, x !== undefined ? x : null, y !== undefined ? y : null, userId]
+        )
+    }
+
+    async updateUserSanctionsThreshold(userId: string, threshold: number): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE users SET sanctions_threshold = ? WHERE id = ?',
+            [threshold, userId]
         )
     }
 

@@ -68,6 +68,8 @@ const api = {
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
+  updateUserWindowPreferences: (width: number, height: number, x?: number, y?: number) => ipcRenderer.invoke('users:updateWindowPreferences', width, height, x, y),
+  updateSanctionsThreshold: (threshold: number) => ipcRenderer.invoke('users:updateSanctionsThreshold', threshold),
 
   // Window Preferences
   windowGetPreferences: () => ipcRenderer.invoke('window:getPreferences'),
@@ -79,7 +81,7 @@ const api = {
   fileTypesValidateFile: (filePath) => ipcRenderer.invoke('fileTypes:validateFile', filePath),
 
   // OFAC/Sanctions Check
-  checkSanctions: (name: string) => ipcRenderer.invoke('ofac:checkSanctions', name),
+  checkSanctions: (name: string, threshold?: number, sources?: string[]) => ipcRenderer.invoke('ofac:checkSanctions', name, threshold, sources),
 
   // Compliance Schedule
   complianceGetScheduleSettings: () => ipcRenderer.invoke('compliance:getScheduleSettings'),

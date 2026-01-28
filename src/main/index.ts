@@ -1516,7 +1516,7 @@ app.whenReady().then(() => {
   })
 
   // OFAC/Sanctions Check Handler
-  ipcMain.handle('ofac:checkSanctions', async (_, name: string) => {
+  ipcMain.handle('ofac:checkSanctions', async (_, name: string, threshold = 0.6, sources?: string[]) => {
     try {
       const apiKey = getSanctionsApiKey()
       if (!apiKey) {
@@ -1533,9 +1533,14 @@ app.whenReady().then(() => {
       const params = new URLSearchParams({
         q: name,
         mode: 'both',
-        threshold: '0.6',
+        threshold: threshold.toString(),
         limit: '20'
       })
+
+      // Add source filtering if provided
+      if (sources && sources.length > 0) {
+        params.append('sources', sources.join(','))
+      }
 
       const response = await fetch(`https://sanctions.fancyshark.com/api/search?${params}`, {
         headers: {
@@ -1550,21 +1555,35 @@ app.whenReady().then(() => {
       const data = await response.json()
 
       // Transform results to match existing SanctionsMatch interface
-      const matches = (data.results || []).map((result: any) => ({
-        id: result.entity?.source_id || '',
-        target_type: result.entity?.entity_type || 'unknown',
-        source: result.entity?.source || 'unknown',
-        source_id: result.entity?.source_id || '',
-        names: [
-          result.entity?.name,
-          ...(result.entity?.aliases || [])
-        ].filter(Boolean),
-        positions: result.entity?.programs || [],
-        remarks: result.entity?.addresses?.join(', ') || null,
-        listed_on: null,
-        created_at: new Date().toISOString(),
-        score: result.score
-      }))
+      const matches = (data.results || [])
+        .map((result: any) => {
+          // Extract IMO number if available in entity metadata (often in details or remarks)
+          let imoNumber: string | undefined
+          if (result.entity?.details) {
+            const detailsStr = JSON.stringify(result.entity.details)
+            const imoMatch = detailsStr.match(/IMO\s*(\d{7})/i)
+            if (imoMatch) imoNumber = imoMatch[1]
+          }
+
+          return {
+            id: result.entity?.source_id || '',
+            target_type: result.entity?.entity_type || 'unknown',
+            source: result.entity?.source || 'unknown',
+            source_id: result.entity?.source_id || '',
+            names: [
+              result.entity?.name,
+              ...(result.entity?.aliases || [])
+            ].filter(Boolean),
+            positions: result.entity?.programs || [],
+            remarks: result.entity?.addresses?.join(', ') || null,
+            listed_on: null,
+            created_at: new Date().toISOString(),
+            score: result.score,
+            imo_number: imoNumber
+          }
+        })
+        // Strict filtering: Ensure API or mapping didn't include matches below threshold
+        .filter((match: any) => (match.score || 0) >= threshold)
 
       const matchFound = matches.length > 0
 

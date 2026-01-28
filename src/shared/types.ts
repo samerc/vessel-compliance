@@ -83,6 +83,7 @@ export interface User {
   passwordHash: string
   role: 'admin' | 'user'
   themePreference?: 'light' | 'dark'
+  sanctionsThreshold?: number // 0-100
   windowWidth?: number
   windowHeight?: number
   windowX?: number
@@ -101,6 +102,7 @@ export interface SanctionsMatch {
   listed_on: string | null
   created_at: string
   score?: number
+  imo_number?: string
 }
 
 export interface FileTypeSettings {
