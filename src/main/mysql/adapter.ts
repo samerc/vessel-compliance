@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
 import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor } from '../../shared/types'
+import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
 
@@ -367,7 +368,7 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute(
             'INSERT INTO vessels (id, name, imo_number, fleet_id, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null, vessel.ofacCheckedAt || null, vessel.ofacMatchFound || false, vessel.ofacStatus || 'PENDING']
+            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null, formatDateForMySQL(vessel.ofacCheckedAt), vessel.ofacMatchFound || false, vessel.ofacStatus || 'PENDING']
         )
         return { ...vessel, id }
     }
@@ -380,7 +381,7 @@ export class MySQLAdapter {
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.imoNumber !== undefined) { fields.push('imo_number = ?'); values.push(updates.imoNumber) }
         if (updates.fleetId !== undefined) { fields.push('fleet_id = ?'); values.push(updates.fleetId || null) }
-        if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(updates.ofacCheckedAt || null) }
+        if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(formatDateForMySQL(updates.ofacCheckedAt)) }
         if (updates.ofacMatchFound !== undefined) { fields.push('ofac_match_found = ?'); values.push(updates.ofacMatchFound || false) }
         if (updates.ofacStatus !== undefined) { fields.push('ofac_status = ?'); values.push(updates.ofacStatus) }
 
@@ -439,14 +440,14 @@ export class MySQLAdapter {
             file_path = ?, sent = ?, required = ?, expiry_date = ?, received_date = ?, 
             uploaded_date = ?, uploaded_by = ? 
             WHERE id = ?`,
-                [doc.filePath, doc.sent, doc.required, doc.expiryDate || null, doc.receivedDate || null, doc.uploadedDate, doc.uploadedBy, existing[0].id]
+                [doc.filePath, doc.sent, doc.required, doc.expiryDate || null, doc.receivedDate || null, formatDateForMySQL(doc.uploadedDate), doc.uploadedBy, existing[0].id]
             )
         } else {
             await this.pool.execute(
                 `INSERT INTO vessel_documents 
             (id, vessel_id, document_type_id, file_path, sent, required, expiry_date, received_date, uploaded_date, uploaded_by)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [uuidv4(), doc.vesselId, doc.documentTypeId, doc.filePath, doc.sent, doc.required, doc.expiryDate || null, doc.receivedDate || null, doc.uploadedDate, doc.uploadedBy]
+                [uuidv4(), doc.vesselId, doc.documentTypeId, doc.filePath, doc.sent, doc.required, doc.expiryDate || null, doc.receivedDate || null, formatDateForMySQL(doc.uploadedDate), doc.uploadedBy]
             )
         }
     }
@@ -509,7 +510,7 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute(
             'INSERT INTO entities (id, name, type, identifier, email, phone, passport_file_path, certificate_of_incorporation_path, articles_of_association_path, kyc_file_path, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, entity.name, entity.type, entity.identifier || null, entity.email || null, entity.phone || null, entity.passportFilePath || null, entity.certificateOfIncorporationPath || null, entity.articlesOfAssociationPath || null, entity.kycFilePath || null, entity.ofacCheckedAt || null, entity.ofacMatchFound || false, entity.ofacStatus || 'PENDING']
+            [id, entity.name, entity.type, entity.identifier || null, entity.email || null, entity.phone || null, entity.passportFilePath || null, entity.certificateOfIncorporationPath || null, entity.articlesOfAssociationPath || null, entity.kycFilePath || null, formatDateForMySQL(entity.ofacCheckedAt), entity.ofacMatchFound || false, entity.ofacStatus || 'PENDING']
         )
         return { ...entity, id }
     }
@@ -555,7 +556,7 @@ export class MySQLAdapter {
         if (updates.certificateOfIncorporationPath !== undefined) { fields.push('certificate_of_incorporation_path = ?'); values.push(updates.certificateOfIncorporationPath) }
         if (updates.articlesOfAssociationPath !== undefined) { fields.push('articles_of_association_path = ?'); values.push(updates.articlesOfAssociationPath) }
         if (updates.kycFilePath !== undefined) { fields.push('kyc_file_path = ?'); values.push(updates.kycFilePath) }
-        if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(updates.ofacCheckedAt || null) }
+        if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(formatDateForMySQL(updates.ofacCheckedAt)) }
         if (updates.ofacMatchFound !== undefined) { fields.push('ofac_match_found = ?'); values.push(updates.ofacMatchFound || false) }
         if (updates.ofacStatus !== undefined) { fields.push('ofac_status = ?'); values.push(updates.ofacStatus) }
 

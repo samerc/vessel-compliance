@@ -114,7 +114,7 @@ export class ExcelImporter {
                             filePath: hasFile ? `[Imported - ${excelName}]` : '',
                             sent: false,
                             required: docType.required,
-                            uploadedDate: new Date().toISOString(),
+                            uploadedDate: new Date().toISOString().replace('T', ' ').split('.')[0], // Format: YYYY-MM-DD HH:MM:SS
                             uploadedBy: 'Excel Import',
                             expiryDate: expiryDate
                         }

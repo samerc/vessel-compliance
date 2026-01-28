@@ -5,6 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
 import { auth } from './auth'
+import { formatDateForMySQL } from './mysql/utils'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 
@@ -1524,7 +1525,7 @@ app.whenReady().then(() => {
         return {
           status: 'ERROR',
           matchFound: false,
-          timestamp: new Date().toISOString(),
+          timestamp: formatDateForMySQL(new Date()),
           matches: [],
           error: 'Sanctions API key not configured. Add sanctionsApiKey to db-config.json'
         }
@@ -1577,7 +1578,7 @@ app.whenReady().then(() => {
             positions: result.entity?.programs || [],
             remarks: result.entity?.addresses?.join(', ') || null,
             listed_on: null,
-            created_at: new Date().toISOString(),
+            created_at: formatDateForMySQL(new Date()),
             score: result.score,
             imo_number: imoNumber
           }
@@ -1590,7 +1591,7 @@ app.whenReady().then(() => {
       return {
         status: matchFound ? 'POTENTIAL_MATCH' : 'CLEARED',
         matchFound,
-        timestamp: new Date().toISOString(),
+        timestamp: formatDateForMySQL(new Date()),
         matches
       }
     } catch (error) {
@@ -1598,7 +1599,7 @@ app.whenReady().then(() => {
       return {
         status: 'ERROR',
         matchFound: false,
-        timestamp: new Date().toISOString(),
+        timestamp: formatDateForMySQL(new Date()),
         matches: []
       }
     }
