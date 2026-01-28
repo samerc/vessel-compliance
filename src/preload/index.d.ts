@@ -28,7 +28,7 @@ export interface Api {
   getVessels: () => Promise<Vessel[]>
   addVessel: (vessel: Omit<Vessel, 'id'>) => Promise<Vessel>
   updateVessel: (id: string, updates: Partial<Vessel>) => Promise<void>
-  deleteVessel: (id: string) => Promise<void>
+  deleteVessel: (id: string) => Promise<{ success: boolean; message?: string }>
 
   getVesselDocuments: (vesselId?: string) => Promise<VesselDocument[]>
   upsertVesselDocument: (doc: VesselDocument) => Promise<void>

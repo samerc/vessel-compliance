@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, ShieldAlert, ShieldCheck, Calendar, FileSpreadsheet, FileText } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, ShieldAlert, ShieldCheck, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
 import { Vessel, DocumentType, VesselDocument } from '../../../shared/types'
 
 import { ReportService } from '../services/ReportService'
@@ -18,7 +20,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
     const [dragOverId, setDragOverId] = useState<string | null>(null)
     const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
+    const [vesselActive, setVesselActive] = useState(vessel.isActive)
     const { theme } = useTheme()
+    const { isAdmin } = useAuth()
+    const { showSuccess, showError } = useToast()
     const isLight = theme === 'light'
 
     useEffect(() => {
@@ -175,6 +180,30 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         vessel.name = editName
         vessel.imoNumber = editImo
         setIsEditing(false)
+        showSuccess('Vessel details updated')
+    }
+
+    const handleToggleVesselActive = async () => {
+        const newStatus = !vesselActive
+        await window.api.updateVessel(vessel.id, { isActive: newStatus })
+        setVesselActive(newStatus)
+        vessel.isActive = newStatus
+        showSuccess(`Vessel is now ${newStatus ? 'ACTIVE' : 'INACTIVE'}`)
+    }
+
+    const handleDeleteVessel = async (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const confirmMsg = 'Are you sure you want to delete this vessel? \n\nThis will also delete all its documents and linked assureds that are not associated with other vessels. \n\nTHIS ACTION CANNOT BE UNDONE.'
+        if (window.confirm(confirmMsg)) {
+            const result = await window.api.deleteVessel(vessel.id)
+            if (result.success) {
+                showSuccess('Vessel deleted successfully')
+                onBack()
+            } else {
+                showError(result.message || 'Failed to delete vessel')
+            }
+        }
     }
 
     return (
@@ -225,6 +254,35 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             <button onClick={() => setIsEditing(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 Edit Details
                             </button>
+                            <button
+                                onClick={handleToggleVesselActive}
+                                className="btn-secondary"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    color: vesselActive ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                                }}
+                            >
+                                {vesselActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                                {vesselActive ? 'Active' : 'Inactive'}
+                            </button>
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteVessel}
+                                    className="btn-secondary"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        color: 'var(--danger)',
+                                        borderColor: 'rgba(255, 77, 77, 0.3)'
+                                    }}
+                                >
+                                    <Trash size={18} /> Delete Vessel
+                                </button>
+                            )}
                             <button onClick={() => ReportService.exportVesselToExcel(vessel, docTypes, vesselDocs)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <FileSpreadsheet size={18} /> Excel Report
                             </button>

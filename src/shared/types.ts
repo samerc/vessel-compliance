@@ -19,6 +19,7 @@ export interface Vessel {
   ofacCheckedAt?: string
   ofacMatchFound?: boolean
   ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
+  isActive: boolean
 }
 
 export interface VesselDocument {

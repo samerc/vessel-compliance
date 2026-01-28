@@ -15,6 +15,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const [allDocs, setAllDocs] = useState<VesselDocument[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
+    const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
 
     useEffect(() => {
         loadData()
@@ -40,6 +41,8 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
         return <VesselDetail vessel={selectedVessel} backLabel="Back to Fleet" onBack={() => { setSelectedVessel(null); loadData(); }} />
     }
 
+    const filteredVessels = vessels.filter(v => statusFilter === 'all' || v.isActive)
+
     return (
         <div className="fade-in">
             <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
@@ -49,13 +52,25 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
                     <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>{fleet.name}</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>{vessels.length} Vessels in this fleet</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <p style={{ color: 'var(--text-secondary)' }}>{vessels.length} Vessels in this fleet</p>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as 'active' | 'all')}
+                            className="input-field"
+                            style={{ padding: '4px 12px', fontSize: '0.85rem', width: 'auto' }}
+                        >
+                            <option value="active">Active Only</option>
+                            <option value="all">Show All</option>
+                        </select>
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                     <button
                         onClick={() => ReportService.exportFleetToExcel(fleet, vessels, docTypes, allDocs)}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        disabled={loading}
                     >
                         <FileSpreadsheet size={18} /> Export Excel
                     </button>
@@ -63,6 +78,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         onClick={() => ReportService.exportFleetToPDF(fleet, vessels, docTypes, allDocs)}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        disabled={loading}
                     >
                         <FileText size={18} /> Export PDF
                     </button>
@@ -82,14 +98,14 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {vessels.length === 0 ? (
+                            {filteredVessels.length === 0 ? (
                                 <tr>
                                     <td colSpan={3} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                        No vessels currently assigned to this fleet.
+                                        No {statusFilter === 'active' ? 'active' : ''} vessels found.
                                     </td>
                                 </tr>
                             ) : (
-                                vessels.map(v => (
+                                filteredVessels.map(v => (
                                     <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -102,6 +118,18 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                                 >
                                                     {v.name}
                                                 </span>
+                                                {!v.isActive && (
+                                                    <span style={{
+                                                        fontSize: '0.65rem',
+                                                        background: 'rgba(0,0,0,0.1)',
+                                                        padding: '1px 6px',
+                                                        borderRadius: '3px',
+                                                        color: 'var(--text-secondary)',
+                                                        border: '1px solid rgba(0,0,0,0.1)'
+                                                    }}>
+                                                        INACTIVE
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>

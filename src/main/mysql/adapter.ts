@@ -96,6 +96,9 @@ export class MySQLAdapter {
             if (!vesselColNames.includes('ofac_status')) {
                 await this.pool.query("ALTER TABLE vessels ADD COLUMN ofac_status VARCHAR(20) DEFAULT 'PENDING' AFTER ofac_match_found")
             }
+            if (!vesselColNames.includes('is_active')) {
+                await this.pool.query("ALTER TABLE vessels ADD COLUMN is_active BOOLEAN DEFAULT TRUE AFTER ofac_status")
+            }
 
             // Migration: Add theme_preference to users if it doesn't exist
             const [userCols] = await this.pool.query('SHOW COLUMNS FROM users')
@@ -359,16 +362,16 @@ export class MySQLAdapter {
     // --- Vessels ---
     async getVessels(): Promise<Vessel[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM vessels')
-        return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
+        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive FROM vessels')
+        return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive) }))
     }
 
     async addVessel(vessel: Omit<Vessel, 'id'>): Promise<Vessel> {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO vessels (id, name, imo_number, fleet_id, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null, formatDateForMySQL(vessel.ofacCheckedAt), vessel.ofacMatchFound || false, vessel.ofacStatus || 'PENDING']
+            'INSERT INTO vessels (id, name, imo_number, fleet_id, ofac_checked_at, ofac_match_found, ofac_status, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null, formatDateForMySQL(vessel.ofacCheckedAt), vessel.ofacMatchFound || false, vessel.ofacStatus || 'PENDING', vessel.isActive !== undefined ? vessel.isActive : true]
         )
         return { ...vessel, id }
     }
@@ -384,6 +387,7 @@ export class MySQLAdapter {
         if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(formatDateForMySQL(updates.ofacCheckedAt)) }
         if (updates.ofacMatchFound !== undefined) { fields.push('ofac_match_found = ?'); values.push(updates.ofacMatchFound || false) }
         if (updates.ofacStatus !== undefined) { fields.push('ofac_status = ?'); values.push(updates.ofacStatus) }
+        if (updates.isActive !== undefined) { fields.push('is_active = ?'); values.push(updates.isActive) }
 
         if (fields.length === 0) return
         values.push(id)
@@ -392,7 +396,33 @@ export class MySQLAdapter {
 
     async deleteVessel(id: string): Promise<void> {
         if (!this.pool) return
+
+        // 1. Get associated entity IDs before deletion
+        const [assureds]: any[] = await this.pool.execute(
+            'SELECT entity_id as entityId FROM vessel_assureds WHERE vessel_id = ?',
+            [id]
+        )
+        const entityIds = assureds.map((a: any) => a.entityId)
+
+        // 2. Delete the vessel (cascades to vessel_documents, vessel_assureds)
         await this.pool.execute('DELETE FROM vessels WHERE id = ?', [id])
+
+        // 3. Delete compliance results for this vessel
+        await this.pool.execute('DELETE FROM compliance_check_results WHERE entity_type = "vessel" AND entity_id = ?', [id])
+
+        // 4. Clean up orphaned entities
+        for (const entityId of entityIds) {
+            const [others]: any[] = await this.pool.execute(
+                'SELECT id FROM vessel_assureds WHERE entity_id = ?',
+                [entityId]
+            )
+            if (others.length === 0) {
+                // Not linked to any other vessel, delete the entity (cascades to entity_ubos)
+                await this.pool.execute('DELETE FROM entities WHERE id = ?', [entityId])
+                // Also delete compliance results for this entity
+                await this.pool.execute('DELETE FROM compliance_check_results WHERE entity_type = "entity" AND entity_id = ?', [entityId])
+            }
+        }
     }
 
     // --- Vessel Documents ---
@@ -1131,18 +1161,25 @@ export class MySQLAdapter {
 
     async getComplianceCheckResults(logId?: string, status?: string): Promise<any[]> {
         if (!this.pool) return []
-        let sql = `SELECT id, log_id as logId, entity_type as entityType, entity_id as entityId,
-                   entity_name as entityName, match_score as matchScore, match_details as matchDetails,
-                   status, decision, reviewed_by as reviewedBy, reviewed_at as reviewedAt, created_at as createdAt
-                   FROM compliance_check_results`
+        let sql = `SELECT r.id, r.log_id as logId, r.entity_type as entityType, r.entity_id as entityId,
+                   r.entity_name as entityName, r.match_score as matchScore, r.match_details as matchDetails,
+                   r.status, r.decision, r.reviewed_by as reviewedBy, r.reviewed_at as reviewedAt, r.created_at as createdAt
+                   FROM compliance_check_results r
+                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
+
         const conditions: string[] = []
         const params: any[] = []
-        if (logId) { conditions.push('log_id = ?'); params.push(logId) }
-        if (status) { conditions.push('status = ?'); params.push(status) }
+
+        // Filter out results for inactive vessels
+        conditions.push("(r.entity_type != 'vessel' OR v.is_active = 1 OR v.id IS NULL)")
+
+        if (logId) { conditions.push('r.log_id = ?'); params.push(logId) }
+        if (status) { conditions.push('r.status = ?'); params.push(status) }
+
         if (conditions.length > 0) {
             sql += ' WHERE ' + conditions.join(' AND ')
         }
-        sql += ' ORDER BY match_score DESC, created_at DESC'
+        sql += ' ORDER BY r.match_score DESC, r.created_at DESC'
         const [rows] = await this.pool.query(sql, params)
         return rows as any[]
     }

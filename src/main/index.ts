@@ -208,7 +208,7 @@ async function runComplianceCheck(): Promise<void> {
 
   // Get all entities and optionally vessels
   const entities = await db.getEntities()
-  const vessels = settings.includeVessels ? await db.getVessels() : []
+  const vessels = settings.includeVessels ? (await db.getVessels()).filter(v => v.isActive) : []
 
   // Filter out already cleared if skipCleared is enabled
   const entitiesToCheck = settings.skipCleared
@@ -1010,7 +1010,14 @@ app.whenReady().then(() => {
   ipcMain.handle('db:getVessels', () => db.getVessels())
   ipcMain.handle('db:addVessel', (_, vessel) => db.addVessel(vessel))
   ipcMain.handle('db:updateVessel', (_, id, updates) => db.updateVessel(id, updates))
-  ipcMain.handle('db:deleteVessel', (_, id) => db.deleteVessel(id))
+  ipcMain.handle('db:deleteVessel', async (event, id) => {
+    if (!isAdminRequest(event)) {
+      console.error('Unauthorized attempt to delete vessel')
+      return { success: false, message: 'Unauthorized' }
+    }
+    await db.deleteVessel(id)
+    return { success: true }
+  })
 
   ipcMain.handle('db:getVesselDocuments', (_, vesselId) => db.getVesselDocuments(vesselId))
   ipcMain.handle('db:upsertVesselDocument', (_, doc) => db.upsertVesselDocument(doc))

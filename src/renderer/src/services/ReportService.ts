@@ -453,9 +453,10 @@ export const ReportService = {
     const data: any[] = []
     let totalCompliant = 0
     let totalRequired = 0
+    const activeVessels = vessels.filter(v => v.isActive)
 
     // Section 1: Vessel Documents
-    vessels.forEach(v => {
+    activeVessels.forEach(v => {
       docTypes.forEach(type => {
         const doc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
         const isRequired = doc ? doc.required : type.required
@@ -484,7 +485,7 @@ export const ReportService = {
     // Collect all unique assureds across the fleet with their vessel associations
     const assuredMap = new Map<string, { entity: any; vessels: string[]; role: string }>()
 
-    for (const vessel of vessels) {
+    for (const vessel of activeVessels) {
       const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
       for (const va of vesselAssureds) {
         const entity = allEntities.find(e => e.id === va.entityId)
@@ -659,7 +660,7 @@ export const ReportService = {
     const summaryHeader = [
       { 'Vessel': 'FLEET COMPLIANCE SUMMARY', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
       { 'Vessel': 'Fleet Name', 'IMO': fleet.name, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Total Vessels', 'IMO': vessels.length.toString(), 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
+      { 'Vessel': 'Total Vessels', 'IMO': activeVessels.length.toString(), 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
       { 'Vessel': 'Total Assureds', 'IMO': assuredMap.size.toString(), 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
       { 'Vessel': 'Fleet Compliance Rate', 'IMO': `${complianceRate}%`, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
       { 'Vessel': 'Compliant / Missing', 'IMO': `${totalCompliant} / ${missingCount}`, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
@@ -679,9 +680,10 @@ export const ReportService = {
     const tableData: any[] = []
     let totalCompliant = 0
     let totalRequired = 0
+    const activeVessels = vessels.filter(v => v.isActive)
 
     // Section 1: Vessel Documents
-    vessels.forEach(v => {
+    activeVessels.forEach(v => {
       docTypes.forEach(type => {
         const vDoc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
         const isRequired = vDoc ? vDoc.required : type.required
@@ -708,7 +710,7 @@ export const ReportService = {
     // Collect all unique assureds across the fleet with their vessel associations
     const assuredMap = new Map<string, { entity: any; vessels: string[]; role: string }>()
 
-    for (const vessel of vessels) {
+    for (const vessel of activeVessels) {
       const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
       for (const va of vesselAssureds) {
         const entity = allEntities.find(e => e.id === va.entityId)

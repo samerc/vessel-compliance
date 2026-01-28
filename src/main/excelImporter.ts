@@ -79,7 +79,8 @@ export class ExcelImporter {
                     vessel = await db.addVessel({
                         name: vesselName,
                         imoNumber: imoNumber || 'N/A',
-                        fleetId: undefined
+                        fleetId: undefined,
+                        isActive: true
                     })
                     stats.vesselsCreated++
                 } else {

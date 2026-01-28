@@ -20,6 +20,7 @@ export default function VesselManager() {
     const [fleetFilter, setFleetFilter] = useState('all')
     const [sortField, setSortField] = useState<'name' | 'imoNumber'>('name')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active')
 
     // Add Mode
     const [newVessel, setNewVessel] = useState({ name: '', imo: '', fleetId: '' })
@@ -62,7 +63,8 @@ export default function VesselManager() {
                 fleetId: newVessel.fleetId,
                 ofacCheckedAt: scanResult.timestamp,
                 ofacMatchFound: scanResult.matchFound,
-                ofacStatus: scanResult.status
+                ofacStatus: scanResult.status,
+                isActive: true
             })
             setNewVessel({ name: '', imo: '', fleetId: '' })
             showSuccess(`Vessel "${vessel.name}" registered successfully`)
@@ -94,7 +96,10 @@ export default function VesselManager() {
             const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 v.imoNumber.includes(searchTerm)
             const matchesFleet = fleetFilter === 'all' || v.fleetId === fleetFilter
-            return matchesSearch && matchesFleet
+            const matchesStatus = statusFilter === 'all' ||
+                (statusFilter === 'active' && v.isActive) ||
+                (statusFilter === 'inactive' && !v.isActive)
+            return matchesSearch && matchesFleet && matchesStatus
         })
         .sort((a, b) => {
             const factor = sortOrder === 'asc' ? 1 : -1
@@ -356,6 +361,18 @@ export default function VesselManager() {
                         ))}
                     </select>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Status:</span>
+                    <select
+                        value={statusFilter}
+                        onChange={e => setStatusFilter(e.target.value as any)}
+                        style={{ padding: '10px', borderRadius: '12px', color: 'var(--text-primary)' }}
+                    >
+                        <option value="active">Active Only</option>
+                        <option value="inactive">Inactive Only</option>
+                        <option value="all">All Vessels</option>
+                    </select>
+                </div>
             </div>
 
             <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
@@ -398,6 +415,18 @@ export default function VesselManager() {
                                             >
                                                 {v.name}
                                                 <OfacBadge vessel={v} />
+                                                {!v.isActive && (
+                                                    <span style={{
+                                                        fontSize: '0.65rem',
+                                                        background: 'rgba(0,0,0,0.1)',
+                                                        padding: '1px 6px',
+                                                        borderRadius: '3px',
+                                                        color: 'var(--text-secondary)',
+                                                        border: '1px solid rgba(0,0,0,0.1)'
+                                                    }}>
+                                                        INACTIVE
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
                                     </td>

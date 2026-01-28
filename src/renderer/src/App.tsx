@@ -77,18 +77,6 @@ function App(): React.JSX.Element {
             onClick={() => setActiveTab('dashboard')}
           />
           <NavItem
-            icon={<ShieldAlert size={20} />}
-            label="Compliance Center"
-            active={activeTab === 'compliance'}
-            onClick={() => setActiveTab('compliance')}
-          />
-          <NavItem
-            icon={<Search size={20} />}
-            label="Sanctions Search"
-            active={activeTab === 'sanctions-search'}
-            onClick={() => setActiveTab('sanctions-search')}
-          />
-          <NavItem
             icon={<Ship size={20} />}
             label="Vessels"
             active={activeTab === 'vessels'}
@@ -99,6 +87,18 @@ function App(): React.JSX.Element {
             label="Fleets"
             active={activeTab === 'fleets'}
             onClick={() => setActiveTab('fleets')}
+          />
+          <NavItem
+            icon={<ShieldAlert size={20} />}
+            label="Compliance Center"
+            active={activeTab === 'compliance'}
+            onClick={() => setActiveTab('compliance')}
+          />
+          <NavItem
+            icon={<Search size={20} />}
+            label="Sanctions Search"
+            active={activeTab === 'sanctions-search'}
+            onClick={() => setActiveTab('sanctions-search')}
           />
           <NavItem
             icon={<Users size={20} />}
