@@ -266,7 +266,7 @@ export default function SanctionsSearch() {
                                         <Shield size={14} /> {match.target_type}
                                     </span>
                                     {match.imo_number && (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-secondary)' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4dabf7', fontWeight: 'bold' }}>
                                             <Ship size={14} /> IMO: {match.imo_number}
                                         </span>
                                     )}

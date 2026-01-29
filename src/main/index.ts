@@ -1,10 +1,12 @@
-import { app, shell, BrowserWindow, ipcMain, Notification } from 'electron'
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join, dirname, resolve, normalize, extname } from 'path'
+import { Worker } from 'worker_threads'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
 import { auth } from './auth'
+import { complianceScheduler } from './services/ComplianceScheduler'
 import { formatDateForMySQL } from './mysql/utils'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
@@ -165,273 +167,7 @@ function createWindow(): void {
   }
 }
 
-// Compliance Scheduler
-let complianceCheckTimer: NodeJS.Timeout | null = null
 
-function calculateNextRunTime(dayOfWeek: number, timeOfDay: string): string {
-  const now = new Date()
-  const [hours, minutes] = timeOfDay.split(':').map(Number)
-
-  // Find next occurrence of the specified day
-  let daysUntilNext = dayOfWeek - now.getDay()
-  if (daysUntilNext < 0) daysUntilNext += 7
-  if (daysUntilNext === 0) {
-    // Same day - check if time has passed
-    const targetTime = new Date(now)
-    targetTime.setHours(hours, minutes, 0, 0)
-    if (now >= targetTime) {
-      daysUntilNext = 7 // Next week
-    }
-  }
-
-  const nextRun = new Date(now)
-  nextRun.setDate(nextRun.getDate() + daysUntilNext)
-  nextRun.setHours(hours, minutes, 0, 0)
-
-  return nextRun.toISOString()
-}
-
-async function runComplianceCheck(): Promise<void> {
-  console.log('Starting scheduled compliance check...')
-
-  const settings = await db.getComplianceScheduleSettings()
-  if (!settings.enabled) {
-    console.log('Compliance check is disabled, skipping')
-    return
-  }
-
-  const apiKey = getSanctionsApiKey()
-  if (!apiKey) {
-    console.error('Sanctions API key not configured, skipping compliance check')
-    return
-  }
-
-  // Get all entities and optionally vessels
-  const entities = await db.getEntities()
-  const vessels = settings.includeVessels ? (await db.getVessels()).filter(v => v.isActive) : []
-
-  // Filter out already cleared if skipCleared is enabled
-  const entitiesToCheck = settings.skipCleared
-    ? entities.filter((e: any) => e.ofacStatus !== 'CLEARED' && e.ofacStatus !== 'MATCH')
-    : entities
-  const vesselsToCheck = settings.skipCleared
-    ? vessels.filter((v: any) => v.ofacStatus !== 'CLEARED' && v.ofacStatus !== 'MATCH')
-    : vessels
-
-  const totalToCheck = entitiesToCheck.length + vesselsToCheck.length
-
-  // Create log entry
-  const logId = await db.createComplianceCheckLog({
-    totalChecked: totalToCheck,
-    status: 'running'
-  })
-
-  let matchesFound = 0
-  const threshold = settings.threshold / 100 // Convert to decimal
-
-  try {
-    // Check entities
-    for (const entity of entitiesToCheck) {
-      try {
-        const params = new URLSearchParams({
-          q: entity.name,
-          mode: 'both',
-          threshold: '0.6',
-          limit: '10'
-        })
-
-        const response = await fetch(`https://sanctions.fancyshark.com/api/search?${params}`, {
-          headers: { 'X-API-Key': apiKey }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const highScoreMatches = (data.results || []).filter((r: any) => r.score >= threshold)
-
-          if (highScoreMatches.length > 0) {
-            matchesFound++
-            const bestScore = Math.max(...highScoreMatches.map((r: any) => r.score))
-
-            // Update entity status
-            await db.updateEntity(entity.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: true,
-              ofacStatus: 'POTENTIAL_MATCH'
-            })
-
-            // Save result
-            await db.addComplianceCheckResult({
-              logId,
-              entityType: 'entity',
-              entityId: entity.id,
-              entityName: entity.name,
-              matchScore: bestScore * 100,
-              matchDetails: JSON.stringify(highScoreMatches.map((r: any) => ({
-                id: r.entity?.source_id || '',
-                target_type: r.entity?.entity_type || 'unknown',
-                source: r.entity?.source || 'unknown',
-                source_id: r.entity?.source_id || '',
-                names: [r.entity?.name, ...(r.entity?.aliases || [])].filter(Boolean),
-                score: r.score
-              })))
-            })
-          } else {
-            // No high-score matches - update as cleared
-            await db.updateEntity(entity.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: false,
-              ofacStatus: 'CLEARED'
-            })
-          }
-        }
-
-        // Rate limiting - wait between requests
-        await new Promise(resolve => setTimeout(resolve, 200))
-      } catch (error) {
-        console.error(`Error checking entity ${entity.name}:`, error)
-      }
-    }
-
-    // Check vessels
-    for (const vessel of vesselsToCheck) {
-      try {
-        const params = new URLSearchParams({
-          q: vessel.name,
-          mode: 'both',
-          threshold: '0.6',
-          limit: '10'
-        })
-
-        const response = await fetch(`https://sanctions.fancyshark.com/api/search?${params}`, {
-          headers: { 'X-API-Key': apiKey }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const highScoreMatches = (data.results || []).filter((r: any) => r.score >= threshold)
-
-          if (highScoreMatches.length > 0) {
-            matchesFound++
-            const bestScore = Math.max(...highScoreMatches.map((r: any) => r.score))
-
-            // Update vessel status
-            await db.updateVessel(vessel.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: true,
-              ofacStatus: 'POTENTIAL_MATCH'
-            })
-
-            // Save result
-            await db.addComplianceCheckResult({
-              logId,
-              entityType: 'vessel',
-              entityId: vessel.id,
-              entityName: vessel.name,
-              matchScore: bestScore * 100,
-              matchDetails: JSON.stringify(highScoreMatches.map((r: any) => ({
-                id: r.entity?.source_id || '',
-                target_type: r.entity?.entity_type || 'unknown',
-                source: r.entity?.source || 'unknown',
-                source_id: r.entity?.source_id || '',
-                names: [r.entity?.name, ...(r.entity?.aliases || [])].filter(Boolean),
-                score: r.score
-              })))
-            })
-          } else {
-            // No high-score matches - update as cleared
-            await db.updateVessel(vessel.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: false,
-              ofacStatus: 'CLEARED'
-            })
-          }
-        }
-
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 200))
-      } catch (error) {
-        console.error(`Error checking vessel ${vessel.name}:`, error)
-      }
-    }
-
-    // Update log as completed
-    await db.updateComplianceCheckLog(logId, {
-      matchesFound,
-      status: 'completed'
-    })
-
-    // Update schedule settings with last run time
-    settings.lastRunAt = new Date().toISOString()
-    settings.nextRunAt = calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
-    await db.setComplianceScheduleSettings(settings)
-
-    // Show notification if matches found
-    if (matchesFound > 0 && Notification.isSupported()) {
-      new Notification({
-        title: 'Compliance Check Complete',
-        body: `Found ${matchesFound} potential sanctions match${matchesFound > 1 ? 'es' : ''} requiring review.`
-      }).show()
-    }
-
-    console.log(`Compliance check completed: ${totalToCheck} checked, ${matchesFound} matches found`)
-
-  } catch (error: any) {
-    console.error('Compliance check failed:', error)
-    await db.updateComplianceCheckLog(logId, {
-      status: 'failed',
-      error: error.message
-    })
-  }
-}
-
-async function startComplianceScheduler(): Promise<void> {
-  // Clear existing timer
-  if (complianceCheckTimer) {
-    clearTimeout(complianceCheckTimer)
-    complianceCheckTimer = null
-  }
-
-  if (!db.isConnected()) {
-    console.log('Database not connected, scheduler will start after connection')
-    return
-  }
-
-  const settings = await db.getComplianceScheduleSettings()
-  if (!settings.enabled) {
-    console.log('Compliance scheduler is disabled')
-    return
-  }
-
-  const nextRunAt = settings.nextRunAt || calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
-  const nextRunTime = new Date(nextRunAt)
-  const now = new Date()
-  const msUntilNextRun = nextRunTime.getTime() - now.getTime()
-
-  if (msUntilNextRun <= 0) {
-    // Run immediately and schedule next
-    console.log('Scheduled compliance check is overdue, running now...')
-    await runComplianceCheck()
-    startComplianceScheduler() // Reschedule
-    return
-  }
-
-  // Cap at 24 hours to avoid timer overflow issues
-  const maxDelay = 24 * 60 * 60 * 1000
-  const delay = Math.min(msUntilNextRun, maxDelay)
-
-  console.log(`Next compliance check scheduled for ${nextRunTime.toLocaleString()} (in ${Math.round(delay / 1000 / 60)} minutes)`)
-
-  complianceCheckTimer = setTimeout(async () => {
-    if (msUntilNextRun > maxDelay) {
-      // Haven't reached the target time yet, reschedule
-      startComplianceScheduler()
-    } else {
-      // Time to run
-      await runComplianceCheck()
-      startComplianceScheduler() // Schedule next run
-    }
-  }, delay)
-}
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -1008,7 +744,16 @@ app.whenReady().then(() => {
   ipcMain.handle('db:deleteFleet', (_, id) => db.deleteFleet(id))
 
   ipcMain.handle('db:getVessels', () => db.getVessels())
-  ipcMain.handle('db:addVessel', (_, vessel) => db.addVessel(vessel))
+  ipcMain.handle('db:getVesselsPaginated', (_, params) => db.getVesselsPaginated(params))
+  ipcMain.handle('db:addVessel', async (_, vessel) => {
+    try {
+      const result = await db.addVessel(vessel)
+      return { success: true, data: result }
+    } catch (error: any) {
+      // Return error as a value instead of throwing to avoid console noise
+      return { success: false, message: error.message }
+    }
+  })
   ipcMain.handle('db:updateVessel', (_, id, updates) => db.updateVessel(id, updates))
   ipcMain.handle('db:deleteVessel', async (event, id) => {
     if (!isAdminRequest(event)) {
@@ -1104,410 +849,52 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('word:importDefects', async (_, surveyId: string, filePath: string) => {
-    try {
-      const fs = await import('fs')
-      const path = await import('path')
+    return new Promise((resolve) => {
+      // In production/dev, the worker file will be in the same output directory
+      const workerPath = join(__dirname, 'parser.js')
+      const worker = new Worker(workerPath)
 
-      let text = ''
-      const ext = path.extname(filePath).toLowerCase()
+      worker.postMessage({ filePath })
 
-      // Extract text based on file type
-      if (ext === '.pdf') {
-        const pdfParse = require('pdf-parse')
-        const dataBuffer = fs.readFileSync(filePath)
-        const pdfData = await pdfParse(dataBuffer)
-        text = pdfData.text
-      } else {
-        // Word document
-        const mammoth = await import('mammoth')
-        const buffer = fs.readFileSync(filePath)
-        const result = await mammoth.extractRawText({ buffer })
-        text = result.value
-      }
-
-      // Parse defects from text - Two-pass approach for complex PDF layouts
-      const lines = text.split('\n')
-      const defects: Array<{ number: string; description: string; dueDate?: string; severity: string }> = []
-
-      // Pass 1: Collect standalone defect numbers (before LIST OF DEFICIENCIES)
-      const standaloneNumbers: string[] = []
-      let foundRef = false
-      let foundListOfDeficiencies = false
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim()
-
-        if (line.includes('Ref')) {
-          foundRef = true
-          continue
-        }
-        if (line.includes('LIST OF DEFICIENCIES')) {
-          foundListOfDeficiencies = true
-          break
-        }
-
-        if (foundRef && !foundListOfDeficiencies) {
-          const numberMatch = line.match(/^(\d+\.?\d*)$/)
-          if (numberMatch) {
-            standaloneNumbers.push(numberMatch[1])
-          }
-        }
-      }
-
-      // Pass 2: Process main deficiencies section
-      const descriptions: string[] = []
-      const itemsNotSurveyedNumbers: string[] = []
-      const itemsNotSurveyedDescriptions: string[] = []
-      let inDeficienciesSection = false
-      let inObservationSection = false
-      let inItemsNotSurveyedSection = false
-      let beforeItemsNotSurveyed = false
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim()
-
-        // Detect sections
-        if (line.includes('LIST OF DEFICIENCIES')) {
-          inDeficienciesSection = true
-          inObservationSection = false
-          inItemsNotSurveyedSection = false
-          beforeItemsNotSurveyed = false
-          continue
-        }
-        if (line.includes('OBSERVATION') && !line.includes('for the observations')) {
-          inDeficienciesSection = false
-          inObservationSection = true
-          inItemsNotSurveyedSection = false
-          beforeItemsNotSurveyed = false
-          continue
-        }
-        if (line.includes('ITEMS NOT SURVEYED')) {
-          inDeficienciesSection = false
-          inObservationSection = false
-          inItemsNotSurveyedSection = true
-          beforeItemsNotSurveyed = false
-          continue
-        }
-        if (line.includes('NOTE') && line.includes('defects are not rectified')) {
-          inDeficienciesSection = false
-          continue
-        }
-        // Don't break on "Vessel's Master" - it can appear in middle of text
-        // Only break on second occurrence of signature sections (after ITEMS NOT SURVEYED)
-        if ((line.includes('Vesse\'sMaster') || line.includes('Attending Surveyor')) && inItemsNotSurveyedSection) {
-          break
-        }
-
-        if (!inDeficienciesSection && !inObservationSection && !inItemsNotSurveyedSection && !beforeItemsNotSurveyed) continue
-        if (!line) continue
-
-        // Skip headers and non-relevant lines (but allow short numbers in deficiencies or beforeItemsNotSurveyed)
-        if (line.includes('Vessel') || line.includes('Date') || line.includes('Place of Survey') ||
-          line.includes('Master') || line.includes('Surveyor') || line.includes('Superintendent') ||
-          line.includes('BJ EXPRESS') || line.includes('Istanbul') || line.includes('DEFICIENCIES & RECOMMENDATIONS') ||
-          line.includes('If the defects') || line.includes('Capt.') ||
-          line.includes('This section is for')) {
-          continue
-        }
-        // Allow short lines if they could be defect numbers (in deficiencies or beforeItemsNotSurveyed sections)
-        if (line.length < 10 && !beforeItemsNotSurveyed && !inDeficienciesSection) {
-          continue
-        }
-
-        // Try inline format: "20.9 Hydraulic pumps..." or "7.5/7/6/7.7 Date of..." (only in deficiencies section)
-        const inlineMatch = line.match(/^([\d\.\/]+)\s+([a-zA-Z].{10,})/)
-        if (inlineMatch && inDeficienciesSection) {
-          let defectNumber = inlineMatch[1]
-          let description = inlineMatch[2].trim()
-          let dueDate: string | undefined
-
-          // Check for due date at end
-          const dueDateMatch = description.match(/\s+((?:\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(?:\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}))$/)
-          if (dueDateMatch) {
-            dueDate = dueDateMatch[1]
-            description = description.substring(0, description.length - dueDateMatch[0].length).trim()
-
-            const parts = dueDate.split(/[\/\-\.]/)
-            if (parts.length === 3) {
-              if (parts[0].length === 4) {
-                dueDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
-              } else if (parts[2].length === 4) {
-                dueDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-              } else {
-                dueDate = `20${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-              }
-            }
-          }
-
-          defects.push({
-            number: defectNumber,
-            description,
-            dueDate,
-            severity: ''
-          })
-          continue
-        }
-
-        // Check if it's a standalone number or compound number like "7.5/7/" that continues on next line
-        const numberMatch = line.match(/^([\d\.\/]+)$/)
-        if (numberMatch) {
-          let defectNumber = numberMatch[1]
-
-          // Check if next line completes the number (like "7.5/7/" followed by "6/7.7")
-          if (i + 1 < lines.length) {
-            const nextLine = lines[i + 1].trim()
-            const continueNumberMatch = nextLine.match(/^([\d\.\/]+)$/)
-            if (continueNumberMatch) {
-              defectNumber = defectNumber + continueNumberMatch[1]
-              i++ // Skip the next line
-            }
-          }
-
-          // Look ahead for description
-          for (let j = i + 1; j < lines.length; j++) {
-            const nextLine = lines[j].trim()
-            if (nextLine && !nextLine.match(/^[\d\.\/]+$/) &&
-              !nextLine.includes('Vessel') && !nextLine.includes('Master') &&
-              !nextLine.startsWith('-') && nextLine.length > 10) {
-              let description = nextLine
-
-              // Collect multi-line descriptions
-              for (let k = j + 1; k < lines.length; k++) {
-                const contLine = lines[k].trim()
-                if (!contLine || contLine.match(/^[\d\.\/]+/) || contLine.includes('NOTE')) {
-                  break
-                }
-                // Stop at bullets or new sections
-                if (contLine.startsWith('-') || contLine.match(/^[A-Z][a-z]+ [a-z]+ [a-z]+ [a-z]+/)) {
-                  break
-                }
-                description += ' ' + contLine
-                j = k
-              }
-
-              let dueDate: string | undefined
-              const dueDateMatch = description.match(/\s+((?:\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(?:\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}))$/)
-              if (dueDateMatch) {
-                dueDate = dueDateMatch[1]
-                description = description.substring(0, description.length - dueDateMatch[0].length).trim()
-
-                const parts = dueDate.split(/[\/\-\.]/)
-                if (parts.length === 3) {
-                  if (parts[0].length === 4) {
-                    dueDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
-                  } else if (parts[2].length === 4) {
-                    dueDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-                  } else {
-                    dueDate = `20${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-                  }
-                }
-              }
-
-              defects.push({
-                number: defectNumber,
-                description,
-                dueDate,
-                severity: ''
+      worker.on('message', async (message) => {
+        if (message.success) {
+          try {
+            // Import defects into database
+            let importCount = 0
+            for (const defect of message.defects) {
+              await db.addSurveyDefect({
+                surveyId,
+                defectNumber: defect.number,
+                description: defect.description,
+                severity: defect.severity as any,
+                status: 'OPEN',
+                dueDate: defect.dueDate
               })
-              i = j // Skip processed lines
-              break
+              importCount++
             }
+            resolve({ success: true, count: importCount })
+          } catch (error: any) {
+            resolve({ success: false, message: error.message, count: 0 })
           }
-          continue
+        } else {
+          resolve({ success: false, message: message.error, count: 0 })
         }
-
-        // Collect items before "ITEMS NOT SURVEYED" header (between OBSERVATION and ITEMS NOT SURVEYED)
-        if (beforeItemsNotSurveyed) {
-          // Standalone number like "17.2" or "21"
-          const standaloneMatch = line.match(/^(\d+\.?\d*)$/)
-          if (standaloneMatch) {
-            itemsNotSurveyedNumbers.push(standaloneMatch[1])
-            continue
-          }
-
-          // Compound format like "15.14/ Pressure test..."
-          const compoundMatch = line.match(/^(\d+\.?\d*\/)\s*(.+)/)
-          if (compoundMatch) {
-            let fullDesc = compoundMatch[2].trim()
-            let compoundNum = compoundMatch[1]
-
-            // Next line has "17.3 and strict..."
-            if (i + 1 < lines.length) {
-              const nextLine = lines[i + 1].trim()
-              const secondPartMatch = nextLine.match(/^(\d+\.?\d*)\s+(.+)/)
-              if (secondPartMatch) {
-                compoundNum = compoundMatch[1] + secondPartMatch[1]
-                fullDesc += ' ' + secondPartMatch[2]
-                i++
-
-                // Collect continuation lines
-                for (let j = i + 1; j < lines.length; j++) {
-                  const contLine = lines[j].trim()
-                  if (!contLine || contLine.match(/^\d+\.?\d*$/) || contLine.includes('ITEMS NOT SURVEYED')) {
-                    break
-                  }
-                  fullDesc += ' ' + contLine
-                  i = j
-                }
-              }
-            }
-
-            defects.push({
-              number: compoundNum,
-              description: fullDesc,
-              dueDate: undefined,
-              severity: ''
-            })
-            continue
-          }
-          continue
-        }
-
-        // Collect descriptions after "ITEMS NOT SURVEYED" header
-        if (inItemsNotSurveyedSection) {
-          if (line.length > 20 && !line.includes('Vesse\'sMaster') && !line.includes('Capt.')) {
-            let fullDesc = line
-            // Collect continuation lines
-            for (let j = i + 1; j < lines.length; j++) {
-              const nextLine = lines[j].trim()
-              if (!nextLine || nextLine.includes('Vesse\'sMaster') || nextLine.includes('Capt.')) {
-                break
-              }
-              // If next line looks like start of new description (Function test, Fire hose test, etc.)
-              if (nextLine.match(/^(Function|Fire|Pressure)/)) {
-                break
-              }
-              fullDesc += ' ' + nextLine
-              i = j
-            }
-            if (fullDesc.length > 30) {
-              itemsNotSurveyedDescriptions.push(fullDesc)
-            }
-          }
-          continue
-        }
-
-        // Handle OBSERVATION section - collect multi-line descriptions
-        if (inObservationSection) {
-          // Skip "This section is for..." line and switch to beforeItemsNotSurveyed mode
-          if (line.includes('This section is for')) {
-            inObservationSection = false
-            beforeItemsNotSurveyed = true
-            continue
-          }
-
-          // Build full observation text from multiple lines
-          let observationText = line
-          for (let j = i + 1; j < lines.length; j++) {
-            const nextLine = lines[j].trim()
-            if (nextLine.includes('ITEMS NOT SURVEYED') ||
-              nextLine.includes('This section is for') ||
-              nextLine.includes('Vessel\'s Master') ||
-              nextLine.match(/^\d+\.?\d*\/?/) ||
-              !nextLine) {
-              break
-            }
-            observationText += ' ' + nextLine
-            i = j
-          }
-
-          if (observationText.length > 20) {
-            defects.push({
-              number: 'OBS',
-              description: observationText,
-              dueDate: undefined,
-              severity: ''
-            })
-          }
-
-          // After collecting observation, switch to beforeItemsNotSurveyed mode
-          inObservationSection = false
-          beforeItemsNotSurveyed = true
-          continue
-        }
-
-        // Collect potential standalone descriptions (for PDF with separated layout)
-        if (!line.match(/^\d+/) && line.length > 15 &&
-          line.endsWith('.') &&
-          !line.includes('rectified') &&
-          !line.includes('Insurer')) {
-          descriptions.push(line)
-        }
-      }
-
-      // Pass 2.5: Match items not surveyed numbers with descriptions
-      const minItems = Math.min(itemsNotSurveyedNumbers.length, itemsNotSurveyedDescriptions.length)
-      for (let i = 0; i < minItems; i++) {
-        defects.push({
-          number: itemsNotSurveyedNumbers[i],
-          description: itemsNotSurveyedDescriptions[i],
-          dueDate: undefined,
-          severity: 'Minor'
-        })
-      }
-
-      // Pass 3: Match standalone numbers with descriptions (for complex PDF layouts)
-      if (standaloneNumbers.length > 0 && descriptions.length > 0) {
-        const minLength = Math.min(standaloneNumbers.length, descriptions.length)
-        for (let i = 0; i < minLength; i++) {
-          // Check if this number hasn't been added yet
-          if (!defects.find(d => d.number === standaloneNumbers[i])) {
-            let description = descriptions[i]
-            let dueDate: string | undefined
-
-            const dueDateMatch = description.match(/\s+((?:\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(?:\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}))$/)
-            if (dueDateMatch) {
-              dueDate = dueDateMatch[1]
-              description = description.substring(0, description.length - dueDateMatch[0].length).trim()
-
-              const parts = dueDate.split(/[\/\-\.]/)
-              if (parts.length === 3) {
-                if (parts[0].length === 4) {
-                  dueDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
-                } else if (parts[2].length === 4) {
-                  dueDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-                } else {
-                  dueDate = `20${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-                }
-              }
-            }
-
-            defects.push({
-              number: standaloneNumbers[i],
-              description,
-              dueDate,
-              severity: ''
-            })
-          }
-        }
-      }
-
-      // Sort defects by number for better organization
-      defects.sort((a, b) => {
-        const numA = parseFloat(a.number)
-        const numB = parseFloat(b.number)
-        return numA - numB
+        worker.terminate()
       })
 
-      // Import defects into database
-      let importCount = 0
-      for (const defect of defects) {
-        await db.addSurveyDefect({
-          surveyId,
-          defectNumber: defect.number,
-          description: defect.description,
-          severity: defect.severity as any,
-          status: 'OPEN',
-          dueDate: defect.dueDate
-        })
-        importCount++
-      }
+      worker.on('error', (error) => {
+        console.error('Worker error:', error)
+        resolve({ success: false, message: error.message, count: 0 })
+        worker.terminate()
+      })
 
-      return { success: true, count: importCount }
-    } catch (error: any) {
-      console.error('Word import error:', error)
-      return { success: false, message: error.message, count: 0 }
-    }
+      worker.on('exit', (code) => {
+        if (code !== 0) {
+          console.error(`Worker stopped with exit code ${code}`)
+          resolve({ success: false, message: 'Worker stopped unexpectedly', count: 0 })
+        }
+      })
+    })
   })
 
   // User Management
@@ -1587,7 +974,7 @@ app.whenReady().then(() => {
             listed_on: null,
             created_at: formatDateForMySQL(new Date()),
             score: result.score,
-            imo_number: imoNumber
+            imo_number: result.entity?.vessel_imo || imoNumber
           }
         })
         // Strict filtering: Ensure API or mapping didn't include matches below threshold
@@ -1627,13 +1014,13 @@ app.whenReady().then(() => {
     }
 
     // Calculate next run time
-    const nextRunAt = calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
+    const nextRunAt = complianceScheduler.calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
     settings.nextRunAt = nextRunAt
 
     await db.setComplianceScheduleSettings(settings)
 
     // Restart scheduler with new settings
-    startComplianceScheduler()
+    complianceScheduler.start()
 
     return { success: true }
   })
@@ -1683,7 +1070,7 @@ app.whenReady().then(() => {
     }
 
     try {
-      await runComplianceCheck()
+      await complianceScheduler.runComplianceCheck()
       return { success: true }
     } catch (error: any) {
       return { success: false, message: error.message }
@@ -1693,7 +1080,8 @@ app.whenReady().then(() => {
   createWindow()
 
   // Start the compliance scheduler after window is created
-  startComplianceScheduler()
+  // Start the compliance scheduler after window is created
+  complianceScheduler.start()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

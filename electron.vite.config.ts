@@ -6,6 +6,10 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          parser: resolve(__dirname, 'src/main/workers/parser.ts')
+        },
         external: ['mysql2', 'mysql2/promise']
       }
     }

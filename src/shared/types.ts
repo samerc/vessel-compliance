@@ -192,3 +192,21 @@ export interface ComplianceCheckResult {
   reviewedAt?: string
   createdAt?: string
 }
+
+export interface PaginatedResult<T> {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export interface VesselQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  fleetId?: string
+  status?: 'all' | 'active' | 'inactive'
+  sortField?: 'name' | 'imoNumber'
+  sortOrder?: 'asc' | 'desc'
+}

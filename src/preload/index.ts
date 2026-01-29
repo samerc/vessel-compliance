@@ -13,6 +13,7 @@ const api = {
   deleteFleet: (id) => ipcRenderer.invoke('db:deleteFleet', id),
 
   getVessels: () => ipcRenderer.invoke('db:getVessels'),
+  getVesselsPaginated: (params: any) => ipcRenderer.invoke('db:getVesselsPaginated', params),
   addVessel: (vessel) => ipcRenderer.invoke('db:addVessel', vessel),
   updateVessel: (id, updates) => ipcRenderer.invoke('db:updateVessel', id, updates),
   deleteVessel: (id) => ipcRenderer.invoke('db:deleteVessel', id),

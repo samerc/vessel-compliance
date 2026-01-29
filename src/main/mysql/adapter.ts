@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -45,6 +45,16 @@ export class MySQLAdapter {
         } catch (error) {
             console.error('Failed to connect to MySQL:', error)
             return false
+        }
+    }
+
+    getSanctionsApiKey(): string | null {
+        if (!this.configPath || !existsSync(this.configPath)) return null
+        try {
+            const config = JSON.parse(readFileSync(this.configPath, 'utf-8'))
+            return config.sanctionsApiKey || null
+        } catch {
+            return null
         }
     }
 
@@ -366,8 +376,82 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive) }))
     }
 
+    async getVesselsPaginated(params: VesselQueryParams): Promise<PaginatedResult<Vessel>> {
+        if (!this.pool) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
+
+        const { page = 1, limit = 10, search, fleetId, status, sortField = 'name', sortOrder = 'asc' } = params
+        const offset = (page - 1) * limit
+
+        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive FROM vessels'
+        let countQuery = 'SELECT COUNT(*) as total FROM vessels'
+        const conditions: string[] = []
+        const values: any[] = []
+
+        if (search) {
+            conditions.push('(name LIKE ? OR imo_number LIKE ?)')
+            values.push(`%${search}%`, `%${search}%`)
+        }
+
+        if (fleetId !== undefined && fleetId !== 'all') {
+            if (fleetId === '') {
+                conditions.push('fleet_id IS NULL')
+            } else {
+                conditions.push('fleet_id = ?')
+                values.push(fleetId)
+            }
+        }
+
+        if (status && status !== 'all') {
+            if (status === 'active') conditions.push('is_active = 1')
+            if (status === 'inactive') conditions.push('is_active = 0')
+        }
+
+        if (conditions.length > 0) {
+            const whereClause = ' WHERE ' + conditions.join(' AND ')
+            query += whereClause
+            countQuery += whereClause
+        }
+
+        // Sorting
+        const allowedSortFields: Record<string, string> = { 'name': 'name', 'imoNumber': 'imo_number' }
+        const dbSortField = allowedSortFields[sortField] || 'name'
+        const dbSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC'
+
+        query += ` ORDER BY ${dbSortField} ${dbSortOrder}`
+
+        // Limits
+        query += ' LIMIT ? OFFSET ?'
+        values.push(limit, offset)
+
+        // Execute Count
+        // Count queries params are same as main query params minus limit/offset
+        const countValues = values.slice(0, values.length - 2)
+        const [countResult] = await this.pool.query(countQuery, countValues)
+        const total = (countResult as any[])[0].total
+
+        // Execute Main
+        const [rows] = await this.pool.query(query, values)
+
+        const data = (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive) }))
+
+        return {
+            data,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        }
+    }
+
     async addVessel(vessel: Omit<Vessel, 'id'>): Promise<Vessel> {
         if (!this.pool) throw new Error('DB Not connected')
+
+        // Check for duplicate IMO
+        const [existing] = await this.pool.query('SELECT id FROM vessels WHERE imo_number = ?', [vessel.imoNumber])
+        if ((existing as any[]).length > 0) {
+            throw new Error(`Vessel with IMO number ${vessel.imoNumber} already exists`)
+        }
+
         const id = uuidv4()
         await this.pool.execute(
             'INSERT INTO vessels (id, name, imo_number, fleet_id, ofac_checked_at, ofac_match_found, ofac_status, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

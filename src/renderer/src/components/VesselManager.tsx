@@ -1,11 +1,22 @@
-import React, { useState, useEffect } from 'react'
-import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
-import { Vessel, Fleet, SanctionsMatch } from '../../../shared/types'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Vessel, Fleet, SanctionsMatch, VesselQueryParams } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import VesselDetail from './VesselDetail'
 import SanctionsModal from './SanctionsModal'
+
+
+// Simple debounce hook implementation if not available
+function useDebounceValue<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value)
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedValue(value), delay)
+        return () => clearTimeout(handler)
+    }, [value, delay])
+    return debouncedValue
+}
 
 export default function VesselManager() {
     const [vessels, setVessels] = useState<Vessel[]>([])
@@ -15,8 +26,17 @@ export default function VesselManager() {
     const { theme } = useTheme()
     const isLight = theme === 'light'
 
+    // Pagination State
+    const [page, setPage] = useState(1)
+    const [limit, setLimit] = useState(10)
+    const [total, setTotal] = useState(0)
+    const [totalPages, setTotalPages] = useState(0)
+    const [isLoading, setIsLoading] = useState(false)
+
     // UI State
     const [searchTerm, setSearchTerm] = useState('')
+    const debouncedSearch = useDebounceValue(searchTerm, 500)
+
     const [fleetFilter, setFleetFilter] = useState('all')
     const [sortField, setSortField] = useState<'name' | 'imoNumber'>('name')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -37,16 +57,50 @@ export default function VesselManager() {
         vesselId?: string
     }>({ show: false, searchedName: '', matches: [] })
 
+    // Load initial fleets
     useEffect(() => {
-        loadData()
+        const loadFleets = async () => {
+            const fData = await window.api.getFleets()
+            setFleets(fData)
+        }
+        loadFleets()
     }, [])
 
+    // Load vessels when params change
+    useEffect(() => {
+        loadData()
+    }, [page, limit, debouncedSearch, fleetFilter, statusFilter, sortField, sortOrder])
+
     const loadData = async () => {
-        const vData = await window.api.getVessels()
-        const fData = await window.api.getFleets()
-        setVessels(vData)
-        setFleets(fData)
+        setIsLoading(true)
+        try {
+            const params: VesselQueryParams = {
+                page,
+                limit,
+                search: debouncedSearch,
+                fleetId: fleetFilter,
+                status: statusFilter,
+                sortField,
+                sortOrder
+            }
+
+            // @ts-ignore - API exposed in preload
+            const result = await window.api.getVesselsPaginated(params)
+            setVessels(result.data)
+            setTotal(result.total)
+            setTotalPages(result.totalPages)
+        } catch (error: any) {
+            console.error('Failed to load vessels:', error)
+            showError('Failed to load vessels')
+        } finally {
+            setIsLoading(false)
+        }
     }
+
+    // Reset page when filters change
+    useEffect(() => {
+        setPage(1)
+    }, [debouncedSearch, fleetFilter, statusFilter, limit])
 
     const handleAddVessel = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -57,7 +111,7 @@ export default function VesselManager() {
             // Scan OFAC
             const scanResult = await OfacService.checkSanctions(newVessel.name)
 
-            const vessel = await window.api.addVessel({
+            const result = await window.api.addVessel({
                 name: newVessel.name,
                 imoNumber: newVessel.imo,
                 fleetId: newVessel.fleetId,
@@ -66,6 +120,13 @@ export default function VesselManager() {
                 ofacStatus: scanResult.status,
                 isActive: true
             })
+
+            if (!result.success || !result.data) {
+                showError(result.message || 'Failed to register vessel')
+                return
+            }
+
+            const vessel = result.data
             setNewVessel({ name: '', imo: '', fleetId: '' })
             showSuccess(`Vessel "${vessel.name}" registered successfully`)
             loadData()
@@ -80,7 +141,8 @@ export default function VesselManager() {
                 })
             }
         } catch (error: any) {
-            showError(error.message || 'Failed to register vessel. Please try again.')
+            console.error('Add vessel error:', error)
+            showError('An unexpected error occurred')
         } finally {
             setIsAdding(false)
         }
@@ -90,21 +152,6 @@ export default function VesselManager() {
         await window.api.updateVessel(vesselId, { fleetId: fleetId })
         loadData()
     }
-
-    const filteredVessels = vessels
-        .filter(v => {
-            const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                v.imoNumber.includes(searchTerm)
-            const matchesFleet = fleetFilter === 'all' || v.fleetId === fleetFilter
-            const matchesStatus = statusFilter === 'all' ||
-                (statusFilter === 'active' && v.isActive) ||
-                (statusFilter === 'inactive' && !v.isActive)
-            return matchesSearch && matchesFleet && matchesStatus
-        })
-        .sort((a, b) => {
-            const factor = sortOrder === 'asc' ? 1 : -1
-            return a[sortField].localeCompare(b[sortField]) * factor
-        })
 
     const toggleSort = (field: 'name' | 'imoNumber') => {
         if (sortField === field) {
@@ -375,86 +422,163 @@ export default function VesselManager() {
                 </div>
             </div>
 
-            <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
-                    <thead>
-                        <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                            <th style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
-                                Vessel Name <ArrowUpDown size={14} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
-                            </th>
-                            <th style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
-                                IMO Number <ArrowUpDown size={14} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
-                            </th>
-                            <th style={{ padding: '16px' }}>Current Fleet</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredVessels.map(v => {
-                            // Removing unused fleet variable
-                            return (
-                                <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
-                                    <td style={{ padding: '16px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
-                                                <Ship size={20} color="var(--accent-primary)" />
+            <div className="glass-card" style={{ padding: '0', overflowX: 'auto', minHeight: '300px' }}>
+                {isLoading && (
+                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <Loader2 className="spinner" style={{ margin: '0 auto 16px', display: 'block' }} />
+                        Loading vessels...
+                    </div>
+                )}
+
+                {!isLoading && vessels.length === 0 && (
+                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No vessels found matching your criteria.
+                    </div>
+                )}
+
+                {!isLoading && vessels.length > 0 && (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                <th style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
+                                    Vessel Name <ArrowUpDown size={14} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
+                                </th>
+                                <th style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
+                                    IMO Number <ArrowUpDown size={14} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
+                                </th>
+                                <th style={{ padding: '16px' }}>Current Fleet</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {vessels.map(v => {
+                                return (
+                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
+                                                    <Ship size={20} color="var(--accent-primary)" />
+                                                </div>
+                                                <span
+                                                    onClick={() => setSelectedVessel(v)}
+                                                    style={{
+                                                        fontWeight: '600',
+                                                        cursor: 'pointer',
+                                                        color: 'var(--accent-primary)',
+                                                        textDecoration: 'none',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px'
+                                                    }}
+                                                    onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                                    onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                                                >
+                                                    {v.name}
+                                                    <OfacBadge vessel={v} />
+                                                    {!v.isActive && (
+                                                        <span style={{
+                                                            fontSize: '0.65rem',
+                                                            background: 'rgba(0,0,0,0.1)',
+                                                            padding: '1px 6px',
+                                                            borderRadius: '3px',
+                                                            color: 'var(--text-secondary)',
+                                                            border: '1px solid rgba(0,0,0,0.1)'
+                                                        }}>
+                                                            INACTIVE
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </div>
-                                            <span
-                                                onClick={() => setSelectedVessel(v)}
-                                                style={{
-                                                    fontWeight: '600',
-                                                    cursor: 'pointer',
-                                                    color: 'var(--accent-primary)',
-                                                    textDecoration: 'none',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px'
-                                                }}
-                                                onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                                                onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                                        </td>
+                                        <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
+                                            <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <select
+                                                value={v.fleetId || ''}
+                                                onChange={e => handleUpdateFleet(v.id, e.target.value)}
+                                                style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}
                                             >
-                                                {v.name}
-                                                <OfacBadge vessel={v} />
-                                                {!v.isActive && (
-                                                    <span style={{
-                                                        fontSize: '0.65rem',
-                                                        background: 'rgba(0,0,0,0.1)',
-                                                        padding: '1px 6px',
-                                                        borderRadius: '3px',
-                                                        color: 'var(--text-secondary)',
-                                                        border: '1px solid rgba(0,0,0,0.1)'
-                                                    }}>
-                                                        INACTIVE
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                                        <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
-                                    </td>
-                                    <td style={{ padding: '16px' }}>
-                                        <select
-                                            value={v.fleetId || ''}
-                                            onChange={e => handleUpdateFleet(v.id, e.target.value)}
-                                            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}
-                                        >
-                                            <option value="">Standalone</option>
-                                            {fleets.map(f => (
-                                                <option key={f.id} value={f.id}>{f.name}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>
-                                        <button onClick={() => setSelectedVessel(v)} className="btn-secondary" style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                            Details <ChevronRight size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
+                                                <option value="">Standalone</option>
+                                                {fleets.map(f => (
+                                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                                            <button onClick={() => setSelectedVessel(v)} className="btn-secondary" style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                Details <ChevronRight size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                )}
+
+                {/* Pagination Controls */}
+                {!isLoading && totalPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--table-border)' }}>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                            Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total} vessels
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button
+                                className="btn-secondary"
+                                disabled={page === 1}
+                                onClick={() => setPage(1)}
+                                style={{ padding: '6px' }}
+                                title="First Page"
+                            >
+                                <ChevronsLeft size={16} />
+                            </button>
+                            <button
+                                className="btn-secondary"
+                                disabled={page === 1}
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                style={{ padding: '6px' }}
+                                title="Previous Page"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+
+                            <span style={{ margin: '0 8px', fontSize: '0.9rem' }}>
+                                Page {page} of {totalPages}
+                            </span>
+
+                            <button
+                                className="btn-secondary"
+                                disabled={page === totalPages}
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                style={{ padding: '6px' }}
+                                title="Next Page"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                            <button
+                                className="btn-secondary"
+                                disabled={page === totalPages}
+                                onClick={() => setPage(totalPages)}
+                                style={{ padding: '6px' }}
+                                title="Last Page"
+                            >
+                                <ChevronsRight size={16} />
+                            </button>
+
+                            <select
+                                value={limit}
+                                onChange={(e) => setLimit(Number(e.target.value))}
+                                style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }}
+                            >
+                                <option value="10">10 / page</option>
+                                <option value="25">25 / page</option>
+                                <option value="50">50 / page</option>
+                                <option value="100">100 / page</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {sanctionsModal.show && (

@@ -95,6 +95,7 @@ export const LoginScreen: React.FC = () => {
                             }}
                             placeholder="Enter your username"
                             required
+                            autoFocus
                         />
                     </div>
 
