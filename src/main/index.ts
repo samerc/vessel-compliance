@@ -968,6 +968,20 @@ app.whenReady().then(() => {
     return db.deleteUser(id)
   })
 
+  safeHandle('users:updateSanctionsThreshold', async (event, threshold: number) => {
+    const user = requireSession(event)
+    await db.updateUserSanctionsThreshold(user.id, threshold)
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (windowId) {
+      const sessionId = windowSessions.get(windowId)
+      const session = auth.getSessionData(sessionId)
+      if (session) {
+        session.user.sanctionsThreshold = threshold
+      }
+    }
+  })
+
   // OFAC/Sanctions Check Handler (session required)
   safeHandle('ofac:checkSanctions', async (event, name: string, threshold = 0.6, sources?: string[]) => {
     requireSession(event)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog, Sun, Moon, ClipboardList, Search, Bell } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog, Sun, Moon, ClipboardList, Search, Bell, Calculator } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -13,11 +13,12 @@ import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
 import SanctionsSearch from './components/SanctionsSearch'
 import ReminderCenter from './components/ReminderCenter'
+import Calculators from './components/Calculators'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users' | 'surveyors' | 'sanctions-search' | 'reminders'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users' | 'surveyors' | 'sanctions-search' | 'reminders' | 'calculators'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -122,6 +123,12 @@ function App(): React.JSX.Element {
             active={activeTab === 'reminders'}
             onClick={() => setActiveTab('reminders')}
           />
+          <NavItem
+            icon={<Calculator size={20} />}
+            label="Calculators"
+            active={activeTab === 'calculators'}
+            onClick={() => setActiveTab('calculators')}
+          />
 
           {isAdmin && (
             <>
@@ -169,6 +176,7 @@ function App(): React.JSX.Element {
         {activeTab === 'compliance' && <ComplianceCenter />}
         {activeTab === 'sanctions-search' && <SanctionsSearch />}
         {activeTab === 'reminders' && <ReminderCenter />}
+        {activeTab === 'calculators' && <Calculators />}
       </main>
     </div>
     </ErrorBoundary>

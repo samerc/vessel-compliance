@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X, Database, Clock, Play, Loader2, Bell } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
@@ -31,6 +31,17 @@ export default function AdminPanel() {
     })
     const [savingCompliance, setSavingCompliance] = useState(false)
     const [runningManualCheck, setRunningManualCheck] = useState(false)
+
+    // Collapsible sections
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+    const toggleSection = (id: string) => {
+        setCollapsedSections(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
 
     // Reminder settings state
     const DEFAULT_TEMPLATE = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
@@ -409,10 +420,14 @@ export default function AdminPanel() {
 
             {/* 1. Document Types */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                    onClick={() => toggleSection('docTypes')}
+                    style={{ marginBottom: collapsedSections.has('docTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('docTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
                     <FileText size={20} color="var(--accent-primary)" /> Document Types
                 </h3>
-                <form onSubmit={handleAddDocType} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                {!collapsedSections.has('docTypes') && <><form onSubmit={handleAddDocType} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
                     <div style={{ flex: '1 1 300px' }}>
                         <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name</label>
                         <input
@@ -464,7 +479,7 @@ export default function AdminPanel() {
                         <caption className="sr-only">Document types configuration</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th scope="col" style={{ padding: '16px', width: '90px' }}>Order</th>
+                                <th scope="col" style={{ padding: '16px', width: '120px' }}>Order</th>
                                 <th scope="col" style={{ padding: '16px' }}>Document Type</th>
                                 <th scope="col" style={{ padding: '16px' }}>Status</th>
                                 <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
@@ -499,7 +514,7 @@ export default function AdminPanel() {
                                                 type="number"
                                                 value={doc.order}
                                                 onChange={(e) => handleUpdateOrder(doc.id, e.target.value)}
-                                                style={{ width: '40px', background: 'transparent', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: '0.9rem' }}
+                                                style={{ width: '50px', background: 'transparent', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: '0.9rem' }}
                                                 aria-label="Display order"
                                             />
                                         </div>
@@ -556,14 +571,19 @@ export default function AdminPanel() {
                         </tbody>
                     </table>
                 </div>
+                </>}
             </section>
 
             {/* 2. Assured Roles */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                    onClick={() => toggleSection('roles')}
+                    style={{ marginBottom: collapsedSections.has('roles') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('roles') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
                     <UserCheck size={20} color="var(--accent-primary)" /> Assured Roles
                 </h3>
-                <form onSubmit={handleAddRole} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                {!collapsedSections.has('roles') && <><form onSubmit={handleAddRole} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
                     <input
                         type="text"
                         value={newRole}
@@ -613,14 +633,19 @@ export default function AdminPanel() {
                         </tbody>
                     </table>
                 </div>
+                </>}
             </section>
 
             {/* 3. Sanctions Check Scheduler */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                    onClick={() => toggleSection('compliance')}
+                    style={{ marginBottom: collapsedSections.has('compliance') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('compliance') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
                     <Clock size={20} color="var(--accent-primary)" /> Scheduled Compliance Check
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                {!collapsedSections.has('compliance') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     Automatically check all entities and vessels against sanctions lists on a weekly schedule.
                 </p>
 
@@ -755,14 +780,19 @@ export default function AdminPanel() {
                     Matches above {complianceSettings.threshold}% confidence will be flagged as "Potential Match" for review.
                     Results can be viewed in the Compliance Center.
                 </div>
+                </>}
             </section>
 
             {/* 4. Vessel Reminder Settings */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                    onClick={() => toggleSection('reminders')}
+                    style={{ marginBottom: collapsedSections.has('reminders') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('reminders') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
                     <Bell size={20} color="var(--accent-primary)" /> Vessel Reminder Settings
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                {!collapsedSections.has('reminders') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     Configure the snooze period and copy-to-clipboard template for document reminders.
                 </p>
 
@@ -807,14 +837,19 @@ export default function AdminPanel() {
                         Save Settings
                     </button>
                 </div>
+                </>}
             </section>
 
             {/* 5. File Types */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                    onClick={() => toggleSection('fileTypes')}
+                    style={{ marginBottom: collapsedSections.has('fileTypes') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('fileTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
                     <Shield size={20} color="var(--accent-primary)" /> File Upload Security
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                {!collapsedSections.has('fileTypes') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     Control which file types users can upload for vessel documents and passport/ID files.
                 </p>
 
@@ -960,14 +995,19 @@ export default function AdminPanel() {
                         </div>
                     </div>
                 </div>
+                </>}
             </section>
 
             {/* 6. Database Configuration */}
             <section className="glass-card" style={{ padding: '24px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                    onClick={() => toggleSection('dbConfig')}
+                    style={{ marginBottom: collapsedSections.has('dbConfig') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('dbConfig') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
                     <Database size={20} color="var(--accent-primary)" /> Database Configuration
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                {!collapsedSections.has('dbConfig') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     View and manage the MySQL database connection settings.
                 </p>
 
@@ -1000,6 +1040,7 @@ export default function AdminPanel() {
                 <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     Changing database configuration will reload the application. Make sure all work is saved.
                 </div>
+                </>}
             </section>
         </div >
     )
