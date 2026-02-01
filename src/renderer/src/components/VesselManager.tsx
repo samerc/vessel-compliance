@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Vessel, Fleet, SanctionsMatch, VesselQueryParams } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
@@ -358,6 +358,7 @@ export default function VesselManager() {
                         onChange={e => setNewVessel({ ...newVessel, name: e.target.value.toUpperCase() })}
                         style={{ flex: 2, minWidth: '200px', textTransform: 'uppercase' }}
                         placeholder="Vessel Name"
+                        aria-label="Vessel name"
                     />
                     <input
                         type="text"
@@ -365,11 +366,13 @@ export default function VesselManager() {
                         onChange={e => setNewVessel({ ...newVessel, imo: e.target.value })}
                         style={{ flex: 1, minWidth: '120px' }}
                         placeholder="IMO No."
+                        aria-label="IMO number"
                     />
                     <select
                         value={newVessel.fleetId}
                         onChange={e => setNewVessel({ ...newVessel, fleetId: e.target.value })}
                         style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
+                        aria-label="Fleet assignment"
                     >
                         <option value="">Standalone</option>
                         {fleets.map(f => (
@@ -392,6 +395,7 @@ export default function VesselManager() {
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         style={{ width: '100%', paddingLeft: '40px' }}
+                        aria-label="Search vessels"
                     />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -400,6 +404,7 @@ export default function VesselManager() {
                         value={fleetFilter}
                         onChange={e => setFleetFilter(e.target.value)}
                         style={{ padding: '10px', borderRadius: '12px', color: 'var(--text-primary)' }}
+                        aria-label="Filter by fleet"
                     >
                         <option value="all">All Fleets</option>
                         <option value="">Standalone</option>
@@ -414,6 +419,7 @@ export default function VesselManager() {
                         value={statusFilter}
                         onChange={e => setStatusFilter(e.target.value as any)}
                         style={{ padding: '10px', borderRadius: '12px', color: 'var(--text-primary)' }}
+                        aria-label="Filter by status"
                     >
                         <option value="active">Active Only</option>
                         <option value="inactive">Inactive Only</option>
@@ -438,16 +444,17 @@ export default function VesselManager() {
 
                 {!isLoading && vessels.length > 0 && (
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+                        <caption className="sr-only">Vessel registry</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
+                                <th scope="col" style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
                                     Vessel Name <ArrowUpDown size={14} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
                                 </th>
-                                <th style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
+                                <th scope="col" style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
                                     IMO Number <ArrowUpDown size={14} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
                                 </th>
-                                <th style={{ padding: '16px' }}>Current Fleet</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                <th scope="col" style={{ padding: '16px' }}>Current Fleet</th>
+                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -498,6 +505,7 @@ export default function VesselManager() {
                                                 value={v.fleetId || ''}
                                                 onChange={e => handleUpdateFleet(v.id, e.target.value)}
                                                 style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}
+                                                aria-label="Assign fleet"
                                             >
                                                 <option value="">Standalone</option>
                                                 {fleets.map(f => (
@@ -530,6 +538,7 @@ export default function VesselManager() {
                                 onClick={() => setPage(1)}
                                 style={{ padding: '6px' }}
                                 title="First Page"
+                                aria-label="First page"
                             >
                                 <ChevronsLeft size={16} />
                             </button>
@@ -539,6 +548,7 @@ export default function VesselManager() {
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 style={{ padding: '6px' }}
                                 title="Previous Page"
+                                aria-label="Previous page"
                             >
                                 <ChevronLeft size={16} />
                             </button>
@@ -553,6 +563,7 @@ export default function VesselManager() {
                                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 style={{ padding: '6px' }}
                                 title="Next Page"
+                                aria-label="Next page"
                             >
                                 <ChevronRight size={16} />
                             </button>
@@ -562,6 +573,7 @@ export default function VesselManager() {
                                 onClick={() => setPage(totalPages)}
                                 style={{ padding: '6px' }}
                                 title="Last Page"
+                                aria-label="Last page"
                             >
                                 <ChevronsRight size={16} />
                             </button>
@@ -570,6 +582,7 @@ export default function VesselManager() {
                                 value={limit}
                                 onChange={(e) => setLimit(Number(e.target.value))}
                                 style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }}
+                                aria-label="Vessels per page"
                             >
                                 <option value="10">10 / page</option>
                                 <option value="25">25 / page</option>

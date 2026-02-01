@@ -67,7 +67,7 @@ export default function UserManager() {
                     <Shield size={20} color="var(--accent-primary)" /> User Registration
                 </h3>
                 {error && (
-                    <div style={{ marginBottom: '16px', borderRadius: '8px', background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.2)', padding: '12px', fontSize: '0.9rem', color: 'var(--danger)' }}>
+                    <div role="alert" aria-live="polite" style={{ marginBottom: '16px', borderRadius: '8px', background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.2)', padding: '12px', fontSize: '0.9rem', color: 'var(--danger)' }}>
                         {error}
                     </div>
                 )}
@@ -78,6 +78,7 @@ export default function UserManager() {
                         onChange={e => setFormData({ ...formData, username: e.target.value })}
                         style={{ flex: 2, minWidth: '200px' }}
                         placeholder="Username"
+                        aria-label="Username"
                     />
                     <input
                         type="password"
@@ -85,11 +86,13 @@ export default function UserManager() {
                         onChange={e => setFormData({ ...formData, password: e.target.value })}
                         style={{ flex: 2, minWidth: '200px' }}
                         placeholder="Password"
+                        aria-label="Password"
                     />
                     <select
                         value={formData.role}
                         onChange={e => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' })}
                         style={{ flex: 1, minWidth: '120px', color: 'var(--text-primary)' }}
+                        aria-label="User role"
                     >
                         <option value="user">User</option>
                         <option value="admin">Admin</option>
@@ -103,12 +106,13 @@ export default function UserManager() {
             ) : (
                 <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                        <caption className="sr-only">User accounts</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th style={{ padding: '16px' }}>Username</th>
-                                <th style={{ padding: '16px' }}>Role</th>
-                                <th style={{ padding: '16px' }}>Created At</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                <th scope="col" style={{ padding: '16px' }}>Username</th>
+                                <th scope="col" style={{ padding: '16px' }}>Role</th>
+                                <th scope="col" style={{ padding: '16px' }}>Created At</th>
+                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -144,6 +148,7 @@ export default function UserManager() {
                                             style={{ background: 'transparent', color: 'var(--danger)', padding: '8px' }}
                                             className="hover-effect"
                                             title="Delete User"
+                                            aria-label="Delete user"
                                         >
                                             <Trash2 size={18} />
                                         </button>

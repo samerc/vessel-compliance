@@ -11,6 +11,15 @@ import { formatDateForMySQL } from './mysql/utils'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 
+// Global error handlers - prevent silent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+})
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error)
+})
+
 const store = new Store()
 
 // Security: Track dialog-selected config files to prevent path injection
@@ -39,6 +48,40 @@ function isSetupAllowed(event: Electron.IpcMainInvokeEvent): boolean {
 
   // Otherwise, require admin authentication
   return isAdminRequest(event)
+}
+
+// Security: Require a valid session, returns the user or throws
+function requireSession(event: Electron.IpcMainInvokeEvent): Omit<import('../shared/types').User, 'passwordHash'> {
+  const webContents = event.sender
+  const windowId = BrowserWindow.fromWebContents(webContents)?.id
+  if (!windowId) throw new Error('Authentication required')
+
+  const sessionId = windowSessions.get(windowId)
+  const user = auth.getCurrentUser(sessionId)
+  if (!user) throw new Error('Authentication required')
+  return user
+}
+
+// Security: Require admin role, returns the user or throws
+function requireAdmin(event: Electron.IpcMainInvokeEvent): Omit<import('../shared/types').User, 'passwordHash'> {
+  const user = requireSession(event)
+  if (user.role !== 'admin') throw new Error('Admin privileges required')
+  return user
+}
+
+// Safe IPC handler wrapper - catches errors and returns them as values
+function safeHandle(
+  channel: string,
+  handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => Promise<any> | any
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      return await handler(event, ...args)
+    } catch (error: any) {
+      console.error(`IPC handler error [${channel}]:`, error?.message || error)
+      return { error: true, message: error?.message || 'An unexpected error occurred' }
+    }
+  })
 }
 
 // Security: Validate database configuration structure
@@ -115,18 +158,26 @@ function createWindow(): void {
     }
   })
 
-  // Save window state on change
-  const saveState = async () => {
-    const bounds = mainWindow.getBounds()
-    store.set('windowState', bounds)
+  // Save window state on change (debounced to avoid excessive writes)
+  let saveStateTimeout: ReturnType<typeof setTimeout> | null = null
 
-    // Also save to database if user is logged in
-    const windowId = mainWindow.id
-    const sessionId = windowSessions.get(windowId)
-    const user = auth.getCurrentUser(sessionId)
-    if (user) {
-      await db.updateUserWindowPreferences(user.id, bounds.width, bounds.height, bounds.x, bounds.y)
-    }
+  const saveState = () => {
+    if (saveStateTimeout) clearTimeout(saveStateTimeout)
+    saveStateTimeout = setTimeout(async () => {
+      try {
+        const bounds = mainWindow.getBounds()
+        store.set('windowState', bounds)
+
+        const windowId = mainWindow.id
+        const sessionId = windowSessions.get(windowId)
+        const user = auth.getCurrentUser(sessionId)
+        if (user) {
+          await db.updateUserWindowPreferences(user.id, bounds.width, bounds.height, bounds.x, bounds.y)
+        }
+      } catch (error) {
+        console.error('Failed to save window state:', error)
+      }
+    }, 500)
   }
 
   mainWindow.on('resize', saveState)
@@ -154,7 +205,16 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    try {
+      const parsed = new URL(details.url)
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        shell.openExternal(details.url)
+      } else {
+        console.warn('Blocked openExternal with non-http(s) scheme:', parsed.protocol)
+      }
+    } catch {
+      console.warn('Blocked openExternal with invalid URL:', details.url)
+    }
     return { action: 'deny' }
   })
 
@@ -186,11 +246,10 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
-  // Auth Handlers
-  ipcMain.handle('auth:login', async (event, { username, password }) => {
+  // Auth Handlers (no session required - these create/destroy sessions)
+  safeHandle('auth:login', async (event, { username, password }) => {
     const result = await auth.login(username, password)
     if (result.success && result.sessionId) {
-      // Store session ID for this window
       const webContents = event.sender
       const window = BrowserWindow.fromWebContents(webContents)
       const windowId = window?.id
@@ -198,14 +257,12 @@ app.whenReady().then(() => {
         windowSessions.set(windowId, result.sessionId)
       }
 
-      // Apply user's window preferences if they exist
       const user = result.user
       if (user && window && user.windowWidth && user.windowHeight) {
         const bounds: { width: number; height: number; x?: number; y?: number } = {
           width: user.windowWidth,
           height: user.windowHeight
         }
-        // Only include x and y if they're defined (not null from DB)
         if (user.windowX !== null && user.windowX !== undefined) {
           bounds.x = user.windowX
         }
@@ -218,7 +275,7 @@ app.whenReady().then(() => {
     return result
   })
 
-  ipcMain.handle('auth:getSession', async (event) => {
+  safeHandle('auth:getSession', async (event) => {
     const webContents = event.sender
     const windowId = BrowserWindow.fromWebContents(webContents)?.id
     if (!windowId) return null
@@ -227,7 +284,7 @@ app.whenReady().then(() => {
     return auth.getCurrentUser(sessionId)
   })
 
-  ipcMain.handle('auth:logout', async (event) => {
+  safeHandle('auth:logout', async (event) => {
     const webContents = event.sender
     const windowId = BrowserWindow.fromWebContents(webContents)?.id
     if (windowId) {
@@ -239,8 +296,8 @@ app.whenReady().then(() => {
     }
   })
 
-  // Theme Handlers (user-specific)
-  ipcMain.handle('theme:get', async (event) => {
+  // Theme Handlers (user-specific, session required)
+  safeHandle('theme:get', async (event) => {
     const webContents = event.sender
     const windowId = BrowserWindow.fromWebContents(webContents)?.id
     if (!windowId) return 'dark'
@@ -250,16 +307,13 @@ app.whenReady().then(() => {
     return user?.themePreference || 'dark'
   })
 
-  ipcMain.handle('theme:set', async (event, theme: 'light' | 'dark') => {
+  safeHandle('theme:set', async (event, theme: 'light' | 'dark') => {
+    const user = requireSession(event)
+    await db.updateUserTheme(user.id, theme)
     const webContents = event.sender
     const windowId = BrowserWindow.fromWebContents(webContents)?.id
-    if (!windowId) return
-
-    const sessionId = windowSessions.get(windowId)
-    const user = auth.getCurrentUser(sessionId)
-    if (user) {
-      await db.updateUserTheme(user.id, theme)
-      // Update session with new theme preference
+    if (windowId) {
+      const sessionId = windowSessions.get(windowId)
       const session = auth.getSessionData(sessionId)
       if (session) {
         session.user.themePreference = theme
@@ -267,8 +321,8 @@ app.whenReady().then(() => {
     }
   })
 
-  // Window Preferences Handlers (user-specific)
-  ipcMain.handle('window:getPreferences', async (event) => {
+  // Window Preferences Handlers (user-specific, session required)
+  safeHandle('window:getPreferences', async (event) => {
     const webContents = event.sender
     const windowId = BrowserWindow.fromWebContents(webContents)?.id
     if (!windowId) return null
@@ -286,37 +340,24 @@ app.whenReady().then(() => {
     return null
   })
 
-  ipcMain.handle('window:savePreferences', async (event) => {
+  safeHandle('window:savePreferences', async (event) => {
+    const user = requireSession(event)
     const webContents = event.sender
     const window = BrowserWindow.fromWebContents(webContents)
     if (!window) return
 
-    const windowId = window.id
-    const sessionId = windowSessions.get(windowId)
-    const user = auth.getCurrentUser(sessionId)
-    if (user) {
-      const bounds = window.getBounds()
-      await db.updateUserWindowPreferences(user.id, bounds.width, bounds.height, bounds.x, bounds.y)
-    }
+    const bounds = window.getBounds()
+    await db.updateUserWindowPreferences(user.id, bounds.width, bounds.height, bounds.x, bounds.y)
   })
 
   // File Type Settings Handlers
-  ipcMain.handle('fileTypes:getSettings', async (event) => {
-    // Security: Only admins can view file type settings
-    if (!isAdminRequest(event)) {
-      console.error('Unauthorized attempt to get file type settings')
-      return { allowedExtensions: [], blockedExtensions: [] }
-    }
+  safeHandle('fileTypes:getSettings', async (event) => {
+    requireAdmin(event)
     return await db.getFileTypeSettings()
   })
 
-  ipcMain.handle('fileTypes:setSettings', async (event, settings: { allowedExtensions: string[]; blockedExtensions: string[] }) => {
-    // Security: Only admins can change file type settings
-    if (!isAdminRequest(event)) {
-      console.error('Unauthorized attempt to set file type settings')
-      return { allowedExtensions: [], blockedExtensions: [] }
-    }
-    // Normalize extensions to lowercase and ensure they start with a dot
+  safeHandle('fileTypes:setSettings', async (event, settings: { allowedExtensions: string[]; blockedExtensions: string[] }) => {
+    requireAdmin(event)
     const normalizeExtensions = (exts: string[]) => {
       return exts.map(ext => {
         ext = ext.toLowerCase().trim()
@@ -329,32 +370,13 @@ app.whenReady().then(() => {
       blockedExtensions: normalizeExtensions(settings.blockedExtensions)
     }
 
-    // Save to database (centralized storage for all users)
     await db.setFileTypeSettings(normalized)
     return normalized
   })
 
-  ipcMain.handle('fileTypes:validateFile', async (_, filePath: string) => {
-    const settings = await db.getFileTypeSettings()
-    const ext = extname(filePath).toLowerCase()
-
-    // Check if blocked
-    if (settings.blockedExtensions.includes(ext)) {
-      return {
-        valid: false,
-        reason: `File type '${ext}' is blocked by administrator`
-      }
-    }
-
-    // Check if allowed (only if allowed list has items)
-    if (settings.allowedExtensions.length > 0 && !settings.allowedExtensions.includes(ext)) {
-      return {
-        valid: false,
-        reason: `File type '${ext}' is not in the allowed list. Allowed types: ${settings.allowedExtensions.join(', ')}`
-      }
-    }
-
-    return { valid: true }
+  safeHandle('fileTypes:validateFile', async (event, filePath: string) => {
+    requireSession(event)
+    return await db.validateFileExtension(filePath)
   })
 
   ipcMain.handle('setup:selectDirectory', async (event) => {
@@ -733,90 +755,120 @@ app.whenReady().then(() => {
     }
   })
 
-  // Database IPC Handlers
-  ipcMain.handle('db:getDocumentTypes', () => db.getDocumentTypes())
-  ipcMain.handle('db:addDocumentType', (_, docType) => db.addDocumentType(docType))
-  ipcMain.handle('db:updateDocumentType', (_, id, updates) => db.updateDocumentType(id, updates))
-  ipcMain.handle('db:deleteDocumentType', (_, id) => db.deleteDocumentType(id))
+  // Database IPC Handlers - Read operations require session, deletes require admin
+  safeHandle('db:getDocumentTypes', (event) => { requireSession(event); return db.getDocumentTypes() })
+  safeHandle('db:addDocumentType', (event, docType) => { requireSession(event); return db.addDocumentType(docType) })
+  safeHandle('db:updateDocumentType', (event, id, updates) => { requireSession(event); return db.updateDocumentType(id, updates) })
+  safeHandle('db:deleteDocumentType', (event, id) => { requireAdmin(event); return db.deleteDocumentType(id) })
 
-  ipcMain.handle('db:getFleets', () => db.getFleets())
-  ipcMain.handle('db:addFleet', (_, fleet) => db.addFleet(fleet))
-  ipcMain.handle('db:deleteFleet', (_, id) => db.deleteFleet(id))
+  safeHandle('db:getFleets', (event) => { requireSession(event); return db.getFleets() })
+  safeHandle('db:addFleet', (event, fleet) => { requireSession(event); return db.addFleet(fleet) })
+  safeHandle('db:deleteFleet', (event, id) => { requireAdmin(event); return db.deleteFleet(id) })
 
-  ipcMain.handle('db:getVessels', () => db.getVessels())
-  ipcMain.handle('db:getVesselsPaginated', (_, params) => db.getVesselsPaginated(params))
-  ipcMain.handle('db:addVessel', async (_, vessel) => {
+  safeHandle('db:getVessels', (event) => { requireSession(event); return db.getVessels() })
+  safeHandle('db:getVesselsPaginated', (event, params) => { requireSession(event); return db.getVesselsPaginated(params) })
+  safeHandle('db:addVessel', async (event, vessel) => {
+    requireSession(event)
     try {
       const result = await db.addVessel(vessel)
       return { success: true, data: result }
     } catch (error: any) {
-      // Return error as a value instead of throwing to avoid console noise
       return { success: false, message: error.message }
     }
   })
-  ipcMain.handle('db:updateVessel', (_, id, updates) => db.updateVessel(id, updates))
-  ipcMain.handle('db:deleteVessel', async (event, id) => {
-    if (!isAdminRequest(event)) {
-      console.error('Unauthorized attempt to delete vessel')
-      return { success: false, message: 'Unauthorized' }
-    }
+  safeHandle('db:updateVessel', (event, id, updates) => { requireSession(event); return db.updateVessel(id, updates) })
+  safeHandle('db:deleteVessel', async (event, id) => {
+    requireAdmin(event)
     await db.deleteVessel(id)
     return { success: true }
   })
 
-  ipcMain.handle('db:getVesselDocuments', (_, vesselId) => db.getVesselDocuments(vesselId))
-  ipcMain.handle('db:upsertVesselDocument', (_, doc) => db.upsertVesselDocument(doc))
-  ipcMain.handle('db:updateVesselDocumentExpiry', (_, vesselId, docTypeId, expiryDate) => db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate))
-  ipcMain.handle('db:updateVesselDocumentReceivedDate', (_, vesselId, docTypeId, receivedDate) => db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate))
+  safeHandle('db:getVesselDocuments', (event, vesselId) => { requireSession(event); return db.getVesselDocuments(vesselId) })
+  safeHandle('db:upsertVesselDocument', async (event, doc) => {
+    requireSession(event)
+    await db.upsertVesselDocument(doc)
+    if (doc.filePath) {
+      await db.autoSnoozeVessel(doc.vesselId)
+    }
+  })
+  safeHandle('db:updateVesselDocumentExpiry', (event, vesselId, docTypeId, expiryDate) => { requireSession(event); return db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate) })
+  safeHandle('db:updateVesselDocumentReceivedDate', (event, vesselId, docTypeId, receivedDate) => { requireSession(event); return db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate) })
 
   // Entity IPC Handlers
-  ipcMain.handle('db:getEntities', () => db.getEntities())
-  ipcMain.handle('db:addEntity', (_, entity) => db.addEntity(entity))
-  ipcMain.handle('db:updateEntity', (_, id, updates) => db.updateEntity(id, updates))
-  ipcMain.handle('db:deleteEntity', (_, id) => db.deleteEntity(id))
+  safeHandle('db:getEntities', (event) => { requireSession(event); return db.getEntities() })
+  safeHandle('db:getEntitiesPaginated', (event, params) => { requireSession(event); return db.getEntitiesPaginated(params) })
+  safeHandle('db:addEntity', (event, entity) => { requireSession(event); return db.addEntity(entity) })
+  safeHandle('db:updateEntity', async (event, id, updates) => {
+    requireSession(event)
+    const docFields = ['passportFilePath', 'certificateOfIncorporationPath', 'articlesOfAssociationPath', 'kycFilePath']
+    const hasDocChange = docFields.some(f => updates[f] !== undefined)
+    await db.updateEntity(id, updates)
+    if (hasDocChange) {
+      await db.autoSnoozeVesselsForEntity(id)
+    }
+  })
+  safeHandle('db:deleteEntity', (event, id) => { requireAdmin(event); return db.deleteEntity(id) })
 
-  ipcMain.handle('db:getAssuredRoles', () => db.getAssuredRoles())
-  ipcMain.handle('db:addAssuredRole', (_, role) => db.addAssuredRole(role))
-  ipcMain.handle('db:updateAssuredRole', (_, id, updates) => db.updateAssuredRole(id, updates))
-  ipcMain.handle('db:deleteAssuredRole', (_, id) => db.deleteAssuredRole(id))
+  safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
+  safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })
+  safeHandle('db:updateAssuredRole', (event, id, updates) => { requireSession(event); return db.updateAssuredRole(id, updates) })
+  safeHandle('db:deleteAssuredRole', (event, id) => { requireAdmin(event); return db.deleteAssuredRole(id) })
 
-  ipcMain.handle('db:getVesselAssureds', (_, vesselId) => db.getVesselAssureds(vesselId))
-  ipcMain.handle('db:addVesselAssured', (_, assured) => db.addVesselAssured(assured))
-  ipcMain.handle('db:deleteVesselAssured', (_, id) => db.deleteVesselAssured(id))
+  safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
+  safeHandle('db:addVesselAssured', (event, assured) => { requireSession(event); return db.addVesselAssured(assured) })
+  safeHandle('db:deleteVesselAssured', (event, id) => { requireAdmin(event); return db.deleteVesselAssured(id) })
 
-  ipcMain.handle('db:getEntityUBOs', (_, assuredEntityId) => db.getEntityUBOs(assuredEntityId))
-  ipcMain.handle('db:addEntityUBO', (_, ubo) => db.addEntityUBO(ubo))
-  ipcMain.handle('db:deleteEntityUBO', (_, ubo) => db.deleteEntityUBO(ubo))
+  safeHandle('db:getEntityUBOs', (event, assuredEntityId) => { requireSession(event); return db.getEntityUBOs(assuredEntityId) })
+  safeHandle('db:addEntityUBO', (event, ubo) => { requireSession(event); return db.addEntityUBO(ubo) })
+  safeHandle('db:deleteEntityUBO', (event, ubo) => { requireAdmin(event); return db.deleteEntityUBO(ubo) })
 
   // Surveyors
-  ipcMain.handle('db:getSurveyors', () => db.getSurveyors())
-  ipcMain.handle('db:addSurveyor', (_, surveyor) => db.addSurveyor(surveyor))
-  ipcMain.handle('db:updateSurveyor', (_, id, updates) => db.updateSurveyor(id, updates))
-  ipcMain.handle('db:deleteSurveyor', (_, id) => db.deleteSurveyor(id))
+  safeHandle('db:getSurveyors', (event) => { requireSession(event); return db.getSurveyors() })
+  safeHandle('db:getSurveyorsPaginated', (event, params) => { requireSession(event); return db.getSurveyorsPaginated(params) })
+  safeHandle('db:addSurveyor', (event, surveyor) => { requireSession(event); return db.addSurveyor(surveyor) })
+  safeHandle('db:updateSurveyor', (event, id, updates) => { requireSession(event); return db.updateSurveyor(id, updates) })
+  safeHandle('db:deleteSurveyor', (event, id) => { requireAdmin(event); return db.deleteSurveyor(id) })
 
   // Condition Surveys
-  ipcMain.handle('db:getConditionSurveys', (_, vesselId) => db.getConditionSurveys(vesselId))
-  ipcMain.handle('db:addConditionSurvey', (_, survey) => db.addConditionSurvey(survey))
-  ipcMain.handle('db:updateConditionSurvey', (_, id, updates) => db.updateConditionSurvey(id, updates))
-  ipcMain.handle('db:deleteConditionSurvey', (_, id) => db.deleteConditionSurvey(id))
-  ipcMain.handle('db:getSurveyDefects', (_, surveyId) => db.getSurveyDefects(surveyId))
-  ipcMain.handle('db:addSurveyDefect', (_, defect) => db.addSurveyDefect(defect))
-  ipcMain.handle('db:updateSurveyDefect', (_, id, updates) => db.updateSurveyDefect(id, updates))
-  ipcMain.handle('db:deleteSurveyDefect', (_, id) => db.deleteSurveyDefect(id))
-  ipcMain.handle('db:closeDefect', (_, id, closedBy, closureNotes) => db.closeDefect(id, closedBy, closureNotes))
-  ipcMain.handle('db:reopenDefect', (_, id) => db.reopenDefect(id))
-  ipcMain.handle('db:getSurveyAttachments', (_, surveyId) => db.getSurveyAttachments(surveyId))
-  ipcMain.handle('db:addSurveyAttachment', (_, attachment) => db.addSurveyAttachment(attachment))
-  ipcMain.handle('db:deleteSurveyAttachment', (_, id) => db.deleteSurveyAttachment(id))
-  ipcMain.handle('db:getOpenDefectsByVessel', () => db.getOpenDefectsByVessel())
-  ipcMain.handle('db:getSurveyHistory', (_, vesselId) => db.getSurveyHistory(vesselId))
+  safeHandle('db:getConditionSurveys', (event, vesselId) => { requireSession(event); return db.getConditionSurveys(vesselId) })
+  safeHandle('db:addConditionSurvey', (event, survey) => { requireSession(event); return db.addConditionSurvey(survey) })
+  safeHandle('db:updateConditionSurvey', (event, id, updates) => { requireSession(event); return db.updateConditionSurvey(id, updates) })
+  safeHandle('db:deleteConditionSurvey', (event, id) => { requireAdmin(event); return db.deleteConditionSurvey(id) })
+  safeHandle('db:getSurveyDefects', (event, surveyId) => { requireSession(event); return db.getSurveyDefects(surveyId) })
+  safeHandle('db:addSurveyDefect', (event, defect) => { requireSession(event); return db.addSurveyDefect(defect) })
+  safeHandle('db:updateSurveyDefect', (event, id, updates) => { requireSession(event); return db.updateSurveyDefect(id, updates) })
+  safeHandle('db:deleteSurveyDefect', (event, id) => { requireAdmin(event); return db.deleteSurveyDefect(id) })
+  safeHandle('db:closeDefect', (event, id, closedBy, closureNotes) => { requireSession(event); return db.closeDefect(id, closedBy, closureNotes) })
+  safeHandle('db:reopenDefect', (event, id) => { requireSession(event); return db.reopenDefect(id) })
+  safeHandle('db:getSurveyAttachments', (event, surveyId) => { requireSession(event); return db.getSurveyAttachments(surveyId) })
+  safeHandle('db:addSurveyAttachment', (event, attachment) => { requireSession(event); return db.addSurveyAttachment(attachment) })
+  safeHandle('db:deleteSurveyAttachment', (event, id) => { requireAdmin(event); return db.deleteSurveyAttachment(id) })
+  safeHandle('db:getOpenDefectsByVessel', (event) => { requireSession(event); return db.getOpenDefectsByVessel() })
+  safeHandle('db:getSurveyHistory', (event, vesselId) => { requireSession(event); return db.getSurveyHistory(vesselId) })
 
-  // File System IPC Handlers
-  ipcMain.handle('fs:exists', (_, filePath) => existsSync(filePath))
-  ipcMain.handle('fs:open', (_, filePath) => shell.openPath(filePath))
+  // File System IPC Handlers (session required, path validation)
+  safeHandle('fs:exists', (event, filePath: string) => {
+    requireSession(event)
+    if (typeof filePath !== 'string' || !filePath) return false
+    return existsSync(normalize(filePath))
+  })
 
-  // Excel Import Handlers
-  ipcMain.handle('dialog:openFile', async () => {
+  safeHandle('fs:open', async (event, filePath: string) => {
+    requireSession(event)
+    if (typeof filePath !== 'string' || !filePath) {
+      throw new Error('Invalid file path')
+    }
+    const normalized = normalize(filePath)
+    const validation = await db.validateFileExtension(normalized)
+    if (!validation.valid) {
+      throw new Error(validation.reason || 'File type not allowed')
+    }
+    return shell.openPath(normalized)
+  })
+
+  // Excel Import Handlers (session required)
+  safeHandle('dialog:openFile', async (event) => {
+    requireSession(event)
     const { dialog } = require('electron')
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
@@ -828,14 +880,16 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePaths[0]
   })
 
-  ipcMain.handle('excel:import', async (_, filePath: string) => {
+  safeHandle('excel:import', async (event, filePath: string) => {
+    requireSession(event)
     const { ExcelImporter } = await import('./excelImporter')
     const importer = new ExcelImporter()
     return await importer.importFromExcel(filePath)
   })
 
-  // Word Import Handlers
-  ipcMain.handle('dialog:openFileWord', async () => {
+  // Word Import Handlers (session required)
+  safeHandle('dialog:openFileWord', async (event) => {
+    requireSession(event)
     const { dialog } = require('electron')
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
@@ -848,7 +902,8 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePaths[0]
   })
 
-  ipcMain.handle('word:importDefects', async (_, surveyId: string, filePath: string) => {
+  safeHandle('word:importDefects', async (event, surveyId: string, filePath: string) => {
+    requireSession(event)
     return new Promise((resolve) => {
       // In production/dev, the worker file will be in the same output directory
       const workerPath = join(__dirname, 'parser.js')
@@ -897,21 +952,25 @@ app.whenReady().then(() => {
     })
   })
 
-  // User Management
-  ipcMain.handle('auth:createUser', async (_, { username, password, role }) => {
+  // User Management (admin only)
+  safeHandle('auth:createUser', async (event, { username, password, role }) => {
+    requireAdmin(event)
     return auth.createUser(username, password, role)
   })
 
-  ipcMain.handle('db:getUsers', async () => {
+  safeHandle('db:getUsers', async (event) => {
+    requireAdmin(event)
     return db.getUsers()
   })
 
-  ipcMain.handle('db:deleteUser', async (_, id) => {
+  safeHandle('db:deleteUser', async (event, id) => {
+    requireAdmin(event)
     return db.deleteUser(id)
   })
 
-  // OFAC/Sanctions Check Handler
-  ipcMain.handle('ofac:checkSanctions', async (_, name: string, threshold = 0.6, sources?: string[]) => {
+  // OFAC/Sanctions Check Handler (session required)
+  safeHandle('ofac:checkSanctions', async (event, name: string, threshold = 0.6, sources?: string[]) => {
+    requireSession(event)
     try {
       const apiKey = getSanctionsApiKey()
       if (!apiKey) {
@@ -1000,86 +1059,62 @@ app.whenReady().then(() => {
   })
 
   // Compliance Schedule Handlers
-  ipcMain.handle('compliance:getScheduleSettings', async (event) => {
-    if (!isAdminRequest(event)) {
-      return { enabled: false, dayOfWeek: 1, timeOfDay: '09:00', threshold: 85, includeVessels: true, skipCleared: true }
-    }
+  safeHandle('compliance:getScheduleSettings', async (event) => {
+    requireAdmin(event)
     return await db.getComplianceScheduleSettings()
   })
 
-  ipcMain.handle('compliance:setScheduleSettings', async (event, settings) => {
-    if (!isAdminRequest(event)) {
-      console.error('Unauthorized attempt to set compliance schedule settings')
-      return { success: false, message: 'Unauthorized' }
-    }
-
-    // Calculate next run time
+  safeHandle('compliance:setScheduleSettings', async (event, settings) => {
+    requireAdmin(event)
     const nextRunAt = complianceScheduler.calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
     settings.nextRunAt = nextRunAt
-
     await db.setComplianceScheduleSettings(settings)
-
-    // Restart scheduler with new settings
     complianceScheduler.start()
-
     return { success: true }
   })
 
-  ipcMain.handle('compliance:getCheckLogs', async () => {
+  safeHandle('compliance:getCheckLogs', async (event) => {
+    requireSession(event)
     return await db.getComplianceCheckLogs()
   })
 
-  ipcMain.handle('compliance:getCheckResults', async (_, logId?: string, status?: string) => {
+  safeHandle('compliance:getCheckResults', async (event, logId?: string, status?: string) => {
+    requireSession(event)
     return await db.getComplianceCheckResults(logId, status)
   })
+  safeHandle('compliance:getCheckResultsPaginated', (event, params) => { requireSession(event); return db.getComplianceCheckResultsPaginated(params) })
 
-  ipcMain.handle('compliance:getPendingResults', async () => {
+  safeHandle('compliance:getPendingResults', async (event) => {
+    requireSession(event)
     return await db.getPendingComplianceResults()
   })
 
-  ipcMain.handle('compliance:markResultReviewed', async (event, resultId: string) => {
-    const webContents = event.sender
-    const windowId = BrowserWindow.fromWebContents(webContents)?.id
-    if (!windowId) return
-
-    const sessionId = windowSessions.get(windowId)
-    const user = auth.getCurrentUser(sessionId)
-    if (user) {
-      await db.markComplianceResultReviewed(resultId, user.username)
-    }
+  safeHandle('compliance:markResultReviewed', async (event, resultId: string) => {
+    const user = requireSession(event)
+    await db.markComplianceResultReviewed(resultId, user.username)
   })
 
-  ipcMain.handle('compliance:decideResult', async (event, resultId: string, decision: 'sanctioned' | 'cleared') => {
-    const webContents = event.sender
-    const windowId = BrowserWindow.fromWebContents(webContents)?.id
-    if (!windowId) return { success: false, message: 'Invalid window context' }
-
-    const sessionId = windowSessions.get(windowId)
-    const user = auth.getCurrentUser(sessionId)
-    if (user) {
-      await db.decideComplianceResult(resultId, decision, user.username)
-      return { success: true }
-    }
-    return { success: false, message: 'Unauthorized' }
+  safeHandle('compliance:decideResult', async (event, resultId: string, decision: 'sanctioned' | 'cleared') => {
+    const user = requireSession(event)
+    await db.decideComplianceResult(resultId, decision, user.username)
+    return { success: true }
   })
 
-  ipcMain.handle('compliance:runManualCheck', async (event) => {
-    if (!isAdminRequest(event)) {
-      console.error('Unauthorized attempt to run manual compliance check')
-      return { success: false, message: 'Unauthorized' }
-    }
-
-    try {
-      await complianceScheduler.runComplianceCheck()
-      return { success: true }
-    } catch (error: any) {
-      return { success: false, message: error.message }
-    }
+  safeHandle('compliance:runManualCheck', async (event) => {
+    requireAdmin(event)
+    await complianceScheduler.runComplianceCheck()
+    return { success: true }
   })
+
+  // Reminder IPC Handlers
+  safeHandle('reminders:getSettings', (event) => { requireSession(event); return db.getReminderSettings() })
+  safeHandle('reminders:setSettings', (event, settings) => { requireSession(event); return db.setReminderSettings(settings) })
+  safeHandle('reminders:getVesselReminders', (event) => { requireSession(event); return db.getVesselReminders() })
+  safeHandle('reminders:snoozeVessel', (event, vesselId, username, periodDays) => { requireSession(event); return db.snoozeVessel(vesselId, username, periodDays) })
+  safeHandle('reminders:unsnoozeVessel', (event, vesselId) => { requireSession(event); return db.unsnoozeVessel(vesselId) })
 
   createWindow()
 
-  // Start the compliance scheduler after window is created
   // Start the compliance scheduler after window is created
   complianceScheduler.start()
 

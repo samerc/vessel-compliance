@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog, Sun, Moon, ClipboardList, Search } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, Users, ShieldAlert, LogOut, UserCog, Sun, Moon, ClipboardList, Search, Bell } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -12,10 +12,12 @@ import SurveyorDirectory from './components/SurveyorDirectory'
 import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
 import SanctionsSearch from './components/SanctionsSearch'
+import ReminderCenter from './components/ReminderCenter'
 import { useAuth } from './contexts/AuthContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users' | 'surveyors' | 'sanctions-search'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users' | 'surveyors' | 'sanctions-search' | 'reminders'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -59,17 +61,19 @@ function App(): React.JSX.Element {
   }
 
   return (
+    <ErrorBoundary>
+    <a href="#main-content" className="sr-only">Skip to main content</a>
     <div className="layout-container">
       <aside className="sidebar">
         <div style={{ paddingBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '8px' }}></div>
+          <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '8px' }} aria-hidden="true"></div>
           <div>
             <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Vessel Compliance</h2>
             <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{user?.username} ({user?.role})</div>
           </div>
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
+        <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
           <NavItem
             icon={<LayoutDashboard size={20} />}
             label="Dashboard"
@@ -112,6 +116,12 @@ function App(): React.JSX.Element {
             active={activeTab === 'surveyors'}
             onClick={() => setActiveTab('surveyors')}
           />
+          <NavItem
+            icon={<Bell size={20} />}
+            label="Reminders"
+            active={activeTab === 'reminders'}
+            onClick={() => setActiveTab('reminders')}
+          />
 
           {isAdmin && (
             <>
@@ -148,7 +158,7 @@ function App(): React.JSX.Element {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main id="main-content" className="main-content">
         {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
         {activeTab === 'vessels' && <VesselManager />}
         {activeTab === 'fleets' && <FleetManager />}
@@ -158,15 +168,18 @@ function App(): React.JSX.Element {
         {activeTab === 'surveyors' && <SurveyorDirectory />}
         {activeTab === 'compliance' && <ComplianceCenter />}
         {activeTab === 'sanctions-search' && <SanctionsSearch />}
+        {activeTab === 'reminders' && <ReminderCenter />}
       </main>
     </div>
+    </ErrorBoundary>
   )
 }
 
 function NavItem({ icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
   return (
-    <div
+    <button
       onClick={onClick}
+      aria-current={active ? 'page' : undefined}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -176,13 +189,18 @@ function NavItem({ icon, label, active, onClick }: { icon: any, label: string, a
         cursor: 'pointer',
         background: active ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        transition: 'var(--transition)'
+        transition: 'var(--transition)',
+        border: 'none',
+        width: '100%',
+        textAlign: 'left',
+        fontSize: 'inherit',
+        fontFamily: 'inherit'
       }}
       className={!active ? 'hover-effect' : ''}
     >
       {icon}
       <span style={{ fontWeight: active ? '600' : '400' }}>{label}</span>
-    </div>
+    </button>
   )
 }
 

@@ -221,6 +221,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 value={editName}
                                 onChange={e => setEditName(e.target.value.toUpperCase())}
                                 style={{ fontSize: '2.5rem', width: '100%', textTransform: 'uppercase' }}
+                                aria-label="Vessel name"
                             />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>IMO:</span>
@@ -229,6 +230,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     value={editImo}
                                     onChange={e => setEditImo(e.target.value)}
                                     style={{ padding: '4px 8px', borderRadius: '4px' }}
+                                    aria-label="IMO number"
                                 />
                             </div>
                         </div>
@@ -296,14 +298,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
             <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+                    <caption className="sr-only">Document compliance</caption>
                     <thead>
                         <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                            <th style={{ padding: '18px 16px' }}>Document Name</th>
-                            <th style={{ padding: '18px 16px' }}>Requirement</th>
-                            <th style={{ padding: '18px 16px' }}>File Status</th>
-                            <th style={{ padding: '18px 16px' }}>Date of Receipt</th>
-                            <th style={{ padding: '18px 16px' }}>Expiry Date</th>
-                            <th style={{ padding: '18px 16px', textAlign: 'right' }}>Actions</th>
+                            <th scope="col" style={{ padding: '18px 16px' }}>Document Name</th>
+                            <th scope="col" style={{ padding: '18px 16px' }}>Requirement</th>
+                            <th scope="col" style={{ padding: '18px 16px' }}>File Status</th>
+                            <th scope="col" style={{ padding: '18px 16px' }}>Date of Receipt</th>
+                            <th scope="col" style={{ padding: '18px 16px' }}>Expiry Date</th>
+                            <th scope="col" style={{ padding: '18px 16px', textAlign: 'right' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -433,6 +436,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     borderRadius: '4px',
                                                     fontSize: '0.85rem'
                                                 }}
+                                                aria-label={`Expiry date for ${type.name}`}
                                             />
                                         </div>
                                     </td>
@@ -440,10 +444,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                                             {hasFile && (
                                                 <>
-                                                    <button onClick={() => openFile(doc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="View File">
+                                                    <button onClick={() => openFile(doc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="View File" aria-label="View file">
                                                         <Eye size={18} />
                                                     </button>
-                                                    <button onClick={() => handleDeleteDoc(doc!)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Unlink File">
+                                                    <button onClick={() => handleDeleteDoc(doc!)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Unlink File" aria-label="Unlink file">
                                                         <Trash2 size={18} />
                                                     </button>
                                                 </>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X, Database, Clock, Play, Loader2 } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, Shield, X, Database, Clock, Play, Loader2, Bell } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
 export default function AdminPanel() {
@@ -32,11 +32,17 @@ export default function AdminPanel() {
     const [savingCompliance, setSavingCompliance] = useState(false)
     const [runningManualCheck, setRunningManualCheck] = useState(false)
 
+    // Reminder settings state
+    const DEFAULT_TEMPLATE = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
+    const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ periodDays: 7, reminderTemplate: DEFAULT_TEMPLATE })
+    const [savingReminder, setSavingReminder] = useState(false)
+
     useEffect(() => {
         loadData()
         loadFileTypeSettings()
         loadConfigPath()
         loadComplianceSettings()
+        loadReminderSettings()
     }, [])
 
     const loadConfigPath = async () => {
@@ -79,6 +85,23 @@ export default function AdminPanel() {
             showError(error.message || 'Failed to start compliance check')
         } finally {
             setRunningManualCheck(false)
+        }
+    }
+
+    const loadReminderSettings = async () => {
+        const settings = await window.api.remindersGetSettings()
+        setReminderSettings(settings)
+    }
+
+    const handleSaveReminderSettings = async () => {
+        setSavingReminder(true)
+        try {
+            await window.api.remindersSetSettings(reminderSettings)
+            showSuccess('Reminder settings saved')
+        } catch (error: any) {
+            showError(error.message || 'Failed to save reminder settings')
+        } finally {
+            setSavingReminder(false)
         }
     }
 
@@ -384,398 +407,216 @@ export default function AdminPanel() {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 0.4fr', gap: '32px' }}>
-                <div>
-                    <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                        <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <FileText size={20} color="var(--accent-primary)" /> Define Document Type
-                        </h3>
-                        <form onSubmit={handleAddDocType} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                            <div style={{ flex: '1 1 300px' }}>
-                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name</label>
-                                <input
-                                    type="text"
-                                    value={newName}
-                                    onChange={e => setNewName(e.target.value)}
-                                    style={{ width: '100%', marginBottom: '12px' }}
-                                    placeholder="e.g. Safety Management Certificate"
-                                />
-                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Description (optional)</label>
-                                <textarea
-                                    value={newDescription}
-                                    onChange={e => setNewDescription(e.target.value)}
-                                    style={{ width: '100%', minHeight: '60px', resize: 'vertical' }}
-                                    placeholder="Brief description of the document purposes..."
-                                />
-                            </div>
-                            <div style={{ width: '80px' }}>
-                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Order</label>
-                                <input
-                                    type="number"
-                                    value={newOrder}
-                                    onChange={e => setNewOrder(parseInt(e.target.value))}
-                                    style={{ width: '100%' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%', marginTop: '12px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={required}
-                                        onChange={e => setRequired(e.target.checked)}
-                                        style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
-                                    />
-                                    Required by default
-                                </label>
-                                <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
-                                    <Plus size={18} /> Add Document Type
-                                </button>
-                            </div>
-                        </form>
-                    </section>
-
-                    <section className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th style={{ padding: '16px', width: '90px' }}>Order</th>
-                                    <th style={{ padding: '16px' }}>Document Type</th>
-                                    <th style={{ padding: '16px' }}>Status</th>
-                                    <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {docTypes.map((doc, index) => (
-                                    <tr key={doc.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                        <td style={{ padding: '20px 16px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.preventDefault(); moveStep(index, 'up'); }}
-                                                        style={{ background: 'transparent', padding: 0, color: index === 0 ? '#333' : 'var(--accent-primary)', cursor: index === 0 ? 'default' : 'pointer', border: 'none' }}
-                                                        disabled={index === 0}
-                                                    >
-                                                        <ChevronUp size={16} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.preventDefault(); moveStep(index, 'down'); }}
-                                                        style={{ background: 'transparent', padding: 0, color: index === docTypes.length - 1 ? '#333' : 'var(--accent-primary)', cursor: index === docTypes.length - 1 ? 'default' : 'pointer', border: 'none' }}
-                                                        disabled={index === docTypes.length - 1}
-                                                    >
-                                                        <ChevronDown size={16} />
-                                                    </button>
-                                                </div>
-                                                <input
-                                                    type="number"
-                                                    value={doc.order}
-                                                    onChange={(e) => handleUpdateOrder(doc.id, e.target.value)}
-                                                    style={{ width: '40px', background: 'transparent', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: '0.9rem' }}
-                                                />
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '20px 16px' }}>
-                                            {editingDocId === doc.id ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    <input
-                                                        type="text"
-                                                        value={editDocName}
-                                                        onChange={e => setEditDocName(e.target.value)}
-                                                        autoFocus
-                                                        style={{ width: '100%' }}
-                                                    />
-                                                    <textarea
-                                                        value={editDocDescription}
-                                                        onChange={e => setEditDocDescription(e.target.value)}
-                                                        placeholder="Description..."
-                                                        style={{ width: '100%', minHeight: '60px', borderRadius: '8px' }}
-                                                    />
-                                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                                        <button onClick={() => saveDocEdit(doc.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
-                                                        <button onClick={() => setEditingDocId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div onClick={() => startEditingDoc(doc)} style={{ cursor: 'pointer' }}>
-                                                    <div style={{ fontWeight: '600' }}>{doc.name}</div>
-                                                    {doc.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{doc.description}</div>}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '20px 16px' }}>
-                                            <span
-                                                onClick={() => handleToggleDocRequired(doc)}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '0.75rem',
-                                                    background: doc.required ? 'rgba(255, 77, 77, 0.1)' : 'var(--table-header-bg)',
-                                                    color: doc.required ? 'var(--danger)' : 'var(--text-secondary)',
-                                                    border: doc.required ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid var(--table-border)',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >{doc.required ? 'REQUIRED' : 'OPTIONAL'}</span>
-                                        </td>
-                                        <td style={{ padding: '20px 16px', textAlign: 'right' }}>
-                                            <button onClick={() => handleDeleteDocType(doc.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </section>
-                </div>
-
-                <div>
-                    <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                        <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <UserCheck size={20} color="var(--accent-primary)" /> Define Assured Role
-                        </h3>
-                        <form onSubmit={handleAddRole} style={{ display: 'flex', gap: '16px' }}>
+            {/* 1. Document Types */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={20} color="var(--accent-primary)" /> Document Types
+                </h3>
+                <form onSubmit={handleAddDocType} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                    <div style={{ flex: '1 1 300px' }}>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name</label>
+                        <input
+                            type="text"
+                            value={newName}
+                            onChange={e => setNewName(e.target.value)}
+                            style={{ width: '100%', marginBottom: '12px' }}
+                            placeholder="e.g. Safety Management Certificate"
+                            aria-label="Document type name"
+                        />
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Description (optional)</label>
+                        <textarea
+                            value={newDescription}
+                            onChange={e => setNewDescription(e.target.value)}
+                            style={{ width: '100%', minHeight: '60px', resize: 'vertical' }}
+                            placeholder="Brief description of the document purposes..."
+                            aria-label="Document type description"
+                        />
+                    </div>
+                    <div style={{ width: '80px' }}>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Order</label>
+                        <input
+                            type="number"
+                            value={newOrder}
+                            onChange={e => setNewOrder(parseInt(e.target.value))}
+                            style={{ width: '100%' }}
+                            aria-label="Document type display order"
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%', marginTop: '12px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                             <input
-                                type="text"
-                                value={newRole}
-                                onChange={e => setNewRole(e.target.value)}
-                                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
-                                placeholder="e.g. Technical Manager"
+                                type="checkbox"
+                                checked={required}
+                                onChange={e => setRequired(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                aria-label="Required by default"
                             />
-                            <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Plus size={18} /> Add Role
-                            </button>
-                        </form>
-                    </section>
+                            Required by default
+                        </label>
+                        <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                            <Plus size={18} /> Add Document Type
+                        </button>
+                    </div>
+                </form>
 
-                    <section className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th style={{ padding: '16px' }}>Role</th>
-                                    <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {roles.map(role => (
-                                    <tr key={role.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                        <td style={{ padding: '16px' }}>
-                                            {editingRoleId === role.id ? (
+                <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <caption className="sr-only">Document types configuration</caption>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                <th scope="col" style={{ padding: '16px', width: '90px' }}>Order</th>
+                                <th scope="col" style={{ padding: '16px' }}>Document Type</th>
+                                <th scope="col" style={{ padding: '16px' }}>Status</th>
+                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {docTypes.map((doc, index) => (
+                                <tr key={doc.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                    <td style={{ padding: '20px 16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); moveStep(index, 'up'); }}
+                                                    style={{ background: 'transparent', padding: 0, color: index === 0 ? '#333' : 'var(--accent-primary)', cursor: index === 0 ? 'default' : 'pointer', border: 'none' }}
+                                                    disabled={index === 0}
+                                                    aria-label="Move up"
+                                                >
+                                                    <ChevronUp size={16} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); moveStep(index, 'down'); }}
+                                                    style={{ background: 'transparent', padding: 0, color: index === docTypes.length - 1 ? '#333' : 'var(--accent-primary)', cursor: index === docTypes.length - 1 ? 'default' : 'pointer', border: 'none' }}
+                                                    disabled={index === docTypes.length - 1}
+                                                    aria-label="Move down"
+                                                >
+                                                    <ChevronDown size={16} />
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                value={doc.order}
+                                                onChange={(e) => handleUpdateOrder(doc.id, e.target.value)}
+                                                style={{ width: '40px', background: 'transparent', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: '0.9rem' }}
+                                                aria-label="Display order"
+                                            />
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '20px 16px' }}>
+                                        {editingDocId === doc.id ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 <input
                                                     type="text"
-                                                    value={editRoleName}
-                                                    onChange={e => setEditRoleName(e.target.value)}
-                                                    onBlur={() => saveRoleEdit(role.id)}
-                                                    onKeyDown={e => e.key === 'Enter' && saveRoleEdit(role.id)}
+                                                    value={editDocName}
+                                                    onChange={e => setEditDocName(e.target.value)}
                                                     autoFocus
                                                     style={{ width: '100%' }}
+                                                    aria-label="Edit document type name"
                                                 />
-                                            ) : (
-                                                <span onClick={() => startEditingRole(role)} style={{ cursor: 'pointer' }}>{role.name}</span>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <button onClick={() => handleDeleteRole(role.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </section>
-                </div>
-            </div>
-
-            {/* File Type Settings Section */}
-            <section className="glass-card" style={{ padding: '24px', marginTop: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Shield size={20} color="var(--accent-primary)" /> File Upload Security
-                </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                    Control which file types users can upload for vessel documents and passport/ID files.
-                </p>
-
-                {fileTypeStatus && (
-                    <div style={{
-                        padding: '12px 16px',
-                        marginBottom: '16px',
-                        background: fileTypeStatus.startsWith('✓') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
-                        border: fileTypeStatus.startsWith('✓') ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
-                        borderRadius: '8px',
-                        fontSize: '0.9rem'
-                    }}>
-                        {fileTypeStatus}
-                    </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                    {/* Allowed Extensions */}
-                    <div>
-                        <h4 style={{ marginBottom: '12px', fontSize: '1rem', color: 'var(--success)' }}>
-                            ✓ Allowed File Types
-                        </h4>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                            Only these file types can be uploaded. Leave empty to allow all (except blocked).
-                        </p>
-
-                        <form onSubmit={handleAddAllowedExt} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                            <input
-                                type="text"
-                                value={newAllowedExt}
-                                onChange={e => setNewAllowedExt(e.target.value)}
-                                placeholder=".pdf or pdf"
-                                style={{ flex: 1 }}
-                            />
-                            <button type="submit" className="btn-primary" style={{ padding: '0 16px' }}>
-                                <Plus size={16} />
-                            </button>
-                        </form>
-
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {fileTypeSettings.allowedExtensions.map(ext => (
-                                <div
-                                    key={ext}
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '6px 12px',
-                                        background: 'rgba(0, 255, 136, 0.1)',
-                                        border: '1px solid rgba(0, 255, 136, 0.3)',
-                                        borderRadius: '6px',
-                                        fontSize: '0.85rem',
-                                        fontFamily: 'monospace'
-                                    }}
-                                >
-                                    <span>{ext}</span>
-                                    <button
-                                        onClick={() => handleRemoveAllowedExt(ext)}
-                                        style={{
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: 'var(--text-secondary)',
-                                            cursor: 'pointer',
-                                            padding: '0',
-                                            display: 'flex',
-                                            alignItems: 'center'
-                                        }}
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
+                                                <textarea
+                                                    value={editDocDescription}
+                                                    onChange={e => setEditDocDescription(e.target.value)}
+                                                    placeholder="Description..."
+                                                    style={{ width: '100%', minHeight: '60px', borderRadius: '8px' }}
+                                                    aria-label="Edit document type description"
+                                                />
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button onClick={() => saveDocEdit(doc.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
+                                                    <button onClick={() => setEditingDocId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div onClick={() => startEditingDoc(doc)} style={{ cursor: 'pointer' }}>
+                                                <div style={{ fontWeight: '600' }}>{doc.name}</div>
+                                                {doc.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{doc.description}</div>}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '20px 16px' }}>
+                                        <span
+                                            onClick={() => handleToggleDocRequired(doc)}
+                                            style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '0.75rem',
+                                                background: doc.required ? 'rgba(255, 77, 77, 0.1)' : 'var(--table-header-bg)',
+                                                color: doc.required ? 'var(--danger)' : 'var(--text-secondary)',
+                                                border: doc.required ? '1px solid rgba(255, 77, 77, 0.2)' : '1px solid var(--table-border)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >{doc.required ? 'REQUIRED' : 'OPTIONAL'}</span>
+                                    </td>
+                                    <td style={{ padding: '20px 16px', textAlign: 'right' }}>
+                                        <button onClick={() => handleDeleteDocType(doc.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete document type"><Trash2 size={18} /></button>
+                                    </td>
+                                </tr>
                             ))}
-                            {fileTypeSettings.allowedExtensions.length === 0 && (
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                                    All file types allowed (except blocked)
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Blocked Extensions */}
-                    <div>
-                        <h4 style={{ marginBottom: '12px', fontSize: '1rem', color: 'var(--danger)' }}>
-                            ✗ Blocked File Types
-                        </h4>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                            These file types are always rejected, even if in allowed list.
-                        </p>
-
-                        <form onSubmit={handleAddBlockedExt} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                            <input
-                                type="text"
-                                value={newBlockedExt}
-                                onChange={e => setNewBlockedExt(e.target.value)}
-                                placeholder=".exe or exe"
-                                style={{ flex: 1 }}
-                            />
-                            <button type="submit" className="btn-primary" style={{ padding: '0 16px', background: 'var(--danger)' }}>
-                                <Plus size={16} />
-                            </button>
-                        </form>
-
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {fileTypeSettings.blockedExtensions.map(ext => (
-                                <div
-                                    key={ext}
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '6px 12px',
-                                        background: 'rgba(255, 77, 77, 0.1)',
-                                        border: '1px solid rgba(255, 77, 77, 0.3)',
-                                        borderRadius: '6px',
-                                        fontSize: '0.85rem',
-                                        fontFamily: 'monospace'
-                                    }}
-                                >
-                                    <span>{ext}</span>
-                                    <button
-                                        onClick={() => handleRemoveBlockedExt(ext)}
-                                        style={{
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: 'var(--text-secondary)',
-                                            cursor: 'pointer',
-                                            padding: '0',
-                                            display: 'flex',
-                                            alignItems: 'center'
-                                        }}
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            ))}
-                            {fileTypeSettings.blockedExtensions.length === 0 && (
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                                    No blocked file types
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
-            {/* Database Configuration Section */}
-            <section className="glass-card" style={{ padding: '24px', marginTop: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Database size={20} color="var(--accent-primary)" /> Database Configuration
+            {/* 2. Assured Roles */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <UserCheck size={20} color="var(--accent-primary)" /> Assured Roles
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                    View and manage the MySQL database connection settings.
-                </p>
-
-                <div style={{ marginBottom: '24px' }}>
-                    <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Current Configuration File</div>
-                    <div className="px-4 py-3 bg-black/20 rounded-lg text-sm text-gray-300 font-mono border border-white/5 break-all">
-                        {configPath || 'Not configured'}
-                    </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <button
-                        onClick={handleBrowseConfigFile}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                    >
-                        <Database size={18} />
-                        Browse for Config File
+                <form onSubmit={handleAddRole} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                    <input
+                        type="text"
+                        value={newRole}
+                        onChange={e => setNewRole(e.target.value)}
+                        style={{ flex: 1 }}
+                        placeholder="e.g. Technical Manager"
+                        aria-label="Assured role name"
+                    />
+                    <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Plus size={18} /> Add Role
                     </button>
-                    <button
-                        onClick={handleBrowseConfigDir}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(100, 100, 255, 0.2)' }}
-                    >
-                        <Database size={18} />
-                        Load from Directory
-                    </button>
-                </div>
+                </form>
 
-                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    ⚠️ Changing database configuration will reload the application. Make sure all work is saved.
+                <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <caption className="sr-only">Assured roles</caption>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                <th scope="col" style={{ padding: '16px' }}>Role</th>
+                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {roles.map(role => (
+                                <tr key={role.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                    <td style={{ padding: '16px' }}>
+                                        {editingRoleId === role.id ? (
+                                            <input
+                                                type="text"
+                                                value={editRoleName}
+                                                onChange={e => setEditRoleName(e.target.value)}
+                                                onBlur={() => saveRoleEdit(role.id)}
+                                                onKeyDown={e => e.key === 'Enter' && saveRoleEdit(role.id)}
+                                                autoFocus
+                                                style={{ width: '100%' }}
+                                                aria-label="Edit role name"
+                                            />
+                                        ) : (
+                                            <span onClick={() => startEditingRole(role)} style={{ cursor: 'pointer' }}>{role.name}</span>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                                        <button onClick={() => handleDeleteRole(role.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete role"><Trash2 size={18} /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
-            {/* Compliance Schedule Section */}
-            <section className="glass-card" style={{ padding: '24px', marginTop: '32px' }}>
+            {/* 3. Sanctions Check Scheduler */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={20} color="var(--accent-primary)" /> Scheduled Compliance Check
                 </h3>
@@ -784,7 +625,6 @@ export default function AdminPanel() {
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                    {/* Schedule Settings */}
                     <div>
                         <div style={{ marginBottom: '20px' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
@@ -793,6 +633,7 @@ export default function AdminPanel() {
                                     checked={complianceSettings.enabled}
                                     onChange={e => setComplianceSettings({ ...complianceSettings, enabled: e.target.checked })}
                                     style={{ width: '20px', height: '20px', accentColor: 'var(--accent-primary)' }}
+                                    aria-label="Enable weekly compliance check"
                                 />
                                 <span style={{ fontWeight: '600' }}>Enable Weekly Compliance Check</span>
                             </label>
@@ -806,6 +647,7 @@ export default function AdminPanel() {
                                     onChange={e => setComplianceSettings({ ...complianceSettings, dayOfWeek: parseInt(e.target.value) })}
                                     style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                                     disabled={!complianceSettings.enabled}
+                                    aria-label="Day of week"
                                 >
                                     {dayNames.map((day, i) => (
                                         <option key={i} value={i}>{day}</option>
@@ -820,6 +662,7 @@ export default function AdminPanel() {
                                     onChange={e => setComplianceSettings({ ...complianceSettings, timeOfDay: e.target.value })}
                                     style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                                     disabled={!complianceSettings.enabled}
+                                    aria-label="Time of day"
                                 />
                             </div>
                         </div>
@@ -837,6 +680,7 @@ export default function AdminPanel() {
                                 onChange={e => setComplianceSettings({ ...complianceSettings, threshold: parseInt(e.target.value) })}
                                 style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
                                 disabled={!complianceSettings.enabled}
+                                aria-label="Match score threshold"
                             />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                                 <span>50% (More matches)</span>
@@ -845,7 +689,6 @@ export default function AdminPanel() {
                         </div>
                     </div>
 
-                    {/* Options and Status */}
                     <div>
                         <div style={{ marginBottom: '16px' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '12px' }}>
@@ -855,6 +698,7 @@ export default function AdminPanel() {
                                     onChange={e => setComplianceSettings({ ...complianceSettings, includeVessels: e.target.checked })}
                                     style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
                                     disabled={!complianceSettings.enabled}
+                                    aria-label="Include vessels in check"
                                 />
                                 <span>Include vessels in check</span>
                             </label>
@@ -910,6 +754,251 @@ export default function AdminPanel() {
                     <strong>How it works:</strong> The system will check all entities{complianceSettings.includeVessels ? ' and vessels' : ''} against sanctions lists.
                     Matches above {complianceSettings.threshold}% confidence will be flagged as "Potential Match" for review.
                     Results can be viewed in the Compliance Center.
+                </div>
+            </section>
+
+            {/* 4. Vessel Reminder Settings */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bell size={20} color="var(--accent-primary)" /> Vessel Reminder Settings
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    Configure the snooze period and copy-to-clipboard template for document reminders.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '20px', marginBottom: '20px' }}>
+                    <div>
+                        <label htmlFor="admin-reminder-period" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Snooze Period (days)</label>
+                        <input
+                            id="admin-reminder-period"
+                            type="number"
+                            min={1}
+                            max={90}
+                            value={reminderSettings.periodDays}
+                            onChange={e => setReminderSettings({ ...reminderSettings, periodDays: Number(e.target.value) })}
+                            style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="admin-reminder-template" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                            Copy Template
+                            <span style={{ marginLeft: '8px', fontSize: '0.8rem', opacity: 0.7 }}>
+                                Placeholders: {'{vesselName}'}, {'{imoNumber}'}, {'{vesselDocuments}'}, {'{assuredDocuments}'}
+                            </span>
+                        </label>
+                        <textarea
+                            id="admin-reminder-template"
+                            value={reminderSettings.reminderTemplate}
+                            onChange={e => setReminderSettings({ ...reminderSettings, reminderTemplate: e.target.value })}
+                            rows={6}
+                            style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}
+                        />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                        onClick={handleSaveReminderSettings}
+                        disabled={savingReminder}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        {savingReminder && <Loader2 size={16} className="spinner" />}
+                        Save Settings
+                    </button>
+                </div>
+            </section>
+
+            {/* 5. File Types */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Shield size={20} color="var(--accent-primary)" /> File Upload Security
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    Control which file types users can upload for vessel documents and passport/ID files.
+                </p>
+
+                {fileTypeStatus && (
+                    <div style={{
+                        padding: '12px 16px',
+                        marginBottom: '16px',
+                        background: fileTypeStatus.startsWith('✓') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                        border: fileTypeStatus.startsWith('✓') ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem'
+                    }}>
+                        {fileTypeStatus}
+                    </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                    <div>
+                        <h4 style={{ marginBottom: '12px', fontSize: '1rem', color: 'var(--success)' }}>
+                            Allowed File Types
+                        </h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                            Only these file types can be uploaded. Leave empty to allow all (except blocked).
+                        </p>
+
+                        <form onSubmit={handleAddAllowedExt} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                            <input
+                                type="text"
+                                value={newAllowedExt}
+                                onChange={e => setNewAllowedExt(e.target.value)}
+                                placeholder=".pdf or pdf"
+                                style={{ flex: 1 }}
+                                aria-label="Allowed file extension"
+                            />
+                            <button type="submit" className="btn-primary" style={{ padding: '0 16px' }} aria-label="Add allowed extension">
+                                <Plus size={16} />
+                            </button>
+                        </form>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {fileTypeSettings.allowedExtensions.map(ext => (
+                                <div
+                                    key={ext}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 12px',
+                                        background: 'rgba(0, 255, 136, 0.1)',
+                                        border: '1px solid rgba(0, 255, 136, 0.3)',
+                                        borderRadius: '6px',
+                                        fontSize: '0.85rem',
+                                        fontFamily: 'monospace'
+                                    }}
+                                >
+                                    <span>{ext}</span>
+                                    <button
+                                        onClick={() => handleRemoveAllowedExt(ext)}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                        aria-label={`Remove allowed extension ${ext}`}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {fileTypeSettings.allowedExtensions.length === 0 && (
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                    All file types allowed (except blocked)
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 style={{ marginBottom: '12px', fontSize: '1rem', color: 'var(--danger)' }}>
+                            Blocked File Types
+                        </h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                            These file types are always rejected, even if in allowed list.
+                        </p>
+
+                        <form onSubmit={handleAddBlockedExt} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                            <input
+                                type="text"
+                                value={newBlockedExt}
+                                onChange={e => setNewBlockedExt(e.target.value)}
+                                placeholder=".exe or exe"
+                                style={{ flex: 1 }}
+                                aria-label="Blocked file extension"
+                            />
+                            <button type="submit" className="btn-primary" style={{ padding: '0 16px', background: 'var(--danger)' }} aria-label="Add blocked extension">
+                                <Plus size={16} />
+                            </button>
+                        </form>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {fileTypeSettings.blockedExtensions.map(ext => (
+                                <div
+                                    key={ext}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 12px',
+                                        background: 'rgba(255, 77, 77, 0.1)',
+                                        border: '1px solid rgba(255, 77, 77, 0.3)',
+                                        borderRadius: '6px',
+                                        fontSize: '0.85rem',
+                                        fontFamily: 'monospace'
+                                    }}
+                                >
+                                    <span>{ext}</span>
+                                    <button
+                                        onClick={() => handleRemoveBlockedExt(ext)}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                        aria-label={`Remove blocked extension ${ext}`}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {fileTypeSettings.blockedExtensions.length === 0 && (
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                    No blocked file types
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* 6. Database Configuration */}
+            <section className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Database size={20} color="var(--accent-primary)" /> Database Configuration
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    View and manage the MySQL database connection settings.
+                </p>
+
+                <div style={{ marginBottom: '24px' }}>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Current Configuration File</div>
+                    <div className="px-4 py-3 bg-black/20 rounded-lg text-sm text-gray-300 font-mono border border-white/5 break-all">
+                        {configPath || 'Not configured'}
+                    </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <button
+                        onClick={handleBrowseConfigFile}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                        <Database size={18} />
+                        Browse for Config File
+                    </button>
+                    <button
+                        onClick={handleBrowseConfigDir}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(100, 100, 255, 0.2)' }}
+                    >
+                        <Database size={18} />
+                        Load from Directory
+                    </button>
+                </div>
+
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Changing database configuration will reload the application. Make sure all work is saved.
                 </div>
             </section>
         </div >

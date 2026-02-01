@@ -301,6 +301,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
                 required
+                aria-label="Survey date"
               />
             </div>
             <div>
@@ -311,6 +312,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 onChange={(e) => setNewType(e.target.value)}
                 placeholder="e.g., Annual Inspection, Hull Survey"
                 required
+                aria-label="Survey type"
               />
             </div>
             <div>
@@ -320,6 +322,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 value={newLocation}
                 onChange={(e) => setNewLocation(e.target.value)}
                 placeholder="e.g., Singapore, Rotterdam"
+                aria-label="Survey location"
               />
             </div>
           </div>
@@ -333,6 +336,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
               }}
               required
               style={{ color: 'var(--text-primary)' }}
+              aria-label="Surveyor"
             >
               <option value="">-- Select Surveyor --</option>
               {surveyors.map(s => (
@@ -353,6 +357,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                     onChange={(e) => setNewSurveyorCompany(e.target.value)}
                     required={newSurveyorId === 'new'}
                     style={{ width: '100%' }}
+                    aria-label="Surveyor company name"
                   />
                 </div>
                 <div>
@@ -363,6 +368,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                     onChange={(e) => setNewSurveyorCountry(e.target.value)}
                     required={newSurveyorId === 'new'}
                     style={{ width: '100%' }}
+                    aria-label="Surveyor country"
                   />
                 </div>
               </div>
@@ -374,6 +380,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                   onChange={(e) => setNewSurveyorContactPerson(e.target.value)}
                   placeholder="e.g., John Smith"
                   style={{ width: '100%' }}
+                  aria-label="Surveyor contact person"
                 />
               </div>
             </div>
@@ -385,6 +392,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
               onChange={(e) => setNewNotes(e.target.value)}
               rows={3}
               style={{ resize: 'vertical', width: '100%' }}
+              aria-label="Survey notes"
             />
           </div>
           <button type="submit" className="btn-primary">
@@ -509,6 +517,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               value={editDate}
                               onChange={(e) => setEditDate(e.target.value)}
                               required
+                              aria-label="Edit survey date"
                             />
                           </div>
                           <div>
@@ -518,6 +527,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               value={editType}
                               onChange={(e) => setEditType(e.target.value)}
                               required
+                              aria-label="Edit survey type"
                             />
                           </div>
                           <div>
@@ -526,6 +536,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               type="text"
                               value={editLocation}
                               onChange={(e) => setEditLocation(e.target.value)}
+                              aria-label="Edit survey location"
                             />
                           </div>
                         </div>
@@ -536,6 +547,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                             onChange={(e) => setEditSurveyorId(e.target.value)}
                             required
                             style={{ color: 'var(--text-primary)' }}
+                            aria-label="Edit surveyor"
                           >
                             <option value="">-- Select Surveyor --</option>
                             {surveyors.map(s => (
@@ -550,6 +562,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                             onChange={(e) => setEditNotes(e.target.value)}
                             rows={3}
                             style={{ resize: 'vertical', width: '100%' }}
+                            aria-label="Edit survey notes"
                           />
                         </div>
                       </div>
@@ -619,6 +632,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                                   onClick={() => handleDeleteAttachment(attachment.id)}
                                   style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                   title="Delete attachment"
+                                  aria-label="Delete attachment"
                                 >
                                   <Trash2 size={14} />
                                 </button>

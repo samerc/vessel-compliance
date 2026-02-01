@@ -1,5 +1,4 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder } from '../shared/types'
 
 export interface Api {
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -36,6 +35,7 @@ export interface Api {
   updateVesselDocumentReceivedDate: (vesselId: string, docTypeId: string, receivedDate: string) => Promise<void>
 
   getEntities: () => Promise<Entity[]>
+  getEntitiesPaginated: (params: EntityQueryParams) => Promise<PaginatedResult<Entity>>
   addEntity: (entity: Omit<Entity, 'id'>) => Promise<Entity>
   updateEntity: (id: string, updates: Partial<Entity>) => Promise<void>
   deleteEntity: (id: string) => Promise<void>
@@ -84,6 +84,7 @@ export interface Api {
   complianceSetScheduleSettings: (settings: ComplianceScheduleSettings) => Promise<{ success: boolean; message?: string }>
   complianceGetCheckLogs: () => Promise<ComplianceCheckLog[]>
   complianceGetCheckResults: (logId?: string, status?: string) => Promise<ComplianceCheckResult[]>
+  complianceGetCheckResultsPaginated: (params: ComplianceResultQueryParams) => Promise<PaginatedResult<ComplianceCheckResult>>
   complianceGetPendingResults: () => Promise<ComplianceCheckResult[]>
   complianceMarkResultReviewed: (resultId: string) => Promise<void>
   complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => Promise<{ success: boolean, message?: string }>
@@ -91,6 +92,7 @@ export interface Api {
 
   // Surveyors
   getSurveyors: () => Promise<Surveyor[]>
+  getSurveyorsPaginated: (params: SurveyorQueryParams) => Promise<PaginatedResult<Surveyor>>
   addSurveyor: (surveyor: Omit<Surveyor, 'id'>) => Promise<Surveyor>
   updateSurveyor: (id: string, updates: Partial<Surveyor>) => Promise<void>
   deleteSurveyor: (id: string) => Promise<void>
@@ -111,11 +113,17 @@ export interface Api {
   deleteSurveyAttachment: (id: string) => Promise<void>
   getOpenDefectsByVessel: () => Promise<any[]>
   getSurveyHistory: (vesselId: string) => Promise<any[]>
+
+  // Reminders
+  remindersGetSettings: () => Promise<ReminderSettings>
+  remindersSetSettings: (settings: ReminderSettings) => Promise<void>
+  remindersGetVesselReminders: () => Promise<VesselReminder[]>
+  remindersSnoozeVessel: (vesselId: string, username: string, periodDays: number) => Promise<void>
+  remindersUnsnoozeVessel: (vesselId: string) => Promise<void>
 }
 
 declare global {
   interface Window {
-    electron: ElectronAPI
     api: Api
   }
 }

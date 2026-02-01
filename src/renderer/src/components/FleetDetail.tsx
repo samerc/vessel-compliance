@@ -59,6 +59,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                             onChange={(e) => setStatusFilter(e.target.value as 'active' | 'all')}
                             className="input-field"
                             style={{ padding: '4px 12px', fontSize: '0.85rem', width: 'auto' }}
+                            aria-label="Filter by status"
                         >
                             <option value="active">Active Only</option>
                             <option value="all">Show All</option>
@@ -90,11 +91,12 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
             ) : (
                 <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                        <caption className="sr-only">Vessels in fleet</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th style={{ padding: '16px' }}>Vessel Name</th>
-                                <th style={{ padding: '16px' }}>IMO Number</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                <th scope="col" style={{ padding: '16px' }}>Vessel Name</th>
+                                <th scope="col" style={{ padding: '16px' }}>IMO Number</th>
+                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>

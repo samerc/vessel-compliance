@@ -87,7 +87,7 @@ export const SetupScreen: React.FC = () => {
                 </p>
 
                 {error && (
-                    <div className="mb-6 rounded-lg p-3 text-sm border" style={{ background: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)', borderColor: 'rgba(255, 77, 77, 0.2)' }}>
+                    <div role="alert" aria-live="polite" className="mb-6 rounded-lg p-3 text-sm border" style={{ background: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)', borderColor: 'rgba(255, 77, 77, 0.2)' }}>
                         {error}
                     </div>
                 )}
@@ -137,9 +137,10 @@ export const SetupScreen: React.FC = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Config Storage Directory</label>
+                        <label htmlFor="setup-directory" className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Config Storage Directory</label>
                         <div className="flex gap-2">
                             <input
+                                id="setup-directory"
                                 type="text"
                                 readOnly
                                 value={directory}
@@ -150,6 +151,7 @@ export const SetupScreen: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={handleSelectDir}
+                                aria-label="Browse for configuration directory"
                                 className="px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20 transition-all border border-white/10"
                             >
                                 Browse
@@ -159,8 +161,9 @@ export const SetupScreen: React.FC = () => {
 
                     <div className="grid grid-cols-4 gap-4">
                         <div className="col-span-3">
-                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Host</label>
+                            <label htmlFor="setup-host" className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Host</label>
                             <input
+                                id="setup-host"
                                 type="text"
                                 name="host"
                                 value={formData.host}
@@ -170,8 +173,9 @@ export const SetupScreen: React.FC = () => {
                             />
                         </div>
                         <div className="col-span-1">
-                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Port</label>
+                            <label htmlFor="setup-port" className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Port</label>
                             <input
+                                id="setup-port"
                                 type="number"
                                 name="port"
                                 value={formData.port}
@@ -183,8 +187,9 @@ export const SetupScreen: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Database Name</label>
+                        <label htmlFor="setup-database" className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Database Name</label>
                         <input
+                            id="setup-database"
                             type="text"
                             name="database"
                             value={formData.database}
@@ -196,8 +201,9 @@ export const SetupScreen: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>User</label>
+                            <label htmlFor="setup-user" className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>User</label>
                             <input
+                                id="setup-user"
                                 type="text"
                                 name="user"
                                 value={formData.user}
@@ -207,8 +213,9 @@ export const SetupScreen: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Password</label>
+                            <label htmlFor="setup-password" className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>Password</label>
                             <input
+                                id="setup-password"
                                 type="password"
                                 name="password"
                                 value={formData.password}

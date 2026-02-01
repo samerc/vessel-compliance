@@ -64,6 +64,7 @@ export default function FleetManager() {
                         onChange={e => setNewFleetName(e.target.value)}
                         style={{ flex: 1 }}
                         placeholder="e.g. Tanker Division"
+                        aria-label="Fleet name"
                     />
                     <button type="submit" className="btn-primary">Add Fleet</button>
                 </form>
@@ -83,6 +84,7 @@ export default function FleetManager() {
                                         onClick={() => setSelectedFleet(fleet)}
                                         style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '4px' }}
                                         title="View Fleet"
+                                        aria-label="View fleet"
                                     >
                                         <Eye size={20} />
                                     </button>
@@ -90,6 +92,7 @@ export default function FleetManager() {
                                         onClick={() => handleDeleteFleet(fleet.id)}
                                         style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }}
                                         title="Delete Fleet"
+                                        aria-label="Delete fleet"
                                     >
                                         <Trash2 size={20} />
                                     </button>

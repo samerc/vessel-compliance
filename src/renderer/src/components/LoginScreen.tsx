@@ -62,7 +62,7 @@ export const LoginScreen: React.FC = () => {
                 </div>
 
                 {error && (
-                    <div style={{
+                    <div role="alert" aria-live="polite" style={{
                         marginBottom: '1.5rem',
                         padding: '1rem',
                         borderRadius: '0.5rem',
@@ -78,8 +78,9 @@ export const LoginScreen: React.FC = () => {
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Username</label>
+                        <label htmlFor="login-username" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Username</label>
                         <input
+                            id="login-username"
                             type="text"
                             name="username"
                             value={formData.username}
@@ -100,8 +101,9 @@ export const LoginScreen: React.FC = () => {
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Password</label>
+                        <label htmlFor="login-password" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Password</label>
                         <input
+                            id="login-password"
                             type="password"
                             name="password"
                             value={formData.password}
@@ -123,6 +125,7 @@ export const LoginScreen: React.FC = () => {
                     <button
                         type="submit"
                         disabled={loading}
+                        aria-busy={loading}
                         className="btn-primary"
                         style={{
                             width: '100%',

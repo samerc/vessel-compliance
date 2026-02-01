@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History } from 'lucide-react'
+import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
@@ -15,12 +15,18 @@ export default function ComplianceCenter() {
     const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
     const [checkLogs, setCheckLogs] = useState<ComplianceCheckLog[]>([])
     const [expandedResult, setExpandedResult] = useState<string | null>(null)
+    const [resultsPage, setResultsPage] = useState(1)
+    const [resultsLimit, setResultsLimit] = useState(10)
+    const [resultsTotal, setResultsTotal] = useState(0)
+    const [resultsTotalPages, setResultsTotalPages] = useState(0)
 
     useEffect(() => {
         console.log('ComplianceCenter: Component mounted, loading data...')
         loadData()
         loadSanctionsData()
     }, [])
+
+    useEffect(() => { loadSanctionsData() }, [resultsPage, resultsLimit])
 
     const loadData = async () => {
         try {
@@ -45,17 +51,25 @@ export default function ComplianceCenter() {
     const loadSanctionsData = async () => {
         try {
             console.log('ComplianceCenter: Loading sanctions data...')
-            const [pending, logs] = await Promise.all([
-                window.api.complianceGetPendingResults(),
+            const [result, logs] = await Promise.all([
+                window.api.complianceGetCheckResultsPaginated({
+                    page: resultsPage,
+                    limit: resultsLimit,
+                    status: 'pending_review'
+                }),
                 window.api.complianceGetCheckLogs()
             ])
-            console.log('ComplianceCenter: Sanctions data loaded successfully', { pending: pending.length, logs: logs.length })
-            setPendingResults(pending)
+            console.log('ComplianceCenter: Sanctions data loaded successfully', { pending: result.data.length, total: result.total, logs: logs.length })
+            setPendingResults(result.data)
+            setResultsTotal(result.total)
+            setResultsTotalPages(result.totalPages)
             setCheckLogs(logs)
         } catch (error) {
             console.error('ComplianceCenter: Failed to load sanctions data:', error)
             // Set empty arrays to prevent blank screen
             setPendingResults([])
+            setResultsTotal(0)
+            setResultsTotalPages(0)
             setCheckLogs([])
         }
     }
@@ -140,8 +154,12 @@ export default function ComplianceCenter() {
                 </div>
 
                 {/* Tab Navigation */}
-                <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
+                <div role="tablist" aria-label="Compliance sections" style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
                     <button
+                        id="tab-documents"
+                        role="tab"
+                        aria-selected={activeTab === 'documents'}
+                        aria-controls="panel-documents"
                         onClick={() => setActiveTab('documents')}
                         style={{
                             padding: '10px 24px',
@@ -165,6 +183,10 @@ export default function ComplianceCenter() {
                         )}
                     </button>
                     <button
+                        id="tab-sanctions"
+                        role="tab"
+                        aria-selected={activeTab === 'sanctions'}
+                        aria-controls="panel-sanctions"
                         onClick={() => {
                             console.log('ComplianceCenter: Switching to sanctions tab')
                             setActiveTab('sanctions')
@@ -184,9 +206,9 @@ export default function ComplianceCenter() {
                     >
                         <Shield size={16} />
                         Sanctions Screening
-                        {pendingResults.length > 0 && (
+                        {resultsTotal > 0 && (
                             <span style={{ background: 'rgba(255, 193, 7, 0.2)', color: '#ffc107', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
-                                {pendingResults.length}
+                                {resultsTotal}
                             </span>
                         )}
                     </button>
@@ -194,7 +216,7 @@ export default function ComplianceCenter() {
             </header>
 
             {activeTab === 'documents' && (
-                <>
+                <div role="tabpanel" id="panel-documents" aria-labelledby="tab-documents">
                     <div style={{ display: 'flex', gap: '8px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px', marginBottom: '20px', width: 'fit-content' }}>
                         <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={getAllAlerts().length} />
                         <FilterButton active={filter === 'missing'} onClick={() => setFilter('missing')} label="Missing" color="var(--danger)" />
@@ -204,13 +226,14 @@ export default function ComplianceCenter() {
 
                     <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <caption className="sr-only">Document compliance alerts</caption>
                             <thead>
                                 <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th style={{ padding: '16px' }}>Vessel</th>
-                                    <th style={{ padding: '16px' }}>Document Type</th>
-                                    <th style={{ padding: '16px' }}>Alert Type</th>
-                                    <th style={{ padding: '16px' }}>Details / Date</th>
-                                    <th style={{ padding: '16px', textAlign: 'right' }}>Severity</th>
+                                    <th scope="col" style={{ padding: '16px' }}>Vessel</th>
+                                    <th scope="col" style={{ padding: '16px' }}>Document Type</th>
+                                    <th scope="col" style={{ padding: '16px' }}>Alert Type</th>
+                                    <th scope="col" style={{ padding: '16px' }}>Details / Date</th>
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Severity</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -259,32 +282,33 @@ export default function ComplianceCenter() {
                             </tbody>
                         </table>
                     </div>
-                </>
+                </div>
             )}
 
             {activeTab === 'sanctions' && (() => {
                 console.log('ComplianceCenter: Rendering sanctions tab', { pendingResults: pendingResults.length, checkLogs: checkLogs.length })
                 return (
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+                    <div role="tabpanel" id="panel-sanctions" aria-labelledby="tab-sanctions" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
                         {/* Pending Reviews */}
                         <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <ShieldAlert size={20} color="#ffc107" />
                                 <h3 style={{ margin: 0 }}>Pending Review</h3>
-                                {pendingResults.length > 0 && (
+                                {resultsTotal > 0 && (
                                     <span style={{ background: 'rgba(255, 193, 7, 0.2)', color: '#ffc107', padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem', marginLeft: 'auto' }}>
-                                        {pendingResults.length} pending
+                                        {resultsTotal} pending
                                     </span>
                                 )}
                             </div>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <caption className="sr-only">Pending sanctions reviews</caption>
                                 <thead>
                                     <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                        <th style={{ padding: '12px 16px' }}>Name</th>
-                                        <th style={{ padding: '12px 16px' }}>Type</th>
-                                        <th style={{ padding: '12px 16px' }}>Match Score</th>
-                                        <th style={{ padding: '12px 16px' }}>Date</th>
-                                        <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                                        <th scope="col" style={{ padding: '12px 16px' }}>Name</th>
+                                        <th scope="col" style={{ padding: '12px 16px' }}>Type</th>
+                                        <th scope="col" style={{ padding: '12px 16px' }}>Match Score</th>
+                                        <th scope="col" style={{ padding: '12px 16px' }}>Date</th>
+                                        <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -319,6 +343,7 @@ export default function ComplianceCenter() {
                                                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                                         <button
                                                             onClick={() => setExpandedResult(expandedResult === result.id ? null : result.id)}
+                                                            aria-expanded={expandedResult === result.id}
                                                             style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
                                                         >
                                                             <Eye size={14} />
@@ -379,6 +404,25 @@ export default function ComplianceCenter() {
                                     )}
                                 </tbody>
                             </table>
+                            {resultsTotalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--table-border)' }}>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                        Showing {((resultsPage - 1) * resultsLimit) + 1} to {Math.min(resultsPage * resultsLimit, resultsTotal)} of {resultsTotal} results
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <button className="btn-secondary" disabled={resultsPage === 1} onClick={() => setResultsPage(1)} style={{ padding: '6px' }} aria-label="First page"><ChevronsLeft size={16} /></button>
+                                        <button className="btn-secondary" disabled={resultsPage === 1} onClick={() => setResultsPage(p => Math.max(1, p - 1))} style={{ padding: '6px' }} aria-label="Previous page"><ChevronLeft size={16} /></button>
+                                        <span style={{ margin: '0 8px', fontSize: '0.9rem' }}>Page {resultsPage} of {resultsTotalPages}</span>
+                                        <button className="btn-secondary" disabled={resultsPage === resultsTotalPages} onClick={() => setResultsPage(p => Math.min(resultsTotalPages, p + 1))} style={{ padding: '6px' }} aria-label="Next page"><ChevronRight size={16} /></button>
+                                        <button className="btn-secondary" disabled={resultsPage === resultsTotalPages} onClick={() => setResultsPage(resultsTotalPages)} style={{ padding: '6px' }} aria-label="Last page"><ChevronsRight size={16} /></button>
+                                        <select value={resultsLimit} onChange={(e) => setResultsLimit(Number(e.target.value))} style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }} aria-label="Results per page">
+                                            <option value="10">10 / page</option>
+                                            <option value="25">25 / page</option>
+                                            <option value="50">50 / page</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Recent Check History */}

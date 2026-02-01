@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -20,7 +20,17 @@ export class MySQLAdapter {
     }
 
     async connect(): Promise<boolean> {
-        if (this.pool) return true
+        // If pool exists, verify it's still healthy
+        if (this.pool) {
+            try {
+                const conn = await this.pool.getConnection()
+                conn.release()
+                return true
+            } catch {
+                console.warn('DB pool unhealthy, reconnecting...')
+                await this.destroyPool()
+            }
+        }
 
         if (!this.configPath || !existsSync(this.configPath)) {
             return false
@@ -40,11 +50,24 @@ export class MySQLAdapter {
                 dateStrings: true
             })
 
-            await this.pool.getConnection()
+            const conn = await this.pool.getConnection()
+            conn.release()
             return true
         } catch (error) {
             console.error('Failed to connect to MySQL:', error)
+            this.pool = null
             return false
+        }
+    }
+
+    private async destroyPool(): Promise<void> {
+        if (this.pool) {
+            try {
+                await this.pool.end()
+            } catch {
+                // Ignore errors during cleanup
+            }
+            this.pool = null
         }
     }
 
@@ -306,6 +329,36 @@ export class MySQLAdapter {
             if (!resultColNames.includes('decision')) {
                 await this.pool.query("ALTER TABLE compliance_check_results ADD COLUMN decision VARCHAR(20) AFTER status")
             }
+
+            // Create vessel reminder snoozes table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_reminder_snoozes (
+                vessel_id VARCHAR(36) NOT NULL,
+                snoozed_at DATETIME NOT NULL,
+                snoozed_by VARCHAR(100) NOT NULL,
+                snooze_until DATETIME NOT NULL,
+                PRIMARY KEY (vessel_id),
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE
+            )`)
+
+            // Add performance indexes (idempotent)
+            const addIndexIfNotExists = async (table: string, indexName: string, columns: string): Promise<void> => {
+                const [rows]: any[] = await this.pool!.query(
+                    `SELECT COUNT(1) as cnt FROM INFORMATION_SCHEMA.STATISTICS WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`,
+                    [table, indexName]
+                )
+                if (rows[0].cnt === 0) {
+                    await this.pool!.query(`CREATE INDEX \`${indexName}\` ON \`${table}\` (${columns})`)
+                }
+            }
+
+            await addIndexIfNotExists('vessels', 'idx_vessels_imo', 'imo_number')
+            await addIndexIfNotExists('vessels', 'idx_vessels_fleet', 'fleet_id')
+            await addIndexIfNotExists('vessels', 'idx_vessels_active', 'is_active')
+            await addIndexIfNotExists('vessel_documents', 'idx_vdocs_vessel_doctype', 'vessel_id, document_type_id')
+            await addIndexIfNotExists('vessel_assureds', 'idx_vassureds_vessel', 'vessel_id')
+            await addIndexIfNotExists('vessel_assureds', 'idx_vassureds_entity', 'entity_id')
+            await addIndexIfNotExists('entities', 'idx_entities_name', 'name')
+            await addIndexIfNotExists('entities', 'idx_entities_type', 'type')
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -619,6 +672,60 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
     }
 
+    async getEntitiesPaginated(params: EntityQueryParams): Promise<PaginatedResult<Entity>> {
+        if (!this.pool) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
+
+        const { page = 1, limit = 10, search, type, ofacStatus, sortField = 'name', sortOrder = 'asc' } = params
+        const offset = (page - 1) * limit
+
+        let query = 'SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, certificate_of_incorporation_path as certificateOfIncorporationPath, articles_of_association_path as articlesOfAssociationPath, kyc_file_path as kycFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM entities'
+        let countQuery = 'SELECT COUNT(*) as total FROM entities'
+        const conditions: string[] = []
+        const values: any[] = []
+
+        if (search) {
+            conditions.push('(name LIKE ? OR identifier LIKE ?)')
+            values.push(`%${search}%`, `%${search}%`)
+        }
+
+        if (type && type !== 'all') {
+            conditions.push('type = ?')
+            values.push(type)
+        }
+
+        if (ofacStatus && ofacStatus !== 'all') {
+            if (ofacStatus === 'PENDING') {
+                conditions.push("(ofac_status = 'PENDING' OR ofac_status IS NULL)")
+            } else {
+                conditions.push('ofac_status = ?')
+                values.push(ofacStatus)
+            }
+        }
+
+        if (conditions.length > 0) {
+            const whereClause = ' WHERE ' + conditions.join(' AND ')
+            query += whereClause
+            countQuery += whereClause
+        }
+
+        const allowedSortFields: Record<string, string> = { 'name': 'name', 'type': 'type' }
+        const dbSortField = allowedSortFields[sortField] || 'name'
+        const dbSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC'
+
+        query += ` ORDER BY ${dbSortField} ${dbSortOrder}`
+        query += ' LIMIT ? OFFSET ?'
+        values.push(limit, offset)
+
+        const countValues = values.slice(0, values.length - 2)
+        const [countResult] = await this.pool.query(countQuery, countValues)
+        const total = (countResult as any[])[0].total
+
+        const [rows] = await this.pool.query(query, values)
+        const data = (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
+
+        return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+    }
+
     async addEntity(entity: Omit<Entity, 'id'>): Promise<Entity> {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
@@ -919,6 +1026,51 @@ export class MySQLAdapter {
              FROM surveyors ORDER BY company_name ASC`
         )
         return rows as Surveyor[]
+    }
+
+    async getSurveyorsPaginated(params: SurveyorQueryParams): Promise<PaginatedResult<Surveyor>> {
+        if (!this.pool) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
+
+        const { page = 1, limit = 10, search, country, sortField = 'companyName', sortOrder = 'asc' } = params
+        const offset = (page - 1) * limit
+
+        let query = `SELECT id, company_name as companyName, country, contact_person as contactPerson,
+             contact_details as contactDetails, notes, created_at as createdAt FROM surveyors`
+        let countQuery = 'SELECT COUNT(*) as total FROM surveyors'
+        const conditions: string[] = []
+        const values: any[] = []
+
+        if (search) {
+            conditions.push('(company_name LIKE ? OR country LIKE ? OR contact_person LIKE ?)')
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`)
+        }
+
+        if (country) {
+            conditions.push('country = ?')
+            values.push(country)
+        }
+
+        if (conditions.length > 0) {
+            const whereClause = ' WHERE ' + conditions.join(' AND ')
+            query += whereClause
+            countQuery += whereClause
+        }
+
+        const allowedSortFields: Record<string, string> = { 'companyName': 'company_name', 'country': 'country' }
+        const dbSortField = allowedSortFields[sortField] || 'company_name'
+        const dbSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC'
+
+        query += ` ORDER BY ${dbSortField} ${dbSortOrder}`
+        query += ' LIMIT ? OFFSET ?'
+        values.push(limit, offset)
+
+        const countValues = values.slice(0, values.length - 2)
+        const [countResult] = await this.pool.query(countQuery, countValues)
+        const total = (countResult as any[])[0].total
+
+        const [rows] = await this.pool.query(query, values)
+
+        return { data: rows as Surveyor[], total, page, limit, totalPages: Math.ceil(total / limit) }
     }
 
     async addSurveyor(surveyor: Omit<Surveyor, 'id'>): Promise<Surveyor> {
@@ -1268,6 +1420,52 @@ export class MySQLAdapter {
         return rows as any[]
     }
 
+    async getComplianceCheckResultsPaginated(params: ComplianceResultQueryParams): Promise<PaginatedResult<any>> {
+        if (!this.pool) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
+
+        const { page = 1, limit = 10, logId, status, entityType, sortField = 'matchScore', sortOrder = 'desc' } = params
+        const offset = (page - 1) * limit
+
+        let query = `SELECT r.id, r.log_id as logId, r.entity_type as entityType, r.entity_id as entityId,
+                   r.entity_name as entityName, r.match_score as matchScore, r.match_details as matchDetails,
+                   r.status, r.decision, r.reviewed_by as reviewedBy, r.reviewed_at as reviewedAt, r.created_at as createdAt
+                   FROM compliance_check_results r
+                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
+        let countQuery = `SELECT COUNT(*) as total FROM compliance_check_results r
+                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
+        const conditions: string[] = []
+        const values: any[] = []
+
+        // Filter out results for inactive vessels
+        conditions.push("(r.entity_type != 'vessel' OR v.is_active = 1 OR v.id IS NULL)")
+
+        if (logId) { conditions.push('r.log_id = ?'); values.push(logId) }
+        if (status && status !== 'all') { conditions.push('r.status = ?'); values.push(status) }
+        if (entityType && entityType !== 'all') { conditions.push('r.entity_type = ?'); values.push(entityType) }
+
+        if (conditions.length > 0) {
+            const whereClause = ' WHERE ' + conditions.join(' AND ')
+            query += whereClause
+            countQuery += whereClause
+        }
+
+        const allowedSortFields: Record<string, string> = { 'matchScore': 'r.match_score', 'createdAt': 'r.created_at', 'entityName': 'r.entity_name' }
+        const dbSortField = allowedSortFields[sortField] || 'r.match_score'
+        const dbSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC'
+
+        query += ` ORDER BY ${dbSortField} ${dbSortOrder}`
+        query += ' LIMIT ? OFFSET ?'
+        values.push(limit, offset)
+
+        const countValues = values.slice(0, values.length - 2)
+        const [countResult] = await this.pool.query(countQuery, countValues)
+        const total = (countResult as any[])[0].total
+
+        const [rows] = await this.pool.query(query, values)
+
+        return { data: rows as any[], total, page, limit, totalPages: Math.ceil(total / limit) }
+    }
+
     async getPendingComplianceResults(): Promise<any[]> {
         return this.getComplianceCheckResults(undefined, 'pending_review')
     }
@@ -1321,6 +1519,180 @@ export class MySQLAdapter {
                     [entityId]
                 )
             }
+        }
+    }
+    // --- Reminder Settings ---
+    async getReminderSettings(): Promise<ReminderSettings> {
+        const defaultTemplate = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
+        const defaults: ReminderSettings = { periodDays: 7, reminderTemplate: defaultTemplate }
+        const settingValue = await this.getSetting('reminder_settings')
+        if (!settingValue) return defaults
+        try {
+            return { ...defaults, ...JSON.parse(settingValue) }
+        } catch {
+            return defaults
+        }
+    }
+
+    async setReminderSettings(settings: ReminderSettings): Promise<void> {
+        await this.setSetting('reminder_settings', JSON.stringify(settings))
+    }
+
+    async getVesselReminders(): Promise<VesselReminder[]> {
+        if (!this.pool) return []
+
+        // Get all active vessels with fleet info
+        const [vessels]: any[] = await this.pool.query(
+            `SELECT v.id, v.name, v.imo_number, v.fleet_id, f.name as fleet_name
+             FROM vessels v
+             LEFT JOIN fleets f ON v.fleet_id = f.id
+             WHERE v.is_active = 1
+             ORDER BY v.name`
+        )
+
+        // Get all required document types
+        const [docTypes]: any[] = await this.pool.query(
+            'SELECT id, name FROM document_types WHERE required = 1'
+        )
+
+        // Get all vessel documents
+        const [vesselDocs]: any[] = await this.pool.query(
+            'SELECT vessel_id, document_type_id, file_path, expiry_date FROM vessel_documents'
+        )
+
+        // Get all vessel assureds with entity info and role names
+        const [assureds]: any[] = await this.pool.query(
+            `SELECT va.id as assured_id, va.vessel_id, va.entity_id, va.role as role_name,
+                    e.name as entity_name, e.type as entity_type,
+                    e.passport_file_path, e.certificate_of_incorporation_path,
+                    e.articles_of_association_path, e.kyc_file_path
+             FROM vessel_assureds va
+             JOIN entities e ON va.entity_id = e.id`
+        )
+
+        // Get active snoozes
+        const [snoozes]: any[] = await this.pool.query(
+            'SELECT vessel_id, snoozed_at, snoozed_by, snooze_until FROM vessel_reminder_snoozes WHERE snooze_until > NOW()'
+        )
+
+        const snoozeMap = new Map<string, { snoozedBy: string; snoozeUntil: string }>()
+        for (const s of snoozes) {
+            snoozeMap.set(s.vessel_id, { snoozedBy: s.snoozed_by, snoozeUntil: s.snooze_until })
+        }
+
+        // Build doc map: vesselId -> docTypeId -> { filePath, expiryDate }
+        const docMap = new Map<string, Map<string, { filePath: string; expiryDate: string | null }>>()
+        for (const d of vesselDocs) {
+            if (!docMap.has(d.vessel_id)) docMap.set(d.vessel_id, new Map())
+            docMap.get(d.vessel_id)!.set(d.document_type_id, {
+                filePath: d.file_path || '',
+                expiryDate: d.expiry_date
+            })
+        }
+
+        // Build assured map: vesselId -> assured[]
+        const assuredMap = new Map<string, any[]>()
+        for (const a of assureds) {
+            if (!assuredMap.has(a.vessel_id)) assuredMap.set(a.vessel_id, [])
+            assuredMap.get(a.vessel_id)!.push(a)
+        }
+
+        const now = new Date()
+        const reminders: VesselReminder[] = []
+
+        for (const vessel of vessels) {
+            const missingVesselDocs: { docTypeName: string; status: 'missing' | 'expired'; expiryDate?: string }[] = []
+            const vesselDocMap = docMap.get(vessel.id) || new Map()
+
+            // Check required vessel documents
+            for (const dt of docTypes) {
+                const doc = vesselDocMap.get(dt.id)
+                if (!doc || !doc.filePath) {
+                    missingVesselDocs.push({ docTypeName: dt.name, status: 'missing' })
+                } else if (doc.expiryDate && new Date(doc.expiryDate) < now) {
+                    missingVesselDocs.push({ docTypeName: dt.name, status: 'expired', expiryDate: doc.expiryDate })
+                }
+            }
+
+            // Check assured entity documents
+            const assuredAlerts: AssuredDocAlert[] = []
+            const vesselAssureds = assuredMap.get(vessel.id) || []
+
+            for (const a of vesselAssureds) {
+                const missing: string[] = []
+
+                if (a.entity_type === 'person') {
+                    if (!a.passport_file_path) missing.push('ID/Passport')
+                } else {
+                    // company
+                    if (!a.certificate_of_incorporation_path) missing.push('Certificate of Incorporation')
+                    if (!a.articles_of_association_path) missing.push('Articles of Association')
+                    if (!a.kyc_file_path) missing.push('KYC')
+                }
+
+                if (missing.length > 0) {
+                    assuredAlerts.push({
+                        assuredId: a.assured_id,
+                        entityId: a.entity_id,
+                        entityName: a.entity_name,
+                        roleName: a.role_name,
+                        entityType: a.entity_type,
+                        missingDocs: missing
+                    })
+                }
+            }
+
+            const totalIssues = missingVesselDocs.length + assuredAlerts.reduce((sum, a) => sum + a.missingDocs.length, 0)
+
+            if (totalIssues > 0) {
+                const snooze = snoozeMap.get(vessel.id)
+                reminders.push({
+                    vesselId: vessel.id,
+                    vesselName: vessel.name,
+                    imoNumber: vessel.imo_number,
+                    fleetId: vessel.fleet_id || null,
+                    fleetName: vessel.fleet_name || null,
+                    missingVesselDocs,
+                    assuredAlerts,
+                    isSnoozed: !!snooze,
+                    snoozeUntil: snooze?.snoozeUntil,
+                    snoozedBy: snooze?.snoozedBy,
+                    totalIssues
+                })
+            }
+        }
+
+        return reminders
+    }
+
+    async snoozeVessel(vesselId: string, username: string, periodDays: number): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            `INSERT INTO vessel_reminder_snoozes (vessel_id, snoozed_at, snoozed_by, snooze_until)
+             VALUES (?, NOW(), ?, DATE_ADD(NOW(), INTERVAL ? DAY))
+             ON DUPLICATE KEY UPDATE snoozed_at = NOW(), snoozed_by = ?, snooze_until = DATE_ADD(NOW(), INTERVAL ? DAY)`,
+            [vesselId, username, periodDays, username, periodDays]
+        )
+    }
+
+    async unsnoozeVessel(vesselId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM vessel_reminder_snoozes WHERE vessel_id = ?', [vesselId])
+    }
+
+    async autoSnoozeVessel(vesselId: string): Promise<void> {
+        const settings = await this.getReminderSettings()
+        await this.snoozeVessel(vesselId, 'system', settings.periodDays)
+    }
+
+    async autoSnoozeVesselsForEntity(entityId: string): Promise<void> {
+        if (!this.pool) return
+        const [rows]: any[] = await this.pool.query(
+            'SELECT DISTINCT vessel_id FROM vessel_assureds WHERE entity_id = ?',
+            [entityId]
+        )
+        for (const row of rows) {
+            await this.autoSnoozeVessel(row.vessel_id)
         }
     }
 }

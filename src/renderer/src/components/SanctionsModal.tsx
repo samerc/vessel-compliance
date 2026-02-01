@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { X, AlertTriangle, Shield, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
@@ -13,6 +14,42 @@ interface SanctionsModalProps {
 export default function SanctionsModal({ searchedName, matches, onClose, onMarkClean, onConfirmMatch }: SanctionsModalProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light'
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const modal = modalRef.current
+    if (!modal) return
+
+    const focusable = modal.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    first?.focus()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key === 'Tab') {
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault()
+            last?.focus()
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault()
+            first?.focus()
+          }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
 
   const getSourceLabel = (source: string) => {
     switch (source.toLowerCase()) {
@@ -34,6 +71,7 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
 
   return (
     <div
+      role="presentation"
       style={{
         position: 'fixed',
         top: 0,
@@ -50,6 +88,10 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
       onClick={onClose}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sanctions-modal-title"
         className="glass-card"
         style={{
           width: '90%',
@@ -78,13 +120,14 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
         >
           <AlertTriangle size={24} color="#ffc107" />
           <div style={{ flex: 1 }}>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', color: isLight ? '#1a1a1a' : '#ffffff' }}>Potential Sanctions Match</h2>
+            <h2 id="sanctions-modal-title" style={{ margin: 0, fontSize: '1.25rem', color: isLight ? '#1a1a1a' : '#ffffff' }}>Potential Sanctions Match</h2>
             <p style={{ margin: 0, fontSize: '0.85rem', color: isLight ? '#666' : 'var(--text-secondary)' }}>
               Searched: <strong>{searchedName}</strong>
             </p>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255, 255, 255, 0.1)',
               border: 'none',

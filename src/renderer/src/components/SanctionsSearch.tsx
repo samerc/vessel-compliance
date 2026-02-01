@@ -118,6 +118,7 @@ export default function SanctionsSearch() {
                                     padding: '12px 12px 12px 48px',
                                     fontSize: '1rem'
                                 }}
+                                aria-label="Entity name search"
                             />
                         </div>
                         <button
@@ -149,6 +150,7 @@ export default function SanctionsSearch() {
                                 value={threshold}
                                 onChange={(e) => handleThresholdChange(parseInt(e.target.value))}
                                 style={{ width: '100%', height: '6px', cursor: 'pointer' }}
+                                aria-label="Minimum match threshold"
                             />
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                                 <span>Broader (10%)</span>
@@ -190,7 +192,7 @@ export default function SanctionsSearch() {
 
             {/* Errors */}
             {error && (
-                <div style={{
+                <div role="alert" aria-live="polite" style={{
                     padding: '16px',
                     background: 'rgba(255, 77, 77, 0.1)',
                     border: '1px solid rgba(255, 77, 77, 0.3)',

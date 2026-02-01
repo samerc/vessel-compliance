@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Activity, AlertTriangle, CheckCircle, Clock, ShieldAlert, AlertCircle, Ship } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType } from '../../../shared/types'
 
@@ -25,70 +25,82 @@ export default function Dashboard({ onViewAlerts }: { onViewAlerts: () => void }
         setFleets(fData)
     }
 
-    // Calculate alerts centrally
-    const getDashboardAlerts = (targetVessels: Vessel[]) => {
+    // O(1) doc lookup map keyed by "vesselId:docTypeId"
+    const docMap = useMemo(() => {
+        const map = new Map<string, VesselDocument>()
+        for (const d of docs) {
+            map.set(`${d.vesselId}:${d.documentTypeId}`, d)
+        }
+        return map
+    }, [docs])
+
+    // Compute all alerts once with O(1) lookups
+    const allAlerts = useMemo(() => {
         const today = new Date()
         const thirtyDaysFromNow = new Date()
         thirtyDaysFromNow.setDate(today.getDate() + 30)
+        const alerts: { vessel: string; vesselId: string; fleetId: string | undefined; document: string; msg: string; type: string }[] = []
 
-        const alerts: any[] = []
-
-        targetVessels.forEach(v => {
-            docTypes.forEach(t => {
-                const doc = docs.find(d => d.vesselId === v.id && d.documentTypeId === t.id)
+        for (const v of vessels) {
+            for (const t of docTypes) {
+                const doc = docMap.get(`${v.id}:${t.id}`)
                 const isRequired = doc ? doc.required : t.required
                 const hasFile = !!doc?.filePath
 
                 if (isRequired && !hasFile) {
-                    alerts.push({ vessel: v.name, document: t.name, msg: 'Missing File', type: 'missing' })
+                    alerts.push({ vessel: v.name, vesselId: v.id, fleetId: v.fleetId, document: t.name, msg: 'Missing File', type: 'missing' })
                 } else if (hasFile && doc?.expiryDate) {
                     const expiry = new Date(doc.expiryDate)
                     if (expiry < today) {
-                        alerts.push({ vessel: v.name, document: t.name, msg: 'Expired', type: 'expired' })
+                        alerts.push({ vessel: v.name, vesselId: v.id, fleetId: v.fleetId, document: t.name, msg: 'Expired', type: 'expired' })
                     } else if (expiry < thirtyDaysFromNow) {
-                        alerts.push({ vessel: v.name, document: t.name, msg: 'Expiring Soon', type: 'soon' })
+                        alerts.push({ vessel: v.name, vesselId: v.id, fleetId: v.fleetId, document: t.name, msg: 'Expiring Soon', type: 'soon' })
                     }
                 }
-            })
-        })
-        return alerts
-    }
-
-    const allAlerts = getDashboardAlerts(vessels)
-    const missingCount = allAlerts.filter(a => a.type === 'missing').length
-    const expiredCount = allAlerts.filter(a => a.type === 'expired').length
-
-    const getComplianceRate = (targetVessels: Vessel[]) => {
-        if (targetVessels.length === 0 || docTypes.length === 0) return 100
-        const alerts = getDashboardAlerts(targetVessels)
-        const criticalCount = alerts.filter(a => a.type === 'missing' || a.type === 'expired').length
-        return Math.round((((targetVessels.length * docTypes.length) - criticalCount) / (targetVessels.length * docTypes.length)) * 100)
-    }
-
-    const globalCompliance = getComplianceRate(vessels)
-
-    const fleetMetrics = [
-        ...fleets.map(f => {
-            const fleetVessels = vessels.filter(v => v.fleetId === f.id)
-            const alerts = getDashboardAlerts(fleetVessels)
-            return {
-                id: f.id,
-                name: f.name,
-                vessels: fleetVessels.length,
-                compliance: getComplianceRate(fleetVessels),
-                alerts: alerts.length,
-                critical: alerts.filter(a => a.type === 'missing' || a.type === 'expired').length
             }
-        }),
-        {
-            id: 'unassigned',
-            name: 'Unassigned Vessels',
-            vessels: vessels.filter(v => !v.fleetId).length,
-            compliance: getComplianceRate(vessels.filter(v => !v.fleetId)),
-            alerts: getDashboardAlerts(vessels.filter(v => !v.fleetId)).length,
-            critical: getDashboardAlerts(vessels.filter(v => !v.fleetId)).filter(a => a.type === 'missing' || a.type === 'expired').length
         }
-    ].filter(m => m.vessels > 0)
+        return alerts
+    }, [vessels, docTypes, docMap])
+
+    const missingCount = useMemo(() => allAlerts.filter(a => a.type === 'missing').length, [allAlerts])
+    const expiredCount = useMemo(() => allAlerts.filter(a => a.type === 'expired').length, [allAlerts])
+
+    const globalCompliance = useMemo(() => {
+        if (vessels.length === 0 || docTypes.length === 0) return 100
+        const criticalCount = allAlerts.filter(a => a.type === 'missing' || a.type === 'expired').length
+        const total = vessels.length * docTypes.length
+        return Math.round(((total - criticalCount) / total) * 100)
+    }, [vessels, docTypes, allAlerts])
+
+    const fleetMetrics = useMemo(() => {
+        const getMetrics = (id: string, name: string, vesselCount: number, fleetAlerts: typeof allAlerts) => {
+            const critical = fleetAlerts.filter(a => a.type === 'missing' || a.type === 'expired').length
+            const total = vesselCount * docTypes.length
+            return {
+                id,
+                name,
+                vessels: vesselCount,
+                compliance: total === 0 ? 100 : Math.round(((total - critical) / total) * 100),
+                alerts: fleetAlerts.length,
+                critical
+            }
+        }
+
+        const results = fleets.map(f => {
+            const fleetVesselIds = new Set(vessels.filter(v => v.fleetId === f.id).map(v => v.id))
+            const fleetAlerts = allAlerts.filter(a => fleetVesselIds.has(a.vesselId))
+            return getMetrics(f.id, f.name, fleetVesselIds.size, fleetAlerts)
+        })
+
+        const unassignedVessels = vessels.filter(v => !v.fleetId)
+        if (unassignedVessels.length > 0) {
+            const unassignedIds = new Set(unassignedVessels.map(v => v.id))
+            const unassignedAlerts = allAlerts.filter(a => unassignedIds.has(a.vesselId))
+            results.push(getMetrics('unassigned', 'Unassigned Vessels', unassignedVessels.length, unassignedAlerts))
+        }
+
+        return results.filter(m => m.vessels > 0)
+    }, [fleets, vessels, docTypes, allAlerts])
 
     return (
         <div className="fade-in">
@@ -169,7 +181,7 @@ function StatCard({ icon, label, value, trend }: any) {
     return (
         <div className="glass-card" style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                {icon}
+                <div aria-hidden="true">{icon}</div>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{trend}</span>
             </div>
             <div style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '4px' }}>{value}</div>
@@ -184,7 +196,7 @@ function ActivityItem({ vessel, action, danger, color }: any) {
             <div>
                 <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{vessel}</div>
                 <div style={{ fontSize: '0.85rem', color: color || 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {danger ? <AlertCircle size={14} /> : <Clock size={14} />}
+                    {danger ? <AlertCircle size={14} aria-hidden="true" /> : <Clock size={14} aria-hidden="true" />}
                     {action}
                 </div>
             </div>

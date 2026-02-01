@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { Search, User, Ship, ChevronRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
-import { Entity, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
+import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
+import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
+
+function useDebounceValue<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value)
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedValue(value), delay)
+        return () => clearTimeout(handler)
+    }, [value, delay])
+    return debouncedValue
+}
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -17,6 +26,19 @@ export default function EntityDirectory() {
     const { theme } = useTheme()
     const isLight = theme === 'light'
 
+    // Pagination state
+    const [page, setPage] = useState(1)
+    const [limit, setLimit] = useState(10)
+    const [total, setTotal] = useState(0)
+    const [totalPages, setTotalPages] = useState(0)
+    const [isLoading, setIsLoading] = useState(false)
+
+    // Filter state
+    const [typeFilter, setTypeFilter] = useState<'all' | 'company' | 'person'>('all')
+    const [ofacStatusFilter, setOfacStatusFilter] = useState<string>('all')
+
+    const debouncedSearch = useDebounceValue(searchTerm, 500)
+
     // Sanctions checking state
     const [checkingId, setCheckingId] = useState<string | null>(null)
 
@@ -29,26 +51,44 @@ export default function EntityDirectory() {
         vesselId?: string
     }>({ show: false, searchedName: '', matches: [] })
 
-    useEffect(() => {
-        loadData()
-    }, [])
-
     const loadData = async () => {
-        const [e, v, va, eu] = await Promise.all([
-            window.api.getEntities(),
-            window.api.getVessels(),
-            window.api.getVesselAssureds(),
-            window.api.getEntityUBOs()
-        ])
-        setEntities(e)
-        setVessels(v)
-        setVesselAssureds(va)
-        setEntityUBOs(eu)
+        setIsLoading(true)
+        try {
+            const [result, v, va, eu] = await Promise.all([
+                window.api.getEntitiesPaginated({
+                    page,
+                    limit,
+                    search: debouncedSearch,
+                    type: typeFilter,
+                    ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus']
+                }),
+                window.api.getVessels(),
+                window.api.getVesselAssureds(),
+                window.api.getEntityUBOs()
+            ])
+            setEntities(result.data)
+            setTotal(result.total)
+            setTotalPages(result.totalPages)
+            setVessels(v)
+            setVesselAssureds(va)
+            setEntityUBOs(eu)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
-    const filteredEntities = entities.filter(e =>
-        e.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    useEffect(() => { loadData() }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter])
+    useEffect(() => { setPage(1) }, [debouncedSearch, typeFilter, ofacStatusFilter, limit])
+
+    // Clear selected entity on page change (but not initial load)
+    const [hasInitialized, setHasInitialized] = useState(false)
+    useEffect(() => {
+        if (hasInitialized) {
+            setSelectedEntity(null)
+        } else {
+            setHasInitialized(true)
+        }
+    }, [page])
 
     const getAssociatedVessels = (entityId: string) => {
         // 1. Check direct assured roles
@@ -281,7 +321,7 @@ export default function EntityDirectory() {
             <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '32px', alignItems: 'start' }}>
                 {/* Left Side: Search & List */}
                 <div className="glass-card" style={{ padding: '0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 200px)' }}>
-                    <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ position: 'relative' }}>
                             <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={18} />
                             <input
@@ -289,6 +329,7 @@ export default function EntityDirectory() {
                                 placeholder="Search names..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
+                                aria-label="Search entities by name"
                                 style={{
                                     width: '100%',
                                     background: 'rgba(255,255,255,0.05)',
@@ -299,9 +340,23 @@ export default function EntityDirectory() {
                                 }}
                             />
                         </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--table-header-bg)', color: 'var(--text-primary)', fontSize: '0.9rem' }} aria-label="Filter by entity type">
+                                <option value="all">All Types</option>
+                                <option value="company">Companies</option>
+                                <option value="person">Persons</option>
+                            </select>
+                            <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--table-header-bg)', color: 'var(--text-primary)', fontSize: '0.9rem' }} aria-label="Filter by sanctions status">
+                                <option value="all">All Statuses</option>
+                                <option value="CLEARED">Cleared</option>
+                                <option value="POTENTIAL_MATCH">Potential Match</option>
+                                <option value="MATCH">Match</option>
+                                <option value="PENDING">Pending</option>
+                            </select>
+                        </div>
                     </div>
                     <div style={{ overflowY: 'auto' }}>
-                        {filteredEntities.map(entity => (
+                        {entities.map(entity => (
                             <div
                                 key={entity.id}
                                 onClick={() => setSelectedEntity(entity)}
@@ -343,6 +398,26 @@ export default function EntityDirectory() {
                             </div>
                         ))}
                     </div>
+                    {!isLoading && totalPages > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--table-border)' }}>
+                            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total} entities
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(1)} style={{ padding: '6px' }} aria-label="First page"><ChevronsLeft size={16} /></button>
+                                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '6px' }} aria-label="Previous page"><ChevronLeft size={16} /></button>
+                                <span style={{ margin: '0 8px', fontSize: '0.9rem' }}>Page {page} of {totalPages}</span>
+                                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ padding: '6px' }} aria-label="Next page"><ChevronRight size={16} /></button>
+                                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(totalPages)} style={{ padding: '6px' }} aria-label="Last page"><ChevronsRight size={16} /></button>
+                                <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }} aria-label="Entities per page">
+                                    <option value="10">10 / page</option>
+                                    <option value="25">25 / page</option>
+                                    <option value="50">50 / page</option>
+                                    <option value="100">100 / page</option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Side: Details */}

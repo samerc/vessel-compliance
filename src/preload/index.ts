@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
@@ -24,6 +23,7 @@ const api = {
   updateVesselDocumentReceivedDate: (vesselId, docTypeId, receivedDate) => ipcRenderer.invoke('db:updateVesselDocumentReceivedDate', vesselId, docTypeId, receivedDate),
 
   getEntities: () => ipcRenderer.invoke('db:getEntities'),
+  getEntitiesPaginated: (params: any) => ipcRenderer.invoke('db:getEntitiesPaginated', params),
   addEntity: (entity) => ipcRenderer.invoke('db:addEntity', entity),
   updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),
@@ -89,6 +89,7 @@ const api = {
   complianceSetScheduleSettings: (settings) => ipcRenderer.invoke('compliance:setScheduleSettings', settings),
   complianceGetCheckLogs: () => ipcRenderer.invoke('compliance:getCheckLogs'),
   complianceGetCheckResults: (logId?: string, status?: string) => ipcRenderer.invoke('compliance:getCheckResults', logId, status),
+  complianceGetCheckResultsPaginated: (params: any) => ipcRenderer.invoke('compliance:getCheckResultsPaginated', params),
   complianceGetPendingResults: () => ipcRenderer.invoke('compliance:getPendingResults'),
   complianceMarkResultReviewed: (resultId: string) => ipcRenderer.invoke('compliance:markResultReviewed', resultId),
   complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => ipcRenderer.invoke('compliance:decideResult', resultId, decision),
@@ -96,6 +97,7 @@ const api = {
 
   // Surveyors
   getSurveyors: () => ipcRenderer.invoke('db:getSurveyors'),
+  getSurveyorsPaginated: (params: any) => ipcRenderer.invoke('db:getSurveyorsPaginated', params),
   addSurveyor: (surveyor) => ipcRenderer.invoke('db:addSurveyor', surveyor),
   updateSurveyor: (id, updates) => ipcRenderer.invoke('db:updateSurveyor', id, updates),
   deleteSurveyor: (id) => ipcRenderer.invoke('db:deleteSurveyor', id),
@@ -115,22 +117,21 @@ const api = {
   addSurveyAttachment: (attachment) => ipcRenderer.invoke('db:addSurveyAttachment', attachment),
   deleteSurveyAttachment: (id) => ipcRenderer.invoke('db:deleteSurveyAttachment', id),
   getOpenDefectsByVessel: () => ipcRenderer.invoke('db:getOpenDefectsByVessel'),
-  getSurveyHistory: (vesselId) => ipcRenderer.invoke('db:getSurveyHistory', vesselId)
+  getSurveyHistory: (vesselId) => ipcRenderer.invoke('db:getSurveyHistory', vesselId),
+
+  // Reminders
+  remindersGetSettings: () => ipcRenderer.invoke('reminders:getSettings'),
+  remindersSetSettings: (settings: any) => ipcRenderer.invoke('reminders:setSettings', settings),
+  remindersGetVesselReminders: () => ipcRenderer.invoke('reminders:getVesselReminders'),
+  remindersSnoozeVessel: (vesselId: string, username: string, periodDays: number) => ipcRenderer.invoke('reminders:snoozeVessel', vesselId, username, periodDays),
+  remindersUnsnoozeVessel: (vesselId: string) => ipcRenderer.invoke('reminders:unsnoozeVessel', vesselId)
 }
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+// Expose curated API to renderer via context bridge
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
     console.error(error)
   }
-} else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
 }

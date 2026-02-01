@@ -493,6 +493,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                     style={{ width: '100%' }}
                                     placeholder="Type name to find or create..."
                                     required
+                                    aria-label="Entity name"
                                 />
 
                                 {newName && !selectedEntityId && matchingEntities.length > 0 && (
@@ -546,6 +547,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                 onChange={e => setNewIdentifier(e.target.value)}
                                                 style={{ width: '100%' }}
                                                 placeholder="e.g. Greek Branch, ID Number..."
+                                                aria-label="Distinguishing identifier"
                                             />
                                         </div>
                                         <div style={{ width: '140px' }}>
@@ -554,6 +556,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                 value={newType}
                                                 onChange={e => setNewType(e.target.value as any)}
                                                 style={{ width: '100%', color: 'var(--text-primary)' }}
+                                                aria-label="Entity type"
                                             >
                                                 <option value="company">Company</option>
                                                 <option value="person">Person</option>
@@ -569,6 +572,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                 onChange={e => setNewEmail(e.target.value)}
                                                 style={{ width: '100%' }}
                                                 placeholder="contact@entity.com"
+                                                aria-label="Entity email"
                                             />
                                         </div>
                                         <div>
@@ -579,6 +583,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                 onChange={e => setNewPhone(e.target.value)}
                                                 style={{ width: '100%' }}
                                                 placeholder="+123..."
+                                                aria-label="Entity phone"
                                             />
                                         </div>
                                     </div>
@@ -597,6 +602,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                     style={{ width: '100%' }}
                                     placeholder="Select or type role..."
                                     required
+                                    aria-label="Role on vessel"
                                 />
                                 <datalist id="role-suggestions">
                                     {roles.map(r => <option key={r.id} value={r.name} />)}
@@ -653,12 +659,14 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             <button
                                                 onClick={() => setExpandedAssuredId(isExpanded ? null : va.id)}
                                                 style={{ background: 'transparent', color: 'var(--accent-primary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                aria-expanded={isExpanded}
+                                                aria-label="Toggle UBO details"
                                             >
                                                 {ubos.length} UBO(s) {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                             </button>
                                         </td>
                                         <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)' }} title="Remove Assured">
+                                            <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)' }} title="Remove Assured" aria-label="Remove assured">
                                                 <Trash2 size={18} />
                                             </button>
                                         </td>
@@ -755,6 +763,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 onChange={e => { setNewUBOName(e.target.value); setSelectedUBOId(null); }}
                                                                 placeholder="UBO Name..."
                                                                 style={{ width: '100%' }}
+                                                                aria-label="UBO name"
                                                             />
                                                             {newUBOName && !selectedUBOId && matchingUBOs.length > 0 && (
                                                                 <div style={{
@@ -797,6 +806,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     onChange={e => setNewUBOIdentifier(e.target.value)}
                                                                     placeholder="UBO Identifier..."
                                                                     style={{ width: '100%' }}
+                                                                    aria-label="UBO identifier"
                                                                 />
                                                             )}
                                                             {selectedUBOId && <div style={{ padding: '8px', fontSize: '0.8rem', color: 'var(--success)' }}><Check size={14} /> Linked</div>}
@@ -806,6 +816,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 value={newUBOType}
                                                                 onChange={e => setNewUBOType(e.target.value as any)}
                                                                 style={{ width: '100%', color: 'var(--text-primary)' }}
+                                                                aria-label="UBO type"
                                                             >
                                                                 <option value="company">Company</option>
                                                                 <option value="person">Person</option>
@@ -825,6 +836,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 onChange={e => setNewUBOEmail(e.target.value)}
                                                                 placeholder="UBO Email..."
                                                                 style={{ width: '100%' }}
+                                                                aria-label="UBO email"
                                                             />
                                                             <input
                                                                 type="text"
@@ -832,6 +844,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 onChange={e => setNewUBOPhone(e.target.value)}
                                                                 placeholder="UBO Phone..."
                                                                 style={{ width: '100%' }}
+                                                                aria-label="UBO phone"
                                                             />
                                                         </div>
                                                     )}
@@ -926,7 +939,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <button onClick={() => handleDeleteUBO(va.entityId, ubo!.id)} style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px' }} className="hover-danger">
+                                                                <button onClick={() => handleDeleteUBO(va.entityId, ubo!.id)} style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px' }} className="hover-danger" aria-label="Remove UBO">
                                                                     <Trash2 size={12} />
                                                                 </button>
                                                             </div>

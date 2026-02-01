@@ -1,18 +1,49 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react'
-import { Surveyor } from '../../../shared/types'
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
+} from 'lucide-react'
+import { Surveyor, SurveyorQueryParams } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+
+function useDebounceValue<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(handler)
+  }, [value, delay])
+  return debouncedValue
+}
 
 export default function SurveyorDirectory() {
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
-  const [filteredSurveyors, setFilteredSurveyors] = useState<Surveyor[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
-  const [filterCountry, setFilterCountry] = useState('')
+  const [filterCountry, setFilterCountry] = useState('all')
   const [sortBy, setSortBy] = useState<'name' | 'country'>('name')
   const [searchTerm, setSearchTerm] = useState('')
   const { showError, showSuccess } = useToast()
+
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // All countries for dropdown
+  const [allCountries, setAllCountries] = useState<string[]>([])
+
+  const debouncedSearch = useDebounceValue(searchTerm, 500)
 
   // Form state
   const [formCompanyName, setFormCompanyName] = useState('')
@@ -21,52 +52,49 @@ export default function SurveyorDirectory() {
   const [formContactDetails, setFormContactDetails] = useState('')
   const [formNotes, setFormNotes] = useState('')
 
+  // Load all countries on mount
   useEffect(() => {
-    loadSurveyors()
+    window.api.getSurveyors().then((all) => {
+      setAllCountries([...new Set(all.map((s) => s.country).filter(Boolean))].sort())
+    })
   }, [])
 
+  // Load surveyors when pagination/filter params change
   useEffect(() => {
-    filterAndSortSurveyors()
-  }, [surveyors, filterCountry, sortBy, searchTerm])
+    loadSurveyors()
+  }, [page, limit, debouncedSearch, filterCountry, sortBy])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, filterCountry, sortBy, limit])
 
   const loadSurveyors = async () => {
-    const data = await window.api.getSurveyors()
-    setSurveyors(data)
-  }
-
-  const filterAndSortSurveyors = () => {
-    let filtered = [...surveyors]
-
-    // Filter by country
-    if (filterCountry) {
-      filtered = filtered.filter(s => s.country === filterCountry)
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(s =>
-        s.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.contactDetails?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      if (sortBy === 'name') {
-        return a.companyName.localeCompare(b.companyName)
-      } else {
-        return a.country.localeCompare(b.country) || a.companyName.localeCompare(b.companyName)
+    setIsLoading(true)
+    try {
+      const params: SurveyorQueryParams = {
+        page,
+        limit,
+        search: debouncedSearch || undefined,
+        country: filterCountry !== 'all' ? filterCountry : undefined,
+        sortField: sortBy === 'name' ? 'companyName' : 'country',
+        sortOrder: 'asc'
       }
-    })
-
-    setFilteredSurveyors(filtered)
+      const result = await window.api.getSurveyorsPaginated(params)
+      setSurveyors(result.data)
+      setTotal(result.total)
+      setTotalPages(result.totalPages)
+    } catch (error: any) {
+      showError(error.message || 'Failed to load surveyors')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const getUniqueCountries = () => {
-    const countries = surveyors.map(s => s.country)
-    return Array.from(new Set(countries)).sort()
+  const reloadCountries = () => {
+    window.api.getSurveyors().then((all) => {
+      setAllCountries([...new Set(all.map((s) => s.country).filter(Boolean))].sort())
+    })
   }
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -87,6 +115,7 @@ export default function SurveyorDirectory() {
       setShowAddForm(false)
       showSuccess('Surveyor added successfully')
       loadSurveyors()
+      reloadCountries()
     } catch (error: any) {
       showError(error.message || 'Failed to add surveyor. Please try again.')
     } finally {
@@ -119,6 +148,7 @@ export default function SurveyorDirectory() {
       setEditingId(null)
       showSuccess('Surveyor updated successfully')
       loadSurveyors()
+      reloadCountries()
     } catch (error: any) {
       showError(error.message || 'Failed to update surveyor. Please try again.')
     }
@@ -130,6 +160,7 @@ export default function SurveyorDirectory() {
         await window.api.deleteSurveyor(surveyor.id)
         showSuccess('Surveyor deleted successfully')
         loadSurveyors()
+        reloadCountries()
       } catch (error: any) {
         showError(error.message || 'Cannot delete surveyor: They are referenced in existing surveys.')
       }
@@ -167,6 +198,7 @@ export default function SurveyorDirectory() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '40px', width: '100%' }}
+              aria-label="Search surveyors"
             />
           </div>
 
@@ -174,9 +206,10 @@ export default function SurveyorDirectory() {
             value={filterCountry}
             onChange={(e) => setFilterCountry(e.target.value)}
             style={{ color: 'var(--text-primary)' }}
+            aria-label="Filter by country"
           >
-            <option value="">All Countries</option>
-            {getUniqueCountries().map(country => (
+            <option value="all">All Countries</option>
+            {allCountries.map(country => (
               <option key={country} value={country}>{country}</option>
             ))}
           </select>
@@ -185,6 +218,7 @@ export default function SurveyorDirectory() {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
             style={{ color: 'var(--text-primary)' }}
+            aria-label="Sort surveyors by"
           >
             <option value="name">Sort by Name</option>
             <option value="country">Sort by Country</option>
@@ -216,6 +250,7 @@ export default function SurveyorDirectory() {
                 onChange={(e) => setFormCompanyName(e.target.value)}
                 required
                 style={{ width: '100%' }}
+                aria-label="Company name"
               />
             </div>
             <div>
@@ -228,6 +263,7 @@ export default function SurveyorDirectory() {
                 onChange={(e) => setFormCountry(e.target.value)}
                 required
                 style={{ width: '100%' }}
+                aria-label="Country"
               />
             </div>
           </div>
@@ -241,6 +277,7 @@ export default function SurveyorDirectory() {
               onChange={(e) => setFormContactPerson(e.target.value)}
               placeholder="e.g., John Smith"
               style={{ width: '100%' }}
+              aria-label="Contact person"
             />
           </div>
           <div style={{ marginBottom: '15px' }}>
@@ -253,6 +290,7 @@ export default function SurveyorDirectory() {
               rows={3}
               placeholder="Phone, email, address, etc."
               style={{ resize: 'vertical', width: '100%' }}
+              aria-label="Contact details"
             />
           </div>
           <div style={{ marginBottom: '15px' }}>
@@ -265,6 +303,7 @@ export default function SurveyorDirectory() {
               rows={2}
               placeholder="Additional notes..."
               style={{ resize: 'vertical', width: '100%' }}
+              aria-label="Notes"
             />
           </div>
           <button type="submit" className="btn-primary" disabled={isAdding}>
@@ -276,16 +315,16 @@ export default function SurveyorDirectory() {
       {/* Surveyors List */}
       <div className="glass-card" style={{ padding: '20px' }}>
         <h3 style={{ marginTop: 0, marginBottom: '15px', color: 'var(--text-primary)' }}>
-          Surveyors ({filteredSurveyors.length})
+          Surveyors ({total})
         </h3>
 
-        {filteredSurveyors.length === 0 ? (
+        {surveyors.length === 0 ? (
           <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
             No surveyors found. Add one to get started.
           </p>
         ) : (
           <div style={{ display: 'grid', gap: '15px' }}>
-            {filteredSurveyors.map((surveyor) => {
+            {surveyors.map((surveyor) => {
               const isEditing = editingId === surveyor.id
 
               if (isEditing) {
@@ -303,6 +342,7 @@ export default function SurveyorDirectory() {
                           onChange={(e) => setFormCompanyName(e.target.value)}
                           required
                           style={{ width: '100%' }}
+                          aria-label="Company name"
                         />
                       </div>
                       <div>
@@ -315,6 +355,7 @@ export default function SurveyorDirectory() {
                           onChange={(e) => setFormCountry(e.target.value)}
                           required
                           style={{ width: '100%' }}
+                          aria-label="Country"
                         />
                       </div>
                     </div>
@@ -328,6 +369,7 @@ export default function SurveyorDirectory() {
                         onChange={(e) => setFormContactPerson(e.target.value)}
                         placeholder="e.g., John Smith"
                         style={{ width: '100%' }}
+                        aria-label="Contact person"
                       />
                     </div>
                     <div style={{ marginBottom: '15px' }}>
@@ -339,6 +381,7 @@ export default function SurveyorDirectory() {
                         onChange={(e) => setFormContactDetails(e.target.value)}
                         rows={3}
                         style={{ resize: 'vertical', width: '100%' }}
+                        aria-label="Contact details"
                       />
                     </div>
                     <div style={{ marginBottom: '15px' }}>
@@ -350,6 +393,7 @@ export default function SurveyorDirectory() {
                         onChange={(e) => setFormNotes(e.target.value)}
                         rows={2}
                         style={{ resize: 'vertical', width: '100%' }}
+                        aria-label="Notes"
                       />
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
@@ -426,6 +470,28 @@ export default function SurveyorDirectory() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!isLoading && totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--table-border)' }}>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+              Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total} surveyors
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(1)} style={{ padding: '6px' }} aria-label="First page"><ChevronsLeft size={16} /></button>
+              <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '6px' }} aria-label="Previous page"><ChevronLeft size={16} /></button>
+              <span style={{ margin: '0 8px', fontSize: '0.9rem' }}>Page {page} of {totalPages}</span>
+              <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ padding: '6px' }} aria-label="Next page"><ChevronRight size={16} /></button>
+              <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(totalPages)} style={{ padding: '6px' }} aria-label="Last page"><ChevronsRight size={16} /></button>
+              <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }} aria-label="Surveyors per page">
+                <option value="10">10 / page</option>
+                <option value="25">25 / page</option>
+                <option value="50">50 / page</option>
+                <option value="100">100 / page</option>
+              </select>
+            </div>
           </div>
         )}
       </div>

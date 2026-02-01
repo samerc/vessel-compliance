@@ -210,3 +210,67 @@ export interface VesselQueryParams {
   sortField?: 'name' | 'imoNumber'
   sortOrder?: 'asc' | 'desc'
 }
+
+export interface EntityQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  type?: 'all' | 'company' | 'person'
+  ofacStatus?: 'all' | 'CLEARED' | 'MATCH' | 'PENDING' | 'POTENTIAL_MATCH'
+  sortField?: 'name' | 'type'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface SurveyorQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  country?: string
+  sortField?: 'companyName' | 'country'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface ComplianceResultQueryParams {
+  page?: number
+  limit?: number
+  logId?: string
+  status?: 'all' | 'pending_review' | 'reviewed'
+  entityType?: 'all' | 'entity' | 'vessel'
+  sortField?: 'matchScore' | 'createdAt' | 'entityName'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface ReminderSettings {
+  periodDays: number
+  reminderTemplate: string
+}
+
+export interface VesselReminderSnooze {
+  vesselId: string
+  snoozedAt: string
+  snoozedBy: string
+  snoozeUntil: string
+}
+
+export interface AssuredDocAlert {
+  assuredId: string
+  entityId: string
+  entityName: string
+  roleName: string
+  entityType: 'company' | 'person'
+  missingDocs: string[]
+}
+
+export interface VesselReminder {
+  vesselId: string
+  vesselName: string
+  imoNumber: string
+  fleetId: string | null
+  fleetName: string | null
+  missingVesselDocs: { docTypeName: string; status: 'missing' | 'expired'; expiryDate?: string }[]
+  assuredAlerts: AssuredDocAlert[]
+  isSnoozed: boolean
+  snoozeUntil?: string
+  snoozedBy?: string
+  totalIssues: number
+}
