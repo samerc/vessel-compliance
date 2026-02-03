@@ -1,22 +1,7 @@
 import XLSX from 'xlsx'
 import { db } from './mysql/adapter'
-import { DocumentType, VesselDocument } from '../shared/types'
 
 export class ExcelImporter {
-    private documentTypeMapping: { [excelColumn: string]: string } = {
-        'Hull App': 'Hull Application',
-        'P&I App': 'P&I Application',
-        'COR': 'Certificate of Registry',
-        'Class': 'Class Certificate',
-        'SMC': 'Safety Management Certificate',
-        'DOC': 'Document of Compliance',
-        'Crew List': 'Crew List',
-        'Crew Salaries': 'Crew Salaries',
-        'Crew Contracts': 'Crew Contracts',
-        'Salaries Letter': 'Salaries Letter',
-        'Medical Letter': 'Medical Letter'
-    }
-
     async importFromExcel(filePath: string): Promise<{ success: boolean; message: string; stats?: any }> {
         try {
             const workbook = XLSX.readFile(filePath)
@@ -32,123 +17,108 @@ export class ExcelImporter {
             const dataRows = rawData.slice(1)
 
             // Find column indices (case-insensitive, trimmed)
-            const vesselCol = headers.findIndex((h: string) => h.toLowerCase() === 'vessel')
-            const imoCol = headers.findIndex((h: string) => h.toLowerCase() === 'imo')
+            const findCol = (name: string) =>
+                headers.findIndex((h: string) => h.toLowerCase().replace(/[#]/g, '').trim() === name.toLowerCase())
+
+            const vesselCol = findCol('vessel')
+            const customerNameCol = findCol('customer name')
+            const customerTypeCol = findCol('customer type')
+            const imoCol = headers.findIndex((h: string) => h.toLowerCase().replace(/[#]/g, '').trim() === 'imo')
+            const ownersCol = findCol('registered owners')
+            const managersCol = findCol('managers')
 
             if (vesselCol === -1) {
-                return { success: false, message: `Could not find "Vessel" column in Excel. Found columns: ${headers.filter((h: string) => h).join(', ')}` }
+                return {
+                    success: false,
+                    message: `Could not find "Vessel" column in Excel. Found columns: ${headers.filter((h: string) => h).join(', ')}`
+                }
             }
 
             const stats = {
                 vesselsCreated: 0,
                 vesselsUpdated: 0,
-                documentsImported: 0,
                 entitiesCreated: 0,
-                assuredsLinked: 0
+                assuredsLinked: 0,
+                customersAssigned: 0
             }
 
-            // Get or create document types
-            const existingDocTypes = await db.getDocumentTypes()
-            const docTypeMap = new Map<string, DocumentType>()
-
-            for (const [excelName, dbName] of Object.entries(this.documentTypeMapping)) {
-                let docType = existingDocTypes.find(dt => dt.name === dbName)
-                if (!docType) {
-                    docType = await db.addDocumentType({
-                        name: dbName,
-                        required: false,
-                        order: existingDocTypes.length + docTypeMap.size + 1
-                    })
-                    stats.entitiesCreated++
-                }
-                docTypeMap.set(excelName, docType)
-            }
-
-            // Process each vessel row
             for (const row of dataRows) {
                 const vesselName = row[vesselCol]?.toString().trim()
                 if (!vesselName || vesselName === '') continue
 
-                const imoNumber = imoCol !== -1 ? row[imoCol]?.toString().trim() : ''
+                // IMO: use from Excel or generate random 7-digit number starting with 9
+                let imoNumber = imoCol !== -1 ? row[imoCol]?.toString().trim() : ''
+                if (!imoNumber || imoNumber === '' || imoNumber === 'N/A') {
+                    imoNumber = '9' + Math.floor(100000 + Math.random() * 900000).toString()
+                }
 
-                // Check if vessel exists
+                // Customer: find or create entity
+                const customerName = customerNameCol !== -1 ? row[customerNameCol]?.toString().trim() : ''
+                const customerTypeRaw = customerTypeCol !== -1 ? row[customerTypeCol]?.toString().trim().toLowerCase() : ''
+                let customerId: string | undefined
+                let customerType: 'broker' | 'direct' | undefined
+
+                if (customerName && customerName !== '' && customerName !== 'N/A') {
+                    const customerEntity = await this.findOrCreateEntity(customerName, 'company', stats)
+                    customerId = customerEntity.id
+
+                    if (customerTypeRaw === 'broker' || customerTypeRaw === 'b') {
+                        customerType = 'broker'
+                    } else if (customerTypeRaw === 'direct' || customerTypeRaw === 'client' || customerTypeRaw === 'd' || customerTypeRaw === 'c') {
+                        customerType = 'direct'
+                    }
+                }
+
+                // Find or create vessel
                 const existingVessels = await db.getVessels()
-                let vessel = existingVessels.find(v => v.name === vesselName || (imoNumber && v.imoNumber === imoNumber))
+                let vessel = existingVessels.find(
+                    v => v.name.toUpperCase() === vesselName.toUpperCase() || v.imoNumber === imoNumber
+                )
 
                 if (!vessel) {
                     vessel = await db.addVessel({
-                        name: vesselName,
-                        imoNumber: imoNumber || 'N/A',
+                        name: vesselName.toUpperCase(),
+                        imoNumber,
                         fleetId: undefined,
-                        isActive: true
+                        isActive: true,
+                        customerId,
+                        customerType
                     })
                     stats.vesselsCreated++
                 } else {
+                    // Update customer if provided
+                    if (customerId) {
+                        await db.updateVessel(vessel.id, { customerId, customerType })
+                        stats.customersAssigned++
+                    }
                     stats.vesselsUpdated++
                 }
 
-                // Import documents
-                for (const [excelName, docType] of docTypeMap.entries()) {
-                    const colIndex = headers.findIndex((h: string) => h === excelName)
-                    if (colIndex === -1) continue
-
-                    const cellValue = row[colIndex]?.toString().trim().toUpperCase()
-
-                    // Handle Yes/No/E/N/A
-                    let hasFile = false
-                    let expiryDate: string | undefined = undefined
-
-                    if (cellValue === 'YES' || cellValue === 'E') {
-                        hasFile = true
-                        if (cellValue === 'E') {
-                            // Mark as expired - set expiry to yesterday
-                            const yesterday = new Date()
-                            yesterday.setDate(yesterday.getDate() - 1)
-                            expiryDate = yesterday.toISOString().split('T')[0]
-                        }
-                    }
-
-                    if (hasFile || cellValue === 'NO') {
-                        const vesselDoc: VesselDocument = {
-                            vesselId: vessel.id,
-                            documentTypeId: docType.id,
-                            filePath: hasFile ? `[Imported - ${excelName}]` : '',
-                            sent: false,
-                            required: docType.required,
-                            uploadedDate: new Date().toISOString().replace('T', ' ').split('.')[0], // Format: YYYY-MM-DD HH:MM:SS
-                            uploadedBy: 'Excel Import',
-                            expiryDate: expiryDate
-                        }
-                        await db.upsertVesselDocument(vesselDoc)
-                        stats.documentsImported++
-                    }
+                // Assign customer to newly created vessel
+                if (customerId && !vessel.customerId) {
+                    stats.customersAssigned++
                 }
 
-                // Import Registered Owner
-                const ownerNameCol = headers.findIndex((h: string, i: number) =>
-                    h === 'Registered Owners' || (i > 0 && headers[i - 1] === 'Medical Letter')
-                )
-
-                if (ownerNameCol !== -1 && row[ownerNameCol]) {
-                    const ownerName = row[ownerNameCol]?.toString().trim()
+                // Import Registered Owners
+                if (ownersCol !== -1 && row[ownersCol]) {
+                    const ownerName = row[ownersCol]?.toString().trim()
                     if (ownerName && ownerName !== 'N/A' && ownerName !== '') {
-                        await this.importEntity(vessel.id, ownerName, 'Registered Owner', 'company', stats)
+                        await this.importAssured(vessel.id, ownerName, 'Registered Owner', 'company', stats)
                     }
                 }
 
                 // Import Managers
-                const managerCol = headers.findIndex((h: string) => h === 'Managers')
-                if (managerCol !== -1 && row[managerCol]) {
-                    const managerName = row[managerCol]?.toString().trim()
+                if (managersCol !== -1 && row[managersCol]) {
+                    const managerName = row[managersCol]?.toString().trim()
                     if (managerName && managerName !== 'N/A' && managerName !== '') {
-                        await this.importEntity(vessel.id, managerName, 'Manager', 'company', stats)
+                        await this.importAssured(vessel.id, managerName, 'Manager', 'company', stats)
                     }
                 }
             }
 
             return {
                 success: true,
-                message: `Import completed successfully!`,
+                message: 'Import completed successfully!',
                 stats
             }
         } catch (error: any) {
@@ -159,24 +129,33 @@ export class ExcelImporter {
         }
     }
 
-    private async importEntity(
-        vesselId: string,
+    private async findOrCreateEntity(
         name: string,
-        role: string,
         type: 'company' | 'person',
         stats: any
     ) {
         const entities = await db.getEntities()
-        let entity = entities.find(e => e.name === name)
+        let entity = entities.find(e => e.name.toLowerCase() === name.toLowerCase())
 
         if (!entity) {
             entity = await db.addEntity({ name, type })
             stats.entitiesCreated++
         }
 
-        // Link to vessel
+        return entity
+    }
+
+    private async importAssured(
+        vesselId: string,
+        name: string,
+        role: string,
+        type: 'company' | 'person',
+        stats: any
+    ) {
+        const entity = await this.findOrCreateEntity(name, type, stats)
+
         const vesselAssureds = await db.getVesselAssureds(vesselId)
-        const existingLink = vesselAssureds.find(va => va.entityId === entity!.id)
+        const existingLink = vesselAssureds.find(va => va.entityId === entity.id)
         if (!existingLink) {
             await db.addVesselAssured({
                 vesselId,

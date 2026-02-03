@@ -27,6 +27,7 @@ const api = {
   addEntity: (entity) => ipcRenderer.invoke('db:addEntity', entity),
   updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),
+  purgeAllVesselsAndEntities: () => ipcRenderer.invoke('db:purgeAllVesselsAndEntities'),
 
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),
   addAssuredRole: (role) => ipcRenderer.invoke('db:addAssuredRole', role),

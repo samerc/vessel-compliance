@@ -808,6 +808,7 @@ app.whenReady().then(() => {
     }
   })
   safeHandle('db:deleteEntity', (event, id) => { requireAdmin(event); return db.deleteEntity(id) })
+  safeHandle('db:purgeAllVesselsAndEntities', (event) => { requireAdmin(event); return db.purgeAllVesselsAndEntities() })
 
   safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
   safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })

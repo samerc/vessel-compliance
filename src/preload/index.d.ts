@@ -39,6 +39,7 @@ export interface Api {
   addEntity: (entity: Omit<Entity, 'id'>) => Promise<Entity>
   updateEntity: (id: string, updates: Partial<Entity>) => Promise<void>
   deleteEntity: (id: string) => Promise<void>
+  purgeAllVesselsAndEntities: () => Promise<{ vesselsDeleted: number; entitiesDeleted: number }>
 
   getAssuredRoles: () => Promise<AssuredRole[]>
   addAssuredRole: (role: Omit<AssuredRole, 'id'>) => Promise<AssuredRole>

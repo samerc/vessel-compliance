@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-react'
-import { Vessel, Fleet, SanctionsMatch, VesselQueryParams } from '../../../shared/types'
+import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -21,6 +21,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
 export default function VesselManager() {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
+    const [entities, setEntities] = useState<Entity[]>([])
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
@@ -43,7 +44,7 @@ export default function VesselManager() {
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active')
 
     // Add Mode
-    const [newVessel, setNewVessel] = useState({ name: '', imo: '', fleetId: '' })
+    const [newVessel, setNewVessel] = useState({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' as '' | 'broker' | 'direct' })
     const [isAdding, setIsAdding] = useState(false)
 
     // Sanctions checking state
@@ -59,11 +60,15 @@ export default function VesselManager() {
 
     // Load initial fleets
     useEffect(() => {
-        const loadFleets = async () => {
-            const fData = await window.api.getFleets()
+        const loadStaticData = async () => {
+            const [fData, eData] = await Promise.all([
+                window.api.getFleets(),
+                window.api.getEntities()
+            ])
             setFleets(fData)
+            setEntities(eData)
         }
-        loadFleets()
+        loadStaticData()
     }, [])
 
     // Load vessels when params change
@@ -115,6 +120,8 @@ export default function VesselManager() {
                 name: newVessel.name,
                 imoNumber: newVessel.imo,
                 fleetId: newVessel.fleetId,
+                customerId: newVessel.customerId || undefined,
+                customerType: newVessel.customerType || undefined,
                 ofacCheckedAt: scanResult.timestamp,
                 ofacMatchFound: scanResult.matchFound,
                 ofacStatus: scanResult.status,
@@ -127,7 +134,7 @@ export default function VesselManager() {
             }
 
             const vessel = result.data
-            setNewVessel({ name: '', imo: '', fleetId: '' })
+            setNewVessel({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' })
             showSuccess(`Vessel "${vessel.name}" registered successfully`)
             loadData()
 
@@ -150,6 +157,14 @@ export default function VesselManager() {
 
     const handleUpdateFleet = async (vesselId: string, fleetId: string) => {
         await window.api.updateVessel(vesselId, { fleetId: fleetId })
+        loadData()
+    }
+
+    const handleUpdateCustomer = async (vesselId: string, customerId: string, customerType: 'broker' | 'direct' | '') => {
+        await window.api.updateVessel(vesselId, {
+            customerId: customerId || undefined,
+            customerType: (customerType || undefined) as Vessel['customerType']
+        })
         loadData()
     }
 
@@ -337,7 +352,7 @@ export default function VesselManager() {
     }
 
     if (selectedVessel) {
-        return <VesselDetail vessel={selectedVessel} backLabel="Back to Vessels" onBack={() => setSelectedVessel(null)} />
+        return <VesselDetail vessel={selectedVessel} backLabel="Back to Vessels" onBack={() => { setSelectedVessel(null); loadData() }} />
     }
 
     return (
@@ -378,6 +393,27 @@ export default function VesselManager() {
                         {fleets.map(f => (
                             <option key={f.id} value={f.id}>{f.name}</option>
                         ))}
+                    </select>
+                    <select
+                        value={newVessel.customerId}
+                        onChange={e => setNewVessel({ ...newVessel, customerId: e.target.value })}
+                        style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
+                        aria-label="Customer"
+                    >
+                        <option value="">No Customer</option>
+                        {entities.map(e => (
+                            <option key={e.id} value={e.id}>{e.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={newVessel.customerType}
+                        onChange={e => setNewVessel({ ...newVessel, customerType: e.target.value as any })}
+                        style={{ flex: 1, minWidth: '120px', color: 'var(--text-primary)' }}
+                        aria-label="Customer type"
+                    >
+                        <option value="">Type</option>
+                        <option value="broker">Broker</option>
+                        <option value="direct">Direct</option>
                     </select>
                     <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {isAdding && <Loader2 size={16} className="spinner" />}
@@ -453,6 +489,7 @@ export default function VesselManager() {
                                 <th scope="col" style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
                                     IMO Number <ArrowUpDown size={14} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
                                 </th>
+                                <th scope="col" style={{ padding: '16px' }}>Customer</th>
                                 <th scope="col" style={{ padding: '16px' }}>Current Fleet</th>
                                 <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                             </tr>
@@ -499,6 +536,31 @@ export default function VesselManager() {
                                         </td>
                                         <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                                             <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                <select
+                                                    value={v.customerId || ''}
+                                                    onChange={e => handleUpdateCustomer(v.id, e.target.value, v.customerType || '')}
+                                                    style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)', maxWidth: '160px' }}
+                                                    aria-label="Assign customer"
+                                                >
+                                                    <option value="">None</option>
+                                                    {entities.map(ent => (
+                                                        <option key={ent.id} value={ent.id}>{ent.name}</option>
+                                                    ))}
+                                                </select>
+                                                <select
+                                                    value={v.customerType || ''}
+                                                    onChange={e => handleUpdateCustomer(v.id, v.customerId || '', e.target.value as any)}
+                                                    style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)', width: '90px' }}
+                                                    aria-label="Customer type"
+                                                >
+                                                    <option value="">Type</option>
+                                                    <option value="broker">Broker</option>
+                                                    <option value="direct">Direct</option>
+                                                </select>
+                                            </div>
                                         </td>
                                         <td style={{ padding: '16px' }}>
                                             <select

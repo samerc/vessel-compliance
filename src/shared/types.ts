@@ -20,6 +20,8 @@ export interface Vessel {
   ofacMatchFound?: boolean
   ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
   isActive: boolean
+  customerId?: string
+  customerType?: 'broker' | 'direct'
 }
 
 export interface VesselDocument {
@@ -207,6 +209,7 @@ export interface VesselQueryParams {
   search?: string
   fleetId?: string
   status?: 'all' | 'active' | 'inactive'
+  customerId?: string
   sortField?: 'name' | 'imoNumber'
   sortOrder?: 'asc' | 'desc'
 }

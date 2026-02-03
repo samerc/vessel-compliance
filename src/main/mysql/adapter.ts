@@ -351,9 +351,18 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Add customer_id and customer_type to vessels
+            if (!vesselColNames.includes('customer_id')) {
+                await this.pool.query('ALTER TABLE vessels ADD COLUMN customer_id VARCHAR(36) NULL AFTER is_active')
+            }
+            if (!vesselColNames.includes('customer_type')) {
+                await this.pool.query("ALTER TABLE vessels ADD COLUMN customer_type VARCHAR(10) NULL AFTER customer_id")
+            }
+
             await addIndexIfNotExists('vessels', 'idx_vessels_imo', 'imo_number')
             await addIndexIfNotExists('vessels', 'idx_vessels_fleet', 'fleet_id')
             await addIndexIfNotExists('vessels', 'idx_vessels_active', 'is_active')
+            await addIndexIfNotExists('vessels', 'idx_vessels_customer', 'customer_id')
             await addIndexIfNotExists('vessel_documents', 'idx_vdocs_vessel_doctype', 'vessel_id, document_type_id')
             await addIndexIfNotExists('vessel_assureds', 'idx_vassureds_vessel', 'vessel_id')
             await addIndexIfNotExists('vessel_assureds', 'idx_vassureds_entity', 'entity_id')
@@ -425,17 +434,17 @@ export class MySQLAdapter {
     // --- Vessels ---
     async getVessels(): Promise<Vessel[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive FROM vessels')
+        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType FROM vessels')
         return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive) }))
     }
 
     async getVesselsPaginated(params: VesselQueryParams): Promise<PaginatedResult<Vessel>> {
         if (!this.pool) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
 
-        const { page = 1, limit = 10, search, fleetId, status, sortField = 'name', sortOrder = 'asc' } = params
+        const { page = 1, limit = 10, search, fleetId, customerId, status, sortField = 'name', sortOrder = 'asc' } = params
         const offset = (page - 1) * limit
 
-        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive FROM vessels'
+        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType FROM vessels'
         let countQuery = 'SELECT COUNT(*) as total FROM vessels'
         const conditions: string[] = []
         const values: any[] = []
@@ -451,6 +460,15 @@ export class MySQLAdapter {
             } else {
                 conditions.push('fleet_id = ?')
                 values.push(fleetId)
+            }
+        }
+
+        if (customerId !== undefined && customerId !== 'all') {
+            if (customerId === '') {
+                conditions.push('customer_id IS NULL')
+            } else {
+                conditions.push('customer_id = ?')
+                values.push(customerId)
             }
         }
 
@@ -507,8 +525,8 @@ export class MySQLAdapter {
 
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO vessels (id, name, imo_number, fleet_id, ofac_checked_at, ofac_match_found, ofac_status, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null, formatDateForMySQL(vessel.ofacCheckedAt), vessel.ofacMatchFound || false, vessel.ofacStatus || 'PENDING', vessel.isActive !== undefined ? vessel.isActive : true]
+            'INSERT INTO vessels (id, name, imo_number, fleet_id, ofac_checked_at, ofac_match_found, ofac_status, is_active, customer_id, customer_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, vessel.name, vessel.imoNumber, vessel.fleetId || null, formatDateForMySQL(vessel.ofacCheckedAt), vessel.ofacMatchFound || false, vessel.ofacStatus || 'PENDING', vessel.isActive !== undefined ? vessel.isActive : true, vessel.customerId || null, vessel.customerType || null]
         )
         return { ...vessel, id }
     }
@@ -525,6 +543,8 @@ export class MySQLAdapter {
         if (updates.ofacMatchFound !== undefined) { fields.push('ofac_match_found = ?'); values.push(updates.ofacMatchFound || false) }
         if (updates.ofacStatus !== undefined) { fields.push('ofac_status = ?'); values.push(updates.ofacStatus) }
         if (updates.isActive !== undefined) { fields.push('is_active = ?'); values.push(updates.isActive) }
+        if (updates.customerId !== undefined) { fields.push('customer_id = ?'); values.push(updates.customerId || null) }
+        if (updates.customerType !== undefined) { fields.push('customer_type = ?'); values.push(updates.customerType || null) }
 
         if (fields.length === 0) return
         values.push(id)
@@ -786,8 +806,30 @@ export class MySQLAdapter {
         await this.pool.execute(`UPDATE entities SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
+    async purgeAllVesselsAndEntities(): Promise<{ vesselsDeleted: number; entitiesDeleted: number }> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const [vRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM vessels')
+        const [eRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM entities')
+        const vesselsDeleted = (vRows as any[])[0].cnt
+        const entitiesDeleted = (eRows as any[])[0].cnt
+        // Delete in dependency order to avoid FK violations
+        await this.pool.execute('DELETE FROM vessel_reminder_snoozes')
+        await this.pool.execute('DELETE FROM survey_attachments WHERE survey_id IN (SELECT id FROM condition_surveys)')
+        await this.pool.execute('DELETE FROM survey_defects WHERE survey_id IN (SELECT id FROM condition_surveys)')
+        await this.pool.execute('DELETE FROM condition_surveys')
+        await this.pool.execute('DELETE FROM entity_ubos')
+        await this.pool.execute('DELETE FROM vessel_assureds')
+        await this.pool.execute('DELETE FROM vessel_documents')
+        await this.pool.execute('DELETE FROM compliance_check_results')
+        await this.pool.execute('DELETE FROM vessels')
+        await this.pool.execute('DELETE FROM entities')
+        return { vesselsDeleted, entitiesDeleted }
+    }
+
     async deleteEntity(id: string): Promise<void> {
         if (!this.pool) return
+        // Clear customer_id on vessels that reference this entity as their customer
+        await this.pool.execute('UPDATE vessels SET customer_id = NULL, customer_type = NULL WHERE customer_id = ?', [id])
         await this.pool.execute('DELETE FROM entities WHERE id = ?', [id])
     }
 

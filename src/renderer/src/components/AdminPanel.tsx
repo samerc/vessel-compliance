@@ -33,7 +33,7 @@ export default function AdminPanel() {
     const [runningManualCheck, setRunningManualCheck] = useState(false)
 
     // Collapsible sections
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dangerZone']))
     const toggleSection = (id: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev)
@@ -236,7 +236,7 @@ export default function AdminPanel() {
             const result = await window.api.excelImport(filePath)
 
             if (result.success) {
-                setImportStatus(`✓ ${result.message}\n\nVessels Created: ${result.stats.vesselsCreated}\nVessels Updated: ${result.stats.vesselsUpdated}\nDocuments Imported: ${result.stats.documentsImported}\nEntities Created: ${result.stats.entitiesCreated}\nAssureds Linked: ${result.stats.assuredsLinked}`)
+                setImportStatus(`✓ ${result.message}\n\nVessels Created: ${result.stats.vesselsCreated}\nVessels Updated: ${result.stats.vesselsUpdated}\nEntities Created: ${result.stats.entitiesCreated}\nAssureds Linked: ${result.stats.assuredsLinked}\nCustomers Assigned: ${result.stats.customersAssigned}`)
                 await loadDocTypes()
                 setTimeout(() => setImportStatus(''), 8000)
             } else {
@@ -400,6 +400,7 @@ export default function AdminPanel() {
                     disabled={importing}
                     className="btn-primary"
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+                    title="Expected columns: Vessel | Customer Name | Customer Type | IMO# | Registered Owners | Managers"
                 >
                     <FileText size={18} />
                     {importing ? 'Importing...' : 'Import from Excel'}
@@ -1040,6 +1041,47 @@ export default function AdminPanel() {
                 <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     Changing database configuration will reload the application. Make sure all work is saved.
                 </div>
+                </>}
+            </section>
+
+            {/* 7. Danger Zone – Purge Data */}
+            <section className="glass-card" style={{ padding: '24px' }}>
+                <h3
+                    onClick={() => toggleSection('dangerZone')}
+                    style={{ marginBottom: collapsedSections.has('dangerZone') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('dangerZone') ? <ChevronRight size={20} color="#e74c3c" /> : <ChevronDown size={20} color="#e74c3c" />}
+                    <Trash2 size={20} color="#e74c3c" /> Danger Zone
+                </h3>
+                {!collapsedSections.has('dangerZone') && <>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+                        Permanently delete all vessels, entities, and related data (assureds, documents, surveys, UBOs). This action cannot be undone.
+                    </p>
+                    <button
+                        onClick={async () => {
+                            const first = confirm('Are you sure you want to delete ALL vessels and entities? This cannot be undone.')
+                            if (!first) return
+                            const second = confirm('This will permanently remove all vessels, entities, documents, surveys, and related data. Type OK to proceed.')
+                            if (!second) return
+                            try {
+                                const result = await window.api.purgeAllVesselsAndEntities()
+                                showSuccess(`Purged ${result.vesselsDeleted} vessels and ${result.entitiesDeleted} entities.`)
+                            } catch (err: any) {
+                                showError(err.message || 'Failed to purge data')
+                            }
+                        }}
+                        className="btn-secondary"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'rgba(231, 76, 60, 0.15)',
+                            border: '1px solid rgba(231, 76, 60, 0.4)',
+                            color: '#e74c3c'
+                        }}
+                    >
+                        <Trash2 size={18} /> Purge All Vessels & Entities
+                    </button>
                 </>}
             </section>
         </div >

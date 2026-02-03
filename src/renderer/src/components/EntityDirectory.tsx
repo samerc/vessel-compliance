@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Trash2, Mail, Phone, FileText, AlertTriangle, CheckCircle2, Hash } from 'lucide-react'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -14,6 +14,7 @@ import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
+import VesselDetail from './VesselDetail'
 
 export default function EntityDirectory() {
     const [entities, setEntities] = useState<Entity[]>([])
@@ -22,7 +23,8 @@ export default function EntityDirectory() {
     const [entityUBOs, setEntityUBOs] = useState<EntityUBO[]>([])
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
-    const { showError } = useToast()
+    const [viewingVessel, setViewingVessel] = useState<Vessel | null>(null)
+    const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
 
@@ -50,6 +52,59 @@ export default function EntityDirectory() {
         entityId?: string
         vesselId?: string
     }>({ show: false, searchedName: '', matches: [] })
+
+    // Entity editing state
+    const [editingEntity, setEditingEntity] = useState<Entity | null>(null)
+    const [editForm, setEditForm] = useState<{ name: string; type: 'company' | 'person'; identifier: string; email: string; phone: string }>({ name: '', type: 'company', identifier: '', email: '', phone: '' })
+    const [isSaving, setIsSaving] = useState(false)
+
+    const startEditing = (entity: Entity) => {
+        setEditingEntity(entity)
+        setEditForm({
+            name: entity.name,
+            type: entity.type,
+            identifier: entity.identifier || '',
+            email: entity.email || '',
+            phone: entity.phone || ''
+        })
+    }
+
+    const handleSaveEdit = async () => {
+        if (!editingEntity || !editForm.name.trim()) return
+        setIsSaving(true)
+        try {
+            await window.api.updateEntity(editingEntity.id, {
+                name: editForm.name.trim(),
+                type: editForm.type,
+                identifier: editForm.identifier.trim() || undefined,
+                email: editForm.email.trim() || undefined,
+                phone: editForm.phone.trim() || undefined
+            })
+            setEditingEntity(null)
+            setSelectedEntity(prev => prev?.id === editingEntity.id ? { ...prev, ...editForm, name: editForm.name.trim(), identifier: editForm.identifier.trim() || undefined, email: editForm.email.trim() || undefined, phone: editForm.phone.trim() || undefined } : prev)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to update entity')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleDeleteEntity = async (entity: Entity) => {
+        const associatedVessels = getAssociatedVessels(entity.id)
+        const warning = associatedVessels.length > 0
+            ? `This entity is linked to ${associatedVessels.length} vessel(s). Deleting it will remove all assured links. Continue?`
+            : `Delete entity "${entity.name}"? This cannot be undone.`
+        if (!confirm(warning)) return
+        try {
+            await window.api.deleteEntity(entity.id)
+            if (selectedEntity?.id === entity.id) setSelectedEntity(null)
+            showSuccess(`Entity "${entity.name}" deleted`)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to delete entity')
+        }
+    }
 
     const loadData = async () => {
         setIsLoading(true)
@@ -197,6 +252,10 @@ export default function EntityDirectory() {
         }
     }
 
+    // Stats
+    const companyCount = useMemo(() => entities.filter(e => e.type === 'company').length, [entities])
+    const personCount = useMemo(() => entities.filter(e => e.type === 'person').length, [entities])
+
     const OfacBadge = ({ entity, vessel, onRecheck }: { entity?: Entity, vessel?: Vessel, onRecheck: () => void }) => {
         const target = entity || vessel
         const isChecking = checkingId === target?.id
@@ -205,7 +264,6 @@ export default function EntityDirectory() {
         const isError = target?.ofacStatus === 'ERROR'
         const isPending = !target?.ofacStatus || target.ofacStatus === 'PENDING'
 
-        // Show checking state
         if (isChecking) {
             return (
                 <div
@@ -311,42 +369,108 @@ export default function EntityDirectory() {
         )
     }
 
+    const DocBadge = ({ label, hasFile, onClick }: { label: string; hasFile: boolean; onClick?: () => void }) => (
+        <div
+            style={{
+                padding: '8px 14px',
+                borderRadius: '10px',
+                background: hasFile
+                    ? (isLight ? 'rgba(0, 140, 70, 0.08)' : 'rgba(0, 255, 136, 0.06)')
+                    : (isLight ? 'rgba(200, 0, 0, 0.06)' : 'rgba(255, 77, 77, 0.06)'),
+                border: hasFile
+                    ? (isLight ? '1px solid rgba(0, 140, 70, 0.2)' : '1px solid rgba(0, 255, 136, 0.15)')
+                    : (isLight ? '1px solid rgba(200, 0, 0, 0.2)' : '1px solid rgba(255, 77, 77, 0.15)'),
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.82rem',
+                cursor: hasFile ? 'pointer' : 'default',
+                transition: 'var(--transition)'
+            }}
+            onClick={onClick}
+        >
+            {hasFile ? (
+                <CheckCircle2 size={15} color={isLight ? '#008c46' : '#00ff88'} />
+            ) : (
+                <AlertTriangle size={15} color={isLight ? '#c00000' : '#ff4d4d'} />
+            )}
+            <span style={{ color: hasFile ? (isLight ? '#008c46' : 'rgba(0, 255, 136, 0.85)') : (isLight ? '#c00000' : 'rgba(255, 77, 77, 0.85)') }}>
+                {label}
+            </span>
+            {hasFile && <FileText size={13} style={{ marginLeft: 'auto', opacity: 0.4 }} />}
+        </div>
+    )
+
+    const associatedVessels = selectedEntity ? getAssociatedVessels(selectedEntity.id) : []
+
+    if (viewingVessel) {
+        return <VesselDetail vessel={viewingVessel} backLabel="Back to Entity" onBack={() => { setViewingVessel(null); loadData() }} />
+    }
+
     return (
         <div className="fade-in">
-            <header style={{ marginBottom: '32px' }}>
+            <header style={{ marginBottom: '28px' }}>
                 <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Entity Directory</h1>
                 <p style={{ color: 'var(--text-secondary)' }}>Search for Assureds and UBOs to see their vessel associations.</p>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '32px', alignItems: 'start' }}>
+            {/* Stats Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
+                <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Shield size={20} color="white" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>{total}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Total Entities</div>
+                    </div>
+                </div>
+                <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: isLight ? 'rgba(26, 115, 232, 0.12)' : 'rgba(0, 210, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Building2 size={20} color="var(--accent-primary)" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>{companyCount}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Companies</div>
+                    </div>
+                </div>
+                <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: isLight ? 'rgba(26, 115, 232, 0.12)' : 'rgba(0, 210, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <User size={20} color="var(--accent-primary)" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>{personCount}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Persons</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '28px', alignItems: 'start' }}>
                 {/* Left Side: Search & List */}
-                <div className="glass-card" style={{ padding: '0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 200px)' }}>
-                    <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div className="glass-card" style={{ padding: '0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 300px)' }}>
+                    <div style={{ padding: '16px', borderBottom: '1px solid var(--table-border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ position: 'relative' }}>
-                            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={18} />
+                            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={16} />
                             <input
                                 type="text"
-                                placeholder="Search names..."
+                                placeholder="Search entities..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 aria-label="Search entities by name"
                                 style={{
                                     width: '100%',
-                                    background: 'rgba(255,255,255,0.05)',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    borderRadius: '8px',
-                                    padding: '10px 10px 10px 40px',
-                                    color: 'white'
+                                    padding: '9px 10px 9px 38px',
+                                    fontSize: '0.9rem'
                                 }}
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--table-header-bg)', color: 'var(--text-primary)', fontSize: '0.9rem' }} aria-label="Filter by entity type">
+                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem' }} aria-label="Filter by entity type">
                                 <option value="all">All Types</option>
                                 <option value="company">Companies</option>
                                 <option value="person">Persons</option>
                             </select>
-                            <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--table-header-bg)', color: 'var(--text-primary)', fontSize: '0.9rem' }} aria-label="Filter by sanctions status">
+                            <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem' }} aria-label="Filter by sanctions status">
                                 <option value="all">All Statuses</option>
                                 <option value="CLEARED">Cleared</option>
                                 <option value="POTENTIAL_MATCH">Potential Match</option>
@@ -355,65 +479,109 @@ export default function EntityDirectory() {
                             </select>
                         </div>
                     </div>
-                    <div style={{ overflowY: 'auto' }}>
-                        {entities.map(entity => (
-                            <div
-                                key={entity.id}
-                                onClick={() => setSelectedEntity(entity)}
-                                style={{
-                                    padding: '16px 20px',
-                                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                    cursor: 'pointer',
-                                    background: selectedEntity?.id === entity.id ? 'rgba(0, 210, 255, 0.1)' : 'transparent',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    transition: 'var(--transition)'
-                                }}
-                                className="hover-effect"
-                            >
-                                <div style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '50%',
-                                    background: 'rgba(255,255,255,0.05)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'var(--accent-primary)'
-                                }}>
-                                    {entity.type === 'company' ? <Building2 size={18} /> : <User size={18} />}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        {entity.name}
+
+                    <div style={{ overflowY: 'auto', flex: 1 }}>
+                        {isLoading && entities.length === 0 ? (
+                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <Loader2 size={24} className="spinner" style={{ marginBottom: '12px' }} />
+                                <div>Loading entities...</div>
+                            </div>
+                        ) : entities.length === 0 ? (
+                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <Shield size={32} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                                <div>No entities found</div>
+                            </div>
+                        ) : (
+                            entities.map(entity => {
+                                const vesselCount = getAssociatedVessels(entity.id).length
+                                const isSelected = selectedEntity?.id === entity.id
+                                return (
+                                    <div
+                                        key={entity.id}
+                                        onClick={() => setSelectedEntity(entity)}
+                                        style={{
+                                            padding: '14px 16px',
+                                            borderBottom: '1px solid var(--table-border)',
+                                            cursor: 'pointer',
+                                            background: isSelected
+                                                ? (isLight ? 'rgba(26, 115, 232, 0.08)' : 'rgba(0, 210, 255, 0.08)')
+                                                : 'transparent',
+                                            borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            transition: 'var(--transition)'
+                                        }}
+                                        className="hover-effect"
+                                    >
+                                        <div style={{
+                                            width: '38px',
+                                            height: '38px',
+                                            borderRadius: '10px',
+                                            background: entity.type === 'company'
+                                                ? (isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(0, 210, 255, 0.1)')
+                                                : (isLight ? 'rgba(156, 39, 176, 0.1)' : 'rgba(186, 104, 200, 0.1)'),
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0
+                                        }}>
+                                            {entity.type === 'company'
+                                                ? <Building2 size={18} color="var(--accent-primary)" />
+                                                : <User size={18} color={isLight ? '#9c27b0' : '#ba68c8'} />
+                                            }
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: '600', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {entity.name}
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                                                <span style={{
+                                                    fontSize: '0.68rem',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.5px',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '3px',
+                                                    background: entity.type === 'company'
+                                                        ? (isLight ? 'rgba(26, 115, 232, 0.08)' : 'rgba(0, 210, 255, 0.08)')
+                                                        : (isLight ? 'rgba(156, 39, 176, 0.08)' : 'rgba(186, 104, 200, 0.08)'),
+                                                    color: entity.type === 'company' ? 'var(--accent-primary)' : (isLight ? '#9c27b0' : '#ba68c8')
+                                                }}>
+                                                    {entity.type}
+                                                </span>
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                                    {vesselCount} vessel{vesselCount !== 1 ? 's' : ''}
+                                                </span>
+                                                {entity.identifier && (
+                                                    <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '80px' }} title={entity.identifier}>
+                                                        {entity.identifier}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                         <OfacBadge entity={entity} onRecheck={() => handleOfacRecheck(entity)} />
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>{getAssociatedVessels(entity.id).length} Vessels</span>
-                                        {entity.identifier && <span style={{ color: 'var(--accent-primary)' }}>{entity.identifier}</span>}
-                                    </div>
-                                </div>
-                                <ChevronRight size={18} opacity={0.3} />
-                            </div>
-                        ))}
+                                )
+                            })
+                        )}
                     </div>
+
                     {!isLoading && totalPages > 1 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--table-border)' }}>
-                            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total} entities
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--table-border)', fontSize: '0.82rem' }}>
+                            <div style={{ color: 'var(--text-secondary)' }}>
+                                {((page - 1) * limit) + 1}–{Math.min(page * limit, total)} of {total}
                             </div>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(1)} style={{ padding: '6px' }} aria-label="First page"><ChevronsLeft size={16} /></button>
-                                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '6px' }} aria-label="Previous page"><ChevronLeft size={16} /></button>
-                                <span style={{ margin: '0 8px', fontSize: '0.9rem' }}>Page {page} of {totalPages}</span>
-                                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ padding: '6px' }} aria-label="Next page"><ChevronRight size={16} /></button>
-                                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(totalPages)} style={{ padding: '6px' }} aria-label="Last page"><ChevronsRight size={16} /></button>
-                                <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }} aria-label="Entities per page">
-                                    <option value="10">10 / page</option>
-                                    <option value="25">25 / page</option>
-                                    <option value="50">50 / page</option>
-                                    <option value="100">100 / page</option>
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(1)} style={{ padding: '4px 6px' }} aria-label="First page"><ChevronsLeft size={14} /></button>
+                                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '4px 6px' }} aria-label="Previous page"><ChevronLeft size={14} /></button>
+                                <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>{page}/{totalPages}</span>
+                                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ padding: '4px 6px' }} aria-label="Next page"><ChevronRight size={14} /></button>
+                                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(totalPages)} style={{ padding: '4px 6px' }} aria-label="Last page"><ChevronsRight size={14} /></button>
+                                <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ marginLeft: '8px', padding: '3px 6px', fontSize: '0.82rem' }} aria-label="Entities per page">
+                                    <option value="10">10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
                                 </select>
                             </div>
                         </div>
@@ -424,8 +592,9 @@ export default function EntityDirectory() {
                 <div style={{ minHeight: '400px' }}>
                     {selectedEntity ? (
                         <div className="fade-in">
-                            <div className="glass-card" style={{ padding: '32px', marginBottom: '24px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '8px' }}>
+                            {/* Entity Header Card */}
+                            <div className="glass-card" style={{ padding: '28px', marginBottom: '24px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px' }}>
                                     <div style={{
                                         width: '64px',
                                         height: '64px',
@@ -434,189 +603,322 @@ export default function EntityDirectory() {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: 'white'
+                                        color: 'white',
+                                        flexShrink: 0
                                     }}>
-                                        {selectedEntity.type === 'company' ? <Building2 size={32} /> : <User size={32} />}
+                                        {selectedEntity.type === 'company' ? <Building2 size={30} /> : <User size={30} />}
                                     </div>
-                                    <div style={{ flex: 1 }}>
-                                        <h2 style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            {selectedEntity.name}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                                            <h2 style={{ fontSize: '1.6rem', margin: 0 }}>{selectedEntity.name}</h2>
                                             <OfacBadge entity={selectedEntity} onRecheck={() => handleOfacRecheck(selectedEntity)} />
-                                        </h2>
-                                        <p style={{ color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
-                                            {selectedEntity.type} {selectedEntity.identifier ? `• ${selectedEntity.identifier}` : ''}
-                                        </p>
-                                        {selectedEntity.type === 'person' && (
-                                            <div
-                                                style={{
-                                                    marginTop: '12px',
-                                                    padding: '8px 12px',
-                                                    borderRadius: '8px',
-                                                    background: selectedEntity.passportFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
-                                                    border: selectedEntity.passportFilePath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px',
-                                                    fontSize: '0.85rem',
-                                                    cursor: selectedEntity.passportFilePath ? 'pointer' : 'default'
-                                                }}
-                                                onClick={() => selectedEntity.passportFilePath && window.api.fsOpen(selectedEntity.passportFilePath)}
-                                            >
-                                                {selectedEntity.passportFilePath ? (
-                                                    <>📄 ID/Passport on file (Click to view)</>
-                                                ) : (
-                                                    <>⚠️ ID/Passport Missing</>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.5px',
+                                                padding: '2px 10px',
+                                                borderRadius: '4px',
+                                                background: selectedEntity.type === 'company'
+                                                    ? (isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(0, 210, 255, 0.1)')
+                                                    : (isLight ? 'rgba(156, 39, 176, 0.1)' : 'rgba(186, 104, 200, 0.1)'),
+                                                color: selectedEntity.type === 'company' ? 'var(--accent-primary)' : (isLight ? '#9c27b0' : '#ba68c8'),
+                                                fontWeight: 600
+                                            }}>
+                                                {selectedEntity.type}
+                                            </span>
+                                            {selectedEntity.identifier && (
+                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{selectedEntity.identifier}</span>
+                                            )}
+                                        </div>
+
+                                        {/* Contact Info */}
+                                        {(selectedEntity.email || selectedEntity.phone) && (
+                                            <div style={{ display: 'flex', gap: '20px', marginTop: '14px', flexWrap: 'wrap' }}>
+                                                {selectedEntity.email && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                        <Mail size={14} color="var(--accent-primary)" />
+                                                        {selectedEntity.email}
+                                                    </div>
+                                                )}
+                                                {selectedEntity.phone && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                        <Phone size={14} color="var(--accent-primary)" />
+                                                        {selectedEntity.phone}
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
-                                        {selectedEntity.type === 'company' && (
-                                            <div style={{ marginTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                                <div
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        borderRadius: '8px',
-                                                        background: selectedEntity.certificateOfIncorporationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
-                                                        border: selectedEntity.certificateOfIncorporationPath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '8px',
-                                                        fontSize: '0.85rem',
-                                                        cursor: selectedEntity.certificateOfIncorporationPath ? 'pointer' : 'default'
-                                                    }}
-                                                    onClick={() => selectedEntity.certificateOfIncorporationPath && window.api.fsOpen(selectedEntity.certificateOfIncorporationPath)}
-                                                >
-                                                    {selectedEntity.certificateOfIncorporationPath ? (
-                                                        <>📄 Certificate of Incorporation (Click to view)</>
-                                                    ) : (
-                                                        <>⚠️ Certificate of Incorporation Missing</>
-                                                    )}
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        borderRadius: '8px',
-                                                        background: selectedEntity.articlesOfAssociationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
-                                                        border: selectedEntity.articlesOfAssociationPath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '8px',
-                                                        fontSize: '0.85rem',
-                                                        cursor: selectedEntity.articlesOfAssociationPath ? 'pointer' : 'default'
-                                                    }}
-                                                    onClick={() => selectedEntity.articlesOfAssociationPath && window.api.fsOpen(selectedEntity.articlesOfAssociationPath)}
-                                                >
-                                                    {selectedEntity.articlesOfAssociationPath ? (
-                                                        <>📄 Articles of Association (Click to view)</>
-                                                    ) : (
-                                                        <>⚠️ Articles of Association Missing</>
-                                                    )}
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        borderRadius: '8px',
-                                                        background: selectedEntity.kycFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
-                                                        border: selectedEntity.kycFilePath ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '8px',
-                                                        fontSize: '0.85rem',
-                                                        cursor: selectedEntity.kycFilePath ? 'pointer' : 'default'
-                                                    }}
-                                                    onClick={() => selectedEntity.kycFilePath && window.api.fsOpen(selectedEntity.kycFilePath)}
-                                                >
-                                                    {selectedEntity.kycFilePath ? (
-                                                        <>📄 KYC (Click to view)</>
-                                                    ) : (
-                                                        <>⚠️ KYC Missing</>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                        <button
+                                            onClick={() => startEditing(selectedEntity)}
+                                            className="btn-secondary"
+                                            style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            title="Edit entity info"
+                                        >
+                                            <Pencil size={14} /> Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteEntity(selectedEntity)}
+                                            className="btn-secondary"
+                                            style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--danger)' }}
+                                            title="Delete entity"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
                                     </div>
                                 </div>
 
-                                {(selectedEntity.email || selectedEntity.phone) && (
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1fr',
-                                        gap: '20px',
-                                        marginTop: '24px',
-                                        paddingTop: '20px',
-                                        borderTop: '1px solid rgba(255,255,255,0.1)'
-                                    }}>
-                                        {selectedEntity.email && (
-                                            <div>
-                                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email Address</div>
-                                                <div style={{ fontWeight: '500' }}>{selectedEntity.email}</div>
-                                            </div>
-                                        )}
-                                        {selectedEntity.phone && (
-                                            <div>
-                                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone Number</div>
-                                                <div style={{ fontWeight: '500' }}>{selectedEntity.phone}</div>
-                                            </div>
+                                {/* Documents Section */}
+                                <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--table-border)' }}>
+                                    <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-secondary)', marginBottom: '10px', fontWeight: 600 }}>Documents</div>
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                        {selectedEntity.type === 'person' ? (
+                                            <DocBadge
+                                                label="ID / Passport"
+                                                hasFile={!!selectedEntity.passportFilePath}
+                                                onClick={selectedEntity.passportFilePath ? () => window.api.fsOpen(selectedEntity.passportFilePath!) : undefined}
+                                            />
+                                        ) : (
+                                            <>
+                                                <DocBadge
+                                                    label="Certificate of Incorporation"
+                                                    hasFile={!!selectedEntity.certificateOfIncorporationPath}
+                                                    onClick={selectedEntity.certificateOfIncorporationPath ? () => window.api.fsOpen(selectedEntity.certificateOfIncorporationPath!) : undefined}
+                                                />
+                                                <DocBadge
+                                                    label="Articles of Association"
+                                                    hasFile={!!selectedEntity.articlesOfAssociationPath}
+                                                    onClick={selectedEntity.articlesOfAssociationPath ? () => window.api.fsOpen(selectedEntity.articlesOfAssociationPath!) : undefined}
+                                                />
+                                                <DocBadge
+                                                    label="KYC"
+                                                    hasFile={!!selectedEntity.kycFilePath}
+                                                    onClick={selectedEntity.kycFilePath ? () => window.api.fsOpen(selectedEntity.kycFilePath!) : undefined}
+                                                />
+                                            </>
                                         )}
                                     </div>
-                                )}
+                                </div>
                             </div>
 
-                            <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Ship size={20} color="var(--accent-primary)" /> Associated Vessels
-                            </h3>
+                            {/* Associated Vessels */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
+                                    <Ship size={20} color="var(--accent-primary)" /> Associated Vessels
+                                </h3>
+                                <span style={{
+                                    fontSize: '0.78rem',
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    background: isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(0, 210, 255, 0.08)',
+                                    color: 'var(--accent-primary)',
+                                    fontWeight: 600
+                                }}>
+                                    {associatedVessels.length} vessel{associatedVessels.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                                {getAssociatedVessels(selectedEntity.id).map(vessel => (
-                                    <div key={vessel.id} className="glass-card" style={{ padding: '20px' }}>
-                                        <div style={{ fontWeight: '600', fontSize: '1.2rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            {vessel.name}
-                                            <OfacBadge vessel={vessel} onRecheck={() => handleVesselOfacRecheck(vessel)} />
+                            {associatedVessels.length === 0 ? (
+                                <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                    <Ship size={36} style={{ marginBottom: '12px', opacity: 0.2 }} />
+                                    <div style={{ fontSize: '0.95rem' }}>No vessels linked to this entity</div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                                    {associatedVessels.map(vessel => (
+                                        <div key={vessel.id} className="glass-card" style={{ padding: '20px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                                                <div style={{
+                                                    width: '32px',
+                                                    height: '32px',
+                                                    borderRadius: '8px',
+                                                    background: isLight ? 'rgba(26, 115, 232, 0.08)' : 'rgba(0, 210, 255, 0.08)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <Ship size={16} color="var(--accent-primary)" />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div
+                                                        style={{ fontWeight: '600', fontSize: '1rem', cursor: 'pointer', color: 'var(--accent-primary)' }}
+                                                        onClick={() => setViewingVessel(vessel)}
+                                                    >{vessel.name}</div>
+                                                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <Hash size={11} /> {vessel.imoNumber}
+                                                    </div>
+                                                </div>
+                                                <OfacBadge vessel={vessel} onRecheck={() => handleVesselOfacRecheck(vessel)} />
+                                            </div>
+
+                                            {vessel.roles.length > 0 && (
+                                                <div style={{ marginTop: '12px' }}>
+                                                    <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Direct Role</div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                        {vessel.roles.map((r, i) => (
+                                                            <span key={i} style={{
+                                                                background: isLight ? 'rgba(26, 115, 232, 0.08)' : 'rgba(0, 210, 255, 0.08)',
+                                                                color: 'var(--accent-primary)',
+                                                                padding: '3px 10px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '0.75rem',
+                                                                border: isLight ? '1px solid rgba(26, 115, 232, 0.15)' : '1px solid rgba(0, 210, 255, 0.15)',
+                                                                fontWeight: 500
+                                                            }}>
+                                                                {r}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {vessel.viaAssureds.length > 0 && (
+                                                <div style={{ marginTop: '10px' }}>
+                                                    <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Via Assured (UBO)</div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                        {vessel.viaAssureds.map((r, i) => (
+                                                            <span key={i} style={{
+                                                                background: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)',
+                                                                color: 'var(--text-secondary)',
+                                                                padding: '3px 10px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '0.75rem',
+                                                                border: '1px solid var(--table-border)'
+                                                            }}>
+                                                                {r}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>IMO: {vessel.imoNumber}</div>
-
-                                        {vessel.roles.length > 0 && (
-                                            <div style={{ marginBottom: '12px' }}>
-                                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Direct Role</div>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                                    {vessel.roles.map((r, i) => (
-                                                        <span key={i} style={{ background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid rgba(0, 210, 255, 0.2)' }}>
-                                                            {r}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {vessel.viaAssureds.length > 0 && (
-                                            <div>
-                                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Via Assured (UBO)</div>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                                    {vessel.viaAssureds.map((r, i) => (
-                                                        <span key={i} style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                                                            {r}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                {getAssociatedVessels(selectedEntity.id).length === 0 && (
-                                    <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
-                                        No vessels found for this entity.
-                                    </div>
-                                )}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div className="glass-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>
-                            <Shield size={64} style={{ marginBottom: '20px', opacity: 0.2 }} />
-                            <h3>Select an entity to view details</h3>
-                            <p>All vessels where this entity is an Assured or a UBO will be listed here.</p>
+                        <div className="glass-card" style={{
+                            height: '100%',
+                            minHeight: '400px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text-secondary)',
+                            textAlign: 'center',
+                            padding: '48px'
+                        }}>
+                            <div style={{
+                                width: '80px',
+                                height: '80px',
+                                borderRadius: '20px',
+                                background: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.03)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: '20px'
+                            }}>
+                                <Shield size={36} style={{ opacity: 0.25 }} />
+                            </div>
+                            <h3 style={{ marginBottom: '8px', fontSize: '1.1rem' }}>Select an entity</h3>
+                            <p style={{ fontSize: '0.9rem', maxWidth: '280px', lineHeight: 1.5 }}>
+                                Choose an entity from the list to view their details, documents, and vessel associations.
+                            </p>
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* Edit Modal */}
+            {editingEntity && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }} onClick={() => setEditingEntity(null)}>
+                    <div className="glass-card" style={{ padding: '32px', width: '480px', maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h3 style={{ fontSize: '1.3rem' }}>Edit Entity</h3>
+                            <button onClick={() => setEditingEntity(null)} className="btn-secondary" style={{ padding: '6px' }}><X size={18} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Name *</label>
+                                <input
+                                    type="text"
+                                    value={editForm.name}
+                                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Entity name"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Type</label>
+                                <select
+                                    value={editForm.type}
+                                    onChange={e => setEditForm(f => ({ ...f, type: e.target.value as 'company' | 'person' }))}
+                                    style={{ width: '100%', padding: '10px 12px' }}
+                                >
+                                    <option value="company">Company</option>
+                                    <option value="person">Person</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Identifier</label>
+                                <input
+                                    type="text"
+                                    value={editForm.identifier}
+                                    onChange={e => setEditForm(f => ({ ...f, identifier: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Optional note to distinguish same-named entities"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email</label>
+                                <input
+                                    type="email"
+                                    value={editForm.email}
+                                    onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Email address"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Phone</label>
+                                <input
+                                    type="text"
+                                    value={editForm.phone}
+                                    onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Phone number"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                                <button onClick={() => setEditingEntity(null)} className="btn-secondary">Cancel</button>
+                                <button
+                                    onClick={handleSaveEdit}
+                                    className="btn-primary"
+                                    disabled={!editForm.name.trim() || isSaving}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    {isSaving ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}
+                                    Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {sanctionsModal.show && (
                 <SanctionsModal
