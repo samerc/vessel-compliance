@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function ComplianceCenter() {
     const [vessels, setVessels] = useState<Vessel[]>([])
@@ -10,6 +11,8 @@ export default function ComplianceCenter() {
     const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
     const [activeTab, setActiveTab] = useState<'documents' | 'sanctions'>('documents')
     const { showSuccess } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     // Sanctions compliance state
     const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
@@ -370,14 +373,14 @@ export default function ComplianceCenter() {
                                             </tr>
                                             {expandedResult === result.id && (
                                                 <tr>
-                                                    <td colSpan={5} style={{ padding: '0 16px 16px 16px', background: 'rgba(0, 0, 0, 0.1)' }}>
+                                                    <td colSpan={5} style={{ padding: '0 16px 16px 16px', background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)' }}>
                                                         <div style={{ padding: '12px', background: 'var(--bg-card)', borderRadius: '8px', fontSize: '0.85rem' }}>
                                                             <div style={{ fontWeight: '600', marginBottom: '8px' }}>Match Details:</div>
                                                             {(() => {
                                                                 try {
                                                                     const matches = JSON.parse(result.matchDetails || '[]')
                                                                     return matches.map((m: any, i: number) => (
-                                                                        <div key={i} style={{ marginBottom: '8px', padding: '8px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '4px' }}>
+                                                                        <div key={i} style={{ marginBottom: '8px', padding: '8px', background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.2)', borderRadius: '4px' }}>
                                                                             <div><strong>Source:</strong> {m.source || 'Unknown'}</div>
                                                                             <div><strong>Names:</strong> {(m.names || []).join(', ')}</div>
                                                                             <div><strong>Score:</strong> {((m.score || 0) * 100).toFixed(0)}%</div>

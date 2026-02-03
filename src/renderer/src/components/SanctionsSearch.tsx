@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react'
 import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function SanctionsSearch() {
     const { user } = useAuth()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     const [query, setQuery] = useState('')
     const [threshold, setThreshold] = useState(user?.sanctionsThreshold || 60)
@@ -295,7 +298,7 @@ export default function SanctionsSearch() {
                             <div style={{
                                 padding: '0 24px 24px',
                                 borderTop: '1px solid var(--glass-border)',
-                                background: 'rgba(255, 255, 255, 0.02)'
+                                background: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.02)'
                             }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '20px' }}>
                                     <div>

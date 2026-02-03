@@ -16,6 +16,7 @@ import ReminderCenter from './components/ReminderCenter'
 import Calculators from './components/Calculators'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { UpdateNotification } from './components/UpdateNotification'
 
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users' | 'surveyors' | 'sanctions-search' | 'reminders' | 'calculators'>('dashboard')
@@ -63,122 +64,126 @@ function App(): React.JSX.Element {
 
   return (
     <ErrorBoundary>
-    <a href="#main-content" className="sr-only">Skip to main content</a>
-    <div className="layout-container">
-      <aside className="sidebar">
-        <div style={{ paddingBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '8px' }} aria-hidden="true"></div>
-          <div>
-            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Vessel Compliance</h2>
-            <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{user?.username} ({user?.role})</div>
+      <a href="#main-content" className="sr-only">Skip to main content</a>
+      <div className="layout-container">
+        <aside className="sidebar">
+          <div style={{ paddingBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '8px' }} aria-hidden="true"></div>
+            <div>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Vessel Compliance</h2>
+              <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{user?.username} ({user?.role})</div>
+            </div>
           </div>
-        </div>
 
-        <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
-          <NavItem
-            icon={<LayoutDashboard size={20} />}
-            label="Dashboard"
-            active={activeTab === 'dashboard'}
-            onClick={() => setActiveTab('dashboard')}
-          />
-          <NavItem
-            icon={<Ship size={20} />}
-            label="Vessels"
-            active={activeTab === 'vessels'}
-            onClick={() => setActiveTab('vessels')}
-          />
-          <NavItem
-            icon={<LayoutDashboard size={20} />} // Reusing icon for fleets
-            label="Fleets"
-            active={activeTab === 'fleets'}
-            onClick={() => setActiveTab('fleets')}
-          />
-          <NavItem
-            icon={<ShieldAlert size={20} />}
-            label="Compliance Center"
-            active={activeTab === 'compliance'}
-            onClick={() => setActiveTab('compliance')}
-          />
-          <NavItem
-            icon={<Search size={20} />}
-            label="Sanctions Search"
-            active={activeTab === 'sanctions-search'}
-            onClick={() => setActiveTab('sanctions-search')}
-          />
-          <NavItem
-            icon={<Users size={20} />}
-            label="Entity Directory"
-            active={activeTab === 'entities'}
-            onClick={() => setActiveTab('entities')}
-          />
-          <NavItem
-            icon={<ClipboardList size={20} />}
-            label="Surveyor Directory"
-            active={activeTab === 'surveyors'}
-            onClick={() => setActiveTab('surveyors')}
-          />
-          <NavItem
-            icon={<Bell size={20} />}
-            label="Reminders"
-            active={activeTab === 'reminders'}
-            onClick={() => setActiveTab('reminders')}
-          />
-          <NavItem
-            icon={<Calculator size={20} />}
-            label="Calculators"
-            active={activeTab === 'calculators'}
-            onClick={() => setActiveTab('calculators')}
-          />
+          <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
+            <NavItem
+              icon={<LayoutDashboard size={20} />}
+              label="Dashboard"
+              active={activeTab === 'dashboard'}
+              onClick={() => setActiveTab('dashboard')}
+            />
+            <NavItem
+              icon={<Ship size={20} />}
+              label="Vessels"
+              active={activeTab === 'vessels'}
+              onClick={() => setActiveTab('vessels')}
+            />
+            <NavItem
+              icon={<LayoutDashboard size={20} />} // Reusing icon for fleets
+              label="Fleets"
+              active={activeTab === 'fleets'}
+              onClick={() => setActiveTab('fleets')}
+            />
+            <NavItem
+              icon={<ShieldAlert size={20} />}
+              label="Compliance Center"
+              active={activeTab === 'compliance'}
+              onClick={() => setActiveTab('compliance')}
+            />
+            <NavItem
+              icon={<Search size={20} />}
+              label="Sanctions Search"
+              active={activeTab === 'sanctions-search'}
+              onClick={() => setActiveTab('sanctions-search')}
+            />
+            <NavItem
+              icon={<Users size={20} />}
+              label="Entity Directory"
+              active={activeTab === 'entities'}
+              onClick={() => setActiveTab('entities')}
+            />
+            <NavItem
+              icon={<ClipboardList size={20} />}
+              label="Surveyor Directory"
+              active={activeTab === 'surveyors'}
+              onClick={() => setActiveTab('surveyors')}
+            />
+            <NavItem
+              icon={<Bell size={20} />}
+              label="Reminders"
+              active={activeTab === 'reminders'}
+              onClick={() => setActiveTab('reminders')}
+            />
+            <NavItem
+              icon={<Calculator size={20} />}
+              label="Calculators"
+              active={activeTab === 'calculators'}
+              onClick={() => setActiveTab('calculators')}
+            />
 
-          {isAdmin && (
-            <>
-              <div className="my-2 border-t border-gray-700 opacity-50"></div>
-              <NavItem
-                icon={<UserCog size={20} />}
-                label="User Management"
-                active={activeTab === 'users'}
-                onClick={() => setActiveTab('users')}
-              />
-              <NavItem
-                icon={<Settings size={20} />}
-                label="System Setup"
-                active={activeTab === 'admin'}
-                onClick={() => setActiveTab('admin')}
-              />
-            </>
-          )}
-        </nav>
+            {isAdmin && (
+              <>
+                <div className="my-2 border-t border-gray-700 opacity-50"></div>
+                <NavItem
+                  icon={<UserCog size={20} />}
+                  label="User Management"
+                  active={activeTab === 'users'}
+                  onClick={() => setActiveTab('users')}
+                />
+                <NavItem
+                  icon={<Settings size={20} />}
+                  label="System Setup"
+                  active={activeTab === 'admin'}
+                  onClick={() => setActiveTab('admin')}
+                />
+              </>
+            )}
+          </nav>
 
-        <div className="mt-8 pt-4 border-t border-gray-700 opacity-50 flex flex-col gap-2">
-          <NavItem
-            icon={theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-            label={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            active={false}
-            onClick={toggleTheme}
-          />
-          <NavItem
-            icon={<LogOut size={20} />}
-            label="Logout"
-            active={false}
-            onClick={logout}
-          />
-        </div>
-      </aside>
+          <div className="mt-8 pt-4 border-t border-gray-700 opacity-50 flex flex-col gap-2">
+            <NavItem
+              icon={theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+              label={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+              active={false}
+              onClick={toggleTheme}
+            />
+            <NavItem
+              icon={<LogOut size={20} />}
+              label="Logout"
+              active={false}
+              onClick={logout}
+            />
+            <div style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.5, marginTop: '8px' }}>
+              v{__APP_VERSION__}
+            </div>
+          </div>
+        </aside>
 
-      <main id="main-content" className="main-content">
-        {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
-        {activeTab === 'vessels' && <VesselManager />}
-        {activeTab === 'fleets' && <FleetManager />}
-        {activeTab === 'admin' && isAdmin && <AdminPanel />}
-        {activeTab === 'users' && isAdmin && <UserManager />}
-        {activeTab === 'entities' && <EntityDirectory />}
-        {activeTab === 'surveyors' && <SurveyorDirectory />}
-        {activeTab === 'compliance' && <ComplianceCenter />}
-        {activeTab === 'sanctions-search' && <SanctionsSearch />}
-        {activeTab === 'reminders' && <ReminderCenter />}
-        {activeTab === 'calculators' && <Calculators />}
-      </main>
-    </div>
+        <main id="main-content" className="main-content">
+          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
+          {activeTab === 'vessels' && <VesselManager />}
+          {activeTab === 'fleets' && <FleetManager />}
+          {activeTab === 'admin' && isAdmin && <AdminPanel />}
+          {activeTab === 'users' && isAdmin && <UserManager />}
+          {activeTab === 'entities' && <EntityDirectory />}
+          {activeTab === 'surveyors' && <SurveyorDirectory />}
+          {activeTab === 'compliance' && <ComplianceCenter />}
+          {activeTab === 'sanctions-search' && <SanctionsSearch />}
+          {activeTab === 'reminders' && <ReminderCenter />}
+          {activeTab === 'calculators' && <Calculators />}
+        </main>
+        <UpdateNotification />
+      </div>
     </ErrorBoundary>
   )
 }

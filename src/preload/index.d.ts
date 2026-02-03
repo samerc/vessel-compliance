@@ -121,6 +121,17 @@ export interface Api {
   remindersGetVesselReminders: () => Promise<VesselReminder[]>
   remindersSnoozeVessel: (vesselId: string, username: string, periodDays: number) => Promise<void>
   remindersUnsnoozeVessel: (vesselId: string) => Promise<void>
+
+  // Auto-Update
+  updateCheckForUpdates: () => Promise<void>
+  updateQuitAndInstall: () => Promise<void>
+  updateGetCurrentVersion: () => Promise<string>
+  onUpdateChecking: (callback: () => void) => void
+  onUpdateAvailable: (callback: (info: { version: string; releaseDate?: string; releaseName?: string; releaseNotes?: string }) => void) => void
+  onUpdateNotAvailable: (callback: (info: { version: string }) => void) => void
+  onUpdateDownloadProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => void
+  onUpdateDownloaded: (callback: (info: { version: string; releaseDate?: string }) => void) => void
+  onUpdateError: (callback: (error: { message: string }) => void) => void
 }
 
 declare global {

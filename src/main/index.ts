@@ -7,6 +7,7 @@ import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
 import { auth } from './auth'
 import { complianceScheduler } from './services/ComplianceScheduler'
+import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
@@ -245,6 +246,19 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // Update Handlers
+  safeHandle('update:checkForUpdates', async () => {
+    await updateService.checkForUpdates(true)
+  })
+
+  safeHandle('update:quitAndInstall', () => {
+    updateService.quitAndInstall()
+  })
+
+  safeHandle('update:getCurrentVersion', () => {
+    return updateService.getCurrentVersion()
+  })
 
   // Auth Handlers (no session required - these create/destroy sessions)
   safeHandle('auth:login', async (event, { username, password }) => {
@@ -817,11 +831,11 @@ app.whenReady().then(() => {
 
   safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
   safeHandle('db:addVesselAssured', (event, assured) => { requireSession(event); return db.addVesselAssured(assured) })
-  safeHandle('db:deleteVesselAssured', (event, id) => { requireAdmin(event); return db.deleteVesselAssured(id) })
+  safeHandle('db:deleteVesselAssured', (event, id) => { requireSession(event); return db.deleteVesselAssured(id) })
 
   safeHandle('db:getEntityUBOs', (event, assuredEntityId) => { requireSession(event); return db.getEntityUBOs(assuredEntityId) })
   safeHandle('db:addEntityUBO', (event, ubo) => { requireSession(event); return db.addEntityUBO(ubo) })
-  safeHandle('db:deleteEntityUBO', (event, ubo) => { requireAdmin(event); return db.deleteEntityUBO(ubo) })
+  safeHandle('db:deleteEntityUBO', (event, ubo) => { requireSession(event); return db.deleteEntityUBO(ubo) })
 
   // Surveyors
   safeHandle('db:getSurveyors', (event) => { requireSession(event); return db.getSurveyors() })
@@ -1132,6 +1146,16 @@ app.whenReady().then(() => {
 
   // Start the compliance scheduler after window is created
   complianceScheduler.start()
+
+  // Initialize update service with main window
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  if (mainWindow) {
+    updateService.setMainWindow(mainWindow)
+    // Check for updates 5 seconds after startup (give time for UI to load)
+    setTimeout(() => {
+      updateService.checkForUpdates(false)
+    }, 5000)
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

@@ -178,14 +178,27 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const handleDeleteAssured = async (id: string) => {
         if (confirm('Remove this assured from this vessel?')) {
-            await window.api.deleteVesselAssured(id)
-            loadData()
+            window.focus()
+            try {
+                await window.api.deleteVesselAssured(id)
+                showSuccess('Assured removed successfully')
+                loadData()
+            } catch (error: any) {
+                showError(error.message || 'Failed to remove assured. You may need admin privileges.')
+            }
+        } else {
+            window.focus()
         }
     }
 
     const handleDeleteUBO = async (assuredEntityId: string, uboEntityId: string) => {
-        await window.api.deleteEntityUBO({ assuredEntityId, uboEntityId })
-        loadData()
+        try {
+            await window.api.deleteEntityUBO({ assuredEntityId, uboEntityId })
+            showSuccess('UBO removed successfully')
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to remove UBO.')
+        }
     }
 
     const handleUploadPassport = async (e: React.DragEvent, entityId: string) => {
@@ -620,7 +633,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                        <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                             <th style={{ padding: '16px' }}>Assured Name</th>
                             <th style={{ padding: '16px' }}>Role</th>
                             <th style={{ padding: '16px' }}>UBOs</th>
@@ -639,7 +652,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
                             return (
                                 <React.Fragment key={va.id}>
-                                    <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
+                                    <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)' }}>
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {entity?.type === 'company' ? <Building2 size={16} opacity={0.5} /> : <User size={16} opacity={0.5} />}
@@ -653,7 +666,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             </div>
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            <span style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>{va.role}</span>
+                                            <span style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>{va.role}</span>
                                         </td>
                                         <td style={{ padding: '16px' }}>
                                             <button
@@ -672,11 +685,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                         </td>
                                     </tr>
                                     {isExpanded && (
-                                        <tr style={{ background: 'rgba(0, 0, 0, 0.1)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <tr style={{ background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)', borderBottom: '1px solid var(--table-border)' }}>
                                             <td colSpan={4} style={{ padding: '16px 32px' }}>
-                                                <div style={{ padding: '16px', borderLeft: '2px solid var(--accent-primary)', background: 'rgba(255,255,255,0.02)' }}>
+                                                <div style={{ padding: '16px', borderLeft: '2px solid var(--accent-primary)', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
                                                     {entity?.type === 'company' && (
-                                                        <div style={{ marginBottom: '20px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                                                        <div style={{ marginBottom: '20px', padding: '12px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                                                             <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Company Documents</h4>
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                                 <div
@@ -685,8 +698,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     style={{
                                                                         padding: '10px',
                                                                         borderRadius: '6px',
-                                                                        background: entity.certificateOfIncorporationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                        border: '1px dashed rgba(255,255,255,0.2)',
+                                                                        background: entity.certificateOfIncorporationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                        border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                         cursor: entity.certificateOfIncorporationPath ? 'pointer' : 'default',
                                                                         fontSize: '0.8rem',
                                                                         textAlign: 'center'
@@ -701,8 +714,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     style={{
                                                                         padding: '10px',
                                                                         borderRadius: '6px',
-                                                                        background: entity.articlesOfAssociationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                        border: '1px dashed rgba(255,255,255,0.2)',
+                                                                        background: entity.articlesOfAssociationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                        border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                         cursor: entity.articlesOfAssociationPath ? 'pointer' : 'default',
                                                                         fontSize: '0.8rem',
                                                                         textAlign: 'center'
@@ -717,8 +730,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     style={{
                                                                         padding: '10px',
                                                                         borderRadius: '6px',
-                                                                        background: entity.kycFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                        border: '1px dashed rgba(255,255,255,0.2)',
+                                                                        background: entity.kycFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                        border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                         cursor: entity.kycFilePath ? 'pointer' : 'default',
                                                                         fontSize: '0.8rem',
                                                                         textAlign: 'center'
@@ -731,7 +744,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                         </div>
                                                     )}
                                                     {entity?.type === 'person' && (
-                                                        <div style={{ marginBottom: '20px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                                                        <div style={{ marginBottom: '20px', padding: '12px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                                                             <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Identity Documents</h4>
                                                             <div
                                                                 onDragOver={(e) => e.preventDefault()}
@@ -739,8 +752,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 style={{
                                                                     padding: '10px',
                                                                     borderRadius: '6px',
-                                                                    background: entity.passportFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                    background: entity.passportFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                     cursor: entity.passportFilePath ? 'pointer' : 'default',
                                                                     fontSize: '0.8rem',
                                                                     textAlign: 'center'
@@ -854,8 +867,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                             <div
                                                                 key={ubo!.id}
                                                                 style={{
-                                                                    background: 'rgba(255,255,255,0.05)',
-                                                                    border: '1px solid rgba(255,255,255,0.1)',
+                                                                    background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)',
+                                                                    border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
                                                                     borderRadius: '12px',
                                                                     padding: '8px 12px',
                                                                     display: 'flex',
@@ -880,8 +893,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                 marginTop: '4px',
                                                                                 padding: '4px 6px',
                                                                                 borderRadius: '4px',
-                                                                                background: ubo!.passportFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                                border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                background: ubo!.passportFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                                border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                                 cursor: ubo!.passportFilePath ? 'pointer' : 'default'
                                                                             }}
                                                                             onClick={() => ubo!.passportFilePath && window.api.fsOpen(ubo!.passportFilePath)}
@@ -898,8 +911,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     fontSize: '0.7rem',
                                                                                     padding: '4px 6px',
                                                                                     borderRadius: '4px',
-                                                                                    background: ubo!.certificateOfIncorporationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                    background: ubo!.certificateOfIncorporationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                                     cursor: ubo!.certificateOfIncorporationPath ? 'pointer' : 'default'
                                                                                 }}
                                                                                 onClick={() => ubo!.certificateOfIncorporationPath && window.api.fsOpen(ubo!.certificateOfIncorporationPath)}
@@ -913,8 +926,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     fontSize: '0.7rem',
                                                                                     padding: '4px 6px',
                                                                                     borderRadius: '4px',
-                                                                                    background: ubo!.articlesOfAssociationPath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                    background: ubo!.articlesOfAssociationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                                     cursor: ubo!.articlesOfAssociationPath ? 'pointer' : 'default'
                                                                                 }}
                                                                                 onClick={() => ubo!.articlesOfAssociationPath && window.api.fsOpen(ubo!.articlesOfAssociationPath)}
@@ -928,8 +941,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     fontSize: '0.7rem',
                                                                                     padding: '4px 6px',
                                                                                     borderRadius: '4px',
-                                                                                    background: ubo!.kycFilePath ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                                                    border: '1px dashed rgba(255,255,255,0.2)',
+                                                                                    background: ubo!.kycFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
                                                                                     cursor: ubo!.kycFilePath ? 'pointer' : 'default'
                                                                                 }}
                                                                                 onClick={() => ubo!.kycFilePath && window.api.fsOpen(ubo!.kycFilePath)}

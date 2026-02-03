@@ -198,7 +198,6 @@ export const ReportService = {
           type.name,
           type.description || '',
           vDoc?.filePath ? 'Compliant' : 'Missing',
-          vDoc?.receivedDate || '-',
           vDoc?.expiryDate || '-'
         ])
       }
@@ -253,48 +252,57 @@ export const ReportService = {
 
     // Header
     doc.setFillColor(15, 18, 24)
-    doc.rect(0, 0, 210, 40, 'F')
+    doc.rect(0, 0, 210, 45, 'F')
 
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
-    doc.text('Compliance Report', 14, 25)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Al Bahriah Insurance & Reinsurance SAL', 14, 15)
 
+    doc.setFontSize(20)
+    doc.text('Compliance Report', 14, 28)
+
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(150, 150, 150)
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 32)
+    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 37)
 
     // Vessel Info Section
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
-    doc.text(vessel.name, 14, 55)
+    doc.text(vessel.name, 14, 58)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(11)
-    doc.text(`IMO Number: ${vessel.imoNumber}`, 14, 62)
+    doc.text(`IMO Number: ${vessel.imoNumber}`, 14, 65)
 
     // Summary Box
     doc.setDrawColor(200, 200, 200)
     doc.setFillColor(245, 247, 249)
-    doc.roundedRect(140, 48, 56, 25, 3, 3, 'FD')
-
-    doc.setFontSize(9)
-    doc.text('Compliance Rate', 145, 55)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(16)
-    doc.setTextColor(parseFloat(complianceRate) > 80 ? 0 : 200, parseFloat(complianceRate) > 80 ? 150 : 0, 0)
-    doc.text(`${complianceRate}%`, 145, 65)
+    doc.roundedRect(140, 52, 56, 25, 3, 3, 'FD')
 
     doc.setFontSize(9)
     doc.setTextColor(100, 100, 100)
-    doc.text(`${compliantCount} / ${requiredCount} Docs`, 145, 70)
+    doc.text('Compliance Rate', 145, 59)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(16)
+    doc.setTextColor(parseFloat(complianceRate) > 80 ? 0 : 200, parseFloat(complianceRate) > 80 ? 150 : 0, 0)
+    doc.text(`${complianceRate}%`, 145, 69)
 
-    let finalY = 80
+    doc.setFontSize(9)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`${compliantCount} / ${requiredCount} Docs`, 145, 74)
+
+    let finalY = 85
     autoTable(doc, {
       startY: finalY,
-      head: [['Document Name', 'Description', 'Status', 'Received', 'Expires']],
+      head: [['Document Name', 'Description', 'Status', 'Expires']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [58, 123, 213], textColor: 255 },
+      columnStyles: {
+        0: { cellWidth: 60 },
+      },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 2) {
           const status = data.cell.raw
@@ -696,7 +704,6 @@ export const ReportService = {
             v.name,
             type.name,
             vDoc?.filePath ? 'Compliant' : 'Missing',
-            vDoc?.receivedDate || '-',
             vDoc?.expiryDate || '-'
           ])
         }
@@ -801,55 +808,60 @@ export const ReportService = {
 
     // Header
     doc.setFillColor(15, 18, 24)
-    doc.rect(0, 0, 210, 40, 'F')
+    doc.rect(0, 0, 210, 45, 'F')
 
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
-    doc.text('Fleet Compliance Report', 14, 25)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Al Bahriah Insurance & Reinsurance SAL', 14, 15)
 
+    doc.setFontSize(20)
+    doc.text('Fleet Compliance Report', 14, 28)
+
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(150, 150, 150)
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 32)
+    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 37)
 
     // Fleet Info Section
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
-    doc.text(fleet.name, 14, 55)
+    doc.text(fleet.name, 14, 58)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(11)
-    doc.text(`Total Vessels: ${vessels.length}  |  Total Assureds: ${assuredMap.size}`, 14, 62)
+    doc.text(`Total Vessels: ${vessels.length}  |  Total Assureds: ${assuredMap.size}`, 14, 65)
 
     // Summary Box
     doc.setDrawColor(200, 200, 200)
     doc.setFillColor(245, 247, 249)
-    doc.roundedRect(140, 48, 56, 25, 3, 3, 'FD')
+    doc.roundedRect(140, 52, 56, 25, 3, 3, 'FD')
 
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text('Fleet Compliance Rate', 142, 55)
+    doc.text('Fleet Compliance Rate', 142, 59)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(16)
     doc.setTextColor(parseFloat(complianceRate) > 80 ? 0 : 200, parseFloat(complianceRate) > 80 ? 150 : 0, 0)
-    doc.text(`${complianceRate}%`, 142, 65)
+    doc.text(`${complianceRate}%`, 142, 69)
 
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text(`${totalCompliant} / ${totalRequired} Docs`, 142, 70)
+    doc.text(`${totalCompliant} / ${totalRequired} Docs`, 142, 74)
 
     // Section 1: Vessel Documents Table
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.text('Vessel Documents', 14, 78)
+    doc.text('Vessel Documents', 14, 83)
 
-    let finalY = 80
+    let finalY = 85
 
     autoTable(doc, {
-      startY: 82,
-      head: [['Vessel', 'Document', 'Status', 'Received', 'Expires']],
+      startY: 87,
+      head: [['Vessel', 'Document', 'Status', 'Expires']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [58, 123, 213], textColor: 255 },

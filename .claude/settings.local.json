@@ -22,7 +22,9 @@
       "Bash(npx:*)",
       "Bash(ls:*)",
       "Bash(done)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(copy:*)",
+      "Bash(git status:*)"
     ]
   }
 }
