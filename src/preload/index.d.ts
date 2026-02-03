@@ -1,6 +1,10 @@
 import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder } from '../shared/types'
 
 export interface Api {
+  login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
+  getSession: () => Promise<Omit<User, 'passwordHash'> | null>
+  logout: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; message?: string }>
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
   authGetSession: () => Promise<Omit<User, 'passwordHash'> | null>
   authLogout: () => Promise<void>

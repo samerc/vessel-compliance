@@ -294,8 +294,34 @@ app.whenReady().then(() => {
     const windowId = BrowserWindow.fromWebContents(webContents)?.id
     if (!windowId) return null
 
-    const sessionId = windowSessions.get(windowId)
+    // Check if we have a session for this window
+    let sessionId = windowSessions.get(windowId)
+
+    // If not, try to restore from persistent storage
+    if (!sessionId) {
+      const restoredSession = auth.getFirstSession()
+      if (restoredSession) {
+        windowSessions.set(windowId, restoredSession.sessionId)
+        sessionId = restoredSession.sessionId
+      }
+    }
+
     return auth.getCurrentUser(sessionId)
+  })
+
+  safeHandle('auth:changePassword', async (event, { currentPassword, newPassword }) => {
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (!windowId) return { success: false, message: 'No active session' }
+
+    const sessionId = windowSessions.get(windowId)
+    const user = auth.getCurrentUser(sessionId)
+
+    if (!user) {
+      return { success: false, message: 'Not authenticated' }
+    }
+
+    return await auth.changePassword(user.id, currentPassword, newPassword)
   })
 
   safeHandle('auth:logout', async (event) => {

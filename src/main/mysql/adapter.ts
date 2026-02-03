@@ -987,6 +987,24 @@ export class MySQLAdapter {
         )
     }
 
+    async getUserById(userId: string): Promise<User | null> {
+        if (!this.pool) return null
+        const [rows]: any[] = await this.pool.query(
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE id = ?',
+            [userId]
+        )
+        return rows.length > 0 ? (rows[0] as User) : null
+    }
+
+    async updateUserPassword(userId: string, newPasswordHash: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE users SET password_hash = ? WHERE id = ?',
+            [newPasswordHash, userId]
+        )
+    }
+
+
     // Settings Management
     async getSetting(key: string): Promise<string | null> {
         if (!this.pool) return null

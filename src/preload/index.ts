@@ -52,9 +52,10 @@ const api = {
   importDefectsFromWord: (surveyId, filePath) => ipcRenderer.invoke('word:importDefects', surveyId, filePath),
 
   // Auth & Setup
-  authLogin: (credentials) => ipcRenderer.invoke('auth:login', credentials),
-  authGetSession: () => ipcRenderer.invoke('auth:getSession'),
-  authLogout: () => ipcRenderer.invoke('auth:logout'),
+  login: (username: string, password: string) => ipcRenderer.invoke('auth:login', { username, password }),
+  logout: () => ipcRenderer.invoke('auth:logout'),
+  changePassword: (currentPassword: string, newPassword: string) => ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
+  getSession: () => ipcRenderer.invoke('auth:getSession'),
   authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),

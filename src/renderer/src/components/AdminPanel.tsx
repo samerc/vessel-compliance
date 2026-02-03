@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell, Key, User as UserIcon } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function AdminPanel() {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
@@ -31,6 +32,13 @@ export default function AdminPanel() {
     })
     const [savingCompliance, setSavingCompliance] = useState(false)
     const [runningManualCheck, setRunningManualCheck] = useState(false)
+    const { user, changePassword } = useAuth()
+
+    // Password change state
+    const [currentPassword, setCurrentPassword] = useState('')
+    const [newPassword, setNewPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [changingPassword, setChangingPassword] = useState(false)
 
     // Collapsible sections
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dangerZone']))
@@ -96,6 +104,36 @@ export default function AdminPanel() {
             showError(error.message || 'Failed to start compliance check')
         } finally {
             setRunningManualCheck(false)
+        }
+    }
+
+    const handlePasswordChange = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (newPassword !== confirmPassword) {
+            showError('New passwords do not match')
+            return
+        }
+        if (newPassword.length < 6) {
+            showError('New password must be at least 6 characters long')
+            return
+        }
+
+        setChangingPassword(true)
+        try {
+            const result = await changePassword(currentPassword, newPassword)
+            if (result.success) {
+                showSuccess('Password changed successfully')
+                setCurrentPassword('')
+                setNewPassword('')
+                setConfirmPassword('')
+                toggleSection('profile')
+            } else {
+                showError(result.message || 'Failed to change password')
+            }
+        } catch (error: any) {
+            showError(error.message || 'Failed to change password')
+        } finally {
+            setChangingPassword(false)
         }
     }
 
@@ -1082,6 +1120,85 @@ export default function AdminPanel() {
                     >
                         <Trash2 size={18} /> Purge All Vessels & Entities
                     </button>
+                </>}
+            </section>
+
+            {/* 8. User Profile Settings */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3
+                    onClick={() => toggleSection('profile')}
+                    style={{ marginBottom: collapsedSections.has('profile') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('profile') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                    <UserIcon size={20} color="var(--accent-primary)" /> My Profile
+                </h3>
+                {!collapsedSections.has('profile') && <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '32px' }}>
+                        <div>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                                Personal information and account details.
+                            </p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Username</div>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{user?.username}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Account Role</div>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: 'var(--accent-primary)', borderRadius: '16px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                        <Shield size={14} /> {user?.role.toUpperCase()}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ borderLeft: '1px solid var(--border-color)', paddingLeft: '32px' }}>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Key size={18} /> Change Password
+                            </h4>
+                            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Current Password</label>
+                                    <input
+                                        type="password"
+                                        value={currentPassword}
+                                        onChange={e => setCurrentPassword(e.target.value)}
+                                        required
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>New Password</label>
+                                    <input
+                                        type="password"
+                                        value={newPassword}
+                                        onChange={e => setNewPassword(e.target.value)}
+                                        required
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Confirm New Password</label>
+                                    <input
+                                        type="password"
+                                        value={confirmPassword}
+                                        onChange={e => setConfirmPassword(e.target.value)}
+                                        required
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={changingPassword}
+                                    className="btn-primary"
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}
+                                >
+                                    {changingPassword ? <Loader2 size={16} className="spinner" /> : <Key size={16} />}
+                                    Update Password
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </>}
             </section>
         </div >

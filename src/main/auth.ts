@@ -2,6 +2,9 @@ import * as bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from './mysql/adapter'
 import { User } from '../shared/types'
+import Store from 'electron-store'
+
+const store = new Store()
 
 interface LoginAttempt {
     count: number
@@ -18,6 +21,41 @@ export class AuthService {
     private readonly LOCKOUT_DURATION = 15 * 60 * 1000 // 15 minutes
     private readonly ATTEMPT_WINDOW = 15 * 60 * 1000 // 15 minutes window to track attempts
 
+    constructor() {
+        // Restore session on startup
+        this.restoreSession()
+    }
+
+    private saveSessionToDisk(sessionId: string, user: Omit<User, 'passwordHash'>): void {
+        store.set('persistentSession', {
+            sessionId,
+            user,
+            timestamp: Date.now()
+        })
+    }
+
+    private clearSessionFromDisk(): void {
+        store.delete('persistentSession')
+    }
+
+    private restoreSession(): void {
+        const savedSession = store.get('persistentSession') as { sessionId: string; user: Omit<User, 'passwordHash'>; timestamp: number } | undefined
+
+        if (savedSession) {
+            // Check if session is still valid (not expired)
+            if (Date.now() - savedSession.timestamp < this.SESSION_TIMEOUT) {
+                this.sessions.set(savedSession.sessionId, {
+                    user: savedSession.user,
+                    timestamp: savedSession.timestamp
+                })
+                console.log('Restored session for user:', savedSession.user.username)
+            } else {
+                // Session expired, clear it
+                this.clearSessionFromDisk()
+            }
+        }
+    }
+
     getCurrentUser(sessionId?: string): Omit<User, 'passwordHash'> | null {
         if (!sessionId) return null
 
@@ -27,11 +65,13 @@ export class AuthService {
         // Check if session is expired
         if (Date.now() - session.timestamp > this.SESSION_TIMEOUT) {
             this.sessions.delete(sessionId)
+            this.clearSessionFromDisk()
             return null
         }
 
         // Update timestamp on activity
         session.timestamp = Date.now()
+        this.saveSessionToDisk(sessionId, session.user)
         return session.user
     }
 
@@ -48,11 +88,13 @@ export class AuthService {
     createSession(user: Omit<User, 'passwordHash'>): string {
         const sessionId = require('uuid').v4()
         this.sessions.set(sessionId, { user, timestamp: Date.now() })
+        this.saveSessionToDisk(sessionId, user)
         return sessionId
     }
 
     clearSession(sessionId: string): void {
         this.sessions.delete(sessionId)
+        this.clearSessionFromDisk()
     }
 
     async createInitialAdmin(): Promise<boolean> {
@@ -167,6 +209,40 @@ export class AuthService {
             role
         })
         return { success: true }
+    }
+
+    async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; message?: string }> {
+        // Get user by ID
+        const user = await db.getUserById(userId)
+        if (!user) {
+            return { success: false, message: 'User not found' }
+        }
+
+        // Verify current password
+        const match = await bcrypt.compare(currentPassword, user.passwordHash)
+        if (!match) {
+            return { success: false, message: 'Current password is incorrect' }
+        }
+
+        // Validate new password
+        if (newPassword.length < 6) {
+            return { success: false, message: 'New password must be at least 6 characters long' }
+        }
+
+        // Hash and update password
+        const newPasswordHash = await bcrypt.hash(newPassword, 10)
+        await db.updateUserPassword(userId, newPasswordHash)
+
+        return { success: true, message: 'Password changed successfully' }
+    }
+
+    // Get the first available session (for auto-login)
+    getFirstSession(): { sessionId: string; user: Omit<User, 'passwordHash'> } | null {
+        const firstEntry = this.sessions.entries().next()
+        if (firstEntry.done) return null
+
+        const [sessionId, session] = firstEntry.value
+        return { sessionId, user: session.user }
     }
 }
 
