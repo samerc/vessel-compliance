@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X } from 'lucide-react'
 import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
@@ -46,6 +46,7 @@ export default function VesselManager() {
     // Add Mode
     const [newVessel, setNewVessel] = useState({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' as '' | 'broker' | 'direct' })
     const [isAdding, setIsAdding] = useState(false)
+    const [showQuickAdd, setShowQuickAdd] = useState(false)
 
     // Sanctions checking state
     const [checkingVesselId, setCheckingVesselId] = useState<string | null>(null)
@@ -357,70 +358,82 @@ export default function VesselManager() {
 
     return (
         <div className="fade-in">
-            <header style={{ marginBottom: '32px' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Vessel Registry</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Search, filter, and manage all vessels across your fleets.</p>
+            <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Vessel Registry</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Search, filter, and manage all vessels across your fleets.</p>
+                </div>
+                <button
+                    onClick={() => setShowQuickAdd(!showQuickAdd)}
+                    className={showQuickAdd ? 'btn-secondary' : 'btn-primary'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
+                >
+                    {showQuickAdd ? <X size={20} /> : <Plus size={20} />}
+                    {showQuickAdd ? 'Cancel' : 'Add Vessel'}
+                </button>
             </header>
 
-            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Ship size={20} color="var(--accent-primary)" /> Quick Register
-                </h3>
-                <form onSubmit={handleAddVessel} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <input
-                        type="text"
-                        value={newVessel.name}
-                        onChange={e => setNewVessel({ ...newVessel, name: e.target.value.toUpperCase() })}
-                        style={{ flex: 2, minWidth: '200px', textTransform: 'uppercase' }}
-                        placeholder="Vessel Name"
-                        aria-label="Vessel name"
-                    />
-                    <input
-                        type="text"
-                        value={newVessel.imo}
-                        onChange={e => setNewVessel({ ...newVessel, imo: e.target.value })}
-                        style={{ flex: 1, minWidth: '120px' }}
-                        placeholder="IMO No."
-                        aria-label="IMO number"
-                    />
-                    <select
-                        value={newVessel.fleetId}
-                        onChange={e => setNewVessel({ ...newVessel, fleetId: e.target.value })}
-                        style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
-                        aria-label="Fleet assignment"
-                    >
-                        <option value="">Standalone</option>
-                        {fleets.map(f => (
-                            <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={newVessel.customerId}
-                        onChange={e => setNewVessel({ ...newVessel, customerId: e.target.value })}
-                        style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
-                        aria-label="Customer"
-                    >
-                        <option value="">No Customer</option>
-                        {entities.map(e => (
-                            <option key={e.id} value={e.id}>{e.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={newVessel.customerType}
-                        onChange={e => setNewVessel({ ...newVessel, customerType: e.target.value as any })}
-                        style={{ flex: 1, minWidth: '120px', color: 'var(--text-primary)' }}
-                        aria-label="Customer type"
-                    >
-                        <option value="">Type</option>
-                        <option value="broker">Broker</option>
-                        <option value="direct">Direct</option>
-                    </select>
-                    <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {isAdding && <Loader2 size={16} className="spinner" />}
-                        {isAdding ? 'Registering...' : 'Register'}
-                    </button>
-                </form>
-            </section>
+            {showQuickAdd && (
+                <section className="glass-card fade-in" style={{ padding: '24px', marginBottom: '32px', border: '1px solid var(--accent-primary)' }}>
+                    <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Ship size={20} color="var(--accent-primary)" /> Quick Register
+                    </h3>
+                    <form onSubmit={handleAddVessel} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            value={newVessel.name}
+                            onChange={e => setNewVessel({ ...newVessel, name: e.target.value.toUpperCase() })}
+                            style={{ flex: 2, minWidth: '200px', textTransform: 'uppercase' }}
+                            placeholder="Vessel Name"
+                            aria-label="Vessel name"
+                        />
+                        <input
+                            type="text"
+                            value={newVessel.imo}
+                            onChange={e => setNewVessel({ ...newVessel, imo: e.target.value })}
+                            style={{ flex: 1, minWidth: '120px' }}
+                            placeholder="IMO No."
+                            aria-label="IMO number"
+                        />
+                        <select
+                            value={newVessel.fleetId}
+                            onChange={e => setNewVessel({ ...newVessel, fleetId: e.target.value })}
+                            style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
+                            aria-label="Fleet assignment"
+                        >
+                            <option value="">Standalone</option>
+                            {fleets.map(f => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={newVessel.customerId}
+                            onChange={e => setNewVessel({ ...newVessel, customerId: e.target.value })}
+                            style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
+                            aria-label="Customer"
+                        >
+                            <option value="">No Customer</option>
+                            {entities.map(e => (
+                                <option key={e.id} value={e.id}>{e.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={newVessel.customerType}
+                            onChange={e => setNewVessel({ ...newVessel, customerType: e.target.value as any })}
+                            style={{ flex: 1, minWidth: '120px', color: 'var(--text-primary)' }}
+                            aria-label="Customer type"
+                        >
+                            <option value="">Type</option>
+                            <option value="broker">Broker</option>
+                            <option value="direct">Direct</option>
+                        </select>
+                        <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {isAdding && <Loader2 size={16} className="spinner" />}
+                            {isAdding ? 'Registering...' : 'Register'}
+                        </button>
+                    </form>
+                </section>
+            )}
 
             <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>

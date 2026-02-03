@@ -41,6 +41,7 @@ const api = {
   getEntityUBOs: (assuredEntityId) => ipcRenderer.invoke('db:getEntityUBOs', assuredEntityId),
   addEntityUBO: (ubo) => ipcRenderer.invoke('db:addEntityUBO', ubo),
   deleteEntityUBO: (ubo) => ipcRenderer.invoke('db:deleteEntityUBO', ubo),
+  maintenanceSyncSettings: () => ipcRenderer.invoke('maintenance:syncSettings'),
 
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   fsOpen: (filePath) => ipcRenderer.invoke('fs:open', filePath),
@@ -56,6 +57,7 @@ const api = {
   logout: () => ipcRenderer.invoke('auth:logout'),
   changePassword: (currentPassword: string, newPassword: string) => ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
   getSession: () => ipcRenderer.invoke('auth:getSession'),
+  authResetPassword: (username: string) => ipcRenderer.invoke('auth:resetPassword', { username }),
   authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),

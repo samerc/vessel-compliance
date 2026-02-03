@@ -836,8 +836,17 @@ export class MySQLAdapter {
     // --- Roles ---
     async getAssuredRoles(): Promise<AssuredRole[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name FROM assured_roles')
-        return rows as AssuredRole[]
+        const [rows] = await this.pool.query(`
+            SELECT ar.id, ar.name, COUNT(DISTINCT va.vessel_id) as vesselCount
+            FROM assured_roles ar
+            LEFT JOIN vessel_assureds va ON ar.name = va.role
+            GROUP BY ar.id, ar.name
+            ORDER BY ar.name ASC
+        `)
+        return (rows as any[]).map(r => ({
+            ...r,
+            vesselCount: Number(r.vesselCount)
+        }))
     }
 
     async addAssuredRole(role: Omit<AssuredRole, 'id'>): Promise<AssuredRole> {
@@ -849,6 +858,11 @@ export class MySQLAdapter {
 
     async updateAssuredRole(id: string, updates: Partial<AssuredRole>): Promise<void> {
         if (!this.pool) return
+
+        // Fetch old role name for syncing with vessel_assureds
+        const [oldRows] = await this.pool.execute('SELECT name FROM assured_roles WHERE id = ?', [id])
+        const oldRole = (oldRows as any[])[0]
+
         const fields: string[] = []
         const values: any[] = []
 
@@ -856,12 +870,52 @@ export class MySQLAdapter {
 
         if (fields.length === 0) return
         values.push(id)
-        await this.pool.execute(`UPDATE assured_roles SET ${fields.join(', ')} WHERE id = ?`, values)
+
+        const connection = await this.pool.getConnection()
+        await connection.beginTransaction()
+        try {
+            await connection.execute(`UPDATE assured_roles SET ${fields.join(', ')} WHERE id = ?`, values)
+
+            if (updates.name !== undefined && oldRole && oldRole.name !== updates.name) {
+                // Sync with vessel_assureds table
+                await connection.execute('UPDATE vessel_assureds SET role = ? WHERE role = ?', [updates.name, oldRole.name])
+            }
+
+            await connection.commit()
+        } catch (error) {
+            await connection.rollback()
+            throw error
+        } finally {
+            connection.release()
+        }
     }
 
     async deleteAssuredRole(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM assured_roles WHERE id = ?', [id])
+    }
+
+    async syncAssuredRoles(): Promise<{ added: number }> {
+        if (!this.pool) throw new Error('DB Not connected')
+
+        // 1. Get all unique roles from vessel_assureds
+        const [usedRows] = await this.pool.query('SELECT DISTINCT role FROM vessel_assureds')
+        const usedRoles = (usedRows as any[]).map(r => r.role)
+
+        // 2. Get all existing roles from assured_roles
+        const existingRoles = await this.getAssuredRoles()
+        const existingRoleNames = new Set(existingRoles.map(r => r.name.toLowerCase()))
+
+        // 3. Find missing roles and add them
+        let addedCount = 0
+        for (const roleName of usedRoles) {
+            if (roleName && !existingRoleNames.has(roleName.toLowerCase())) {
+                await this.addAssuredRole({ name: roleName })
+                addedCount++
+            }
+        }
+
+        return { added: addedCount }
     }
 
     // --- Vessel Assureds ---

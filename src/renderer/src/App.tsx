@@ -11,6 +11,7 @@ import UserManager from './components/UserManager'
 import SurveyorDirectory from './components/SurveyorDirectory'
 import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
+import UserProfileModal from './components/UserProfileModal'
 import SanctionsSearch from './components/SanctionsSearch'
 import ReminderCenter from './components/ReminderCenter'
 import Calculators from './components/Calculators'
@@ -21,12 +22,17 @@ import { UpdateNotification } from './components/UpdateNotification'
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'entities' | 'compliance' | 'users' | 'surveyors' | 'sanctions-search' | 'reminders' | 'calculators'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
+  const [appVersion, setAppVersion] = useState<string>('')
+  const [showProfile, setShowProfile] = useState(false)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
 
   useEffect(() => {
     // Check initial connection
     window.api.setupCheckConnection().then(setDbConnected)
+
+    // Fetch version
+    window.api.updateGetCurrentVersion().then(setAppVersion)
 
     // Listen for status updates
     window.api.onDbStatus((status) => {
@@ -67,7 +73,19 @@ function App(): React.JSX.Element {
       <a href="#main-content" className="sr-only">Skip to main content</a>
       <div className="layout-container">
         <aside className="sidebar">
-          <div style={{ paddingBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            onClick={() => setShowProfile(true)}
+            style={{
+              paddingBottom: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              cursor: 'pointer',
+              transition: 'var(--transition)'
+            }}
+            className="hover-effect"
+            title="View Profile"
+          >
             <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '8px' }} aria-hidden="true"></div>
             <div>
               <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Vessel Compliance</h2>
@@ -164,7 +182,7 @@ function App(): React.JSX.Element {
               onClick={logout}
             />
             <div style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.5, marginTop: '8px' }}>
-              v{__APP_VERSION__}
+              v{appVersion}
             </div>
           </div>
         </aside>
@@ -183,6 +201,7 @@ function App(): React.JSX.Element {
           {activeTab === 'calculators' && <Calculators />}
         </main>
         <UpdateNotification />
+        {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
       </div>
     </ErrorBoundary>
   )

@@ -6,6 +6,7 @@ interface AuthContextType {
     login: (credentials: { username: string; password: string }) => Promise<{ success: boolean; message?: string }>
     logout: () => void
     changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; message?: string }>
+    resetPassword: (username: string) => Promise<{ success: boolean; message?: string; newPassword?: string }>
     isAuthenticated: boolean
     isAdmin: boolean
 }
@@ -53,6 +54,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return await window.api.changePassword(currentPassword, newPassword)
     }
 
+    const resetPassword = async (username: string) => {
+        return await window.api.authResetPassword(username)
+    }
+
     if (loading) {
         return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading...</div>
     }
@@ -64,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 login,
                 logout,
                 changePassword,
+                resetPassword,
                 isAuthenticated: !!user,
                 isAdmin: user?.role === 'admin'
             }}

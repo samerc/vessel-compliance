@@ -7,6 +7,7 @@ export interface Api {
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; message?: string }>
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
   authGetSession: () => Promise<Omit<User, 'passwordHash'> | null>
+  authResetPassword: (username: string) => Promise<{ success: boolean; message?: string; newPassword?: string }>
   authLogout: () => Promise<void>
   authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string }>
   getUsers: () => Promise<User[]>
@@ -57,6 +58,7 @@ export interface Api {
   getEntityUBOs: (assuredEntityId?: string) => Promise<EntityUBO[]>
   addEntityUBO: (ubo: EntityUBO) => Promise<void>
   deleteEntityUBO: (ubo: EntityUBO) => Promise<void>
+  maintenanceSyncSettings: () => Promise<{ added: number }>
 
   fsExists: (filePath: string) => Promise<boolean>
   fsOpen: (filePath: string) => Promise<void>

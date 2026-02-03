@@ -79,7 +79,7 @@ function safeHandle(
     try {
       return await handler(event, ...args)
     } catch (error: any) {
-      console.error(`IPC handler error [${channel}]:`, error?.message || error)
+      console.error(`IPC handler error[${channel}]: `, error?.message || error)
       return { error: true, message: error?.message || 'An unexpected error occurred' }
     }
   })
@@ -301,8 +301,11 @@ app.whenReady().then(() => {
     if (!sessionId) {
       const restoredSession = auth.getFirstSession()
       if (restoredSession) {
+        console.log(`[IPC] Restoring session ${restoredSession.sessionId} for window ${windowId}`)
         windowSessions.set(windowId, restoredSession.sessionId)
         sessionId = restoredSession.sessionId
+      } else {
+        console.log(`[IPC] No session found to restore for window ${windowId}`)
       }
     }
 
@@ -322,6 +325,10 @@ app.whenReady().then(() => {
     }
 
     return await auth.changePassword(user.id, currentPassword, newPassword)
+  })
+
+  safeHandle('auth:resetPassword', async (_event, { username }) => {
+    return await auth.resetPassword(username)
   })
 
   safeHandle('auth:logout', async (event) => {
@@ -401,7 +408,7 @@ app.whenReady().then(() => {
     const normalizeExtensions = (exts: string[]) => {
       return exts.map(ext => {
         ext = ext.toLowerCase().trim()
-        return ext.startsWith('.') ? ext : `.${ext}`
+        return ext.startsWith('.') ? ext : `.${ext} `
       })
     }
 
@@ -849,6 +856,7 @@ app.whenReady().then(() => {
   })
   safeHandle('db:deleteEntity', (event, id) => { requireAdmin(event); return db.deleteEntity(id) })
   safeHandle('db:purgeAllVesselsAndEntities', (event) => { requireAdmin(event); return db.purgeAllVesselsAndEntities() })
+  safeHandle('maintenance:syncSettings', (event) => { requireAdmin(event); return db.syncAssuredRoles() })
 
   safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
   safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })
@@ -986,7 +994,7 @@ app.whenReady().then(() => {
 
       worker.on('exit', (code) => {
         if (code !== 0) {
-          console.error(`Worker stopped with exit code ${code}`)
+          console.error(`Worker stopped with exit code ${code} `)
           resolve({ success: false, message: 'Worker stopped unexpectedly', count: 0 })
         }
       })

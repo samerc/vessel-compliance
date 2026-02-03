@@ -3,11 +3,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { Shield } from 'lucide-react'
 
 export const LoginScreen: React.FC = () => {
-    const { login } = useAuth()
+    const { login, resetPassword } = useAuth()
+    const [view, setView] = useState<'login' | 'forgot'>('login')
     const [formData, setFormData] = useState({
         username: '',
         password: ''
     })
+    const [resetUsername, setResetUsername] = useState('')
+    const [newPassword, setNewPassword] = useState<string | null>(null)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
@@ -25,6 +28,26 @@ export const LoginScreen: React.FC = () => {
             const result = await login(formData)
             if (!result.success) {
                 setError(result.message || 'Login failed')
+            }
+        } catch (err: any) {
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleReset = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+        setLoading(true)
+        setNewPassword(null)
+
+        try {
+            const result = await resetPassword(resetUsername)
+            if (result.success && result.newPassword) {
+                setNewPassword(result.newPassword)
+            } else {
+                setError(result.message || 'Reset failed')
             }
         } catch (err: any) {
             setError(err.message)
@@ -58,7 +81,9 @@ export const LoginScreen: React.FC = () => {
                         <Shield style={{ width: '32px', height: '32px', color: 'white' }} />
                     </div>
                     <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Vessel Compliance</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Sign in to continue</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>
+                        {view === 'login' ? 'Sign in to continue' : 'Reset your password'}
+                    </p>
                 </div>
 
                 {error && (
@@ -76,70 +101,113 @@ export const LoginScreen: React.FC = () => {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <div>
-                        <label htmlFor="login-username" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Username</label>
-                        <input
-                            id="login-username"
-                            type="text"
-                            name="username"
-                            value={formData.username}
-                            onChange={handleChange}
-                            style={{
-                                width: '100%',
-                                padding: '0.75rem 1rem',
-                                borderRadius: '0.5rem',
-                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                color: 'var(--text-primary)',
-                                outline: 'none'
-                            }}
-                            placeholder="Enter your username"
-                            required
-                            autoFocus
-                        />
-                    </div>
+                {view === 'login' ? (
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        <div>
+                            <label htmlFor="login-username" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Username</label>
+                            <input
+                                id="login-username"
+                                type="text"
+                                name="username"
+                                value={formData.username}
+                                onChange={handleChange}
+                                style={{ width: '100%' }}
+                                placeholder="Enter your username"
+                                required
+                                autoFocus
+                            />
+                        </div>
 
-                    <div>
-                        <label htmlFor="login-password" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Password</label>
-                        <input
-                            id="login-password"
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            style={{
-                                width: '100%',
-                                padding: '0.75rem 1rem',
-                                borderRadius: '0.5rem',
-                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                color: 'var(--text-primary)',
-                                outline: 'none'
-                            }}
-                            placeholder="••••••••"
-                            required
-                        />
-                    </div>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                <label htmlFor="login-password" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Password</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setView('forgot')}
+                                    style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                >
+                                    Forgot password?
+                                </button>
+                            </div>
+                            <input
+                                id="login-password"
+                                type="password"
+                                name="password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                style={{ width: '100%' }}
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        aria-busy={loading}
-                        className="btn-primary"
-                        style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            fontSize: '1rem',
-                            marginTop: '0.5rem',
-                            opacity: loading ? 0.7 : 1,
-                            cursor: loading ? 'not-allowed' : 'pointer'
-                        }}
-                    >
-                        {loading ? 'Signing In...' : 'Sign In'}
-                    </button>
-                </form>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="btn-primary"
+                            style={{ padding: '0.75rem', fontSize: '1rem', marginTop: '0.5rem' }}
+                        >
+                            {loading ? 'Signing In...' : 'Sign In'}
+                        </button>
+                    </form>
+                ) : (
+                    <div className="fade-in">
+                        {newPassword ? (
+                            <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Your new temporary password is:</p>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#86efac', letterSpacing: '0.1em', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', margin: '0.5rem 0' }}>
+                                    {newPassword}
+                                </div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.5rem' }}>Please copy this password and sign in.</p>
+                                <button
+                                    onClick={() => { setView('login'); setNewPassword(null); setResetUsername(''); }}
+                                    className="btn-primary"
+                                    style={{ width: '100%', marginTop: '1rem' }}
+                                >
+                                    Back to Login
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                <div>
+                                    <label htmlFor="reset-username" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Username</label>
+                                    <input
+                                        id="reset-username"
+                                        type="text"
+                                        value={resetUsername}
+                                        onChange={e => setResetUsername(e.target.value)}
+                                        style={{ width: '100%' }}
+                                        placeholder="Enter your username to reset"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setView('login')}
+                                        className="btn-secondary"
+                                        style={{ flex: 1 }}
+                                    >
+                                        Back
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="btn-primary"
+                                        style={{ flex: 1.5 }}
+                                    >
+                                        {loading ? 'Resetting...' : 'Reset Password'}
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' }}>
+                                    Note: Your new password will be displayed on screen.
+                                </p>
+                            </form>
+                        )}
+                    </div>
+                )}
             </div>
-        </div >
+        </div>
     )
 }

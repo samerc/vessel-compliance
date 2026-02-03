@@ -55,6 +55,7 @@ export interface Entity {
 export interface AssuredRole {
   id: string
   name: string
+  vesselCount?: number
 }
 
 export interface VesselAssured {

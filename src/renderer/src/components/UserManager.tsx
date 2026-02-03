@@ -1,9 +1,33 @@
 import { useState, useEffect } from 'react'
 import { User } from '../../../shared/types'
-import { Trash2, Shield } from 'lucide-react'
+import { Trash2, Shield, RefreshCcw } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function UserManager() {
+    const { resetPassword } = useAuth()
     const [users, setUsers] = useState<User[]>([])
+    // ... (rest of states)
+    const [resettingUser, setResettingUser] = useState<string | null>(null)
+    const [tempPassword, setTempPassword] = useState<string | null>(null)
+
+    const handleResetPassword = async (username: string) => {
+        if (!confirm(`Are you sure you want to reset the password for ${username}?`)) return
+
+        setResettingUser(username)
+        setTempPassword(null)
+        try {
+            const result = await resetPassword(username)
+            if (result.success && result.newPassword) {
+                setTempPassword(result.newPassword)
+            } else {
+                alert(result.message || 'Failed to reset password')
+            }
+        } catch (err: any) {
+            alert(err.message)
+        }
+    }
+
+    // ... (rest of component)
     const [loading, setLoading] = useState(true)
     const [formData, setFormData] = useState({
         username: '',
@@ -105,6 +129,22 @@ export default function UserManager() {
                 <div style={{ color: 'var(--text-secondary)' }}>Loading users...</div>
             ) : (
                 <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+                    {tempPassword && (
+                        <div style={{ padding: '16px', background: 'rgba(34, 197, 94, 0.1)', borderBottom: '1px solid var(--table-border)', textAlign: 'center' }}>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                New password for <strong>{resettingUser}</strong>:
+                            </p>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#86efac', margin: '8px 0' }}>
+                                {tempPassword}
+                            </div>
+                            <button
+                                onClick={() => { setTempPassword(null); setResettingUser(null); }}
+                                style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    )}
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
                         <caption className="sr-only">User accounts</caption>
                         <thead>
@@ -143,15 +183,26 @@ export default function UserManager() {
                                         {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>
-                                        <button
-                                            onClick={() => handleDelete(user.id)}
-                                            style={{ background: 'transparent', color: 'var(--danger)', padding: '8px' }}
-                                            className="hover-effect"
-                                            title="Delete User"
-                                            aria-label="Delete user"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                            <button
+                                                onClick={() => handleResetPassword(user.username)}
+                                                style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '8px' }}
+                                                className="hover-effect"
+                                                title="Reset Password"
+                                                aria-label="Reset password"
+                                            >
+                                                <RefreshCcw size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(user.id)}
+                                                style={{ background: 'transparent', color: 'var(--danger)', padding: '8px' }}
+                                                className="hover-effect"
+                                                title="Delete User"
+                                                aria-label="Delete user"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

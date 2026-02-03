@@ -16,7 +16,7 @@ interface LoginAttempt {
 export class AuthService {
     private sessions: Map<string, { user: Omit<User, 'passwordHash'>; timestamp: number }> = new Map()
     private loginAttempts: Map<string, LoginAttempt> = new Map()
-    private readonly SESSION_TIMEOUT = 2 * 60 * 60 * 1000 // 2 hours
+    private readonly SESSION_TIMEOUT = 30 * 24 * 60 * 60 * 1000 // 30 days for persistent login
     private readonly MAX_LOGIN_ATTEMPTS = 5
     private readonly LOCKOUT_DURATION = 15 * 60 * 1000 // 15 minutes
     private readonly ATTEMPT_WINDOW = 15 * 60 * 1000 // 15 minutes window to track attempts
@@ -48,11 +48,14 @@ export class AuthService {
                     user: savedSession.user,
                     timestamp: savedSession.timestamp
                 })
-                console.log('Restored session for user:', savedSession.user.username)
+                console.log(`[AuthService] Restored session for user: ${savedSession.user.username} (ID: ${savedSession.sessionId})`)
             } else {
+                console.log('[AuthService] Persistent session found but expired')
                 // Session expired, clear it
                 this.clearSessionFromDisk()
             }
+        } else {
+            console.log('[AuthService] No persistent session found on disk')
         }
     }
 
@@ -86,7 +89,7 @@ export class AuthService {
     }
 
     createSession(user: Omit<User, 'passwordHash'>): string {
-        const sessionId = require('uuid').v4()
+        const sessionId = uuidv4()
         this.sessions.set(sessionId, { user, timestamp: Date.now() })
         this.saveSessionToDisk(sessionId, user)
         return sessionId
@@ -235,6 +238,26 @@ export class AuthService {
 
         return { success: true, message: 'Password changed successfully' }
     }
+
+    async resetPassword(username: string): Promise<{ success: boolean; message?: string; newPassword?: string }> {
+        const user = await db.getUser(username)
+        if (!user) {
+            return { success: false, message: 'User not found' }
+        }
+
+        // Generate a simple temporary password (as requested)
+        const tempPassword = Math.random().toString(36).slice(-8)
+        const passwordHash = await bcrypt.hash(tempPassword, 10)
+
+        await db.updateUserPassword(user.id, passwordHash)
+
+        return {
+            success: true,
+            message: 'Password has been reset',
+            newPassword: tempPassword
+        }
+    }
+
 
     // Get the first available session (for auto-login)
     getFirstSession(): { sessionId: string; user: Omit<User, 'passwordHash'> } | null {
