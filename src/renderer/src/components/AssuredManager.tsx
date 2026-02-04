@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Edit2, X, Save } from 'lucide-react'
+import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save } from 'lucide-react'
 import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
+import { useAuth } from '../contexts/AuthContext'
 
 interface AssuredManagerProps {
     vessel: Vessel
@@ -17,6 +18,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [entityUBOs, setEntityUBOs] = useState<EntityUBO[]>([])
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
+    const { isAdmin } = useAuth()
     const isLight = theme === 'light'
 
     const [showAddForm, setShowAddForm] = useState(false)
@@ -510,13 +512,15 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Users size={20} color="var(--accent-primary)" /> Assureds & UBOs
                 </h3>
-                <button
-                    onClick={() => { setShowAddForm(!showAddForm); setSelectedEntityId(null); }}
-                    className="btn-primary"
-                    style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-                >
-                    {showAddForm ? 'Cancel' : <><UserPlus size={16} /> Add Assured</>}
-                </button>
+                {isAdmin && (
+                    <button
+                        onClick={() => { setShowAddForm(!showAddForm); setSelectedEntityId(null); }}
+                        className="btn-primary"
+                        style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                    >
+                        {showAddForm ? 'Cancel' : <><UserPlus size={16} /> Add Assured</>}
+                    </button>
+                )}
             </header>
 
             {showAddForm && (
@@ -747,17 +751,23 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                         </button>
                                                     </>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => { setEditingVesselAssuredId(va.id); setEditRoleValue(va.role); }}
-                                                        style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '4px' }}
-                                                        title="Edit Role"
-                                                    >
-                                                        <Edit2 size={18} />
+                                                    <>
+                                                        {isAdmin && (
+                                                            <button
+                                                                onClick={() => { setEditingVesselAssuredId(va.id); setEditRoleValue(va.role); }}
+                                                                style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '4px' }}
+                                                                title="Edit Role"
+                                                            >
+                                                                <Pencil size={18} />
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                )}
+                                                {isAdmin && (
+                                                    <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }} title="Remove Assured" aria-label="Remove assured">
+                                                        <Trash2 size={18} />
                                                     </button>
                                                 )}
-                                                <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }} title="Remove Assured" aria-label="Remove assured">
-                                                    <Trash2 size={18} />
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
