@@ -866,6 +866,7 @@ app.whenReady().then(() => {
   safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
   safeHandle('db:addVesselAssured', (event, assured) => { requireSession(event); return db.addVesselAssured(assured) })
   safeHandle('db:deleteVesselAssured', (event, id) => { requireSession(event); return db.deleteVesselAssured(id) })
+  safeHandle('db:updateVesselAssuredRole', (event, id, role) => { requireSession(event); return db.updateVesselAssuredRole(id, role) })
 
   safeHandle('db:getEntityUBOs', (event, assuredEntityId) => { requireSession(event); return db.getEntityUBOs(assuredEntityId) })
   safeHandle('db:addEntityUBO', (event, ubo) => { requireSession(event); return db.addEntityUBO(ubo) })

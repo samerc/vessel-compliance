@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
+import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Edit2, X, Save } from 'lucide-react'
 import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
@@ -35,6 +35,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
     const [selectedUBOId, setSelectedUBOId] = useState<string | null>(null)
+
+    // Editing state for assured roles
+    const [editingVesselAssuredId, setEditingVesselAssuredId] = useState<string | null>(null)
+    const [editRoleValue, setEditRoleValue] = useState('')
+    const [isUpdatingRole, setIsUpdatingRole] = useState(false)
 
     // Loading states
     const [isAddingAssured, setIsAddingAssured] = useState(false)
@@ -173,6 +178,27 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             showError(error.message || 'Failed to add UBO. Please try again.')
         } finally {
             setIsAddingUBO(false)
+        }
+    }
+
+    const handleUpdateRole = async (id: string) => {
+        if (!editRoleValue.trim()) return
+        setIsUpdatingRole(true)
+        try {
+            // Auto-register role if it doesn't exist
+            const roleExists = roles.some(r => r.name.toLowerCase() === editRoleValue.trim().toLowerCase())
+            if (!roleExists) {
+                await window.api.addAssuredRole({ name: editRoleValue.trim() })
+            }
+
+            await window.api.updateVesselAssuredRole(id, editRoleValue.trim())
+            showSuccess('Role updated successfully')
+            setEditingVesselAssuredId(null)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to update role.')
+        } finally {
+            setIsUpdatingRole(false)
         }
     }
 
@@ -666,7 +692,27 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             </div>
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            <span style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>{va.role}</span>
+                                            {editingVesselAssuredId === va.id ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <input
+                                                        list="role-suggestions-edit"
+                                                        type="text"
+                                                        value={editRoleValue}
+                                                        onChange={e => setEditRoleValue(e.target.value)}
+                                                        style={{ padding: '4px 8px', fontSize: '0.8rem', width: '150px' }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleUpdateRole(va.id)
+                                                            if (e.key === 'Escape') setEditingVesselAssuredId(null)
+                                                        }}
+                                                        autoFocus
+                                                    />
+                                                    <datalist id="role-suggestions-edit">
+                                                        {roles.map(r => <option key={r.id} value={r.name} />)}
+                                                    </datalist>
+                                                </div>
+                                            ) : (
+                                                <span style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>{va.role}</span>
+                                            )}
                                         </td>
                                         <td style={{ padding: '16px' }}>
                                             <button
@@ -679,9 +725,40 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             </button>
                                         </td>
                                         <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)' }} title="Remove Assured" aria-label="Remove assured">
-                                                <Trash2 size={18} />
-                                            </button>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                                {editingVesselAssuredId === va.id ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleUpdateRole(va.id)}
+                                                            className="btn-secondary"
+                                                            style={{ padding: '4px', color: 'var(--success)' }}
+                                                            title="Save Role"
+                                                            disabled={isUpdatingRole}
+                                                        >
+                                                            {isUpdatingRole ? <Loader2 size={18} className="spinner" /> : <Save size={18} />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingVesselAssuredId(null)}
+                                                            className="btn-secondary"
+                                                            style={{ padding: '4px', color: 'var(--danger)' }}
+                                                            title="Cancel"
+                                                        >
+                                                            <X size={18} />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => { setEditingVesselAssuredId(va.id); setEditRoleValue(va.role); }}
+                                                        style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '4px' }}
+                                                        title="Edit Role"
+                                                    >
+                                                        <Edit2 size={18} />
+                                                    </button>
+                                                )}
+                                                <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }} title="Remove Assured" aria-label="Remove assured">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {isExpanded && (

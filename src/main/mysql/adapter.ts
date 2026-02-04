@@ -946,6 +946,11 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM vessel_assureds WHERE id = ?', [id])
     }
 
+    async updateVesselAssuredRole(id: string, role: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE vessel_assureds SET role = ? WHERE id = ?', [role, id])
+    }
+
     // --- Entity UBOs ---
     async getEntityUBOs(assuredEntityId?: string): Promise<EntityUBO[]> {
         if (!this.pool) return []

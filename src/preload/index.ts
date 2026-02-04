@@ -37,6 +37,7 @@ const api = {
   getVesselAssureds: (vesselId) => ipcRenderer.invoke('db:getVesselAssureds', vesselId),
   addVesselAssured: (assured) => ipcRenderer.invoke('db:addVesselAssured', assured),
   deleteVesselAssured: (id) => ipcRenderer.invoke('db:deleteVesselAssured', id),
+  updateVesselAssuredRole: (id, role) => ipcRenderer.invoke('db:updateVesselAssuredRole', id, role),
 
   getEntityUBOs: (assuredEntityId) => ipcRenderer.invoke('db:getEntityUBOs', assuredEntityId),
   addEntityUBO: (ubo) => ipcRenderer.invoke('db:addEntityUBO', ubo),

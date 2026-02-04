@@ -54,6 +54,7 @@ export interface Api {
   getVesselAssureds: (vesselId?: string) => Promise<VesselAssured[]>
   addVesselAssured: (assured: Omit<VesselAssured, 'id'>) => Promise<VesselAssured>
   deleteVesselAssured: (id: string) => Promise<void>
+  updateVesselAssuredRole: (id: string, role: string) => Promise<void>
 
   getEntityUBOs: (assuredEntityId?: string) => Promise<EntityUBO[]>
   addEntityUBO: (ubo: EntityUBO) => Promise<void>
