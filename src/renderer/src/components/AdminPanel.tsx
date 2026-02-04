@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell, RefreshCw } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell, RefreshCw, ClipboardCheck } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
 export default function AdminPanel() {
@@ -11,6 +11,8 @@ export default function AdminPanel() {
     const [newOrder, setNewOrder] = useState(0)
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [newRole, setNewRole] = useState('')
+    const [surveyTypes, setSurveyTypes] = useState<ConditionSurveyType[]>([])
+    const [newSurveyType, setNewSurveyType] = useState('')
     const [importing, setImporting] = useState(false)
     const [importStatus, setImportStatus] = useState<string>('')
     const [fileTypeSettings, setFileTypeSettings] = useState<FileTypeSettings>({ allowedExtensions: [], blockedExtensions: [] })
@@ -34,7 +36,7 @@ export default function AdminPanel() {
     const [runningManualCheck, setRunningManualCheck] = useState(false)
 
     // Collapsible sections
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dangerZone']))
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dangerZone']))
     const toggleSection = (id: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev)
@@ -136,6 +138,7 @@ export default function AdminPanel() {
     const loadData = async () => {
         await loadDocTypes()
         await loadRoles()
+        await loadSurveyTypes()
     }
 
     const loadDocTypes = async () => {
@@ -174,6 +177,11 @@ export default function AdminPanel() {
     const loadRoles = async () => {
         const data = await window.api.getAssuredRoles()
         setRoles(data)
+    }
+
+    const loadSurveyTypes = async () => {
+        const data = await window.api.getConditionSurveyTypes()
+        setSurveyTypes(data)
     }
 
     const handleAddDocType = async (e: React.FormEvent) => {
@@ -232,6 +240,21 @@ export default function AdminPanel() {
         if (confirm('Delete this role? Existing vessel assignments will keep the name but the role will be removed from suggestions.')) {
             await window.api.deleteAssuredRole(id)
             await loadRoles()
+        }
+    }
+
+    const handleAddSurveyType = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newSurveyType.trim()) return
+        await window.api.addConditionSurveyType(newSurveyType)
+        setNewSurveyType('')
+        await loadSurveyTypes()
+    }
+
+    const handleDeleteSurveyType = async (id: string) => {
+        if (confirm('Delete this survey type? Existing surveys will keep their type.')) {
+            await window.api.deleteConditionSurveyType(id)
+            await loadSurveyTypes()
         }
     }
 
@@ -666,7 +689,54 @@ export default function AdminPanel() {
                 </>}
             </section>
 
-            {/* 3. Sanctions Check Scheduler */}
+            {/* 3. Condition Survey Types */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3
+                    onClick={() => toggleSection('surveyTypes')}
+                    style={{ marginBottom: collapsedSections.has('surveyTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('surveyTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                    <ClipboardCheck size={20} color="var(--accent-primary)" /> Condition Survey Types
+                </h3>
+                {!collapsedSections.has('surveyTypes') && <><form onSubmit={handleAddSurveyType} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                    <input
+                        type="text"
+                        value={newSurveyType}
+                        onChange={e => setNewSurveyType(e.target.value)}
+                        style={{ flex: 1 }}
+                        placeholder="e.g. Annual Condition Survey"
+                        aria-label="Survey type name"
+                    />
+                    <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Plus size={18} /> Add Type
+                    </button>
+                </form>
+
+                    <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <caption className="sr-only">Condition survey types</caption>
+                            <thead>
+                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                    <th scope="col" style={{ padding: '16px' }}>Survey Type</th>
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {surveyTypes.map(type => (
+                                    <tr key={type.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                        <td style={{ padding: '16px' }}>{type.name}</td>
+                                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                                            <button onClick={() => handleDeleteSurveyType(type.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete survey type"><Trash2 size={18} /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>}
+            </section>
+
+            {/* 4. Sanctions Check Scheduler */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3
                     onClick={() => toggleSection('compliance')}

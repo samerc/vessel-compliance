@@ -110,6 +110,9 @@ export interface Api {
   addConditionSurvey: (survey: Omit<ConditionSurvey, 'id'>) => Promise<ConditionSurvey>
   updateConditionSurvey: (id: string, updates: Partial<ConditionSurvey>) => Promise<void>
   deleteConditionSurvey: (id: string) => Promise<void>
+  getConditionSurveyTypes: () => Promise<{ id: string; name: string }[]>
+  addConditionSurveyType: (name: string) => Promise<{ id: string; name: string }>
+  deleteConditionSurveyType: (id: string) => Promise<void>
   getSurveyDefects: (surveyId?: string) => Promise<SurveyDefect[]>
   addSurveyDefect: (defect: Omit<SurveyDefect, 'id'>) => Promise<SurveyDefect>
   updateSurveyDefect: (id: string, updates: Partial<SurveyDefect>) => Promise<void>

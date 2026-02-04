@@ -3,6 +3,14 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { Vessel, Fleet, VesselDocument, DocumentType } from '../../../shared/types'
 
+const isExpired = (expiryDate: string | null | undefined): boolean => {
+  if (!expiryDate) return false
+  const expiry = new Date(expiryDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return expiry < today
+}
+
 export const ReportService = {
   exportVesselToExcel: async (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[]) => {
     const complianceData: any[] = []
@@ -197,7 +205,7 @@ export const ReportService = {
         tableData.push([
           type.name,
           type.description || '',
-          vDoc?.filePath ? 'Compliant' : 'Missing',
+          vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
           vDoc?.expiryDate || '-'
         ])
       }
@@ -308,6 +316,9 @@ export const ReportService = {
           const status = data.cell.raw
           if (status === 'Missing') {
             data.cell.styles.textColor = [255, 0, 0]
+            data.cell.styles.fontStyle = 'bold'
+          } else if (status === 'File Expired (Warning)') {
+            data.cell.styles.textColor = [255, 100, 0]
             data.cell.styles.fontStyle = 'bold'
           } else {
             data.cell.styles.textColor = [0, 150, 0]
@@ -703,7 +714,7 @@ export const ReportService = {
           tableData.push([
             v.name,
             type.name,
-            vDoc?.filePath ? 'Compliant' : 'Missing',
+            vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
             vDoc?.expiryDate || '-'
           ])
         }
@@ -870,6 +881,9 @@ export const ReportService = {
           const status = data.cell.raw
           if (status === 'Missing') {
             data.cell.styles.textColor = [255, 0, 0]
+            data.cell.styles.fontStyle = 'bold'
+          } else if (status === 'File Expired (Warning)') {
+            data.cell.styles.textColor = [255, 100, 0]
             data.cell.styles.fontStyle = 'bold'
           } else {
             data.cell.styles.textColor = [0, 150, 0]

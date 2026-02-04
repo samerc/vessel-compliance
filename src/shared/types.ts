@@ -114,12 +114,18 @@ export interface FileTypeSettings {
   blockedExtensions: string[] // e.g., ['.exe', '.bat', '.sh']
 }
 
+export interface ConditionSurveyType {
+  id: string
+  name: string
+}
+
 export interface ConditionSurvey {
   id: string
   vesselId: string
   surveyDate: string
   surveyorId: string
   surveyType: string
+  reference?: string
   location?: string
   notes?: string
   createdAt?: string

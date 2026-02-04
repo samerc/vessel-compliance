@@ -550,10 +550,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                         padding: '8px',
                                         maxHeight: '200px',
                                         overflowY: 'auto',
-                                        background: 'var(--bg-card)',
-                                        border: '1px solid var(--input-border)',
+                                        background: isLight ? '#ffffff' : '#1e222a',
+                                        border: '1px solid var(--accent-primary)',
                                         borderRadius: '8px',
-                                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                                        backdropFilter: 'none'
                                     }}>
                                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '8px', padding: '4px' }}>Existing matches (Click to select):</div>
                                         {matchingEntities.map(ent => (
@@ -876,10 +877,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     padding: '8px',
                                                                     maxHeight: '150px',
                                                                     overflowY: 'auto',
-                                                                    background: 'var(--bg-card)',
-                                                                    border: '1px solid var(--input-border)',
+                                                                    background: isLight ? '#ffffff' : '#1e222a',
+                                                                    border: '1px solid var(--accent-primary)',
                                                                     borderRadius: '8px',
-                                                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                                                                    backdropFilter: 'none'
                                                                 }}>
                                                                     {matchingUBOs.map(ent => (
                                                                         <div

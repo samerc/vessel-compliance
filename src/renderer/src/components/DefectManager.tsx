@@ -12,6 +12,8 @@ interface DefectManagerProps {
 export default function DefectManager({ survey, onUpdate }: DefectManagerProps) {
   const { user } = useAuth()
   const [defects, setDefects] = useState<SurveyDefect[]>([])
+  const [sortField, setSortField] = useState<'defectNumber' | 'createdAt'>('defectNumber')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [showAddForm, setShowAddForm] = useState(false)
   const [closeModalDefect, setCloseModalDefect] = useState<SurveyDefect | null>(null)
   const [closureNotes, setClosureNotes] = useState('')
@@ -39,8 +41,24 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
 
   const loadDefects = async () => {
     const data = await window.api.getSurveyDefects(survey.id)
-    setDefects(data)
+    // Sort implementation
+    const sorted = [...data].sort((a, b) => {
+      if (sortField === 'defectNumber') {
+        const numA = parseInt(a.defectNumber) || 0
+        const numB = parseInt(b.defectNumber) || 0
+        return sortOrder === 'asc' ? numA - numB : numB - numA
+      } else {
+        const dateA = new Date(a.createdAt || 0).getTime()
+        const dateB = new Date(b.createdAt || 0).getTime()
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
+      }
+    })
+    setDefects(sorted)
   }
+
+  useEffect(() => {
+    loadDefects()
+  }, [sortField, sortOrder, survey.id])
 
   const handleAddDefect = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -161,7 +179,31 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
   return (
     <div style={{ marginTop: '20px', padding: '20px', background: 'var(--bg-card)', borderRadius: '12px', border: 'var(--glass-border)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Defects</h4>
+        <h4 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          Defects
+          <select
+            value={`${sortField}-${sortOrder}`}
+            onChange={(e) => {
+              const [field, order] = e.target.value.split('-') as [any, any]
+              setSortField(field)
+              setSortOrder(order)
+            }}
+            style={{
+              fontSize: '12px',
+              padding: '4px',
+              borderRadius: '4px',
+              border: '1px solid var(--input-border)',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
+              marginLeft: '10px'
+            }}
+          >
+            <option value="defectNumber-asc">Number (Asc)</option>
+            <option value="defectNumber-desc">Number (Desc)</option>
+            <option value="createdAt-desc">Newest First</option>
+            <option value="createdAt-asc">Oldest First</option>
+          </select>
+        </h4>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
           className={showAddForm ? 'btn-secondary' : 'btn-primary'}
@@ -397,18 +439,16 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                               >
                                 Reopen
                               </button>
-                              {(defect.closureNotes || defect.closedBy || defect.closedAt) && (
-                                <button
-                                  onClick={() => toggleClosureNotes(defect.id)}
-                                  aria-expanded={expandedClosureIds.has(defect.id)}
-                                  aria-label={`${expandedClosureIds.has(defect.id) ? 'Hide' : 'View'} closure notes for defect ${defect.defectNumber}`}
-                                  style={{ padding: '6px 12px', background: 'var(--primary-color)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
-                                  title="View closure details"
-                                >
-                                  {expandedClosureIds.has(defect.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                  Notes
-                                </button>
-                              )}
+                              <button
+                                onClick={() => toggleClosureNotes(defect.id)}
+                                aria-expanded={expandedClosureIds.has(defect.id)}
+                                aria-label={`${expandedClosureIds.has(defect.id) ? 'Hide' : 'View'} closure notes for defect ${defect.defectNumber}`}
+                                style={{ padding: '6px 12px', background: 'var(--primary-color)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
+                                title="View closure details"
+                              >
+                                {expandedClosureIds.has(defect.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                Notes
+                              </button>
                             </>
                           )}
                           <button
@@ -504,8 +544,8 @@ function CloseDefectModal({ defect, closureNotes, onClosureNotesChange, onClose,
   }, [onClose])
 
   return (
-    <div role="presentation" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={onClose}>
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="close-defect-title" className="glass-card" style={{ padding: '30px', width: '500px', maxWidth: '90%' }} onClick={e => e.stopPropagation()}>
+    <div role="presentation" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 99999 }} onClick={onClose}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="close-defect-title" className="glass-card" style={{ padding: '30px', width: '500px', maxWidth: '90%', background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
         <h3 id="close-defect-title" style={{ marginTop: 0, color: 'var(--text-primary)' }}>Close Defect #{defect.defectNumber}</h3>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>Add optional closure notes:</p>
         <textarea
@@ -513,7 +553,7 @@ function CloseDefectModal({ defect, closureNotes, onClosureNotesChange, onClose,
           onChange={(e) => onClosureNotesChange(e.target.value)}
           placeholder="Closure notes (optional)"
           rows={4}
-          style={{ width: '100%', resize: 'vertical' }}
+          style={{ width: '100%', resize: 'vertical', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', padding: '10px', borderRadius: '6px' }}
           aria-label="Closure notes"
         />
         <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>

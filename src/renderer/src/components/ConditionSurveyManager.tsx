@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText, X, Download, FileUp, Edit, Save } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-import { Vessel, ConditionSurvey, SurveyAttachment, Surveyor } from '../../../shared/types'
+import { Vessel, ConditionSurvey, SurveyAttachment, Surveyor, ConditionSurveyType } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import DefectManager from './DefectManager'
 import * as XLSX from 'xlsx'
@@ -14,6 +14,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const { user } = useAuth()
   const [surveys, setSurveys] = useState<ConditionSurvey[]>([])
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
+  const [surveyTypes, setSurveyTypes] = useState<ConditionSurveyType[]>([])
   const [attachments, setAttachments] = useState<SurveyAttachment[]>([])
   const [expandedSurveyId, setExpandedSurveyId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -30,6 +31,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const [newDate, setNewDate] = useState('')
   const [newSurveyorId, setNewSurveyorId] = useState('')
   const [newType, setNewType] = useState('')
+  const [newReference, setNewReference] = useState('')
   const [newLocation, setNewLocation] = useState('')
   const [newNotes, setNewNotes] = useState('')
 
@@ -42,6 +44,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const [editDate, setEditDate] = useState('')
   const [editSurveyorId, setEditSurveyorId] = useState('')
   const [editType, setEditType] = useState('')
+  const [editReference, setEditReference] = useState('')
   const [editLocation, setEditLocation] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
@@ -55,6 +58,9 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
 
     const surveyorData = await window.api.getSurveyors()
     setSurveyors(surveyorData)
+
+    const typeData = await window.api.getConditionSurveyTypes()
+    setSurveyTypes(typeData)
 
     const attachmentData = await window.api.getSurveyAttachments()
     setAttachments(attachmentData)
@@ -96,6 +102,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       surveyDate: newDate,
       surveyorId,
       surveyType: newType,
+      reference: newReference || undefined,
       location: newLocation || undefined,
       notes: newNotes || undefined,
       createdBy: user?.username || 'Unknown'
@@ -104,6 +111,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     setNewDate('')
     setNewSurveyorId('')
     setNewType('')
+    setNewReference('')
     setNewLocation('')
     setNewNotes('')
     setNewSurveyorCompany('')
@@ -119,6 +127,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     setEditDate(survey.surveyDate)
     setEditSurveyorId(survey.surveyorId)
     setEditType(survey.surveyType)
+    setEditReference(survey.reference || '')
     setEditLocation(survey.location || '')
     setEditNotes(survey.notes || '')
     setExpandedSurveyId(survey.id)
@@ -129,6 +138,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       surveyDate: editDate,
       surveyorId: editSurveyorId,
       surveyType: editType,
+      reference: editReference || undefined,
       location: editLocation || undefined,
       notes: editNotes || undefined
     })
@@ -293,7 +303,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
 
       {showAddForm && (
         <form onSubmit={handleAddSurvey} style={{ marginBottom: '20px', padding: '20px', background: 'var(--input-bg)', borderRadius: '12px', border: '1px solid var(--input-border)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Date *</label>
               <input
@@ -306,13 +316,27 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Type *</label>
-              <input
-                type="text"
+              <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value)}
-                placeholder="e.g., Annual Inspection, Hull Survey"
                 required
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
                 aria-label="Survey type"
+              >
+                <option value="">-- Select Type --</option>
+                {surveyTypes.map(t => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Reference</label>
+              <input
+                type="text"
+                value={newReference}
+                onChange={(e) => setNewReference(e.target.value)}
+                placeholder="e.g. REF-2024-001"
+                aria-label="Survey reference"
               />
             </div>
             <div>
@@ -321,7 +345,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 type="text"
                 value={newLocation}
                 onChange={(e) => setNewLocation(e.target.value)}
-                placeholder="e.g., Singapore, Rotterdam"
+                placeholder="e.g. Singapore, Rotterdam"
                 aria-label="Survey location"
               />
             </div>
@@ -439,6 +463,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '8px', flexWrap: 'wrap' }}>
                       <strong style={{ color: 'var(--text-primary)', fontSize: '16px' }}>{survey.surveyDate}</strong>
                       <span style={{ color: 'var(--accent-primary)', fontWeight: '500' }}>{survey.surveyType}</span>
+                      {survey.reference && <span style={{ color: 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-active)', borderRadius: '4px', fontSize: '0.85rem' }}>{survey.reference}</span>}
                       <span style={{ color: 'var(--text-primary)' }}>{getSurveyorName(survey.surveyorId)}</span>
                       {survey.location && <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{survey.location}</span>}
                     </div>
@@ -509,7 +534,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                     {isEditing ? (
                       <div style={{ marginBottom: '20px', padding: '20px', background: 'var(--input-bg)', borderRadius: '12px', border: '1px solid var(--input-border)' }}>
                         <h4 style={{ color: 'var(--text-primary)', marginBottom: '15px' }}>Edit Survey Details</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                           <div>
                             <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Date *</label>
                             <input
@@ -522,12 +547,26 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                           </div>
                           <div>
                             <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Type *</label>
-                            <input
-                              type="text"
+                            <select
                               value={editType}
                               onChange={(e) => setEditType(e.target.value)}
                               required
+                              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
                               aria-label="Edit survey type"
+                            >
+                              <option value="">-- Select Type --</option>
+                              {surveyTypes.map(t => (
+                                <option key={t.id} value={t.name}>{t.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Reference</label>
+                            <input
+                              type="text"
+                              value={editReference}
+                              onChange={(e) => setEditReference(e.target.value)}
+                              aria-label="Edit survey reference"
                             />
                           </div>
                           <div>
@@ -577,70 +616,16 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
 
                     {/* File Attachments - Hidden when editing */}
                     {!isEditing && (
-                      <div style={{ marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <h4 style={{ color: 'var(--text-primary)', margin: 0 }}>Attachments</h4>
-                          <button
-                            onClick={() => handleImportDefectsFromWord(survey.id)}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '14px' }}
-                          >
-                            <FileUp size={16} />
-                            Import from Word/PDF
-                          </button>
-                        </div>
-                        <div
-                          onDragOver={(e) => handleDragOver(e, survey.id)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, survey.id)}
-                          style={{
-                            border: '2px dashed var(--input-border)',
-                            borderRadius: '8px',
-                            padding: '20px',
-                            textAlign: 'center',
-                            background: isDragOver ? 'var(--bg-card-hover)' : 'var(--input-bg)',
-                            marginBottom: '15px',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <Upload size={32} color="var(--text-secondary)" style={{ margin: '0 auto 10px' }} />
-                          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Drag and drop files here (multiple files supported)</p>
-                        </div>
-                        {surveyAttachments.length === 0 ? (
-                          <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No attachments</p>
-                        ) : (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
-                            {surveyAttachments.map((attachment) => (
-                              <div
-                                key={attachment.id}
-                                className="glass-card"
-                                style={{
-                                  padding: '12px',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
-                                }}
-                              >
-                                <span
-                                  onClick={() => handleOpenFile(attachment.filePath)}
-                                  style={{ color: 'var(--accent-primary)', cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}
-                                  title={attachment.fileName}
-                                >
-                                  {attachment.fileName}
-                                </span>
-                                <button
-                                  onClick={() => handleDeleteAttachment(attachment.id)}
-                                  style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                  title="Delete attachment"
-                                  aria-label="Delete attachment"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <SurveyAttachments
+                        attachments={surveyAttachments}
+                        isDragOver={isDragOver}
+                        onDragOver={(e) => handleDragOver(e, survey.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, survey.id)}
+                        onDelete={handleDeleteAttachment}
+                        onOpenFile={handleOpenFile}
+                        onImportWord={() => handleImportDefectsFromWord(survey.id)}
+                      />
                     )}
 
                     {/* Defects Manager - Hidden when editing */}
@@ -650,6 +635,127 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
               </div>
             )
           })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SurveyAttachments({
+  attachments,
+  isDragOver,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDelete,
+  onOpenFile,
+  onImportWord
+}: {
+  attachments: SurveyAttachment[]
+  isDragOver: boolean
+  onDragOver: (e: React.DragEvent) => void
+  onDragLeave: (e: React.DragEvent) => void
+  onDrop: (e: React.DragEvent) => void
+  onDelete: (id: string) => void
+  onOpenFile: (path: string) => void
+  onImportWord: () => void
+}) {
+  const [showUpload, setShowUpload] = useState(false)
+
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <h4 style={{ color: 'var(--text-primary)', margin: 0 }}>Attachments</h4>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setShowUpload(!showUpload)}
+            className="btn-primary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '14px',
+              backgroundColor: 'var(--accent-primary)',
+              color: 'white',
+              border: 'none'
+            }}
+          >
+            <Upload size={16} />
+            {showUpload ? 'Hide Upload' : 'Upload Documents'}
+          </button>
+          <button
+            onClick={onImportWord}
+            className="btn-secondary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '14px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--accent-secondary)',
+              color: 'var(--accent-secondary)'
+            }}
+          >
+            <FileUp size={16} />
+            Import Defects
+          </button>
+        </div>
+      </div>
+
+      {showUpload && (
+        <div
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          style={{
+            border: '2px dashed var(--input-border)',
+            borderRadius: '8px',
+            padding: '20px',
+            textAlign: 'center',
+            background: isDragOver ? 'var(--bg-card-hover)' : 'var(--input-bg)',
+            marginBottom: '15px',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Upload size={32} color="var(--text-secondary)" style={{ margin: '0 auto 10px' }} />
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Drag and drop files here (multiple files supported)</p>
+        </div>
+      )}
+
+      {attachments.length === 0 ? (
+        <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No attachments</p>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+          {attachments.map((attachment) => (
+            <div
+              key={attachment.id}
+              className="glass-card"
+              style={{
+                padding: '12px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span
+                onClick={() => onOpenFile(attachment.filePath)}
+                style={{ color: 'var(--accent-primary)', cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}
+                title={attachment.fileName}
+              >
+                {attachment.fileName}
+              </span>
+              <button
+                onClick={() => onDelete(attachment.id)}
+                style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Delete attachment"
+                aria-label="Delete attachment"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

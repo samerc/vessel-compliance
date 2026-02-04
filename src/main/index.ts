@@ -883,7 +883,26 @@ app.whenReady().then(() => {
   safeHandle('db:getConditionSurveys', (event, vesselId) => { requireSession(event); return db.getConditionSurveys(vesselId) })
   safeHandle('db:addConditionSurvey', (event, survey) => { requireSession(event); return db.addConditionSurvey(survey) })
   safeHandle('db:updateConditionSurvey', (event, id, updates) => { requireSession(event); return db.updateConditionSurvey(id, updates) })
-  safeHandle('db:deleteConditionSurvey', (event, id) => { requireAdmin(event); return db.deleteConditionSurvey(id) })
+  safeHandle('db:deleteConditionSurvey', async (event, id) => {
+    requireSession(event)
+    return db.deleteConditionSurvey(id)
+  })
+
+  // Condition Survey Types
+  safeHandle('db:getConditionSurveyTypes', async (event) => {
+    requireSession(event)
+    return db.getConditionSurveyTypes()
+  })
+
+  safeHandle('db:addConditionSurveyType', async (event, name) => {
+    requireAdmin(event)
+    return db.addConditionSurveyType(name)
+  })
+
+  safeHandle('db:deleteConditionSurveyType', async (event, id) => {
+    requireAdmin(event)
+    return db.deleteConditionSurveyType(id)
+  })
   safeHandle('db:getSurveyDefects', (event, surveyId) => { requireSession(event); return db.getSurveyDefects(surveyId) })
   safeHandle('db:addSurveyDefect', (event, defect) => { requireSession(event); return db.addSurveyDefect(defect) })
   safeHandle('db:updateSurveyDefect', (event, id, updates) => { requireSession(event); return db.updateSurveyDefect(id, updates) })

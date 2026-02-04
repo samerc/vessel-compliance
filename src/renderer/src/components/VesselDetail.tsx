@@ -22,7 +22,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
     const [vesselActive, setVesselActive] = useState(vessel.isActive)
     const { theme } = useTheme()
-    const { isAdmin } = useAuth()
+    const { user, isAdmin } = useAuth()
     const { showSuccess, showError } = useToast()
     const isLight = theme === 'light'
 
@@ -118,7 +118,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             sent: existing?.sent || false,
             required: existing ? existing.required : (docTypes.find(t => t.id === docTypeId)?.required || false),
             uploadedDate: new Date().toISOString(),
-            uploadedBy: 'Current User',
+            uploadedBy: user?.username || 'Unknown',
             receivedDate: new Date().toISOString().split('T')[0]
         }
 
@@ -146,7 +146,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 sent: false,
                 required: docType ? !docType.required : true,
                 uploadedDate: new Date().toISOString(),
-                uploadedBy: 'Default'
+                uploadedBy: user?.username || 'System'
             }
             await window.api.upsertVesselDocument(newDoc)
         }

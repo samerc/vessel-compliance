@@ -98,6 +98,30 @@ export class MySQLAdapter {
             if ((cols as any[]).length === 0) {
                 await this.pool.query('ALTER TABLE document_types ADD COLUMN description TEXT AFTER name')
             }
+
+            // Migration: Add reference to condition_surveys if it doesn't exist
+            try {
+                // Check if table exists first
+                const [surveyTable] = await this.pool.query("SHOW TABLES LIKE 'condition_surveys'")
+                if ((surveyTable as any[]).length > 0) {
+                    const [refCol] = await this.pool.query('SHOW COLUMNS FROM condition_surveys LIKE "reference"')
+                    if ((refCol as any[]).length === 0) {
+                        console.log('Migrating: Adding reference column to condition_surveys')
+                        await this.pool.query('ALTER TABLE condition_surveys ADD COLUMN reference VARCHAR(255) AFTER survey_type')
+                    }
+                }
+            } catch (e) {
+                console.error('Migration error (reference col):', e)
+            }
+
+            // Ensure condition_survey_types table exists
+            await this.pool.query(`
+                CREATE TABLE IF NOT EXISTS condition_survey_types (
+                    id VARCHAR(36) PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `)
             // Migration: Add email and phone to entities if they don't exist
             const [entityCols] = await this.pool.query('SHOW COLUMNS FROM entities')
             const entityColNames = (entityCols as any[]).map(c => c.Field)
@@ -1227,7 +1251,7 @@ export class MySQLAdapter {
     async getConditionSurveys(vesselId?: string): Promise<ConditionSurvey[]> {
         if (!this.pool) return []
         let sql = `SELECT id, vessel_id as vesselId, survey_date as surveyDate,
-                   surveyor_id as surveyorId, survey_type as surveyType, location, notes,
+                   surveyor_id as surveyorId, survey_type as surveyType, reference, location, notes,
                    created_at as createdAt, created_by as createdBy
                    FROM condition_surveys`
         const params: any[] = []
@@ -1246,10 +1270,10 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute(
             `INSERT INTO condition_surveys
-             (id, vessel_id, survey_date, surveyor_id, survey_type, location, notes, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, vessel_id, survey_date, surveyor_id, survey_type, reference, location, notes, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, survey.vesselId, survey.surveyDate, survey.surveyorId,
-                survey.surveyType, survey.location || null,
+                survey.surveyType, survey.reference || null, survey.location || null,
                 survey.notes || null, survey.createdBy || 'System']
         )
         return { ...survey, id }
@@ -1262,6 +1286,7 @@ export class MySQLAdapter {
         if (updates.surveyDate !== undefined) { fields.push('survey_date = ?'); values.push(updates.surveyDate) }
         if (updates.surveyorId !== undefined) { fields.push('surveyor_id = ?'); values.push(updates.surveyorId) }
         if (updates.surveyType !== undefined) { fields.push('survey_type = ?'); values.push(updates.surveyType) }
+        if (updates.reference !== undefined) { fields.push('reference = ?'); values.push(updates.reference) }
         if (updates.location !== undefined) { fields.push('location = ?'); values.push(updates.location) }
         if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes) }
         if (fields.length === 0) return
@@ -1272,6 +1297,25 @@ export class MySQLAdapter {
     async deleteConditionSurvey(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM condition_surveys WHERE id = ?', [id])
+    }
+
+    // --- Condition Survey Types ---
+    async getConditionSurveyTypes(): Promise<{ id: string; name: string }[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name FROM condition_survey_types ORDER BY name ASC')
+        return rows as { id: string; name: string }[]
+    }
+
+    async addConditionSurveyType(name: string): Promise<{ id: string; name: string }> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute('INSERT INTO condition_survey_types (id, name) VALUES (?, ?)', [id, name])
+        return { id, name }
+    }
+
+    async deleteConditionSurveyType(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM condition_survey_types WHERE id = ?', [id])
     }
 
     // --- Survey Defects ---
