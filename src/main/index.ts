@@ -854,14 +854,14 @@ app.whenReady().then(() => {
       await db.autoSnoozeVesselsForEntity(id)
     }
   })
-  safeHandle('db:deleteEntity', (event, id) => { requireAdmin(event); return db.deleteEntity(id) })
+  safeHandle('db:deleteEntity', (event, id) => { requireSession(event); return db.deleteEntity(id) })
   safeHandle('db:purgeAllVesselsAndEntities', (event) => { requireAdmin(event); return db.purgeAllVesselsAndEntities() })
   safeHandle('maintenance:syncSettings', (event) => { requireAdmin(event); return db.syncAssuredRoles() })
 
   safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
   safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })
   safeHandle('db:updateAssuredRole', (event, id, updates) => { requireSession(event); return db.updateAssuredRole(id, updates) })
-  safeHandle('db:deleteAssuredRole', (event, id) => { requireAdmin(event); return db.deleteAssuredRole(id) })
+  safeHandle('db:deleteAssuredRole', (event, id) => { requireSession(event); return db.deleteAssuredRole(id) })
 
   safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
   safeHandle('db:addVesselAssured', (event, assured) => { requireSession(event); return db.addVesselAssured(assured) })
@@ -877,7 +877,7 @@ app.whenReady().then(() => {
   safeHandle('db:getSurveyorsPaginated', (event, params) => { requireSession(event); return db.getSurveyorsPaginated(params) })
   safeHandle('db:addSurveyor', (event, surveyor) => { requireSession(event); return db.addSurveyor(surveyor) })
   safeHandle('db:updateSurveyor', (event, id, updates) => { requireSession(event); return db.updateSurveyor(id, updates) })
-  safeHandle('db:deleteSurveyor', (event, id) => { requireAdmin(event); return db.deleteSurveyor(id) })
+  safeHandle('db:deleteSurveyor', (event, id) => { requireSession(event); return db.deleteSurveyor(id) })
 
   // Condition Surveys
   safeHandle('db:getConditionSurveys', (event, vesselId) => { requireSession(event); return db.getConditionSurveys(vesselId) })
