@@ -381,7 +381,7 @@ export default function FleetManager() {
                         <select
                             value={typeFilter}
                             onChange={e => setTypeFilter(e.target.value as any)}
-                            style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                            style={{ padding: '10px' }}
                             aria-label="Filter by customer type"
                         >
                             <option value="all">All Types</option>

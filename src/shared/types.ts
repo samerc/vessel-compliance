@@ -332,6 +332,7 @@ export interface DABQueryCriteria {
   logic: 'AND' | 'OR'
   policyTypeIds?: string[]
   flagStateIds?: string[]
+  flagStateUnassigned?: boolean
   customerIds?: string[]
   customerType?: 'broker' | 'direct' | 'both'
   exportType: 'email' | 'phone' | 'both'

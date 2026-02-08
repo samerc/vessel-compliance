@@ -573,12 +573,12 @@ export default function EntityDirectory() {
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} aria-label="Filter by entity type">
+                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem' }} aria-label="Filter by entity type">
                                 <option value="all">All Types</option>
                                 <option value="company">Companies</option>
                                 <option value="person">Persons</option>
                             </select>
-                            <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} aria-label="Filter by sanctions status">
+                            <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem' }} aria-label="Filter by sanctions status">
                                 <option value="all">All Statuses</option>
                                 <option value="CLEARED">Cleared</option>
                                 <option value="POTENTIAL_MATCH">Potential Match</option>

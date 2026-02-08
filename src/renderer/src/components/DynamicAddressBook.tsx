@@ -18,6 +18,7 @@ export default function DynamicAddressBook() {
     const [logic, setLogic] = useState<'AND' | 'OR'>('AND')
     const [policyFilter, setPolicyFilter] = useState<PolicyFilter>([])
     const [selectedFlagStates, setSelectedFlagStates] = useState<string[]>([])
+    const [flagUnassigned, setFlagUnassigned] = useState(false)
     const [customerType, setCustomerType] = useState<'broker' | 'direct' | 'both'>('both')
     const [exportType, setExportType] = useState<'email' | 'phone' | 'both'>('email')
     const [vesselStatus, setVesselStatus] = useState<'active' | 'inactive' | 'all'>('active')
@@ -44,7 +45,7 @@ export default function DynamicAddressBook() {
 
     const hasAnyCriteria = policyFilter === 'all' || policyFilter === 'undefined' ||
         (Array.isArray(policyFilter) && policyFilter.length > 0) ||
-        selectedFlagStates.length > 0 || customerType !== 'both'
+        selectedFlagStates.length > 0 || flagUnassigned || customerType !== 'both'
 
     const handleSearch = async () => {
         if (!hasAnyCriteria) {
@@ -59,6 +60,7 @@ export default function DynamicAddressBook() {
                 exportType,
                 policyTypeIds: selectedPolicyTypeIds.length > 0 ? selectedPolicyTypeIds : undefined,
                 flagStateIds: selectedFlagStates.length > 0 ? selectedFlagStates : undefined,
+                flagStateUnassigned: flagUnassigned || undefined,
                 customerIds: undefined,
                 customerType: customerType !== 'both' ? customerType : undefined,
                 vesselStatus
@@ -217,6 +219,24 @@ export default function DynamicAddressBook() {
                     <div style={{ marginBottom: '16px' }}>
                         <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>Flag States</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            <button
+                                onClick={() => {
+                                    if (selectedFlagStates.length === flagStates.length) {
+                                        setSelectedFlagStates([])
+                                    } else {
+                                        setSelectedFlagStates(flagStates.map(f => f.id))
+                                    }
+                                }}
+                                style={chipStyle(selectedFlagStates.length === flagStates.length)}
+                            >
+                                All
+                            </button>
+                            <button
+                                onClick={() => setFlagUnassigned(!flagUnassigned)}
+                                style={chipStyle(flagUnassigned)}
+                            >
+                                Unassigned
+                            </button>
                             {flagStates.map(fs => (
                                 <button
                                     key={fs.id}

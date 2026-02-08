@@ -2202,10 +2202,16 @@ export class MySQLAdapter {
             params.push(...criteria.policyTypeIds)
         }
 
-        if (criteria.flagStateIds && criteria.flagStateIds.length > 0) {
+        if (criteria.flagStateIds && criteria.flagStateIds.length > 0 && criteria.flagStateUnassigned) {
+            const placeholders = criteria.flagStateIds.map(() => '?').join(',')
+            conditions.push(`(v.flag_state_id IN (${placeholders}) OR v.flag_state_id IS NULL)`)
+            params.push(...criteria.flagStateIds)
+        } else if (criteria.flagStateIds && criteria.flagStateIds.length > 0) {
             const placeholders = criteria.flagStateIds.map(() => '?').join(',')
             conditions.push(`v.flag_state_id IN (${placeholders})`)
             params.push(...criteria.flagStateIds)
+        } else if (criteria.flagStateUnassigned) {
+            conditions.push(`v.flag_state_id IS NULL`)
         }
 
         if (criteria.customerIds && criteria.customerIds.length > 0) {
