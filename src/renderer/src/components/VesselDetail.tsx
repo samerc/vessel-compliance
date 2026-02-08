@@ -16,9 +16,10 @@ interface VesselDetailProps {
     vessel: Vessel
     onBack: () => void
     backLabel?: string
+    initialSection?: 'documents' | 'surveys'
 }
 
-export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels' }: VesselDetailProps) {
+export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels', initialSection }: VesselDetailProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
     const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -265,7 +266,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [isEditing, setIsEditing] = useState(false)
     const [editName, setEditName] = useState(vessel.name)
     const [editImo, setEditImo] = useState(vessel.imoNumber)
-    const [detailView, setDetailView] = useState<'documents' | 'surveys'>('documents')
+    const [detailView, setDetailView] = useState<'documents' | 'surveys'>(initialSection || 'documents')
     const [showExportMenu, setShowExportMenu] = useState(false)
     const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
     const [showNotesModal, setShowNotesModal] = useState(false)
@@ -654,18 +655,22 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <button
                                         onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
                                         style={{
-                                            background: 'transparent',
-                                            border: '1px solid var(--table-border)',
-                                            borderRadius: '4px',
-                                            padding: '2px',
+                                            background: isLight ? 'rgba(0, 119, 163, 0.12)' : 'rgba(0, 210, 255, 0.12)',
+                                            border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(0, 210, 255, 0.3)'}`,
+                                            borderRadius: '6px',
+                                            padding: '3px 8px',
                                             cursor: 'pointer',
                                             display: 'inline-flex',
                                             alignItems: 'center',
-                                            color: 'var(--accent-primary)'
+                                            gap: '4px',
+                                            color: 'var(--accent-primary)',
+                                            fontSize: '0.75rem',
+                                            fontWeight: '600'
                                         }}
                                         title="Add custom document type"
                                     >
                                         <Plus size={14} />
+                                        Custom
                                     </button>
                                 </div>
                             </th>

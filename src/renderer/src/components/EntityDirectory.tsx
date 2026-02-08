@@ -31,7 +31,7 @@ export default function EntityDirectory() {
 
     // Pagination state
     const [page, setPage] = useState(1)
-    const [limit, setLimit] = useState(10)
+    const [limit, setLimit] = useState(25)
     const [total, setTotal] = useState(0)
     const [totalPages, setTotalPages] = useState(0)
     const [isLoading, setIsLoading] = useState(false)
@@ -134,7 +134,7 @@ export default function EntityDirectory() {
         if (!createForm.name.trim()) return
         setIsCreating(true)
         try {
-            await window.api.addEntity({
+            const newEntity = await window.api.addEntity({
                 name: createForm.name.trim(),
                 type: createForm.type,
                 identifier: createForm.identifier.trim() || undefined,
@@ -143,8 +143,30 @@ export default function EntityDirectory() {
             })
             setShowCreateModal(false)
             setCreateForm({ name: '', type: 'company', identifier: '', email: '', phone: '' })
-            showSuccess('Entity created successfully')
+            showSuccess('Entity created. Checking sanctions...')
             loadData()
+
+            // Auto-check sanctions for the new entity
+            try {
+                const entityId = newEntity?.id
+                if (entityId) {
+                    setCheckingId(entityId)
+                    const entityName = createForm.name.trim()
+                    const result = await OfacService.checkSanctions(entityName)
+                    await window.api.updateEntity(entityId, {
+                        ofacCheckedAt: result.timestamp,
+                        ofacMatchFound: result.matchFound,
+                        ofacStatus: result.status
+                    })
+                    loadData()
+                    if (result.matchFound && result.matches.length > 0) {
+                        setSanctionsModal({ show: true, searchedName: entityName, matches: result.matches, entityId })
+                    }
+                    setCheckingId(null)
+                }
+            } catch {
+                setCheckingId(null)
+            }
         } catch (error: any) {
             showError(error.message || 'Failed to create entity')
         } finally {
@@ -551,12 +573,12 @@ export default function EntityDirectory() {
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem' }} aria-label="Filter by entity type">
+                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} aria-label="Filter by entity type">
                                 <option value="all">All Types</option>
                                 <option value="company">Companies</option>
                                 <option value="person">Persons</option>
                             </select>
-                            <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem' }} aria-label="Filter by sanctions status">
+                            <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} aria-label="Filter by sanctions status">
                                 <option value="all">All Statuses</option>
                                 <option value="CLEARED">Cleared</option>
                                 <option value="POTENTIAL_MATCH">Potential Match</option>
@@ -644,8 +666,10 @@ export default function EntityDirectory() {
                                                     </span>
                                                 )}
                                             </div>
+                                            <div style={{ marginTop: '4px' }}>
+                                                <OfacBadge entity={entity} onRecheck={() => handleOfacRecheck(entity)} />
+                                            </div>
                                         </div>
-                                        <OfacBadge entity={entity} onRecheck={() => handleOfacRecheck(entity)} />
                                     </div>
                                 )
                             })
@@ -721,13 +745,13 @@ export default function EntityDirectory() {
 
                                         {/* Contact Info */}
                                         {(selectedEntity.email || selectedEntity.phone) && (
-                                            <div style={{ display: 'flex', gap: '20px', marginTop: '14px', flexWrap: 'wrap' }}>
-                                                {selectedEntity.email && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '14px' }}>
+                                                {selectedEntity.email && selectedEntity.email.split(',').map((em, i) => (
+                                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                                         <Mail size={14} color="var(--accent-primary)" />
-                                                        {selectedEntity.email}
+                                                        {em.trim()}
                                                     </div>
-                                                )}
+                                                ))}
                                                 {selectedEntity.phone && (
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                                         <Phone size={14} color="var(--accent-primary)" />
@@ -974,13 +998,13 @@ export default function EntityDirectory() {
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email</label>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email(s)</label>
                                 <input
-                                    type="email"
+                                    type="text"
                                     value={editForm.email}
                                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
                                     style={{ width: '100%' }}
-                                    placeholder="Email address"
+                                    placeholder="Separate multiple emails with commas"
                                 />
                             </div>
                             <div>
@@ -1063,13 +1087,13 @@ export default function EntityDirectory() {
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email</label>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email(s)</label>
                                 <input
-                                    type="email"
+                                    type="text"
                                     value={createForm.email}
                                     onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
                                     style={{ width: '100%' }}
-                                    placeholder="Email address"
+                                    placeholder="Separate multiple emails with commas"
                                 />
                             </div>
                             <div>

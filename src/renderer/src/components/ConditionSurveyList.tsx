@@ -121,16 +121,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
             placeholder="Search by vessel name, IMO, or survey type..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 12px 10px 36px',
-              borderRadius: '8px',
-              border: '1px solid var(--glass-border)',
-              background: 'var(--glass-bg)',
-              color: 'var(--text-primary)',
-              fontSize: '0.9rem',
-              outline: 'none'
-            }}
+            style={{ width: '100%', paddingLeft: '36px' }}
           />
         </div>
         <button

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, RefreshCw, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3 } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3 } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
@@ -13,14 +13,11 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [newRole, setNewRole] = useState('')
     const [surveyTypes, setSurveyTypes] = useState<ConditionSurveyType[]>([])
     const [newSurveyType, setNewSurveyType] = useState('')
-    const [importing, setImporting] = useState(false)
-    const [importStatus, setImportStatus] = useState<string>('')
     const [fileTypeSettings, setFileTypeSettings] = useState<FileTypeSettings>({ allowedExtensions: [], blockedExtensions: [] })
     const [newAllowedExt, setNewAllowedExt] = useState('')
     const [newBlockedExt, setNewBlockedExt] = useState('')
     const [fileTypeStatus, setFileTypeStatus] = useState('')
     const [configPath, setConfigPath] = useState<string | null>(null)
-    const [syncingData, setSyncingData] = useState(false)
     const { showSuccess, showError } = useToast()
 
     // Compliance schedule state
@@ -107,18 +104,6 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         }
     }
 
-    const handleSyncSettings = async () => {
-        setSyncingData(true)
-        try {
-            const result = await window.api.maintenanceSyncSettings()
-            showSuccess(`Sync complete! Added ${result.added} new roles to settings.`)
-            loadData() // Refresh the roles list in the settings UI
-        } catch (error: any) {
-            showError(error.message || 'Failed to sync settings')
-        } finally {
-            setSyncingData(false)
-        }
-    }
 
 
     const loadReminderSettings = async () => {
@@ -351,36 +336,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         }
     }
 
-    const handleImportExcel = async () => {
-        try {
-            setImporting(true)
-            setImportStatus('Opening file dialog...')
 
-            const filePath = await window.api.dialogOpenFile()
-            if (!filePath) {
-                setImportStatus('')
-                setImporting(false)
-                return
-            }
-
-            setImportStatus('Importing data from Excel...')
-            const result = await window.api.excelImport(filePath)
-
-            if (result.success) {
-                setImportStatus(`✓ ${result.message}\n\nVessels Created: ${result.stats.vesselsCreated}\nVessels Updated: ${result.stats.vesselsUpdated}\nEntities Created: ${result.stats.entitiesCreated}\nAssureds Linked: ${result.stats.assuredsLinked}\nCustomers Assigned: ${result.stats.customersAssigned}`)
-                await loadDocTypes()
-                setTimeout(() => setImportStatus(''), 8000)
-            } else {
-                setImportStatus(`✗ ${result.message}`)
-                setTimeout(() => setImportStatus(''), 5000)
-            }
-        } catch (error: any) {
-            setImportStatus(`✗ Error: ${error.message}`)
-            setTimeout(() => setImportStatus(''), 5000)
-        } finally {
-            setImporting(false)
-        }
-    }
 
     const [editingDocId, setEditingDocId] = useState<string | null>(null)
     const [editDocName, setEditDocName] = useState('')
@@ -588,34 +544,11 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
 
     return (
         <div className="fade-in">
-            <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                    <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Admin Panel</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Configure global document types, their display order, and assured roles.</p>
-                </div>
-                <button
-                    onClick={handleImportExcel}
-                    disabled={importing}
-                    className="btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
-                    title="Expected columns: Vessel | Customer Name | Customer Type | IMO# | Registered Owners | Managers"
-                >
-                    <FileText size={18} />
-                    {importing ? 'Importing...' : 'Import from Excel'}
-                </button>
+            <header style={{ marginBottom: '32px' }}>
+                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Admin Panel</h1>
+                <p style={{ color: 'var(--text-secondary)' }}>Configure global document types, their display order, and assured roles.</p>
             </header>
 
-            {importStatus && (
-                <div className="glass-card" style={{
-                    padding: '16px 24px',
-                    marginBottom: '24px',
-                    background: importStatus.startsWith('✓') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 77, 77, 0.1)',
-                    border: importStatus.startsWith('✓') ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
-                    whiteSpace: 'pre-line'
-                }}>
-                    {importStatus}
-                </div>
-            )}
 
             {/* 1. Document Types */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
@@ -1469,23 +1402,6 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                         <Trash2 size={18} /> Purge All Vessels & Entities
                     </button>
 
-                    <button
-                        onClick={handleSyncSettings}
-                        disabled={syncingData}
-                        className="btn-secondary"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            marginTop: '16px',
-                            background: 'rgba(0, 210, 255, 0.1)',
-                            border: '1px solid rgba(0, 210, 255, 0.3)',
-                            color: 'var(--accent-primary)'
-                        }}
-                    >
-                        {syncingData ? <Loader2 size={18} className="spinner" /> : <RefreshCw size={18} />}
-                        Sync Assigned Data with Settings
-                    </button>
                 </>}
             </section>
 

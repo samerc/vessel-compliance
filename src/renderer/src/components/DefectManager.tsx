@@ -361,7 +361,7 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
 
                 return (
                   <>
-                    <tr key={defect.id} style={{ borderBottom: defect.status === 'CLOSED' && (defect.closureNotes || defect.closedBy) ? 'none' : '1px solid var(--table-border)' }}>
+                    <tr key={defect.id} style={{ borderBottom: expandedClosureIds.has(defect.id) ? 'none' : '1px solid var(--table-border)' }}>
                       <td style={{ padding: '12px', color: 'var(--text-primary)', fontWeight: 'bold' }}>{defect.defectNumber}</td>
                       <td style={{ padding: '12px', color: 'var(--text-primary)' }}>{truncate(defect.description, 80)}</td>
                       <td style={{ padding: '12px' }}>
@@ -431,26 +431,37 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                               Close
                             </button>
                           ) : (
-                            <>
-                              <button
-                                onClick={() => handleReopenDefect(defect)}
-                                style={{ padding: '6px 12px', background: 'var(--warning)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
-                                title="Reopen defect"
-                              >
-                                Reopen
-                              </button>
-                              <button
-                                onClick={() => toggleClosureNotes(defect.id)}
-                                aria-expanded={expandedClosureIds.has(defect.id)}
-                                aria-label={`${expandedClosureIds.has(defect.id) ? 'Hide' : 'View'} closure notes for defect ${defect.defectNumber}`}
-                                className="btn-secondary"
-                                style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
-                                title="View closure details"
-                              >
-                                {expandedClosureIds.has(defect.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                Notes
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handleReopenDefect(defect)}
+                              style={{ padding: '6px 12px', background: 'var(--warning)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
+                              title="Reopen defect"
+                            >
+                              Reopen
+                            </button>
+                          )}
+                          {(defect.notes || defect.closureNotes || defect.closedBy) && (
+                            <button
+                              onClick={() => toggleClosureNotes(defect.id)}
+                              aria-expanded={expandedClosureIds.has(defect.id)}
+                              aria-label={`${expandedClosureIds.has(defect.id) ? 'Hide' : 'View'} notes for defect ${defect.defectNumber}`}
+                              style={{
+                                padding: '6px 12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                border: 'none',
+                                background: isLight ? 'rgba(0, 119, 163, 0.15)' : 'rgba(0, 210, 255, 0.15)',
+                                color: 'var(--accent-primary)'
+                              }}
+                              title="View notes"
+                            >
+                              {expandedClosureIds.has(defect.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              Notes
+                            </button>
                           )}
                           <button
                             onClick={() => handleDeleteDefect(defect)}
@@ -463,25 +474,35 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                         </div>
                       </td>
                     </tr>
-                    {defect.status === 'CLOSED' && expandedClosureIds.has(defect.id) && (defect.closureNotes || defect.closedBy || defect.closedAt) && (
-                      <tr key={`${defect.id}-closure`} style={{ borderBottom: '1px solid var(--table-border)', background: 'rgba(0, 255, 136, 0.05)' }}>
+                    {expandedClosureIds.has(defect.id) && (defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt) && (
+                      <tr key={`${defect.id}-notes`} style={{ borderBottom: '1px solid var(--table-border)', background: isLight ? 'rgba(0, 119, 163, 0.04)' : 'rgba(0, 210, 255, 0.04)' }}>
                         <td colSpan={6} style={{ padding: '12px', fontSize: '13px' }}>
-                          <div style={{ display: 'flex', gap: '20px', color: 'var(--text-secondary)' }}>
-                            {defect.closedAt && (
-                              <div>
-                                <strong style={{ color: 'var(--text-primary)' }}>Closed:</strong> {new Date(defect.closedAt).toLocaleDateString()}
+                          {defect.notes && (
+                            <div style={{ marginBottom: (defect.closedAt || defect.closedBy || defect.closureNotes) ? '10px' : '0' }}>
+                              <strong style={{ color: 'var(--text-primary)' }}>Notes:</strong>
+                              <div style={{ marginTop: '4px', padding: '8px', background: 'var(--input-bg)', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                                {defect.notes}
                               </div>
-                            )}
-                            {defect.closedBy && (
-                              <div>
-                                <strong style={{ color: 'var(--text-primary)' }}>By:</strong> {defect.closedBy}
-                              </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
+                          {(defect.closedAt || defect.closedBy) && (
+                            <div style={{ display: 'flex', gap: '20px', color: 'var(--text-secondary)' }}>
+                              {defect.closedAt && (
+                                <div>
+                                  <strong style={{ color: 'var(--text-primary)' }}>Closed:</strong> {new Date(defect.closedAt).toLocaleDateString()}
+                                </div>
+                              )}
+                              {defect.closedBy && (
+                                <div>
+                                  <strong style={{ color: 'var(--text-primary)' }}>By:</strong> {defect.closedBy}
+                                </div>
+                              )}
+                            </div>
+                          )}
                           {defect.closureNotes && (
                             <div style={{ marginTop: '8px' }}>
                               <strong style={{ color: 'var(--text-primary)' }}>Closure Notes:</strong>
-                              <div style={{ marginTop: '4px', padding: '8px', background: 'var(--input-bg)', borderRadius: '6px', color: 'var(--text-primary)' }}>
+                              <div style={{ marginTop: '4px', padding: '8px', background: 'var(--input-bg)', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
                                 {defect.closureNotes}
                               </div>
                             </div>

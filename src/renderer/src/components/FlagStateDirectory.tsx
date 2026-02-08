@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, Pencil, Ship, Flag } from 'lucide-react'
 import { FlagState } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -180,141 +180,140 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                         ) : flagStates.map(fs => {
                             const flagCls = getFlagClass(fs.iso3Code)
                             const isExpanded = expandedId === fs.id
+                            const isEditingRow = editingId === fs.id
                             return (
-                                <tr key={fs.id} style={{ borderBottom: '1px solid var(--table-border)', verticalAlign: 'top' }}>
-                                    <td colSpan={5} style={{ padding: 0 }}>
-                                        <div>
-                                            <div
-                                                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-                                                className="hover-effect"
-                                            >
-                                                <div style={{ padding: '16px', width: '40px' }} onClick={() => handleExpand(fs)}>
-                                                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                                </div>
-                                                <div style={{ padding: '16px', flex: 1 }} onClick={() => handleExpand(fs)}>
-                                                    {editingId === fs.id ? (
-                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                                            <input
-                                                                type="text"
-                                                                value={editName}
-                                                                onChange={e => handleNameChange(e.target.value, setEditName, setEditIso3)}
-                                                                onClick={e => e.stopPropagation()}
-                                                                style={{ flex: 1, minWidth: '150px' }}
-                                                                list="country-names-edit"
-                                                                autoFocus
-                                                            />
-                                                            <datalist id="country-names-edit">
-                                                                {countryNameToIso3.map(c => (
-                                                                    <option key={c.iso3} value={c.name} />
-                                                                ))}
-                                                            </datalist>
-                                                            <input
-                                                                type="text"
-                                                                value={editIso3}
-                                                                onChange={e => setEditIso3(e.target.value.toUpperCase().slice(0, 3))}
-                                                                onClick={e => e.stopPropagation()}
-                                                                style={{ width: '80px', textTransform: 'uppercase' }}
-                                                                maxLength={3}
-                                                            />
-                                                            <textarea
-                                                                value={editAddress}
-                                                                onChange={e => setEditAddress(e.target.value)}
-                                                                onClick={e => e.stopPropagation()}
-                                                                placeholder="Address"
-                                                                rows={2}
-                                                                style={{ width: '100%', resize: 'vertical' }}
-                                                            />
-                                                            <div style={{ display: 'flex', gap: '6px' }}>
-                                                                <button onClick={(e) => { e.stopPropagation(); saveEdit(fs.id) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Save</button>
-                                                                <button onClick={(e) => { e.stopPropagation(); setEditingId(null) }} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Cancel</button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                            {flagCls && <span className={flagCls} style={{ fontSize: '1.2rem' }}></span>}
-                                                            <span style={{ fontWeight: '600' }}>{fs.name}</span>
-                                                            {fs.address && (
-                                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginLeft: '4px' }}>
-                                                                    — {fs.address.split('\n')[0]}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div style={{ padding: '16px', width: '80px' }}>
-                                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{fs.iso3Code}</span>
-                                                </div>
-                                                <div style={{ padding: '16px', width: '120px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                                                        <Ship size={14} /> {fs.vesselCount || 0}
+                                <React.Fragment key={fs.id}>
+                                    <tr
+                                        style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)', cursor: 'pointer' }}
+                                        className="hover-effect"
+                                        onClick={() => !isEditingRow && handleExpand(fs)}
+                                    >
+                                        <td style={{ padding: '16px', width: '40px' }}>
+                                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            {isEditingRow ? (
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                                                    <input
+                                                        type="text"
+                                                        value={editName}
+                                                        onChange={e => handleNameChange(e.target.value, setEditName, setEditIso3)}
+                                                        style={{ flex: 1, minWidth: '150px' }}
+                                                        list="country-names-edit"
+                                                        autoFocus
+                                                    />
+                                                    <datalist id="country-names-edit">
+                                                        {countryNameToIso3.map(c => (
+                                                            <option key={c.iso3} value={c.name} />
+                                                        ))}
+                                                    </datalist>
+                                                    <input
+                                                        type="text"
+                                                        value={editIso3}
+                                                        onChange={e => setEditIso3(e.target.value.toUpperCase().slice(0, 3))}
+                                                        style={{ width: '80px', textTransform: 'uppercase' }}
+                                                        maxLength={3}
+                                                    />
+                                                    <textarea
+                                                        value={editAddress}
+                                                        onChange={e => setEditAddress(e.target.value)}
+                                                        placeholder="Address"
+                                                        rows={2}
+                                                        style={{ width: '100%', resize: 'vertical' }}
+                                                    />
+                                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                                        <button onClick={(e) => { e.stopPropagation(); saveEdit(fs.id) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Save</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setEditingId(null) }} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Cancel</button>
                                                     </div>
                                                 </div>
-                                                <div style={{ padding: '16px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); startEditing(fs) }}
-                                                        style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer', padding: '4px' }}
-                                                        title="Edit"
-                                                        aria-label="Edit flag state"
-                                                    >
-                                                        <Pencil size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(fs.id) }}
-                                                        style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', padding: '4px' }}
-                                                        title="Delete"
-                                                        aria-label="Delete flag state"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {isExpanded && (
-                                                <div style={{ borderTop: '1px solid var(--table-border)', padding: '12px 16px 16px 56px' }}>
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    {flagCls && <span className={flagCls} style={{ fontSize: '1.2rem' }}></span>}
+                                                    <span style={{ fontWeight: '600' }}>{fs.name}</span>
                                                     {fs.address && (
-                                                        <div style={{ marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-line' }}>
-                                                            {fs.address}
-                                                        </div>
-                                                    )}
-                                                    {expandedVessels.length === 0 ? (
-                                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                                                            No vessels registered under this flag.
-                                                        </div>
-                                                    ) : (
-                                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                                            <caption className="sr-only">Vessels under {fs.name}</caption>
-                                                            <thead>
-                                                                <tr style={{ background: 'var(--table-header-bg)' }}>
-                                                                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Vessel</th>
-                                                                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>IMO</th>
-                                                                    <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Action</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {expandedVessels.map(v => (
-                                                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                                                        <td style={{ padding: '8px 12px', fontWeight: '600' }}>{v.name}</td>
-                                                                        <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{v.imoNumber}</td>
-                                                                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                                                                            {onNavigateToVessel && (
-                                                                                <button
-                                                                                    onClick={() => onNavigateToVessel(v.id)}
-                                                                                    className="btn-primary"
-                                                                                    style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                                                                                >
-                                                                                    Open
-                                                                                </button>
-                                                                            )}
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginLeft: '4px' }}>
+                                                            — {fs.address.split('\n')[0]}
+                                                        </span>
                                                     )}
                                                 </div>
                                             )}
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                        <td style={{ padding: '16px', width: '80px' }}>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{fs.iso3Code}</span>
+                                        </td>
+                                        <td style={{ padding: '16px', width: '120px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                                <Ship size={14} /> {fs.vesselCount || 0}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); startEditing(fs) }}
+                                                    style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer', padding: '4px' }}
+                                                    title="Edit"
+                                                    aria-label="Edit flag state"
+                                                >
+                                                    <Pencil size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(fs.id) }}
+                                                    style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', padding: '4px' }}
+                                                    title="Delete"
+                                                    aria-label="Delete flag state"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {isExpanded && (
+                                        <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                            <td colSpan={5} style={{ padding: '0 16px 16px 56px', borderTop: '1px solid var(--table-border)' }}>
+                                                {fs.address && (
+                                                    <div style={{ marginBottom: '12px', marginTop: '12px', color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-line' }}>
+                                                        {fs.address}
+                                                    </div>
+                                                )}
+                                                {expandedVessels.length === 0 ? (
+                                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic', marginTop: '12px' }}>
+                                                        No vessels registered under this flag.
+                                                    </div>
+                                                ) : (
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px' }}>
+                                                        <caption className="sr-only">Vessels under {fs.name}</caption>
+                                                        <thead>
+                                                            <tr style={{ background: 'var(--table-header-bg)' }}>
+                                                                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Vessel</th>
+                                                                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>IMO</th>
+                                                                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Action</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {expandedVessels.map(v => (
+                                                                <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                                                    <td style={{ padding: '8px 12px', fontWeight: '600' }}>{v.name}</td>
+                                                                    <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{v.imoNumber}</td>
+                                                                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                                                        {onNavigateToVessel && (
+                                                                            <button
+                                                                                onClick={() => onNavigateToVessel(v.id)}
+                                                                                className="btn-primary"
+                                                                                style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                                                                            >
+                                                                                Open
+                                                                            </button>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             )
                         })}
                     </tbody>

@@ -20,7 +20,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function VesselManager({ initialVesselId, onClearInitialVessel }: { initialVesselId?: string | null; onClearInitialVessel?: () => void } = {}) {
+export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'surveys'; onClearInitialVessel?: () => void } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
@@ -378,7 +378,7 @@ export default function VesselManager({ initialVesselId, onClearInitialVessel }:
     }
 
     if (selectedVessel) {
-        return <VesselDetail vessel={selectedVessel} backLabel="Back to Vessels" onBack={() => { setSelectedVessel(null); loadData() }} />
+        return <VesselDetail vessel={selectedVessel} backLabel="Back to Vessels" onBack={() => { setSelectedVessel(null); loadData() }} initialSection={initialVesselSection} />
     }
 
     return (
@@ -552,6 +552,7 @@ export default function VesselManager({ initialVesselId, onClearInitialVessel }:
                                 <th scope="col" style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
                                     IMO Number <ArrowUpDown size={14} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
                                 </th>
+                                <th scope="col" style={{ padding: '16px', width: '100px' }}>Sanctions</th>
                                 <th scope="col" style={{ padding: '16px' }}>Customer</th>
                                 <th scope="col" style={{ padding: '16px' }}>Current Fleet</th>
                                 <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
@@ -587,7 +588,6 @@ export default function VesselManager({ initialVesselId, onClearInitialVessel }:
                                                     onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
                                                 >
                                                     {v.name}
-                                                    <OfacBadge vessel={v} />
                                                     {!v.isActive && (
                                                         <span style={{
                                                             fontSize: '0.65rem',
@@ -605,6 +605,9 @@ export default function VesselManager({ initialVesselId, onClearInitialVessel }:
                                         </td>
                                         <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                                             <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <OfacBadge vessel={v} />
                                         </td>
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ position: 'relative' }}>

@@ -12,7 +12,9 @@ import {
     Users,
     HelpCircle
 } from 'lucide-react'
-import { Fleet, Vessel, Entity } from '../../../shared/types'
+import { Fleet, Vessel, Entity, FlagState } from '../../../shared/types'
+import { getFlagClass } from '../utils/countryCodeMap'
+import 'flag-icons/css/flag-icons.min.css'
 import FleetDetail from './FleetDetail'
 import VesselDetail from './VesselDetail'
 
@@ -25,6 +27,7 @@ export default function FleetManager() {
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
+    const [flagStates, setFlagStates] = useState<FlagState[]>([])
 
     const [newFleetName, setNewFleetName] = useState('')
     const [selectedFleet, setSelectedFleet] = useState<Fleet | null>(null)
@@ -48,14 +51,16 @@ export default function FleetManager() {
     }, [])
 
     const loadData = async () => {
-        const [fData, vData, eData] = await Promise.all([
+        const [fData, vData, eData, fsData] = await Promise.all([
             window.api.getFleets(),
             window.api.getVessels(),
-            window.api.getEntities()
+            window.api.getEntities(),
+            window.api.getFlagStates()
         ])
         setFleets(fData)
         setVessels(vData)
         setEntities(eData)
+        setFlagStates(fsData)
     }
 
     const handleAddFleet = async (e: React.FormEvent) => {
@@ -154,6 +159,8 @@ export default function FleetManager() {
 
     const renderVesselRow = (vessel: Vessel) => {
         const fleet = fleets.find(f => f.id === vessel.fleetId)
+        const fs = flagStates.find(f => f.id === vessel.flagStateId)
+        const flagCls = fs ? getFlagClass(fs.iso3Code) : ''
         return (
             <tr
                 key={vessel.id}
@@ -185,6 +192,9 @@ export default function FleetManager() {
                 </td>
                 <td style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                     {vessel.imoNumber}
+                </td>
+                <td style={{ padding: '10px 16px' }}>
+                    {flagCls ? <span className={flagCls} style={{ fontSize: '1.1rem' }}></span> : <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>—</span>}
                 </td>
                 <td style={{ padding: '10px 16px' }}>
                     {fleet ? (
@@ -250,6 +260,7 @@ export default function FleetManager() {
                                 <tr style={{ background: 'var(--table-header-bg)' }}>
                                     <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Vessel</th>
                                     <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>IMO</th>
+                                    <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', width: '60px' }}>Flag</th>
                                     <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Fleet</th>
                                 </tr>
                             </thead>
@@ -268,7 +279,7 @@ export default function FleetManager() {
         const totalVessels = groups.reduce((sum, g) => sum + g.vessels.length, 0)
         if (groups.length === 0 && title !== 'Unassigned') return null
         return (
-            <div style={{ marginBottom: '24px' }}>
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
                 <div
                     onClick={() => toggleSection(title)}
                     style={{
@@ -276,11 +287,11 @@ export default function FleetManager() {
                         alignItems: 'center',
                         gap: '10px',
                         cursor: 'pointer',
-                        marginBottom: isCollapsed ? '0' : '12px',
-                        padding: '8px 0'
+                        marginBottom: isCollapsed ? '0' : '16px',
+                        userSelect: 'none'
                     }}
                 >
-                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                    {isCollapsed ? <ChevronRight size={18} color="var(--accent-primary)" /> : <ChevronDown size={18} color="var(--accent-primary)" />}
                     {icon}
                     <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{title}</h3>
                     {badge && (
@@ -300,7 +311,7 @@ export default function FleetManager() {
                     </span>
                 </div>
                 {!isCollapsed && groups.map(renderCustomerGroup)}
-            </div>
+            </section>
         )
     }
 
@@ -311,8 +322,8 @@ export default function FleetManager() {
                 <p style={{ color: 'var(--text-secondary)' }}>View vessels grouped by customer, manage fleets, and export reports.</p>
             </header>
 
-            {/* View toggle & filters */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* View toggle */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
                     <button
                         onClick={() => setViewMode('customers')}
@@ -350,9 +361,12 @@ export default function FleetManager() {
                         <Folder size={16} /> By Fleet
                     </button>
                 </div>
+            </div>
 
-                {viewMode === 'customers' && (
-                    <>
+            {viewMode === 'customers' ? (
+                <>
+                    {/* Search & Filter */}
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <div style={{ position: 'relative', flex: 1, minWidth: '200px', maxWidth: '400px' }}>
                             <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={16} />
                             <input
@@ -367,19 +381,15 @@ export default function FleetManager() {
                         <select
                             value={typeFilter}
                             onChange={e => setTypeFilter(e.target.value as any)}
-                            style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--table-header-bg)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                            style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                             aria-label="Filter by customer type"
                         >
                             <option value="all">All Types</option>
                             <option value="broker">Brokers Only</option>
                             <option value="direct">Direct Clients Only</option>
                         </select>
-                    </>
-                )}
-            </div>
+                    </div>
 
-            {viewMode === 'customers' ? (
-                <>
                     {/* Brokers */}
                     {(typeFilter === 'all' || typeFilter === 'broker') && brokerGroups.length > 0 &&
                         renderSection('Brokers', <Building2 size={20} color="#f59e0b" />, brokerGroups, 'BROKER')
@@ -392,7 +402,7 @@ export default function FleetManager() {
 
                     {/* Unassigned */}
                     {unassigned.length > 0 && (
-                        <div style={{ marginBottom: '24px' }}>
+                        <section className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
                             <div
                                 onClick={() => toggleSection('Unassigned')}
                                 style={{
@@ -400,11 +410,11 @@ export default function FleetManager() {
                                     alignItems: 'center',
                                     gap: '10px',
                                     cursor: 'pointer',
-                                    marginBottom: collapsedSections.has('Unassigned') ? '0' : '12px',
-                                    padding: '8px 0'
+                                    marginBottom: collapsedSections.has('Unassigned') ? '0' : '16px',
+                                    userSelect: 'none'
                                 }}
                             >
-                                {collapsedSections.has('Unassigned') ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                                {collapsedSections.has('Unassigned') ? <ChevronRight size={18} color="var(--accent-primary)" /> : <ChevronDown size={18} color="var(--accent-primary)" />}
                                 <HelpCircle size={20} color="var(--text-secondary)" />
                                 <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Unassigned</h3>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -412,13 +422,14 @@ export default function FleetManager() {
                                 </span>
                             </div>
                             {!collapsedSections.has('Unassigned') && (
-                                <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                                <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <caption className="sr-only">Unassigned vessels</caption>
                                         <thead>
                                             <tr style={{ background: 'var(--table-header-bg)' }}>
                                                 <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Vessel</th>
                                                 <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>IMO</th>
+                                                <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', width: '60px' }}>Flag</th>
                                                 <th scope="col" style={{ padding: '8px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Fleet</th>
                                             </tr>
                                         </thead>
@@ -428,7 +439,7 @@ export default function FleetManager() {
                                     </table>
                                 </div>
                             )}
-                        </div>
+                        </section>
                     )}
 
                     {brokerGroups.length === 0 && directGroups.length === 0 && unassigned.length === 0 && (

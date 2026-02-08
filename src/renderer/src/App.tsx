@@ -28,6 +28,7 @@ function App(): React.JSX.Element {
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
+  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'surveys' | undefined>(undefined)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -295,7 +296,7 @@ function App(): React.JSX.Element {
 
         <main id="main-content" className="main-content">
           {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
-          {activeTab === 'vessels' && <VesselManager initialVesselId={navigateToVesselId} onClearInitialVessel={() => setNavigateToVesselId(null)} />}
+          {activeTab === 'vessels' && <VesselManager initialVesselId={navigateToVesselId} initialVesselSection={navigateToVesselSection} onClearInitialVessel={() => { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }} />}
           {activeTab === 'fleets' && <FleetManager />}
           {activeTab === 'admin' && isAdmin && <AdminPanel onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
           {activeTab === 'users' && isAdmin && <UserManager />}
@@ -303,7 +304,7 @@ function App(): React.JSX.Element {
           {activeTab === 'compliance' && <ComplianceCenter />}
           {activeTab === 'sanctions-search' && <SanctionsSearch />}
           {activeTab === 'reminders' && <ReminderCenter />}
-          {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
+          {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setActiveTab('vessels') }} />}
           {activeTab === 'calculators' && <Calculators />}
         </main>
         <UpdateNotification />

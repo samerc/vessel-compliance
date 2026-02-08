@@ -93,7 +93,9 @@ Automated weekly sanctions screening for all entities and vessels:
 Vessel inspection tracking with defects management:
 - **Surveyors**: Directory of surveyor companies (`SurveyorDirectory.tsx`) with company name, country, contact info
 - **Surveys**: Condition surveys attached to vessels (`ConditionSurveyManager.tsx`) with date, surveyor, type, location
+- **Survey List**: Cross-vessel survey overview (`ConditionSurveyList.tsx`) with search, navigates directly to vessel's survey section
 - **Defects**: Each survey can have multiple defects (`DefectManager.tsx`) with severity (optional), status (OPEN/CLOSED), due dates
+- **Defect Notes**: Notes button visible for all defects with notes (not just closed), shows both general notes and closure notes
 - **Attachments**: Multiple file attachments per survey (reports, photos, certificates)
 - **Survey Status**: Automatically shows "SURVEY CLOSED" when all defects are closed
 - **Closure Tracking**: Defects track who closed them, when, and optional closure notes
@@ -113,17 +115,19 @@ Dual-view fleet management page (`src/renderer/src/components/FleetManager.tsx`)
 
 - **By Customer** view: Vessels grouped under customer entities, split into Brokers / Direct Clients / Unassigned sections
 - **By Fleet** view: Original fleet CRUD with vessel assignment
-- **Filters**: Customer type filter, text search across customer and vessel names
-- **Collapsible**: Customer cards expand/collapse to show vessel tables
+- **Filters**: Customer type filter and text search (under By Customer view only)
+- **Collapsible**: Customer cards and sections expand/collapse with glass-card styling
+- **Flag Column**: Fleet vessel tables show flag icons alongside vessel name, IMO, and fleet
 
 ### Entity Directory
 
 Entity management page (`src/renderer/src/components/EntityDirectory.tsx`) with master-detail layout:
 
 - **Stats Row**: Total entities, companies, persons counts with gradient icons
-- **Left Panel**: Paginated entity list with type-colored avatars, OFAC badges, search/filter
-- **Right Panel**: Entity detail with contact info, document status badges, associated vessels grid
-- **Edit Modal**: Modify entity name, type, identifier, email, phone
+- **Left Panel**: Paginated entity list (default 25 per page) with type-colored avatars, OFAC badges on separate line, search/filter
+- **Right Panel**: Entity detail with contact info (multiple comma-separated emails supported), document status badges, associated vessels grid
+- **Edit Modal**: Modify entity name, type, identifier, email(s), phone
+- **Create Entity**: Modal with auto-sanctions check after creation (shows spinner)
 - **Delete**: With confirmation warning about linked vessels; clears customer references
 - **Vessel Navigation**: Clicking vessel names navigates to VesselDetail with "Back to Entity" return
 
@@ -159,18 +163,6 @@ Vessel document expiry monitoring and notification system:
 - **Settings** (Admin Panel → Vessel Reminder Settings): Snooze period (days) and clipboard template
 - **IPC Handlers**: `reminders:getSettings`, `reminders:setSettings`, `reminders:getVesselReminders`, `reminders:snoozeVessel`, `reminders:unsnoozeVessel`
 
-### Excel Import
-
-Bulk vessel import from Excel files (`src/main/excelImporter.ts`):
-
-- **Expected Columns**: `Vessel | Customer Name | Customer Type | IMO# | Registered Owners | Managers`
-- **Customer Assignment**: Finds or creates customer entity, assigns to vessel with broker/direct type
-- **IMO Generation**: Empty IMO fields get a random 7-digit number starting with `9`
-- **Entity Linking**: Registered Owners and Managers are found/created as entities and linked as vessel assureds
-- **Customer Type Normalization**: 'broker'/'b' → broker, 'direct'/'client'/'d'/'c' → direct
-- **Stats**: Returns counts of vessels created/updated, entities created, customers assigned
-- **UI**: Import button in Admin Panel with tooltip showing expected column format
-
 ### Calculators
 
 Extensible calculator section with sub-navigation for insurance calculation tools:
@@ -182,6 +174,10 @@ Extensible calculator section with sub-navigation for insurance calculation tool
   - **Instalment logic**: Based on annual premium / number of instalments as the base instalment amount; checks how many full annual instalments the pro-rata covers; remainder goes in first instalment
   - **Commission**: Same instalment pattern applied to commission (annual commission / instalments as base)
   - **Calculation Steps**: All 10 intermediate steps displayed in the results section for transparency
+  - **Pure calculator**: No database persistence, instant reactive computation via `useMemo`
+- **TLO Rate Calculator** (`src/renderer/src/components/TLORateCalculator.tsx`):
+  - Calculates adjusted Total Loss Only premium when vessel value changes
+  - **6-step calculation**: Current rate, rate/3, value difference, additional premium, new premium, new rate
   - **Pure calculator**: No database persistence, instant reactive computation via `useMemo`
 
 ### Sanctions Search
@@ -195,15 +191,17 @@ Ad-hoc sanctions lookup page (`src/renderer/src/components/SanctionsSearch.tsx`)
 
 ### Admin Panel
 
-System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with 7 collapsible sections (all collapsed by default):
+System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with collapsible sections (all collapsed by default):
 
 1. **Document Types**: CRUD with drag-to-reorder and active/inactive toggle
 2. **Assured Roles**: CRUD for entity role types
-3. **Scheduled Compliance Check**: Enable/disable, schedule, threshold, include vessels, skip cleared
-4. **Vessel Reminder Settings**: Snooze period and clipboard template
-5. **File Upload Security**: Allowed/blocked file extensions for uploads
-6. **Database Configuration**: View/change MySQL connection settings
-7. **Danger Zone**: Purge all vessels and entities (double confirmation required, admin-only)
+3. **Survey Types**: CRUD for condition survey types
+4. **Policy Types**: CRUD with reorder for vessel policy classifications
+5. **Scheduled Compliance Check**: Enable/disable, schedule, threshold, include vessels, skip cleared
+6. **Vessel Reminder Settings**: Snooze period and clipboard template
+7. **File Upload Security**: Allowed/blocked file extensions for uploads
+8. **Database Configuration**: View/change MySQL connection settings
+9. **Danger Zone**: Purge all vessels and entities (double confirmation required, admin-only)
 
 - **Collapsible Pattern**: Uses `collapsedSections` state (`Set<string>`) with `toggleSection` function; each section header has ChevronRight/ChevronDown toggle
 - **All sections collapsed by default**: Initial state includes all section IDs
@@ -217,6 +215,44 @@ When updating user-specific settings (theme, sanctions threshold, window prefere
 
 Without step 2, `auth:getSession` returns stale data until next login.
 
+### Custom Vessel Document Types
+
+Per-vessel custom document types beyond the global admin-defined ones:
+
+- **Table**: `vessel_custom_doc_types` (id, vessel_id, name, description, order_index)
+- **UI**: "Custom" button in VesselDetail document table header opens inline add form
+- **Behavior**: Custom docs appear in same table after global types with "(Custom)" label
+- **Reports**: Custom doc types included in PDF/Excel exports
+
+### Policy Types & Vessel Policies
+
+Classification system for vessel insurance policies:
+
+- **Policy Types**: Admin-managed list with CRUD and reorder (`policy_types` table)
+- **Vessel Policies**: Many-to-many assignment via `vessel_policies` table
+- **VesselDetail**: Modal with checkbox list to assign/remove policy types per vessel
+
+### Dynamic Address Book (DAB)
+
+Query builder for finding entity contacts across the fleet:
+
+- **Component**: `DynamicAddressBook.tsx` within Directory page
+- **Filters**: Policy types, flag states (with All/Unassigned), customer type, vessel status
+- **Logic**: AND/OR toggle for combining filter criteria
+- **Export**: Email only (default), phone only, or both; copy to clipboard
+- **Results**: Table with entity name, type, contacts, associated vessels
+
+### Vessel Detail Navigation
+
+- **Sections**: Toggle between Documents and Surveys views via `detailView` state
+- **External Navigation**: `initialSection` prop allows navigating directly to surveys tab (used by ConditionSurveyList)
+- **Navigation Chain**: App.tsx → VesselManager (initialVesselSection) → VesselDetail (initialSection)
+
+### Vessel List
+
+- **Sanctions Column**: OfacBadge displayed in separate column (not inline with vessel name)
+- **Flag Icons**: Flag state shown as icon next to vessel name using `flag-icons` CSS package
+
 ### Code Style
 - Prettier: Single quotes, no semicolons, 100 char width, no trailing commas
 - Path alias: `@renderer/*` maps to `src/renderer/src/*`
@@ -227,10 +263,14 @@ Without step 2, `auth:getSession` returns stale data until next login.
 On first launch, admin enters MySQL credentials which are saved to `db-config.json`. Default admin credentials are `admin/admin123`. The schema auto-migrates on startup.
 
 ### Key Tables
+
 - `users` - User accounts with auth, theme, window preferences
 - `vessels`, `fleets` - Vessel registry and fleet grouping
 - `entities`, `vessel_assureds`, `entity_ubos` - Assured parties and beneficial owners
 - `document_types`, `vessel_documents` - Document requirements and uploads
+- `vessel_custom_doc_types` - Per-vessel custom document types
+- `flag_states` - Vessel flag state registries
+- `policy_types`, `vessel_policies` - Insurance policy type classifications
 - `surveyors`, `condition_surveys`, `survey_defects`, `survey_attachments` - Survey management
 - `compliance_check_logs` - History of scheduled/manual compliance runs
 - `compliance_check_results` - Individual sanctions matches pending review
