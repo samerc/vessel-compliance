@@ -808,6 +808,10 @@ app.whenReady().then(() => {
   safeHandle('db:updateDocumentType', (event, id, updates) => { requireSession(event); return db.updateDocumentType(id, updates) })
   safeHandle('db:deleteDocumentType', (event, id) => { requireAdmin(event); return db.deleteDocumentType(id) })
 
+  safeHandle('db:getVesselCustomDocTypes', (event, vesselId: string) => { requireSession(event); return db.getVesselCustomDocTypes(vesselId) })
+  safeHandle('db:addVesselCustomDocType', (event, docType) => { requireSession(event); return db.addVesselCustomDocType(docType) })
+  safeHandle('db:deleteVesselCustomDocType', (event, id: string) => { requireSession(event); return db.deleteVesselCustomDocType(id) })
+
   safeHandle('db:getFleets', (event) => { requireSession(event); return db.getFleets() })
   safeHandle('db:addFleet', (event, fleet) => { requireSession(event); return db.addFleet(fleet) })
   safeHandle('db:deleteFleet', (event, id) => { requireAdmin(event); return db.deleteFleet(id) })
@@ -874,6 +878,21 @@ app.whenReady().then(() => {
   safeHandle('db:updateFlagState', (event, id, updates) => { requireSession(event); return db.updateFlagState(id, updates) })
   safeHandle('db:deleteFlagState', (event, id) => { requireSession(event); return db.deleteFlagState(id) })
   safeHandle('db:getVesselsByFlagState', (event, flagStateId) => { requireSession(event); return db.getVesselsByFlagState(flagStateId) })
+
+  // Policy Types
+  safeHandle('db:getPolicyTypes', (event) => { requireSession(event); return db.getPolicyTypes() })
+  safeHandle('db:addPolicyType', (event, name) => { requireAdmin(event); return db.addPolicyType(name) })
+  safeHandle('db:updatePolicyType', (event, id, updates) => { requireAdmin(event); return db.updatePolicyType(id, updates) })
+  safeHandle('db:deletePolicyType', (event, id) => { requireAdmin(event); return db.deletePolicyType(id) })
+  safeHandle('db:reorderPolicyTypes', (event, orderedIds) => { requireAdmin(event); return db.reorderPolicyTypes(orderedIds) })
+
+  // Vessel Policies
+  safeHandle('db:getVesselPolicies', (event, vesselId) => { requireSession(event); return db.getVesselPolicies(vesselId) })
+  safeHandle('db:addVesselPolicy', (event, vesselId, policyTypeId) => { requireSession(event); return db.addVesselPolicy(vesselId, policyTypeId) })
+  safeHandle('db:deleteVesselPolicy', (event, id) => { requireSession(event); return db.deleteVesselPolicy(id) })
+
+  // Dynamic Address Book
+  safeHandle('db:queryDAB', (event, criteria) => { requireSession(event); return db.queryDAB(criteria) })
 
   safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
   safeHandle('db:addVesselAssured', (event, assured) => { requireSession(event); return db.addVesselAssured(assured) })
@@ -1060,6 +1079,11 @@ app.whenReady().then(() => {
   safeHandle('db:deleteUser', async (event, id) => {
     requireAdmin(event)
     return db.deleteUser(id)
+  })
+
+  safeHandle('db:updateUserRole', async (event, userId: string, role: 'admin' | 'user') => {
+    requireAdmin(event)
+    return db.updateUserRole(userId, role)
   })
 
   safeHandle('users:updateSanctionsThreshold', async (event, threshold: number) => {

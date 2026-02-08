@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { Users, ClipboardList, Flag } from 'lucide-react'
+import { Users, ClipboardList, Flag, BookOpen } from 'lucide-react'
 import EntityDirectory from './EntityDirectory'
 import SurveyorDirectory from './SurveyorDirectory'
 import FlagStateDirectory from './FlagStateDirectory'
+import DynamicAddressBook from './DynamicAddressBook'
 
 interface DirectoryProps {
     onNavigateToVessel?: (vesselId: string) => void
 }
 
 export default function Directory({ onNavigateToVessel }: DirectoryProps) {
-    const [activeView, setActiveView] = useState<'entities' | 'surveyors' | 'flag-states'>('entities')
+    const [activeView, setActiveView] = useState<'entities' | 'surveyors' | 'flag-states' | 'address-book'>('entities')
 
     return (
         <div className="fade-in">
@@ -80,12 +81,33 @@ export default function Directory({ onNavigateToVessel }: DirectoryProps) {
                 >
                     <Flag size={18} /> Flag States
                 </button>
+                <button
+                    onClick={() => setActiveView('address-book')}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 20px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: activeView === 'address-book' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                        color: activeView === 'address-book' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        fontWeight: activeView === 'address-book' ? '600' : '400',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        transition: 'var(--transition)',
+                        marginBottom: '-1px'
+                    }}
+                >
+                    <BookOpen size={18} /> Address Book
+                </button>
             </div>
 
             {/* Active view content */}
             {activeView === 'entities' && <EntityDirectory />}
             {activeView === 'surveyors' && <SurveyorDirectory />}
             {activeView === 'flag-states' && <FlagStateDirectory onNavigateToVessel={onNavigateToVessel} />}
+            {activeView === 'address-book' && <DynamicAddressBook />}
         </div>
     )
 }

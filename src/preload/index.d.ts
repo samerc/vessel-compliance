@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -12,6 +12,7 @@ export interface Api {
   authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string }>
   getUsers: () => Promise<User[]>
   deleteUser: (id: string) => Promise<void>
+  updateUserRole: (userId: string, role: 'admin' | 'user') => Promise<void>
   setupSelectDirectory: () => Promise<string | null>
   setupSelectConfigFile: () => Promise<string | null>
   setupSaveConfig: (config: any, directory: string) => Promise<{ success: boolean; message?: string }>
@@ -24,6 +25,10 @@ export interface Api {
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>
   updateDocumentType: (id: string, updates: Partial<DocumentType>) => Promise<void>
   deleteDocumentType: (id: string) => Promise<void>
+
+  getVesselCustomDocTypes: (vesselId: string) => Promise<VesselCustomDocType[]>
+  addVesselCustomDocType: (docType: Omit<VesselCustomDocType, 'id'>) => Promise<VesselCustomDocType>
+  deleteVesselCustomDocType: (id: string) => Promise<void>
 
   getFleets: () => Promise<Fleet[]>
   addFleet: (fleet: Omit<Fleet, 'id'>) => Promise<Fleet>
@@ -110,6 +115,21 @@ export interface Api {
   updateFlagState: (id: string, updates: Partial<FlagState>) => Promise<void>
   deleteFlagState: (id: string) => Promise<void>
   getVesselsByFlagState: (flagStateId: string) => Promise<{ id: string; name: string; imoNumber: string }[]>
+
+  // Policy Types
+  getPolicyTypes: () => Promise<PolicyType[]>
+  addPolicyType: (name: string) => Promise<PolicyType>
+  updatePolicyType: (id: string, updates: { name?: string }) => Promise<void>
+  deletePolicyType: (id: string) => Promise<void>
+  reorderPolicyTypes: (orderedIds: string[]) => Promise<void>
+
+  // Vessel Policies
+  getVesselPolicies: (vesselId: string) => Promise<VesselPolicy[]>
+  addVesselPolicy: (vesselId: string, policyTypeId: string) => Promise<VesselPolicy>
+  deleteVesselPolicy: (id: string) => Promise<void>
+
+  // Dynamic Address Book
+  queryDAB: (criteria: DABQueryCriteria) => Promise<any[]>
 
   // Surveyors
   getSurveyors: () => Promise<Surveyor[]>

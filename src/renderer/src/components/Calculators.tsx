@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Calculator } from 'lucide-react'
 import PremiumCalculator from './PremiumCalculator'
+import TLORateCalculator from './TLORateCalculator'
 
-type CalculatorType = 'premium'
+type CalculatorType = 'premium' | 'tlo'
 
 const calculators: { id: CalculatorType; label: string; description: string }[] = [
-  { id: 'premium', label: 'Pro-Rata Premium', description: 'Calculate pro-rata premiums with instalment and commission breakdowns' }
+  { id: 'premium', label: 'Pro-Rata Premium', description: 'Calculate pro-rata premiums with instalment and commission breakdowns' },
+  { id: 'tlo', label: 'TLO Rate', description: 'Calculate Total Loss Only premium based on vessel value changes' }
 ]
 
 export default function Calculators() {
@@ -47,6 +49,7 @@ export default function Calculators() {
       </div>
 
       {activeCalc === 'premium' && <PremiumCalculator />}
+      {activeCalc === 'tlo' && <TLORateCalculator />}
     </div>
   )
 }

@@ -7,6 +7,14 @@ export interface DocumentType {
   description?: string
 }
 
+export interface VesselCustomDocType {
+  id: string
+  vesselId: string
+  name: string
+  description?: string
+  order: number
+}
+
 export interface Fleet {
   id: string
   name: string
@@ -306,4 +314,26 @@ export interface VesselReminder {
   snoozeUntil?: string
   snoozedBy?: string
   totalIssues: number
+}
+
+export interface PolicyType {
+  id: string
+  name: string
+  order: number
+}
+
+export interface VesselPolicy {
+  id: string
+  vesselId: string
+  policyTypeId: string
+}
+
+export interface DABQueryCriteria {
+  logic: 'AND' | 'OR'
+  policyTypeIds?: string[]
+  flagStateIds?: string[]
+  customerIds?: string[]
+  customerType?: 'broker' | 'direct' | 'both'
+  exportType: 'email' | 'phone' | 'both'
+  vesselStatus?: 'active' | 'inactive' | 'all'
 }

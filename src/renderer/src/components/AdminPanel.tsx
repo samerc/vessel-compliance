@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell, RefreshCw, ClipboardCheck, ArrowLeft, Ship, GripVertical } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, RefreshCw, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3 } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
 export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?: (vesselId: string) => void }) {
@@ -36,7 +36,12 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [runningManualCheck, setRunningManualCheck] = useState(false)
 
     // Collapsible sections
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dangerZone']))
+    const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
+    const [newPolicyType, setNewPolicyType] = useState('')
+    const [editingPolicyTypeId, setEditingPolicyTypeId] = useState<string | null>(null)
+    const [editPolicyTypeName, setEditPolicyTypeName] = useState('')
+
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'policyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dangerZone']))
     const toggleSection = (id: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev)
@@ -139,6 +144,50 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         await loadDocTypes()
         await loadRoles()
         await loadSurveyTypes()
+        await loadPolicyTypes()
+    }
+
+    const loadPolicyTypes = async () => {
+        const data = await window.api.getPolicyTypes()
+        setPolicyTypes(data)
+    }
+
+    const handleAddPolicyType = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newPolicyType.trim()) return
+        await window.api.addPolicyType(newPolicyType.trim())
+        setNewPolicyType('')
+        loadPolicyTypes()
+        showSuccess('Policy type added')
+    }
+
+    const handleDeletePolicyType = async (id: string) => {
+        if (!confirm('Delete this policy type? It will be removed from all vessels.')) return
+        await window.api.deletePolicyType(id)
+        loadPolicyTypes()
+        showSuccess('Policy type deleted')
+    }
+
+    const startEditingPolicyType = (pt: PolicyType) => {
+        setEditingPolicyTypeId(pt.id)
+        setEditPolicyTypeName(pt.name)
+    }
+
+    const savePolicyTypeEdit = async (id: string) => {
+        if (!editPolicyTypeName.trim()) return
+        await window.api.updatePolicyType(id, { name: editPolicyTypeName.trim() })
+        setEditingPolicyTypeId(null)
+        loadPolicyTypes()
+        showSuccess('Policy type updated')
+    }
+
+    const handleMovePolicyType = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...policyTypes]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setPolicyTypes(newOrder)
+        await window.api.reorderPolicyTypes(newOrder.map(p => p.id))
     }
 
     const loadDocTypes = async () => {
@@ -1282,7 +1331,106 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                 </>}
             </section>
 
-            {/* 7. Danger Zone – Purge Data */}
+            {/* 7. Policy Types */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3
+                    onClick={() => toggleSection('policyTypes')}
+                    style={{ marginBottom: collapsedSections.has('policyTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('policyTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                    <Tag size={20} color="var(--accent-primary)" /> Policy Types
+                </h3>
+                {!collapsedSections.has('policyTypes') && <>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+                        Define policy types that can be assigned to vessels. Used by the Dynamic Address Book for building distribution lists.
+                    </p>
+                    <form onSubmit={handleAddPolicyType} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                        <input
+                            type="text"
+                            value={newPolicyType}
+                            onChange={e => setNewPolicyType(e.target.value)}
+                            style={{ flex: 1 }}
+                            placeholder="e.g. Hull & Machinery"
+                            aria-label="Policy type name"
+                        />
+                        <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Plus size={18} /> Add Policy Type
+                        </button>
+                    </form>
+
+                    {policyTypes.length > 0 && (
+                        <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <caption className="sr-only">Policy types</caption>
+                                <thead>
+                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                        <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
+                                        <th scope="col" style={{ padding: '16px' }}>Policy Type</th>
+                                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {policyTypes.map((pt, index) => (
+                                        <tr key={pt.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                            <td style={{ padding: '16px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <button
+                                                            onClick={() => handleMovePolicyType(index, 'up')}
+                                                            disabled={index === 0}
+                                                            style={{ background: 'transparent', border: 'none', cursor: index === 0 ? 'default' : 'pointer', padding: '0', opacity: index === 0 ? 0.3 : 1 }}
+                                                            aria-label="Move up"
+                                                        >
+                                                            <ChevronUp size={14} color="var(--text-secondary)" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleMovePolicyType(index, 'down')}
+                                                            disabled={index === policyTypes.length - 1}
+                                                            style={{ background: 'transparent', border: 'none', cursor: index === policyTypes.length - 1 ? 'default' : 'pointer', padding: '0', opacity: index === policyTypes.length - 1 ? 0.3 : 1 }}
+                                                            aria-label="Move down"
+                                                        >
+                                                            <ChevronDown size={14} color="var(--text-secondary)" />
+                                                        </button>
+                                                    </div>
+                                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '20px', textAlign: 'center' }}>{index + 1}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '16px' }}>
+                                                {editingPolicyTypeId === pt.id ? (
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={editPolicyTypeName}
+                                                            onChange={e => setEditPolicyTypeName(e.target.value)}
+                                                            onKeyDown={e => e.key === 'Enter' && savePolicyTypeEdit(pt.id)}
+                                                            onKeyDownCapture={e => e.key === 'Escape' && setEditingPolicyTypeId(null)}
+                                                            autoFocus
+                                                            style={{ flex: 1 }}
+                                                            aria-label="Edit policy type name"
+                                                        />
+                                                        <button onClick={() => savePolicyTypeEdit(pt.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
+                                                        <button onClick={() => setEditingPolicyTypeId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
+                                                    </div>
+                                                ) : (
+                                                    <span onClick={() => startEditingPolicyType(pt)} style={{ cursor: 'pointer' }}>{pt.name}</span>
+                                                )}
+                                            </td>
+                                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                                    <button onClick={() => startEditingPolicyType(pt)} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }} aria-label="Edit policy type"><Edit3 size={18} /></button>
+                                                    <button onClick={() => handleDeletePolicyType(pt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete policy type"><Trash2 size={18} /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </>}
+            </section>
+
+            {/* 8. Danger Zone – Purge Data */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3
                     onClick={() => toggleSection('dangerZone')}

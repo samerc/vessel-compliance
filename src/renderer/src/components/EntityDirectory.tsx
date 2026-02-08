@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Trash2, Mail, Phone, FileText, AlertTriangle, CheckCircle2, Hash } from 'lucide-react'
+import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Trash2, Mail, Phone, FileText, AlertTriangle, CheckCircle2, Hash, Plus, Upload } from 'lucide-react'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -66,6 +66,11 @@ export default function EntityDirectory() {
         message: string
     }>({ show: false, entity: null, message: '' })
 
+    // Create entity state
+    const [showCreateModal, setShowCreateModal] = useState(false)
+    const [createForm, setCreateForm] = useState({ name: '', type: 'company' as 'company' | 'person', identifier: '', email: '', phone: '' })
+    const [isCreating, setIsCreating] = useState(false)
+
     const startEditing = (entity: Entity) => {
         setEditingEntity(entity)
         setEditForm({
@@ -122,6 +127,42 @@ export default function EntityDirectory() {
             showError(error.message || 'Failed to delete entity')
         } finally {
             setDeleteConfirmation({ show: false, entity: null, message: '' })
+        }
+    }
+
+    const handleCreateEntity = async () => {
+        if (!createForm.name.trim()) return
+        setIsCreating(true)
+        try {
+            await window.api.addEntity({
+                name: createForm.name.trim(),
+                type: createForm.type,
+                identifier: createForm.identifier.trim() || undefined,
+                email: createForm.email.trim() || undefined,
+                phone: createForm.phone.trim() || undefined
+            })
+            setShowCreateModal(false)
+            setCreateForm({ name: '', type: 'company', identifier: '', email: '', phone: '' })
+            showSuccess('Entity created successfully')
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to create entity')
+        } finally {
+            setIsCreating(false)
+        }
+    }
+
+    const handleUploadEntityDoc = async (entityId: string, field: string) => {
+        try {
+            const filePath = await window.api.dialogOpenFileAny()
+            if (!filePath) return
+            await window.api.updateEntity(entityId, { [field]: filePath })
+            showSuccess('Document uploaded')
+            // Update selectedEntity locally to reflect change immediately
+            setSelectedEntity(prev => prev?.id === entityId ? { ...prev, [field]: filePath } : prev)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to upload document')
         }
     }
 
@@ -388,7 +429,7 @@ export default function EntityDirectory() {
         )
     }
 
-    const DocBadge = ({ label, hasFile, onClick }: { label: string; hasFile: boolean; onClick?: () => void }) => (
+    const DocBadge = ({ label, hasFile, onClick, onUpload }: { label: string; hasFile: boolean; onClick?: () => void; onUpload?: () => void }) => (
         <div
             style={{
                 padding: '8px 14px',
@@ -417,6 +458,23 @@ export default function EntityDirectory() {
                 {label}
             </span>
             {hasFile && <FileText size={13} style={{ marginLeft: 'auto', opacity: 0.4 }} />}
+            {!hasFile && onUpload && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onUpload() }}
+                    className="btn-secondary"
+                    style={{
+                        marginLeft: 'auto',
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                    }}
+                    title={`Upload ${label}`}
+                >
+                    <Upload size={11} /> Upload
+                </button>
+            )}
         </div>
     )
 
@@ -428,9 +486,18 @@ export default function EntityDirectory() {
 
     return (
         <div className="fade-in">
-            <header style={{ marginBottom: '28px' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Entity Directory</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Search for Assureds and UBOs to see their vessel associations.</p>
+            <header style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Entity Directory</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Search for Assureds and UBOs to see their vessel associations.</p>
+                </div>
+                <button
+                    className="btn-primary"
+                    onClick={() => setShowCreateModal(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem', flexShrink: 0 }}
+                >
+                    <Plus size={16} /> Create Entity
+                </button>
             </header>
 
             {/* Stats Row */}
@@ -699,6 +766,7 @@ export default function EntityDirectory() {
                                                 label="ID / Passport"
                                                 hasFile={!!selectedEntity.passportFilePath}
                                                 onClick={selectedEntity.passportFilePath ? () => window.api.fsOpen(selectedEntity.passportFilePath!) : undefined}
+                                                onUpload={!selectedEntity.passportFilePath ? () => handleUploadEntityDoc(selectedEntity.id, 'passportFilePath') : undefined}
                                             />
                                         ) : (
                                             <>
@@ -706,16 +774,19 @@ export default function EntityDirectory() {
                                                     label="Certificate of Incorporation"
                                                     hasFile={!!selectedEntity.certificateOfIncorporationPath}
                                                     onClick={selectedEntity.certificateOfIncorporationPath ? () => window.api.fsOpen(selectedEntity.certificateOfIncorporationPath!) : undefined}
+                                                    onUpload={!selectedEntity.certificateOfIncorporationPath ? () => handleUploadEntityDoc(selectedEntity.id, 'certificateOfIncorporationPath') : undefined}
                                                 />
                                                 <DocBadge
                                                     label="Articles of Association"
                                                     hasFile={!!selectedEntity.articlesOfAssociationPath}
                                                     onClick={selectedEntity.articlesOfAssociationPath ? () => window.api.fsOpen(selectedEntity.articlesOfAssociationPath!) : undefined}
+                                                    onUpload={!selectedEntity.articlesOfAssociationPath ? () => handleUploadEntityDoc(selectedEntity.id, 'articlesOfAssociationPath') : undefined}
                                                 />
                                                 <DocBadge
                                                     label="KYC"
                                                     hasFile={!!selectedEntity.kycFilePath}
                                                     onClick={selectedEntity.kycFilePath ? () => window.api.fsOpen(selectedEntity.kycFilePath!) : undefined}
+                                                    onUpload={!selectedEntity.kycFilePath ? () => handleUploadEntityDoc(selectedEntity.id, 'kycFilePath') : undefined}
                                                 />
                                             </>
                                         )}
@@ -932,6 +1003,95 @@ export default function EntityDirectory() {
                                 >
                                     {isSaving ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}
                                     Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Entity Modal */}
+            {showCreateModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }} onClick={() => setShowCreateModal(false)}>
+                    <div className="glass-card" style={{ padding: '32px', width: '480px', maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h3 style={{ fontSize: '1.3rem' }}>Create Entity</h3>
+                            <button onClick={() => setShowCreateModal(false)} className="btn-secondary" style={{ padding: '6px' }}><X size={18} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Name *</label>
+                                <input
+                                    type="text"
+                                    value={createForm.name}
+                                    onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Entity name"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Type</label>
+                                <select
+                                    value={createForm.type}
+                                    onChange={e => setCreateForm(f => ({ ...f, type: e.target.value as 'company' | 'person' }))}
+                                    style={{ width: '100%', padding: '10px 12px' }}
+                                >
+                                    <option value="company">Company</option>
+                                    <option value="person">Person</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Identifier</label>
+                                <input
+                                    type="text"
+                                    value={createForm.identifier}
+                                    onChange={e => setCreateForm(f => ({ ...f, identifier: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Optional note to distinguish same-named entities"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email</label>
+                                <input
+                                    type="email"
+                                    value={createForm.email}
+                                    onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Email address"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Phone</label>
+                                <input
+                                    type="text"
+                                    value={createForm.phone}
+                                    onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                    placeholder="Phone number"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                                <button onClick={() => setShowCreateModal(false)} className="btn-secondary">Cancel</button>
+                                <button
+                                    onClick={handleCreateEntity}
+                                    className="btn-primary"
+                                    disabled={!createForm.name.trim() || isCreating}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    {isCreating ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />}
+                                    Create Entity
                                 </button>
                             </div>
                         </div>

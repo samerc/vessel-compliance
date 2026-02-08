@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -263,7 +263,7 @@ export class MySQLAdapter {
                     survey_id VARCHAR(36) NOT NULL,
                     defect_number VARCHAR(50) NOT NULL,
                     description TEXT NOT NULL,
-                    severity VARCHAR(20) NOT NULL,
+                    severity VARCHAR(20),
                     status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
                     due_date DATE,
                     closed_at DATETIME,
@@ -321,6 +321,24 @@ export class MySQLAdapter {
             if ((defectCols as any[]).length === 0) {
                 await this.pool.query("ALTER TABLE survey_defects ADD COLUMN notes TEXT AFTER due_date")
             }
+
+            // Migration: Make severity nullable in survey_defects
+            const [sevCols] = await this.pool.query("SHOW COLUMNS FROM survey_defects WHERE Field = 'severity'") as any[]
+            if (sevCols.length > 0 && sevCols[0].Null === 'NO') {
+                await this.pool.query("ALTER TABLE survey_defects MODIFY COLUMN severity VARCHAR(20) NULL")
+            }
+
+            // Create vessel_custom_doc_types table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_custom_doc_types (
+                id VARCHAR(36) PRIMARY KEY,
+                vessel_id VARCHAR(36) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+                INDEX idx_vessel_custom_docs (vessel_id)
+            )`)
 
             // Create compliance check logs table
             await this.pool.query(`CREATE TABLE IF NOT EXISTS compliance_check_logs (
@@ -443,6 +461,25 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE vessels ADD COLUMN flag_state_id VARCHAR(36) NULL")
             }
 
+            // Create policy_types table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_types (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
+            // Create vessel_policies table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_policies (
+                id VARCHAR(36) PRIMARY KEY,
+                vessel_id VARCHAR(36) NOT NULL,
+                policy_type_id VARCHAR(36) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_vessel_policy (vessel_id, policy_type_id),
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+                FOREIGN KEY (policy_type_id) REFERENCES policy_types(id) ON DELETE CASCADE
+            )`)
+
             await addIndexIfNotExists('vessels', 'idx_vessels_fleet', 'fleet_id')
             await addIndexIfNotExists('vessels', 'idx_vessels_active', 'is_active')
             await addIndexIfNotExists('vessels', 'idx_vessels_customer', 'customer_id')
@@ -494,6 +531,31 @@ export class MySQLAdapter {
     async deleteDocumentType(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM document_types WHERE id = ?', [id])
+    }
+
+    // --- Vessel Custom Doc Types ---
+    async getVesselCustomDocTypes(vesselId: string): Promise<VesselCustomDocType[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, vessel_id as vesselId, name, description, order_index as `order` FROM vessel_custom_doc_types WHERE vessel_id = ? ORDER BY order_index ASC',
+            [vesselId]
+        )
+        return rows as VesselCustomDocType[]
+    }
+
+    async addVesselCustomDocType(docType: Omit<VesselCustomDocType, 'id'>): Promise<VesselCustomDocType> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO vessel_custom_doc_types (id, vessel_id, name, description, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, docType.vesselId, docType.name, docType.description || null, docType.order]
+        )
+        return { ...docType, id }
+    }
+
+    async deleteVesselCustomDocType(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM vessel_custom_doc_types WHERE id = ?', [id])
     }
 
     // --- Fleets ---
@@ -1288,6 +1350,11 @@ export class MySQLAdapter {
         )
     }
 
+    async updateUserRole(userId: string, role: 'admin' | 'user'): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE users SET role = ? WHERE id = ?', [role, userId])
+    }
+
 
     // Settings Management
     async getSetting(key: string): Promise<string | null> {
@@ -1544,7 +1611,7 @@ export class MySQLAdapter {
              (id, survey_id, defect_number, description, severity, status, due_date, notes)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, defect.surveyId, defect.defectNumber, defect.description,
-                defect.severity, defect.status || 'OPEN', defect.dueDate || null, defect.notes || null]
+                defect.severity || null, defect.status || 'OPEN', defect.dueDate || null, defect.notes || null]
         )
         return { ...defect, id }
     }
@@ -2058,6 +2125,161 @@ export class MySQLAdapter {
         for (const row of rows) {
             await this.autoSnoozeVessel(row.vessel_id)
         }
+    }
+
+    // --- Policy Types ---
+    async getPolicyTypes(): Promise<PolicyType[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, order_index as `order` FROM policy_types ORDER BY order_index ASC')
+        return rows as PolicyType[]
+    }
+
+    async addPolicyType(name: string): Promise<PolicyType> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow]: any[] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM policy_types')
+        const order = maxRow[0].nextOrder
+        await this.pool.execute('INSERT INTO policy_types (id, name, order_index) VALUES (?, ?, ?)', [id, name, order])
+        return { id, name, order }
+    }
+
+    async updatePolicyType(id: string, updates: { name?: string }): Promise<void> {
+        if (!this.pool) return
+        if (updates.name !== undefined) {
+            await this.pool.execute('UPDATE policy_types SET name = ? WHERE id = ?', [updates.name, id])
+        }
+    }
+
+    async deletePolicyType(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM policy_types WHERE id = ?', [id])
+    }
+
+    async reorderPolicyTypes(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE policy_types SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // --- Vessel Policies ---
+    async getVesselPolicies(vesselId: string): Promise<VesselPolicy[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, vessel_id as vesselId, policy_type_id as policyTypeId FROM vessel_policies WHERE vessel_id = ?',
+            [vesselId]
+        )
+        return rows as VesselPolicy[]
+    }
+
+    async addVesselPolicy(vesselId: string, policyTypeId: string): Promise<VesselPolicy> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO vessel_policies (id, vessel_id, policy_type_id) VALUES (?, ?, ?)',
+            [id, vesselId, policyTypeId]
+        )
+        return { id, vesselId, policyTypeId }
+    }
+
+    async deleteVesselPolicy(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM vessel_policies WHERE id = ?', [id])
+    }
+
+    // --- Dynamic Address Book Query ---
+    async queryDAB(criteria: DABQueryCriteria): Promise<any[]> {
+        if (!this.pool) return []
+
+        // Build a query that finds entities matching the criteria via their vessel associations
+        // We need: entity name, type, email, phone, associated vessel names
+        const conditions: string[] = []
+        const params: any[] = []
+
+        if (criteria.policyTypeIds && criteria.policyTypeIds.length > 0) {
+            const placeholders = criteria.policyTypeIds.map(() => '?').join(',')
+            conditions.push(`v.id IN (SELECT vessel_id FROM vessel_policies WHERE policy_type_id IN (${placeholders}))`)
+            params.push(...criteria.policyTypeIds)
+        }
+
+        if (criteria.flagStateIds && criteria.flagStateIds.length > 0) {
+            const placeholders = criteria.flagStateIds.map(() => '?').join(',')
+            conditions.push(`v.flag_state_id IN (${placeholders})`)
+            params.push(...criteria.flagStateIds)
+        }
+
+        if (criteria.customerIds && criteria.customerIds.length > 0) {
+            const placeholders = criteria.customerIds.map(() => '?').join(',')
+            conditions.push(`v.customer_id IN (${placeholders})`)
+            params.push(...criteria.customerIds)
+        }
+
+        if (criteria.customerType && criteria.customerType !== 'both') {
+            conditions.push(`v.customer_type = ?`)
+            params.push(criteria.customerType)
+        }
+
+        if (conditions.length === 0) return []
+
+        const logicOp = criteria.logic === 'OR' ? ' OR ' : ' AND '
+        const whereClause = conditions.join(logicOp)
+
+        // Vessel status filter
+        let statusFilter = 'v.is_active = TRUE'
+        if (criteria.vesselStatus === 'inactive') statusFilter = 'v.is_active = FALSE'
+        else if (criteria.vesselStatus === 'all') statusFilter = '1=1'
+
+        const [rows] = await this.pool.query(`
+            SELECT DISTINCT
+                e.id as entityId,
+                e.name as entityName,
+                e.type as entityType,
+                e.email,
+                e.phone,
+                GROUP_CONCAT(DISTINCT v.name ORDER BY v.name SEPARATOR ', ') as vesselNames
+            FROM entities e
+            INNER JOIN vessel_assureds va ON va.entity_id = e.id
+            INNER JOIN vessels v ON v.id = va.vessel_id
+            WHERE ${statusFilter} AND (${whereClause})
+            GROUP BY e.id, e.name, e.type, e.email, e.phone
+            ORDER BY e.name
+        `, params)
+
+        // Also include customer entities (those assigned directly to vessels, not via vessel_assureds)
+        const [customerRows] = await this.pool.query(`
+            SELECT DISTINCT
+                e.id as entityId,
+                e.name as entityName,
+                e.type as entityType,
+                e.email,
+                e.phone,
+                GROUP_CONCAT(DISTINCT v.name ORDER BY v.name SEPARATOR ', ') as vesselNames
+            FROM entities e
+            INNER JOIN vessels v ON v.customer_id = e.id
+            WHERE ${statusFilter} AND (${whereClause})
+            GROUP BY e.id, e.name, e.type, e.email, e.phone
+            ORDER BY e.name
+        `, params)
+
+        // Merge results, deduplicating by entityId
+        const resultMap = new Map<string, any>()
+        for (const row of (rows as any[])) {
+            resultMap.set(row.entityId, row)
+        }
+        for (const row of (customerRows as any[])) {
+            if (resultMap.has(row.entityId)) {
+                // Merge vessel names
+                const existing = resultMap.get(row.entityId)
+                const existingVessels = new Set(existing.vesselNames.split(', '))
+                const newVessels = row.vesselNames.split(', ')
+                for (const v of newVessels) existingVessels.add(v)
+                existing.vesselNames = Array.from(existingVessels).sort().join(', ')
+            } else {
+                resultMap.set(row.entityId, row)
+            }
+        }
+
+        return Array.from(resultMap.values()).sort((a, b) => a.entityName.localeCompare(b.entityName))
     }
 }
 

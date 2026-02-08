@@ -822,6 +822,22 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                         <tr style={{ background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)', borderBottom: '1px solid var(--table-border)' }}>
                                             <td colSpan={4} style={{ padding: '16px 32px' }}>
                                                 <div style={{ padding: '16px', borderLeft: '2px solid var(--accent-primary)', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
+                                                    {entity && (entity.email || entity.phone) && (
+                                                        <div style={{ marginBottom: '16px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                                                            {entity.email && (
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
+                                                                    <span style={{ color: 'var(--text-secondary)' }}>Email:</span>
+                                                                    <span style={{ color: 'var(--accent-primary)' }}>{entity.email}</span>
+                                                                </div>
+                                                            )}
+                                                            {entity.phone && (
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
+                                                                    <span style={{ color: 'var(--text-secondary)' }}>Phone:</span>
+                                                                    <span>{entity.phone}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {entity?.type === 'company' && (
                                                         <div style={{ marginBottom: '20px', padding: '12px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                                                             <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Company Documents</h4>

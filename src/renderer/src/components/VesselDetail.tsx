@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, ShieldAlert, ShieldCheck, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, StickyNote } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, ShieldAlert, ShieldCheck, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, StickyNote, Plus, X } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState } from '../../../shared/types'
+import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 
@@ -46,6 +46,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const loadData = async () => {
         const types = await window.api.getDocumentTypes()
         const docs = await window.api.getVesselDocuments(vessel.id)
+        const customTypes = await window.api.getVesselCustomDocTypes(vessel.id)
 
         // Custom sort: Required first, then by the 'order' defined in Admin.
         const sortedTypes = [...types].sort((a, b) => {
@@ -62,6 +63,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
         setDocTypes(sortedTypes)
         setVesselDocs(docs)
+        setCustomDocTypes(customTypes)
 
         // Check if files exist on disk
         const status: Record<string, boolean> = {}
@@ -80,6 +82,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         try {
             const fs = await window.api.getFlagStates()
             setFlagStates(fs || [])
+        } catch { /* ignore */ }
+        try {
+            const [pt, vp] = await Promise.all([
+                window.api.getPolicyTypes(),
+                window.api.getVesselPolicies(vessel.id)
+            ])
+            setAllPolicyTypes(pt || [])
+            setVesselPolicies(vp || [])
+            setAssignedPolicyTypeIds(new Set((vp || []).map((p: VesselPolicy) => p.policyTypeId)))
         } catch { /* ignore */ }
     }
 
@@ -261,6 +272,68 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [vesselNotes, setVesselNotes] = useState(vessel.notes || '')
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
     const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
+    const [policyExpiry, setPolicyExpiry] = useState(vessel.policyExpiryDate || '')
+    const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
+    const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
+    const [newCustomDocName, setNewCustomDocName] = useState('')
+    const [showPoliciesModal, setShowPoliciesModal] = useState(false)
+    const [allPolicyTypes, setAllPolicyTypes] = useState<PolicyType[]>([])
+    const [vesselPolicies, setVesselPolicies] = useState<VesselPolicy[]>([])
+    const [assignedPolicyTypeIds, setAssignedPolicyTypeIds] = useState<Set<string>>(new Set())
+
+    const handleTogglePolicy = async (policyTypeId: string) => {
+        try {
+            if (assignedPolicyTypeIds.has(policyTypeId)) {
+                // Remove
+                const vp = vesselPolicies.find(p => p.policyTypeId === policyTypeId)
+                if (vp) {
+                    await window.api.deleteVesselPolicy(vp.id)
+                    setVesselPolicies(prev => prev.filter(p => p.id !== vp.id))
+                    setAssignedPolicyTypeIds(prev => { const n = new Set(prev); n.delete(policyTypeId); return n })
+                }
+            } else {
+                // Add
+                const vp = await window.api.addVesselPolicy(vessel.id, policyTypeId)
+                setVesselPolicies(prev => [...prev, vp])
+                setAssignedPolicyTypeIds(prev => new Set([...prev, policyTypeId]))
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to update policies')
+        }
+    }
+
+    const handleAddCustomDocType = async () => {
+        if (!newCustomDocName.trim()) return
+        await window.api.addVesselCustomDocType({
+            vesselId: vessel.id,
+            name: newCustomDocName.trim(),
+            order: customDocTypes.length
+        })
+        setNewCustomDocName('')
+        setShowAddCustomDoc(false)
+        showSuccess('Custom document type added')
+        loadData()
+    }
+
+    const handleDeleteCustomDocType = async (customType: VesselCustomDocType) => {
+        setConfirmation({
+            show: true,
+            title: 'Remove Custom Document Type?',
+            message: `Are you sure you want to remove "${customType.name}"? Any linked file will also be removed.`,
+            isDangerous: true,
+            onConfirm: async () => {
+                // Delete any vessel document linked to this custom type
+                const linkedDoc = vesselDocs.find(d => d.documentTypeId === customType.id)
+                if (linkedDoc?.id) {
+                    await window.api.deleteVesselDocumentById(linkedDoc.id)
+                }
+                await window.api.deleteVesselCustomDocType(customType.id)
+                showSuccess('Custom document type removed')
+                loadData()
+                setConfirmation(prev => ({ ...prev, show: false }))
+            }
+        })
+    }
 
     const handleSaveVessel = async () => {
         if (!editName.trim() || !editImo.trim()) return
@@ -352,13 +425,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Policy Expiry:</span>
                                 <input
                                     type="date"
-                                    value={vessel.policyExpiryDate || ''}
+                                    value={policyExpiry}
                                     onChange={async (e) => {
-                                        await window.api.updateVessel(vessel.id, { policyExpiryDate: e.target.value })
-                                        vessel.policyExpiryDate = e.target.value
+                                        const val = e.target.value
+                                        setPolicyExpiry(val)
+                                        vessel.policyExpiryDate = val
+                                        await window.api.updateVessel(vessel.id, { policyExpiryDate: val })
                                         showSuccess('Policy expiry date updated')
                                     }}
-                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}
+                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
                                     aria-label="Policy expiry date"
                                 />
                             </div>
@@ -372,13 +447,14 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 <select
                                     value={selectedFlagStateId}
                                     onChange={async (e) => {
-                                        const newId = e.target.value || null
-                                        await window.api.updateVessel(vessel.id, { flagStateId: newId as any })
+                                        const val = e.target.value
+                                        const newId = val || null
+                                        setSelectedFlagStateId(val)
                                         vessel.flagStateId = newId || undefined
-                                        setSelectedFlagStateId(e.target.value)
+                                        await window.api.updateVessel(vessel.id, { flagStateId: newId as any })
                                         showSuccess('Flag state updated')
                                     }}
-                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--table-header-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
+                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
                                     aria-label="Flag state"
                                 >
                                     <option value="">No flag</option>
@@ -387,6 +463,35 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     ))}
                                 </select>
                             </div>
+                            {allPolicyTypes.length > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Policies:</span>
+                                    {assignedPolicyTypeIds.size > 0 ? (
+                                        Array.from(assignedPolicyTypeIds).map(ptId => {
+                                            const pt = allPolicyTypes.find(p => p.id === ptId)
+                                            return pt ? (
+                                                <span key={ptId} style={{
+                                                    padding: '2px 10px',
+                                                    borderRadius: '10px',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: '600',
+                                                    background: 'rgba(0, 210, 255, 0.1)',
+                                                    color: 'var(--accent-primary)',
+                                                    border: '1px solid rgba(0, 210, 255, 0.2)'
+                                                }}>{pt.name}</span>
+                                            ) : null
+                                        })
+                                    ) : (
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>None</span>
+                                    )}
+                                    <button
+                                        onClick={() => setShowPoliciesModal(true)}
+                                        style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.75rem', textDecoration: 'underline', padding: '0' }}
+                                    >
+                                        Edit
+                                    </button>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
@@ -543,7 +648,27 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     <caption className="sr-only">Document compliance</caption>
                     <thead>
                         <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                            <th scope="col" style={{ padding: '18px 16px' }}>Document Name</th>
+                            <th scope="col" style={{ padding: '18px 16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    Document Name
+                                    <button
+                                        onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
+                                        style={{
+                                            background: 'transparent',
+                                            border: '1px solid var(--table-border)',
+                                            borderRadius: '4px',
+                                            padding: '2px',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            color: 'var(--accent-primary)'
+                                        }}
+                                        title="Add custom document type"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                </div>
+                            </th>
                             <th scope="col" style={{ padding: '18px 16px' }}>Requirement</th>
                             <th scope="col" style={{ padding: '18px 16px' }}>File Status</th>
                             <th scope="col" style={{ padding: '18px 16px' }}>Date of Receipt</th>
@@ -731,6 +856,187 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 ...extraDocs.map(ed => renderDocRow(ed, type, true, ed.id!))
                             ]
                         })}
+                        {customDocTypes.map(customType => {
+                            const doc = vesselDocs.find(d => d.documentTypeId === customType.id)
+                            const rowHasFile = !!(doc?.filePath)
+                            const rowExists = fileStatus[customType.id]
+
+                            return (
+                                <tr
+                                    key={customType.id}
+                                    style={{
+                                        borderBottom: '1px solid var(--table-border)',
+                                        background: dragOverId === customType.id
+                                            ? 'rgba(0, 210, 255, 0.2)'
+                                            : (!rowHasFile) ? 'rgba(255, 77, 77, 0.05)' : 'transparent',
+                                        outline: dragOverId === customType.id ? '2px dashed var(--accent-primary)' : 'none',
+                                        outlineOffset: '-2px',
+                                        transition: 'all 0.2s ease',
+                                        cursor: dragOverId === customType.id ? 'copy' : 'default'
+                                    }}
+                                    onDragOver={e => handleDragOver(e, customType.id)}
+                                    onDragEnter={e => handleDragEnter(e, customType.id)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={e => handleDrop(e, customType.id)}
+                                >
+                                    <td style={{ padding: '16px' }}>
+                                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {customType.name}
+                                            <span style={{
+                                                fontSize: '0.65rem',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                background: isLight ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.2)',
+                                                color: isLight ? '#3b82f6' : '#93c5fd',
+                                                fontWeight: '500'
+                                            }}>Custom</span>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>CUSTOM</span>
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        {rowHasFile ? (
+                                            rowExists ? (
+                                                <div
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '600',
+                                                        background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
+                                                        border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
+                                                        color: isLight ? '#008c46' : '#00ff88',
+                                                        textTransform: 'uppercase'
+                                                    }}
+                                                >
+                                                    <CheckCircle size={14} />
+                                                    LINKED
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '600',
+                                                        background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
+                                                        border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
+                                                        color: isLight ? '#c00000' : '#ff4d4d',
+                                                        textTransform: 'uppercase'
+                                                    }}
+                                                >
+                                                    <AlertCircle size={14} />
+                                                    MISSING
+                                                </div>
+                                            )
+                                        ) : (
+                                            <button
+                                                onClick={() => handleClickUpload(customType.id)}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '500',
+                                                    background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(0, 210, 255, 0.05)',
+                                                    border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(0, 210, 255, 0.3)'}`,
+                                                    color: isLight ? '#0077a3' : '#00d2ff',
+                                                    textTransform: 'uppercase',
+                                                    cursor: 'pointer'
+                                                }}
+                                                title="Click to browse or drag a file here"
+                                            >
+                                                <Upload size={14} />
+                                                UPLOAD FILE
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                            {doc?.receivedDate ? new Date(doc.receivedDate).toLocaleDateString() : '-'}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Calendar size={14} color="var(--text-secondary)" />
+                                            <input
+                                                type="date"
+                                                value={doc?.expiryDate || ''}
+                                                onChange={e => handleUpdateExpiry(customType.id, e.target.value)}
+                                                style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.85rem'
+                                                }}
+                                                aria-label={`Expiry date for ${customType.name}`}
+                                            />
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                            {rowHasFile && (
+                                                <>
+                                                    <button onClick={() => openFile(doc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="View File" aria-label="View file">
+                                                        <Eye size={18} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteDoc(doc!)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Unlink File" aria-label="Unlink file">
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </>
+                                            )}
+                                            <button onClick={() => handleDeleteCustomDocType(customType)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Remove custom document type" aria-label="Remove custom document type">
+                                                <X size={18} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )
+                        })}
+                        {showAddCustomDoc && (
+                            <tr style={{ borderBottom: '1px solid var(--table-border)', background: isLight ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.1)' }}>
+                                <td colSpan={6} style={{ padding: '12px 16px' }}>
+                                    <form
+                                        onSubmit={e => { e.preventDefault(); handleAddCustomDocType() }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+                                    >
+                                        <input
+                                            type="text"
+                                            value={newCustomDocName}
+                                            onChange={e => setNewCustomDocName(e.target.value)}
+                                            placeholder="Custom document type name..."
+                                            style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                            autoFocus
+                                            aria-label="Custom document type name"
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="btn-primary"
+                                            style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                                            disabled={!newCustomDocName.trim()}
+                                        >
+                                            Add
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                            onClick={() => { setShowAddCustomDoc(false); setNewCustomDocName('') }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>}
@@ -747,6 +1053,43 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     onConfirm={confirmation.onConfirm}
                     onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
                 />
+            )}
+
+            {showPoliciesModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', zIndex: 1000
+                }} onClick={() => setShowPoliciesModal(false)}>
+                    <div style={{
+                        background: isLight ? '#ffffff' : '#1e222a',
+                        borderRadius: '16px', padding: '24px', width: '400px', maxWidth: '90vw',
+                        border: '1px solid var(--glass-border)'
+                    }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: '16px' }}>Assign Policy Types</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                            Toggle policy types for this vessel. Used by the Dynamic Address Book.
+                        </p>
+                        {allPolicyTypes.map(pt => (
+                            <label key={pt.id} style={{
+                                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px',
+                                borderRadius: '8px', cursor: 'pointer', marginBottom: '4px',
+                                background: assignedPolicyTypeIds.has(pt.id) ? 'rgba(0, 210, 255, 0.08)' : 'transparent'
+                            }}>
+                                <input
+                                    type="checkbox"
+                                    checked={assignedPolicyTypeIds.has(pt.id)}
+                                    onChange={() => handleTogglePolicy(pt.id)}
+                                    style={{ accentColor: 'var(--accent-primary)' }}
+                                />
+                                <span>{pt.name}</span>
+                            </label>
+                        ))}
+                        <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowPoliciesModal(false)} className="btn-secondary">Done</button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {showNotesModal && (

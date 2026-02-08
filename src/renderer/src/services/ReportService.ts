@@ -25,15 +25,32 @@ export const ReportService = {
         requiredCount++
         if (doc?.filePath) compliantCount++
 
+        const expiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? vessel.policyExpiryDate : (doc?.expiryDate || 'N/A')
         complianceData.push({
           'Document Name': type.name,
           'Description': type.description || '',
           'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
           'Date of Receipt': doc?.receivedDate || 'N/A',
-          'Expiry Date': doc?.expiryDate || 'N/A',
+          'Expiry Date': expiryToShow,
           'Uploaded Date': doc?.uploadedDate ? new Date(doc.uploadedDate).toLocaleDateString() : 'N/A'
         })
       }
+    })
+
+    // Custom document types
+    const customDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
+    customDocTypes.forEach(customType => {
+      const vDoc = docs.find(d => d.documentTypeId === customType.id)
+      requiredCount++
+      if (vDoc?.filePath) compliantCount++
+      complianceData.push({
+        'Document Name': `${customType.name} (Custom)`,
+        'Description': customType.description || '',
+        'Status': vDoc?.filePath ? 'COMPLIANT' : 'MISSING',
+        'Date of Receipt': vDoc?.receivedDate || 'N/A',
+        'Expiry Date': vDoc?.expiryDate || 'N/A',
+        'Uploaded Date': vDoc?.uploadedDate ? new Date(vDoc.uploadedDate).toLocaleDateString() : 'N/A'
+      })
     })
 
     // Fetch entity documents
@@ -168,7 +185,7 @@ export const ReportService = {
             }
           })
         } else {
-          entityDocsData.push({ 'Document Name': '  ⚠ Missing UBO', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
+          entityDocsData.push({ 'Document Name': '  No Ultimate Beneficial Owner on record', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
         }
 
         entityDocsData.push({ 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
@@ -208,13 +225,28 @@ export const ReportService = {
         requiredCount++
         if (vDoc?.filePath) compliantCount++
 
+        const pdfExpiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? vessel.policyExpiryDate : (vDoc?.expiryDate || '-')
         tableData.push([
           type.name,
           type.description || '',
           vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
-          vDoc?.expiryDate || '-'
+          pdfExpiryToShow
         ])
       }
+    })
+
+    // Custom document types for PDF
+    const pdfCustomDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
+    pdfCustomDocTypes.forEach(customType => {
+      const vDoc = docs.find(d => d.documentTypeId === customType.id)
+      requiredCount++
+      if (vDoc?.filePath) compliantCount++
+      tableData.push([
+        `${customType.name} (Custom)`,
+        customType.description || '',
+        vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
+        vDoc?.expiryDate || '-'
+      ])
     })
 
     // Fetch entity documents for counting
@@ -473,7 +505,7 @@ export const ReportService = {
           doc.setFontSize(9)
           doc.setFont('helvetica', 'bold')
           doc.setTextColor(255, 0, 0)
-          doc.text('⚠ Missing UBO', 20, finalY)
+          doc.text('No Ultimate Beneficial Owner on record', 20, finalY)
           finalY += 5
         }
 
@@ -500,6 +532,7 @@ export const ReportService = {
           totalRequired++
           if (doc?.filePath) totalCompliant++
 
+          const fleetExcelExpiry = (type.annualRenewal && v.policyExpiryDate) ? v.policyExpiryDate : (doc?.expiryDate || 'N/A')
           data.push({
             'Vessel': v.name,
             'IMO': v.imoNumber,
@@ -507,7 +540,7 @@ export const ReportService = {
             'Description': type.description || '',
             'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
             'Date of Receipt': doc?.receivedDate || 'N/A',
-            'Expiry Date': doc?.expiryDate || 'N/A'
+            'Expiry Date': fleetExcelExpiry
           })
         }
       })
@@ -689,7 +722,7 @@ export const ReportService = {
             }
           })
         } else {
-          assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '  ⚠ Missing UBO', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '' })
+          assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '  No Ultimate Beneficial Owner on record', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '' })
         }
 
         assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
@@ -734,11 +767,12 @@ export const ReportService = {
           totalRequired++
           if (vDoc?.filePath) totalCompliant++
 
+          const fleetPdfExpiry = (type.annualRenewal && v.policyExpiryDate) ? v.policyExpiryDate : (vDoc?.expiryDate || '-')
           tableData.push([
             v.name,
             type.name,
             vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
-            vDoc?.expiryDate || '-'
+            fleetPdfExpiry
           ])
         }
       })
@@ -841,7 +875,7 @@ export const ReportService = {
           }
         })
       } else {
-        assuredTableData.push(['', '', '  ⚠ Missing UBO', '', 'Warning'])
+        assuredTableData.push(['', '', '  No Ultimate Beneficial Owner on record', '', 'Warning'])
       }
     }
 

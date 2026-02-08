@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, KeyRound } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, KeyRound, ClipboardList } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -14,12 +14,13 @@ import UserProfileModal from './components/UserProfileModal'
 import SanctionsSearch from './components/SanctionsSearch'
 import ReminderCenter from './components/ReminderCenter'
 import Calculators from './components/Calculators'
+import ConditionSurveyList from './components/ConditionSurveyList'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'calculators'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'calculators'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -256,6 +257,12 @@ function App(): React.JSX.Element {
               onClick={() => setActiveTab('reminders')}
             />
             <NavItem
+              icon={<ClipboardList size={20} />}
+              label="Surveys"
+              active={activeTab === 'surveys'}
+              onClick={() => setActiveTab('surveys')}
+            />
+            <NavItem
               icon={<Calculator size={20} />}
               label="Calculators"
               active={activeTab === 'calculators'}
@@ -296,6 +303,7 @@ function App(): React.JSX.Element {
           {activeTab === 'compliance' && <ComplianceCenter />}
           {activeTab === 'sanctions-search' && <SanctionsSearch />}
           {activeTab === 'reminders' && <ReminderCenter />}
+          {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
           {activeTab === 'calculators' && <Calculators />}
         </main>
         <UpdateNotification />

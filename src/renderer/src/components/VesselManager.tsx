@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X } from 'lucide-react'
-import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams } from '../../../shared/types'
+import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
+import { getFlagClass } from '../utils/countryCodeMap'
+import 'flag-icons/css/flag-icons.min.css'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -55,6 +57,8 @@ export default function VesselManager({ initialVesselId, onClearInitialVessel }:
     const [editingCustomerVesselId, setEditingCustomerVesselId] = useState<string | null>(null)
     const [tableCustomerSearch, setTableCustomerSearch] = useState('')
 
+    const [flagStates, setFlagStates] = useState<FlagState[]>([])
+
     // Sanctions checking state
     const [checkingVesselId, setCheckingVesselId] = useState<string | null>(null)
 
@@ -69,12 +73,14 @@ export default function VesselManager({ initialVesselId, onClearInitialVessel }:
     // Load initial fleets
     useEffect(() => {
         const loadStaticData = async () => {
-            const [fData, eData] = await Promise.all([
+            const [fData, eData, fsData] = await Promise.all([
                 window.api.getFleets(),
-                window.api.getEntities()
+                window.api.getEntities(),
+                window.api.getFlagStates()
             ])
             setFleets(fData)
             setEntities(eData)
+            setFlagStates(fsData)
         }
         loadStaticData()
     }, [])
@@ -557,8 +563,14 @@ export default function VesselManager({ initialVesselId, onClearInitialVessel }:
                                     <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
-                                                    <Ship size={20} color="var(--accent-primary)" />
+                                                <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '28px' }}>
+                                                    {(() => {
+                                                        const fs = flagStates.find(f => f.id === v.flagStateId)
+                                                        const flagCls = fs ? getFlagClass(fs.iso3Code) : ''
+                                                        return flagCls
+                                                            ? <span className={flagCls} style={{ fontSize: '1.2rem' }}></span>
+                                                            : <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '500' }}>N/A</span>
+                                                    })()}
                                                 </div>
                                                 <span
                                                     onClick={() => setSelectedVessel(v)}

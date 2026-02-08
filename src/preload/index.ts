@@ -7,6 +7,10 @@ const api = {
   updateDocumentType: (id, updates) => ipcRenderer.invoke('db:updateDocumentType', id, updates),
   deleteDocumentType: (id) => ipcRenderer.invoke('db:deleteDocumentType', id),
 
+  getVesselCustomDocTypes: (vesselId: string) => ipcRenderer.invoke('db:getVesselCustomDocTypes', vesselId),
+  addVesselCustomDocType: (docType: any) => ipcRenderer.invoke('db:addVesselCustomDocType', docType),
+  deleteVesselCustomDocType: (id: string) => ipcRenderer.invoke('db:deleteVesselCustomDocType', id),
+
   getFleets: () => ipcRenderer.invoke('db:getFleets'),
   addFleet: (fleet) => ipcRenderer.invoke('db:addFleet', fleet),
   deleteFleet: (id) => ipcRenderer.invoke('db:deleteFleet', id),
@@ -68,6 +72,7 @@ const api = {
   authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),
+  updateUserRole: (userId: string, role: 'admin' | 'user') => ipcRenderer.invoke('db:updateUserRole', userId, role),
 
   setupSelectDirectory: () => ipcRenderer.invoke('setup:selectDirectory'),
   setupSelectConfigFile: () => ipcRenderer.invoke('setup:selectConfigFile'),
@@ -113,6 +118,21 @@ const api = {
   updateFlagState: (id: string, updates: any) => ipcRenderer.invoke('db:updateFlagState', id, updates),
   deleteFlagState: (id: string) => ipcRenderer.invoke('db:deleteFlagState', id),
   getVesselsByFlagState: (flagStateId: string) => ipcRenderer.invoke('db:getVesselsByFlagState', flagStateId),
+
+  // Policy Types
+  getPolicyTypes: () => ipcRenderer.invoke('db:getPolicyTypes'),
+  addPolicyType: (name: string) => ipcRenderer.invoke('db:addPolicyType', name),
+  updatePolicyType: (id: string, updates: any) => ipcRenderer.invoke('db:updatePolicyType', id, updates),
+  deletePolicyType: (id: string) => ipcRenderer.invoke('db:deletePolicyType', id),
+  reorderPolicyTypes: (orderedIds: string[]) => ipcRenderer.invoke('db:reorderPolicyTypes', orderedIds),
+
+  // Vessel Policies
+  getVesselPolicies: (vesselId: string) => ipcRenderer.invoke('db:getVesselPolicies', vesselId),
+  addVesselPolicy: (vesselId: string, policyTypeId: string) => ipcRenderer.invoke('db:addVesselPolicy', vesselId, policyTypeId),
+  deleteVesselPolicy: (id: string) => ipcRenderer.invoke('db:deleteVesselPolicy', id),
+
+  // Dynamic Address Book
+  queryDAB: (criteria: any) => ipcRenderer.invoke('db:queryDAB', criteria),
 
   // Surveyors
   getSurveyors: () => ipcRenderer.invoke('db:getSurveyors'),

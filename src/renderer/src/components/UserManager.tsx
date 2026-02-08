@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { User } from '../../../shared/types'
-import { Trash2, Shield, RefreshCcw } from 'lucide-react'
+import { Trash2, Shield, RefreshCcw, ArrowLeftRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import ConfirmationModal from './ConfirmationModal'
 
 export default function UserManager() {
-    const { resetPassword } = useAuth()
+    const { resetPassword, user: currentUser } = useAuth()
+    const { showSuccess, showError } = useToast()
     const [users, setUsers] = useState<User[]>([])
     // ... (rest of states)
     const [resettingUser, setResettingUser] = useState<string | null>(null)
@@ -76,6 +78,29 @@ export default function UserManager() {
             onConfirm: async () => {
                 await window.api.deleteUser(id)
                 loadUsers()
+                setConfirmation(prev => ({ ...prev, show: false }))
+            }
+        })
+    }
+
+    const handleToggleRole = async (u: User) => {
+        if (u.id === currentUser?.id) {
+            showError('You cannot change your own role')
+            return
+        }
+        const newRole = u.role === 'admin' ? 'user' : 'admin'
+        setConfirmation({
+            show: true,
+            title: 'Change User Role?',
+            message: `Change ${u.username} from ${u.role.toUpperCase()} to ${newRole.toUpperCase()}?`,
+            onConfirm: async () => {
+                try {
+                    await window.api.updateUserRole(u.id, newRole)
+                    showSuccess(`${u.username} is now ${newRole.toUpperCase()}`)
+                    loadUsers()
+                } catch (err: any) {
+                    showError(err.message || 'Failed to update role')
+                }
                 setConfirmation(prev => ({ ...prev, show: false }))
             }
         })
@@ -212,6 +237,16 @@ export default function UserManager() {
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                            <button
+                                                onClick={() => handleToggleRole(user)}
+                                                style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '8px' }}
+                                                className="hover-effect"
+                                                title={user.id === currentUser?.id ? 'Cannot change own role' : `Change to ${user.role === 'admin' ? 'User' : 'Admin'}`}
+                                                aria-label="Toggle role"
+                                                disabled={user.id === currentUser?.id}
+                                            >
+                                                <ArrowLeftRight size={18} />
+                                            </button>
                                             <button
                                                 onClick={() => handleResetPassword(user.username)}
                                                 style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '8px' }}
