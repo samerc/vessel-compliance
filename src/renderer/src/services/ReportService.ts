@@ -40,6 +40,9 @@ export const ReportService = {
     const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
+    const assuredRoles = await window.api.getAssuredRoles()
+    const roleOrderMap = new Map(assuredRoles.map((r, i) => [r.name, i]))
+    vesselAssureds.sort((a, b) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999))
 
     const entityDocsData: any[] = []
     if (vesselAssureds.length > 0) {
@@ -115,6 +118,7 @@ export const ReportService = {
             if (!ubo) return
             entityDocsData.push({ 'Document Name': `    ${uboIndex + 1}. ${ubo.name}`, 'Description': ubo.identifier || '', 'Status': ubo.type.toUpperCase(), 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
 
+
             if (ubo.type === 'company') {
               requiredCount++
               if (ubo.certificateOfIncorporationPath) compliantCount++
@@ -163,6 +167,8 @@ export const ReportService = {
               })
             }
           })
+        } else {
+          entityDocsData.push({ 'Document Name': '  ⚠ Missing UBO', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
         }
 
         entityDocsData.push({ 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
@@ -215,6 +221,9 @@ export const ReportService = {
     const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
+    const pdfAssuredRoles = await window.api.getAssuredRoles()
+    const pdfRoleOrderMap = new Map(pdfAssuredRoles.map((r, i) => [r.name, i]))
+    vesselAssureds.sort((a, b) => (pdfRoleOrderMap.get(a.role) ?? 999) - (pdfRoleOrderMap.get(b.role) ?? 999))
 
     // Count entity documents
     if (vesselAssureds.length > 0) {
@@ -459,6 +468,13 @@ export const ReportService = {
               finalY += 4
             }
           })
+        } else {
+          finalY += 3
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(255, 0, 0)
+          doc.text('⚠ Missing UBO', 20, finalY)
+          finalY += 5
         }
 
         finalY += 8
@@ -500,6 +516,8 @@ export const ReportService = {
     // Section 2: Fleet Assureds (Deduplicated)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
+    const excelAssuredRoles = await window.api.getAssuredRoles()
+    const excelRoleOrderMap = new Map(excelAssuredRoles.map((r, i) => [r.name, i]))
 
     // Collect all unique assureds across the fleet with their vessel associations
     const assuredMap = new Map<string, { entity: any; vessels: string[]; role: string }>()
@@ -521,14 +539,17 @@ export const ReportService = {
       }
     }
 
+    // Sort assureds by role order
+    const sortedExcelAssureds = [...assuredMap.entries()].sort((a, b) => (excelRoleOrderMap.get(a[1].role) ?? 999) - (excelRoleOrderMap.get(b[1].role) ?? 999))
+
     // Add assured entities section
     const assuredData: any[] = []
-    if (assuredMap.size > 0) {
+    if (sortedExcelAssureds.length > 0) {
       assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
       assuredData.push({ 'Vessel': 'FLEET ASSUREDS', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
       assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
 
-      for (const [, { entity, vessels: vesselNames, role }] of assuredMap) {
+      for (const [, { entity, vessels: vesselNames, role }] of sortedExcelAssureds) {
         const vesselList = vesselNames.join(', ')
         assuredData.push({
           'Vessel': entity.name,
@@ -667,6 +688,8 @@ export const ReportService = {
               })
             }
           })
+        } else {
+          assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '  ⚠ Missing UBO', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '' })
         }
 
         assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
@@ -724,6 +747,8 @@ export const ReportService = {
     // Section 2: Fleet Assureds (Deduplicated)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
+    const fleetAssuredRoles = await window.api.getAssuredRoles()
+    const fleetRoleOrderMap = new Map(fleetAssuredRoles.map((r, i) => [r.name, i]))
 
     // Collect all unique assureds across the fleet with their vessel associations
     const assuredMap = new Map<string, { entity: any; vessels: string[]; role: string }>()
@@ -745,9 +770,12 @@ export const ReportService = {
       }
     }
 
+    // Sort assureds by role order
+    const sortedAssureds = [...assuredMap.entries()].sort((a, b) => (fleetRoleOrderMap.get(a[1].role) ?? 999) - (fleetRoleOrderMap.get(b[1].role) ?? 999))
+
     // Build assured data for PDF
     const assuredTableData: any[] = []
-    for (const [, { entity, vessels: vesselNames, role }] of assuredMap) {
+    for (const [, { entity, vessels: vesselNames, role }] of sortedAssureds) {
       const vesselList = vesselNames.length > 2 ? `${vesselNames.slice(0, 2).join(', ')}...` : vesselNames.join(', ')
 
       // Entity header row
@@ -812,6 +840,8 @@ export const ReportService = {
             assuredTableData.push(['', '', '    ID/Passport', '', ubo.passportFilePath ? 'On File' : 'Missing'])
           }
         })
+      } else {
+        assuredTableData.push(['', '', '  ⚠ Missing UBO', '', 'Warning'])
       }
     }
 

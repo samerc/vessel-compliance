@@ -181,11 +181,11 @@ export default function SurveyorDirectory() {
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '30px' }}>
-        <h2 style={{ color: 'var(--text-primary)', marginBottom: '10px' }}>Surveyor Directory</h2>
+    <div className="fade-in">
+      <header style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Surveyor Directory</h1>
         <p style={{ color: 'var(--text-secondary)' }}>Manage surveying companies and contacts</p>
-      </div>
+      </header>
 
       {/* Filters and Controls */}
       <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
@@ -313,11 +313,7 @@ export default function SurveyorDirectory() {
       )}
 
       {/* Surveyors List */}
-      <div className="glass-card" style={{ padding: '20px' }}>
-        <h3 style={{ marginTop: 0, marginBottom: '15px', color: 'var(--text-primary)' }}>
-          Surveyors ({total})
-        </h3>
-
+      <div>
         {surveyors.length === 0 ? (
           <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
             No surveyors found. Add one to get started.
@@ -453,14 +449,16 @@ export default function SurveyorDirectory() {
                     <div style={{ display: 'flex', gap: '10px', marginLeft: '20px' }}>
                       <button
                         onClick={() => handleEdit(surveyor)}
-                        style={{ padding: '8px 16px', background: 'var(--primary-color)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}
+                        className="btn-secondary"
+                        style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
                       >
                         <Edit size={16} />
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(surveyor)}
-                        style={{ padding: '8px 16px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}
+                        className="btn-secondary"
+                        style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--danger)', borderColor: 'rgba(255, 77, 77, 0.3)' }}
                       >
                         <Trash2 size={16} />
                         Delete

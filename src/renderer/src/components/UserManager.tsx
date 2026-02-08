@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { User } from '../../../shared/types'
 import { Trash2, Shield, RefreshCcw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import ConfirmationModal from './ConfirmationModal'
 
 export default function UserManager() {
     const { resetPassword } = useAuth()
@@ -10,21 +11,36 @@ export default function UserManager() {
     const [resettingUser, setResettingUser] = useState<string | null>(null)
     const [tempPassword, setTempPassword] = useState<string | null>(null)
 
-    const handleResetPassword = async (username: string) => {
-        if (!confirm(`Are you sure you want to reset the password for ${username}?`)) return
+    // Confirmation modal state
+    const [confirmation, setConfirmation] = useState<{
+        show: boolean
+        title: string
+        message: string
+        onConfirm: () => void
+        isDangerous?: boolean
+    }>({ show: false, title: '', message: '', onConfirm: () => { } })
 
-        setResettingUser(username)
-        setTempPassword(null)
-        try {
-            const result = await resetPassword(username)
-            if (result.success && result.newPassword) {
-                setTempPassword(result.newPassword)
-            } else {
-                alert(result.message || 'Failed to reset password')
+    const handleResetPassword = async (username: string) => {
+        setConfirmation({
+            show: true,
+            title: 'Reset Password?',
+            message: `Are you sure you want to reset the password for ${username}?`,
+            onConfirm: async () => {
+                setResettingUser(username)
+                setTempPassword(null)
+                try {
+                    const result = await resetPassword(username)
+                    if (result.success && result.newPassword) {
+                        setTempPassword(result.newPassword)
+                    } else {
+                        setError(result.message || 'Failed to reset password')
+                    }
+                } catch (err: any) {
+                    setError(err.message)
+                }
+                setConfirmation(prev => ({ ...prev, show: false }))
             }
-        } catch (err: any) {
-            alert(err.message)
-        }
+        })
     }
 
     // ... (rest of component)
@@ -52,9 +68,17 @@ export default function UserManager() {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this user?')) return
-        await window.api.deleteUser(id)
-        loadUsers()
+        setConfirmation({
+            show: true,
+            title: 'Delete User?',
+            message: 'Are you sure you want to delete this user? This action cannot be undone.',
+            isDangerous: true,
+            onConfirm: async () => {
+                await window.api.deleteUser(id)
+                loadUsers()
+                setConfirmation(prev => ({ ...prev, show: false }))
+            }
+        })
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -152,6 +176,7 @@ export default function UserManager() {
                                 <th scope="col" style={{ padding: '16px' }}>Username</th>
                                 <th scope="col" style={{ padding: '16px' }}>Role</th>
                                 <th scope="col" style={{ padding: '16px' }}>Created At</th>
+                                <th scope="col" style={{ padding: '16px' }}>App Version</th>
                                 <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
@@ -182,6 +207,9 @@ export default function UserManager() {
                                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                                         {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
                                     </td>
+                                    <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                        {user.lastAppVersion || '-'}
+                                    </td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                                             <button
@@ -209,6 +237,16 @@ export default function UserManager() {
                         </tbody>
                     </table>
                 </div>
+            )}
+
+            {confirmation.show && (
+                <ConfirmationModal
+                    title={confirmation.title}
+                    message={confirmation.message}
+                    isDangerous={confirmation.isDangerous}
+                    onConfirm={confirmation.onConfirm}
+                    onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
+                />
             )}
         </div>
     )

@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -32,12 +32,15 @@ export interface Api {
   getVessels: () => Promise<Vessel[]>
   addVessel: (vessel: Omit<Vessel, 'id'>) => Promise<{ success: boolean; data?: Vessel; message?: string }>
   updateVessel: (id: string, updates: Partial<Vessel>) => Promise<void>
+  getVesselNameHistory: (vesselId: string) => Promise<VesselNameHistory[]>
   deleteVessel: (id: string) => Promise<{ success: boolean; message?: string }>
 
   getVesselDocuments: (vesselId?: string) => Promise<VesselDocument[]>
   upsertVesselDocument: (doc: VesselDocument) => Promise<void>
   updateVesselDocumentExpiry: (vesselId: string, docTypeId: string, expiryDate: string) => Promise<void>
   updateVesselDocumentReceivedDate: (vesselId: string, docTypeId: string, receivedDate: string) => Promise<void>
+  duplicateVesselDocument: (docId: string, uploadedBy: string) => Promise<void>
+  deleteVesselDocumentById: (docId: string) => Promise<void>
 
   getEntities: () => Promise<Entity[]>
   getEntitiesPaginated: (params: EntityQueryParams) => Promise<PaginatedResult<Entity>>
@@ -50,6 +53,8 @@ export interface Api {
   addAssuredRole: (role: Omit<AssuredRole, 'id'>) => Promise<AssuredRole>
   updateAssuredRole: (id: string, updates: Partial<AssuredRole>) => Promise<void>
   deleteAssuredRole: (id: string) => Promise<void>
+  reorderAssuredRoles: (orderedIds: string[]) => Promise<void>
+  getVesselsByRole: (roleName: string) => Promise<{ id: string; name: string; imoNumber: string }[]>
 
   getVesselAssureds: (vesselId?: string) => Promise<VesselAssured[]>
   addVesselAssured: (assured: Omit<VesselAssured, 'id'>) => Promise<VesselAssured>
@@ -66,6 +71,7 @@ export interface Api {
   getFilePath: (file: File) => string
 
   dialogOpenFile: () => Promise<string | null>
+  dialogOpenFileAny: () => Promise<string | null>
   excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
   dialogOpenFileWord: () => Promise<string | null>
   importDefectsFromWord: (surveyId: string, filePath: string) => Promise<{ success: boolean; message?: string; count: number }>
@@ -97,6 +103,13 @@ export interface Api {
   complianceMarkResultReviewed: (resultId: string) => Promise<void>
   complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => Promise<{ success: boolean, message?: string }>
   complianceRunManualCheck: () => Promise<{ success: boolean; message?: string }>
+
+  // Flag States
+  getFlagStates: () => Promise<FlagState[]>
+  addFlagState: (flagState: Omit<FlagState, 'id' | 'vesselCount'>) => Promise<FlagState>
+  updateFlagState: (id: string, updates: Partial<FlagState>) => Promise<void>
+  deleteFlagState: (id: string) => Promise<void>
+  getVesselsByFlagState: (flagStateId: string) => Promise<{ id: string; name: string; imoNumber: string }[]>
 
   // Surveyors
   getSurveyors: () => Promise<Surveyor[]>
@@ -136,6 +149,7 @@ export interface Api {
   updateCheckForUpdates: () => Promise<void>
   updateQuitAndInstall: () => Promise<void>
   updateGetCurrentVersion: () => Promise<string>
+  updateUserAppVersion: (version: string) => Promise<void>
   onUpdateChecking: (callback: () => void) => void
   onUpdateAvailable: (callback: (info: { version: string; releaseDate?: string; releaseName?: string; releaseNotes?: string }) => void) => void
   onUpdateNotAvailable: (callback: (info: { version: string }) => void) => void

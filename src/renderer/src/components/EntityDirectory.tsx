@@ -15,6 +15,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
+import ConfirmationModal from './ConfirmationModal'
 
 export default function EntityDirectory() {
     const [entities, setEntities] = useState<Entity[]>([])
@@ -58,6 +59,13 @@ export default function EntityDirectory() {
     const [editForm, setEditForm] = useState<{ name: string; type: 'company' | 'person'; identifier: string; email: string; phone: string }>({ name: '', type: 'company', identifier: '', email: '', phone: '' })
     const [isSaving, setIsSaving] = useState(false)
 
+    // Confirmation modal state
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{
+        show: boolean
+        entity: Entity | null
+        message: string
+    }>({ show: false, entity: null, message: '' })
+
     const startEditing = (entity: Entity) => {
         setEditingEntity(entity)
         setEditForm({
@@ -92,17 +100,28 @@ export default function EntityDirectory() {
 
     const handleDeleteEntity = async (entity: Entity) => {
         const associatedVessels = getAssociatedVessels(entity.id)
-        const warning = associatedVessels.length > 0
+        const message = associatedVessels.length > 0
             ? `This entity is linked to ${associatedVessels.length} vessel(s). Deleting it will remove all assured links. Continue?`
             : `Delete entity "${entity.name}"? This cannot be undone.`
-        if (!confirm(warning)) return
+
+        setDeleteConfirmation({
+            show: true,
+            entity,
+            message
+        })
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!deleteConfirmation.entity) return
         try {
-            await window.api.deleteEntity(entity.id)
-            if (selectedEntity?.id === entity.id) setSelectedEntity(null)
-            showSuccess(`Entity "${entity.name}" deleted`)
+            await window.api.deleteEntity(deleteConfirmation.entity.id)
+            if (selectedEntity?.id === deleteConfirmation.entity.id) setSelectedEntity(null)
+            showSuccess(`Entity "${deleteConfirmation.entity.name}" deleted`)
             loadData()
         } catch (error: any) {
             showError(error.message || 'Failed to delete entity')
+        } finally {
+            setDeleteConfirmation({ show: false, entity: null, message: '' })
         }
     }
 
@@ -927,6 +946,17 @@ export default function EntityDirectory() {
                     onClose={() => setSanctionsModal({ show: false, searchedName: '', matches: [] })}
                     onMarkClean={handleMarkClean}
                     onConfirmMatch={handleConfirmMatch}
+                />
+            )}
+
+            {deleteConfirmation.show && (
+                <ConfirmationModal
+                    title="Delete Entity?"
+                    message={deleteConfirmation.message}
+                    confirmLabel="Delete"
+                    isDangerous={true}
+                    onConfirm={handleConfirmDelete}
+                    onCancel={() => setDeleteConfirmation({ show: false, entity: null, message: '' })}
                 />
             )}
         </div>

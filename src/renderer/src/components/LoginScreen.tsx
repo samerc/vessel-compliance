@@ -119,16 +119,7 @@ export const LoginScreen: React.FC = () => {
                         </div>
 
                         <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <label htmlFor="login-password" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Password</label>
-                                <button
-                                    type="button"
-                                    onClick={() => setView('forgot')}
-                                    style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                                >
-                                    Forgot password?
-                                </button>
-                            </div>
+                            <label htmlFor="login-password" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Password</label>
                             <input
                                 id="login-password"
                                 type="password"
@@ -139,6 +130,13 @@ export const LoginScreen: React.FC = () => {
                                 placeholder="••••••••"
                                 required
                             />
+                            <button
+                                type="button"
+                                onClick={() => setView('forgot')}
+                                style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '0.5rem' }}
+                            >
+                                Forgot password?
+                            </button>
                         </div>
 
                         <button

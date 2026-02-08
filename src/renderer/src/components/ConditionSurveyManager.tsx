@@ -275,7 +275,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   }
 
   return (
-    <div className="glass-card" style={{ marginTop: '30px', padding: '25px' }}>
+    <section className="fade-in" style={{ marginTop: '32px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h3 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <FileText size={24} />
@@ -637,7 +637,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
           })}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 

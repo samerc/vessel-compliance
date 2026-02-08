@@ -98,6 +98,10 @@ export class MySQLAdapter {
             if ((cols as any[]).length === 0) {
                 await this.pool.query('ALTER TABLE document_types ADD COLUMN description TEXT AFTER name')
             }
+            const [arCols] = await this.pool.query('SHOW COLUMNS FROM document_types LIKE "annual_renewal"')
+            if ((arCols as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE document_types ADD COLUMN annual_renewal BOOLEAN DEFAULT FALSE AFTER required')
+            }
 
             // Migration: Add reference to condition_surveys if it doesn't exist
             try {
@@ -176,6 +180,9 @@ export class MySQLAdapter {
             }
             if (!userColNames.includes('sanctions_threshold')) {
                 await this.pool.query("ALTER TABLE users ADD COLUMN sanctions_threshold INT DEFAULT 60 AFTER theme_preference")
+            }
+            if (!userColNames.includes('last_app_version')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN last_app_version VARCHAR(20) DEFAULT NULL AFTER sanctions_threshold")
             }
 
             // Migration: Add surveyors table
@@ -382,8 +389,60 @@ export class MySQLAdapter {
             if (!vesselColNames.includes('customer_type')) {
                 await this.pool.query("ALTER TABLE vessels ADD COLUMN customer_type VARCHAR(10) NULL AFTER customer_id")
             }
+            if (!vesselColNames.includes('policy_expiry_date')) {
+                await this.pool.query("ALTER TABLE vessels ADD COLUMN policy_expiry_date DATE NULL AFTER customer_type")
+            }
+            if (!vesselColNames.includes('notes')) {
+                await this.pool.query("ALTER TABLE vessels ADD COLUMN notes TEXT NULL")
+            }
 
             await addIndexIfNotExists('vessels', 'idx_vessels_imo', 'imo_number')
+            // Migration: Add vessel_name_history table
+            const [nameHistoryTable] = await this.pool.query("SHOW TABLES LIKE 'vessel_name_history'")
+            if ((nameHistoryTable as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE vessel_name_history (
+                    id VARCHAR(36) PRIMARY KEY,
+                    vessel_id VARCHAR(36) NOT NULL,
+                    previous_name VARCHAR(255) NOT NULL,
+                    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    changed_by VARCHAR(255),
+                    FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+                    INDEX idx_vnh_vessel (vessel_id),
+                    INDEX idx_vnh_name (previous_name)
+                )`)
+            }
+
+            // Migration: Add order_index to assured_roles
+            const [arOrderCols] = await this.pool.query("SHOW COLUMNS FROM assured_roles")
+            const arColNames = (arOrderCols as any[]).map(c => c.Field)
+            if (!arColNames.includes('order_index')) {
+                await this.pool.query("ALTER TABLE assured_roles ADD COLUMN order_index INT DEFAULT 0")
+            }
+
+            // Migration: Remove duplicate assured_roles (keep first by id, delete rest)
+            try {
+                await this.pool.query(`
+                    DELETE ar1 FROM assured_roles ar1
+                    INNER JOIN assured_roles ar2
+                    ON LOWER(ar1.name) = LOWER(ar2.name) AND ar1.id > ar2.id
+                `)
+            } catch { /* ignore if no duplicates */ }
+
+            // Migration: Create flag_states table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS flag_states (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                iso3_code VARCHAR(3) NOT NULL UNIQUE,
+                address TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
+            // Migration: Add flag_state_id to vessels
+            const [vFlagCols] = await this.pool.query("SHOW COLUMNS FROM vessels LIKE 'flag_state_id'")
+            if ((vFlagCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE vessels ADD COLUMN flag_state_id VARCHAR(36) NULL")
+            }
+
             await addIndexIfNotExists('vessels', 'idx_vessels_fleet', 'fleet_id')
             await addIndexIfNotExists('vessels', 'idx_vessels_active', 'is_active')
             await addIndexIfNotExists('vessels', 'idx_vessels_customer', 'customer_id')
@@ -401,16 +460,16 @@ export class MySQLAdapter {
     // --- Document Types ---
     async getDocumentTypes(): Promise<DocumentType[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, description, required, order_index as `order` FROM document_types ORDER BY order_index ASC')
-        return (rows as any[]).map(r => ({ ...r, required: Boolean(r.required) }))
+        const [rows] = await this.pool.query('SELECT id, name, description, required, annual_renewal as annualRenewal, order_index as `order` FROM document_types ORDER BY order_index ASC')
+        return (rows as any[]).map(r => ({ ...r, required: Boolean(r.required), annualRenewal: Boolean(r.annualRenewal) }))
     }
 
     async addDocumentType(docType: Omit<DocumentType, 'id'>): Promise<DocumentType> {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO document_types (id, name, description, required, order_index) VALUES (?, ?, ?, ?, ?)',
-            [id, docType.name, docType.description || null, docType.required, docType.order]
+            'INSERT INTO document_types (id, name, description, required, annual_renewal, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, docType.name, docType.description || null, docType.required, docType.annualRenewal || false, docType.order]
         )
         return { ...docType, id }
     }
@@ -423,6 +482,7 @@ export class MySQLAdapter {
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
         if (updates.required !== undefined) { fields.push('required = ?'); values.push(updates.required) }
+        if (updates.annualRenewal !== undefined) { fields.push('annual_renewal = ?'); values.push(updates.annualRenewal) }
         if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
 
         if (fields.length === 0) return
@@ -458,7 +518,7 @@ export class MySQLAdapter {
     // --- Vessels ---
     async getVessels(): Promise<Vessel[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType FROM vessels')
+        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId FROM vessels')
         return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive) }))
     }
 
@@ -468,14 +528,14 @@ export class MySQLAdapter {
         const { page = 1, limit = 10, search, fleetId, customerId, status, sortField = 'name', sortOrder = 'asc' } = params
         const offset = (page - 1) * limit
 
-        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType FROM vessels'
+        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId FROM vessels'
         let countQuery = 'SELECT COUNT(*) as total FROM vessels'
         const conditions: string[] = []
         const values: any[] = []
 
         if (search) {
-            conditions.push('(name LIKE ? OR imo_number LIKE ?)')
-            values.push(`%${search}%`, `%${search}%`)
+            conditions.push('(name LIKE ? OR imo_number LIKE ? OR EXISTS (SELECT 1 FROM vessel_name_history vnh WHERE vnh.vessel_id = vessels.id AND vnh.previous_name LIKE ?))')
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`)
         }
 
         if (fleetId !== undefined && fleetId !== 'all') {
@@ -555,12 +615,22 @@ export class MySQLAdapter {
         return { ...vessel, id }
     }
 
-    async updateVessel(id: string, updates: Partial<Vessel>): Promise<void> {
+    async updateVessel(id: string, updates: Partial<Vessel>, changedBy?: string): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
 
-        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.name !== undefined) {
+            // Record name history before update
+            const [current]: any[] = await this.pool.query('SELECT name FROM vessels WHERE id = ?', [id])
+            if (current.length > 0 && current[0].name !== updates.name) {
+                await this.pool.execute(
+                    'INSERT INTO vessel_name_history (id, vessel_id, previous_name, changed_by) VALUES (?, ?, ?, ?)',
+                    [uuidv4(), id, current[0].name, changedBy || 'system']
+                )
+            }
+            fields.push('name = ?'); values.push(updates.name)
+        }
         if (updates.imoNumber !== undefined) { fields.push('imo_number = ?'); values.push(updates.imoNumber) }
         if (updates.fleetId !== undefined) { fields.push('fleet_id = ?'); values.push(updates.fleetId || null) }
         if (updates.ofacCheckedAt !== undefined) { fields.push('ofac_checked_at = ?'); values.push(formatDateForMySQL(updates.ofacCheckedAt)) }
@@ -569,10 +639,22 @@ export class MySQLAdapter {
         if (updates.isActive !== undefined) { fields.push('is_active = ?'); values.push(updates.isActive) }
         if (updates.customerId !== undefined) { fields.push('customer_id = ?'); values.push(updates.customerId || null) }
         if (updates.customerType !== undefined) { fields.push('customer_type = ?'); values.push(updates.customerType || null) }
+        if (updates.policyExpiryDate !== undefined) { fields.push('policy_expiry_date = ?'); values.push(updates.policyExpiryDate || null) }
+        if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes || null) }
+        if (updates.flagStateId !== undefined) { fields.push('flag_state_id = ?'); values.push(updates.flagStateId || null) }
 
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE vessels SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async getVesselNameHistory(vesselId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, vessel_id as vesselId, previous_name as previousName, changed_at as changedAt, changed_by as changedBy FROM vessel_name_history WHERE vessel_id = ? ORDER BY changed_at DESC',
+            [vesselId]
+        )
+        return rows as any[]
     }
 
     async deleteVessel(id: string): Promise<void> {
@@ -663,6 +745,27 @@ export class MySQLAdapter {
         }
     }
 
+    async duplicateVesselDocument(docId: string, uploadedBy: string): Promise<void> {
+        if (!this.pool) return
+        const [rows]: any[] = await this.pool.query(
+            'SELECT * FROM vessel_documents WHERE id = ?',
+            [docId]
+        )
+        if (rows.length === 0) throw new Error('Document not found')
+        const doc = rows[0]
+        await this.pool.execute(
+            `INSERT INTO vessel_documents
+            (id, vessel_id, document_type_id, file_path, sent, required, expiry_date, received_date, uploaded_date, uploaded_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+            [uuidv4(), doc.vessel_id, doc.document_type_id, doc.file_path, doc.sent, doc.required, doc.expiry_date, doc.received_date, uploadedBy]
+        )
+    }
+
+    async deleteVesselDocumentById(docId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM vessel_documents WHERE id = ?', [docId])
+    }
+
     async updateVesselDocumentExpiry(vesselId: string, docTypeId: string, expiryDate: string): Promise<void> {
         if (!this.pool) return
 
@@ -707,6 +810,58 @@ export class MySQLAdapter {
                 [uuidv4(), vesselId, docTypeId, '', required, receivedDate]
             )
         }
+    }
+
+    // --- Flag States ---
+    async getFlagStates(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT fs.id, fs.name, fs.iso3_code as iso3Code, fs.address,
+                   COUNT(v.id) as vesselCount
+            FROM flag_states fs
+            LEFT JOIN vessels v ON fs.id = v.flag_state_id
+            GROUP BY fs.id, fs.name, fs.iso3_code, fs.address
+            ORDER BY fs.name ASC
+        `)
+        return (rows as any[]).map(r => ({ ...r, vesselCount: Number(r.vesselCount) }))
+    }
+
+    async addFlagState(flagState: { name: string; iso3Code: string; address?: string }): Promise<any> {
+        if (!this.pool) throw new Error('No database connection')
+        const id = require('crypto').randomUUID()
+        await this.pool.execute(
+            'INSERT INTO flag_states (id, name, iso3_code, address) VALUES (?, ?, ?, ?)',
+            [id, flagState.name, flagState.iso3Code.toUpperCase(), flagState.address || null]
+        )
+        return { id, ...flagState, iso3Code: flagState.iso3Code.toUpperCase(), vesselCount: 0 }
+    }
+
+    async updateFlagState(id: string, updates: { name?: string; iso3Code?: string; address?: string }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.iso3Code !== undefined) { fields.push('iso3_code = ?'); values.push(updates.iso3Code.toUpperCase()) }
+        if (updates.address !== undefined) { fields.push('address = ?'); values.push(updates.address || null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE flag_states SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteFlagState(id: string): Promise<void> {
+        if (!this.pool) return
+        // Clear flag_state_id on vessels referencing this flag state
+        await this.pool.execute('UPDATE vessels SET flag_state_id = NULL WHERE flag_state_id = ?', [id])
+        await this.pool.execute('DELETE FROM flag_states WHERE id = ?', [id])
+    }
+
+    async getVesselsByFlagState(flagStateId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, name, imo_number as imoNumber FROM vessels WHERE flag_state_id = ? ORDER BY name ASC',
+            [flagStateId]
+        )
+        return rows as any[]
     }
 
     // --- Entities ---
@@ -861,11 +1016,11 @@ export class MySQLAdapter {
     async getAssuredRoles(): Promise<AssuredRole[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`
-            SELECT ar.id, ar.name, COUNT(DISTINCT va.vessel_id) as vesselCount
+            SELECT ar.id, ar.name, ar.order_index as \`order\`, COUNT(DISTINCT va.vessel_id) as vesselCount
             FROM assured_roles ar
             LEFT JOIN vessel_assureds va ON ar.name = va.role
-            GROUP BY ar.id, ar.name
-            ORDER BY ar.name ASC
+            GROUP BY ar.id, ar.name, ar.order_index
+            ORDER BY ar.order_index ASC, ar.name ASC
         `)
         return (rows as any[]).map(r => ({
             ...r,
@@ -875,9 +1030,17 @@ export class MySQLAdapter {
 
     async addAssuredRole(role: Omit<AssuredRole, 'id'>): Promise<AssuredRole> {
         if (!this.pool) throw new Error('DB Not connected')
+        // Check for duplicate name (case-insensitive)
+        const [existing] = await this.pool.execute('SELECT id FROM assured_roles WHERE LOWER(name) = LOWER(?)', [role.name.trim()])
+        if ((existing as any[]).length > 0) {
+            throw new Error('This role already exists')
+        }
         const id = uuidv4()
-        await this.pool.execute('INSERT INTO assured_roles (id, name) VALUES (?, ?)', [id, role.name])
-        return { ...role, id }
+        // Get max order_index
+        const [maxRows] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) as maxOrder FROM assured_roles')
+        const maxOrder = (maxRows as any[])[0].maxOrder
+        await this.pool.execute('INSERT INTO assured_roles (id, name, order_index) VALUES (?, ?, ?)', [id, role.name.trim(), maxOrder + 1])
+        return { ...role, id, order: maxOrder + 1 }
     }
 
     async updateAssuredRole(id: string, updates: Partial<AssuredRole>): Promise<void> {
@@ -891,6 +1054,7 @@ export class MySQLAdapter {
         const values: any[] = []
 
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
 
         if (fields.length === 0) return
         values.push(id)
@@ -912,6 +1076,35 @@ export class MySQLAdapter {
         } finally {
             connection.release()
         }
+    }
+
+    async reorderAssuredRoles(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        const connection = await this.pool.getConnection()
+        await connection.beginTransaction()
+        try {
+            for (let i = 0; i < orderedIds.length; i++) {
+                await connection.execute('UPDATE assured_roles SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+            }
+            await connection.commit()
+        } catch (error) {
+            await connection.rollback()
+            throw error
+        } finally {
+            connection.release()
+        }
+    }
+
+    async getVesselsByRole(roleName: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT DISTINCT v.id, v.name, v.imo_number as imoNumber
+            FROM vessels v
+            INNER JOIN vessel_assureds va ON v.id = va.vessel_id
+            WHERE va.role = ?
+            ORDER BY v.name ASC
+        `, [roleName])
+        return rows as any[]
     }
 
     async deleteAssuredRole(id: string): Promise<void> {
@@ -1012,7 +1205,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE username = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -1035,7 +1228,7 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users ORDER BY username ASC'
+            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
@@ -1070,10 +1263,18 @@ export class MySQLAdapter {
         )
     }
 
+    async updateUserAppVersion(userId: string, version: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE users SET last_app_version = ? WHERE id = ?',
+            [version, userId]
+        )
+    }
+
     async getUserById(userId: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE id = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE id = ?',
             [userId]
         )
         return rows.length > 0 ? (rows[0] as User) : null

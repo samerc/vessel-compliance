@@ -15,12 +15,15 @@ const api = {
   getVesselsPaginated: (params: any) => ipcRenderer.invoke('db:getVesselsPaginated', params),
   addVessel: (vessel) => ipcRenderer.invoke('db:addVessel', vessel),
   updateVessel: (id, updates) => ipcRenderer.invoke('db:updateVessel', id, updates),
+  getVesselNameHistory: (vesselId) => ipcRenderer.invoke('db:getVesselNameHistory', vesselId),
   deleteVessel: (id) => ipcRenderer.invoke('db:deleteVessel', id),
 
   getVesselDocuments: (vesselId) => ipcRenderer.invoke('db:getVesselDocuments', vesselId),
   upsertVesselDocument: (doc) => ipcRenderer.invoke('db:upsertVesselDocument', doc),
   updateVesselDocumentExpiry: (vesselId, docTypeId, expiryDate) => ipcRenderer.invoke('db:updateVesselDocumentExpiry', vesselId, docTypeId, expiryDate),
   updateVesselDocumentReceivedDate: (vesselId, docTypeId, receivedDate) => ipcRenderer.invoke('db:updateVesselDocumentReceivedDate', vesselId, docTypeId, receivedDate),
+  duplicateVesselDocument: (docId, uploadedBy) => ipcRenderer.invoke('db:duplicateVesselDocument', docId, uploadedBy),
+  deleteVesselDocumentById: (docId) => ipcRenderer.invoke('db:deleteVesselDocumentById', docId),
 
   getEntities: () => ipcRenderer.invoke('db:getEntities'),
   getEntitiesPaginated: (params: any) => ipcRenderer.invoke('db:getEntitiesPaginated', params),
@@ -33,6 +36,8 @@ const api = {
   addAssuredRole: (role) => ipcRenderer.invoke('db:addAssuredRole', role),
   updateAssuredRole: (id, updates) => ipcRenderer.invoke('db:updateAssuredRole', id, updates),
   deleteAssuredRole: (id) => ipcRenderer.invoke('db:deleteAssuredRole', id),
+  reorderAssuredRoles: (orderedIds) => ipcRenderer.invoke('db:reorderAssuredRoles', orderedIds),
+  getVesselsByRole: (roleName) => ipcRenderer.invoke('db:getVesselsByRole', roleName),
 
   getVesselAssureds: (vesselId) => ipcRenderer.invoke('db:getVesselAssureds', vesselId),
   addVesselAssured: (assured) => ipcRenderer.invoke('db:addVesselAssured', assured),
@@ -49,6 +54,7 @@ const api = {
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 
   dialogOpenFile: () => ipcRenderer.invoke('dialog:openFile'),
+  dialogOpenFileAny: () => ipcRenderer.invoke('dialog:openFileAny'),
   excelImport: (filePath) => ipcRenderer.invoke('excel:import', filePath),
   dialogOpenFileWord: () => ipcRenderer.invoke('dialog:openFileWord'),
   importDefectsFromWord: (surveyId, filePath) => ipcRenderer.invoke('word:importDefects', surveyId, filePath),
@@ -76,6 +82,7 @@ const api = {
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
   updateUserWindowPreferences: (width: number, height: number, x?: number, y?: number) => ipcRenderer.invoke('users:updateWindowPreferences', width, height, x, y),
   updateSanctionsThreshold: (threshold: number) => ipcRenderer.invoke('users:updateSanctionsThreshold', threshold),
+  updateUserAppVersion: (version: string) => ipcRenderer.invoke('users:updateAppVersion', version),
 
   // Window Preferences
   windowGetPreferences: () => ipcRenderer.invoke('window:getPreferences'),
@@ -99,6 +106,13 @@ const api = {
   complianceMarkResultReviewed: (resultId: string) => ipcRenderer.invoke('compliance:markResultReviewed', resultId),
   complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => ipcRenderer.invoke('compliance:decideResult', resultId, decision),
   complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
+
+  // Flag States
+  getFlagStates: () => ipcRenderer.invoke('db:getFlagStates'),
+  addFlagState: (flagState: any) => ipcRenderer.invoke('db:addFlagState', flagState),
+  updateFlagState: (id: string, updates: any) => ipcRenderer.invoke('db:updateFlagState', id, updates),
+  deleteFlagState: (id: string) => ipcRenderer.invoke('db:deleteFlagState', id),
+  getVesselsByFlagState: (flagStateId: string) => ipcRenderer.invoke('db:getVesselsByFlagState', flagStateId),
 
   // Surveyors
   getSurveyors: () => ipcRenderer.invoke('db:getSurveyors'),

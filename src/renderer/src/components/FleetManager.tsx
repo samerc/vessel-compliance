@@ -4,8 +4,6 @@ import {
     Trash2,
     Folder,
     Ship,
-    FileSpreadsheet,
-    FileText,
     Eye,
     ChevronDown,
     ChevronRight,
@@ -14,8 +12,7 @@ import {
     Users,
     HelpCircle
 } from 'lucide-react'
-import { Fleet, Vessel, VesselDocument, DocumentType, Entity } from '../../../shared/types'
-import { ReportService } from '../services/ReportService'
+import { Fleet, Vessel, Entity } from '../../../shared/types'
 import FleetDetail from './FleetDetail'
 import VesselDetail from './VesselDetail'
 
@@ -28,8 +25,7 @@ export default function FleetManager() {
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
-    const [docTypes, setDocTypes] = useState<DocumentType[]>([])
-    const [allDocs, setAllDocs] = useState<VesselDocument[]>([])
+
     const [newFleetName, setNewFleetName] = useState('')
     const [selectedFleet, setSelectedFleet] = useState<Fleet | null>(null)
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
@@ -42,7 +38,7 @@ export default function FleetManager() {
     const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
 
     // Collapsed sections
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['Brokers', 'Direct Clients', 'Unassigned']))
 
     // View mode
     const [viewMode, setViewMode] = useState<'customers' | 'fleets'>('customers')
@@ -52,18 +48,14 @@ export default function FleetManager() {
     }, [])
 
     const loadData = async () => {
-        const [fData, vData, eData, dTypes, docs] = await Promise.all([
+        const [fData, vData, eData] = await Promise.all([
             window.api.getFleets(),
             window.api.getVessels(),
-            window.api.getEntities(),
-            window.api.getDocumentTypes(),
-            window.api.getVesselDocuments()
+            window.api.getEntities()
         ])
         setFleets(fData)
         setVessels(vData)
         setEntities(eData)
-        setDocTypes(dTypes)
-        setAllDocs(docs)
     }
 
     const handleAddFleet = async (e: React.FormEvent) => {
@@ -466,58 +458,62 @@ export default function FleetManager() {
                         </form>
                     </section>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
-                        {fleets.map(fleet => {
-                            const count = vessels.filter(v => v.fleetId === fleet.id).length
-                            return (
-                                <div key={fleet.id} className="glass-card" style={{ padding: '24px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                        <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '12px' }}>
-                                            <Folder size={24} color="var(--accent-primary)" />
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button
-                                                onClick={() => setSelectedFleet(fleet)}
-                                                style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '4px' }}
-                                                title="View Fleet"
-                                                aria-label="View fleet"
-                                            >
-                                                <Eye size={20} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteFleet(fleet.id)}
-                                                style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }}
-                                                title="Delete Fleet"
-                                                aria-label="Delete fleet"
-                                            >
-                                                <Trash2 size={20} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <h3 style={{ marginBottom: '8px' }}>{fleet.name}</h3>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                                        <Ship size={14} /> {count} Vessels Assigned
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: '12px' }}>
-                                        <button
-                                            onClick={() => ReportService.exportFleetToExcel(fleet, vessels.filter(v => v.fleetId === fleet.id), docTypes, allDocs)}
-                                            className="btn-secondary"
-                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem' }}
-                                        >
-                                            <FileSpreadsheet size={16} /> Excel
-                                        </button>
-                                        <button
-                                            onClick={() => ReportService.exportFleetToPDF(fleet, vessels.filter(v => v.fleetId === fleet.id), docTypes, allDocs)}
-                                            className="btn-secondary"
-                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem' }}
-                                        >
-                                            <FileText size={16} /> PDF
-                                        </button>
-                                    </div>
-                                </div>
-                            )
-                        })}
+                    <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <caption className="sr-only">Fleets</caption>
+                            <thead>
+                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                    <th scope="col" style={{ padding: '16px' }}>Fleet Name</th>
+                                    <th scope="col" style={{ padding: '16px', width: '120px' }}>Vessels</th>
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {fleets.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={3} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                            No fleets created yet.
+                                        </td>
+                                    </tr>
+                                ) : fleets.map(fleet => {
+                                    const count = vessels.filter(v => v.fleetId === fleet.id).length
+                                    return (
+                                        <tr key={fleet.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                            <td style={{ padding: '16px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <Folder size={18} color="var(--accent-primary)" />
+                                                    <span style={{ fontWeight: '600' }}>{fleet.name}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '16px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                                    <Ship size={14} /> {count}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        onClick={() => setSelectedFleet(fleet)}
+                                                        className="btn-primary"
+                                                        style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                                                    >
+                                                        <Eye size={14} /> View
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteFleet(fleet.id)}
+                                                        style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', padding: '6px' }}
+                                                        title="Delete Fleet"
+                                                        aria-label="Delete fleet"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </>
             )}

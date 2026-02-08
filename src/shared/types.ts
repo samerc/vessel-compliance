@@ -2,6 +2,7 @@ export interface DocumentType {
   id: string
   name: string
   required: boolean
+  annualRenewal?: boolean
   order: number
   description?: string
 }
@@ -20,11 +21,15 @@ export interface Vessel {
   ofacMatchFound?: boolean
   ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
   isActive: boolean
+  policyExpiryDate?: string
   customerId?: string
   customerType?: 'broker' | 'direct'
+  notes?: string
+  flagStateId?: string
 }
 
 export interface VesselDocument {
+  id?: string
   vesselId: string
   documentTypeId: string
   filePath: string
@@ -56,6 +61,7 @@ export interface AssuredRole {
   id: string
   name: string
   vesselCount?: number
+  order?: number
 }
 
 export interface VesselAssured {
@@ -68,6 +74,22 @@ export interface VesselAssured {
 export interface EntityUBO {
   assuredEntityId: string
   uboEntityId: string
+}
+
+export interface VesselNameHistory {
+  id: string
+  vesselId: string
+  previousName: string
+  changedAt: string
+  changedBy?: string
+}
+
+export interface FlagState {
+  id: string
+  name: string
+  iso3Code: string
+  address?: string
+  vesselCount?: number
 }
 
 export interface AppData {
@@ -88,6 +110,7 @@ export interface User {
   role: 'admin' | 'user'
   themePreference?: 'light' | 'dark'
   sanctionsThreshold?: number // 0-100
+  lastAppVersion?: string
   windowWidth?: number
   windowHeight?: number
   windowX?: number

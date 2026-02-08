@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Ship, FileSpreadsheet, FileText, ExternalLink, Hash } from 'lucide-react'
+import { ArrowLeft, Ship, FileSpreadsheet, FileText, ExternalLink, Hash, Plus, Search, X, UserMinus } from 'lucide-react'
 import { Fleet, Vessel, VesselDocument, DocumentType } from '../../../shared/types'
 import { ReportService } from '../services/ReportService'
 import VesselDetail from './VesselDetail'
+import { useToast } from '../contexts/ToastContext'
 
 interface FleetDetailProps {
     fleet: Fleet
@@ -11,11 +12,16 @@ interface FleetDetailProps {
 
 export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const [vessels, setVessels] = useState<Vessel[]>([])
+    const [allVessels, setAllVessels] = useState<Vessel[]>([])
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [allDocs, setAllDocs] = useState<VesselDocument[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
-    const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
+    const { showSuccess } = useToast()
+
+    // Quick-add state
+    const [showQuickAdd, setShowQuickAdd] = useState(false)
+    const [quickAddSearch, setQuickAddSearch] = useState('')
 
     useEffect(() => {
         loadData()
@@ -24,11 +30,12 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const loadData = async () => {
         setLoading(true)
         try {
-            const allVessels = await window.api.getVessels()
-            const fVessels = allVessels.filter(v => v.fleetId === fleet.id)
+            const allV = await window.api.getVessels()
+            const fVessels = allV.filter(v => v.fleetId === fleet.id)
             const dTypes = await window.api.getDocumentTypes()
             const docs = await window.api.getVesselDocuments()
 
+            setAllVessels(allV)
             setVessels(fVessels)
             setDocTypes(dTypes)
             setAllDocs(docs)
@@ -37,11 +44,117 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
         }
     }
 
+    const handleAddVessel = async (vessel: Vessel) => {
+        await window.api.updateVessel(vessel.id, { fleetId: fleet.id })
+        setQuickAddSearch('')
+        setShowQuickAdd(false)
+        showSuccess(`${vessel.name} added to fleet`)
+        loadData()
+    }
+
+    const handleRemoveVessel = async (vessel: Vessel) => {
+        if (confirm(`Remove ${vessel.name} from this fleet?`)) {
+            await window.api.updateVessel(vessel.id, { fleetId: null as any })
+            showSuccess(`${vessel.name} removed from fleet`)
+            loadData()
+        }
+    }
+
     if (selectedVessel) {
         return <VesselDetail vessel={selectedVessel} backLabel="Back to Fleet" onBack={() => { setSelectedVessel(null); loadData(); }} />
     }
 
-    const filteredVessels = vessels.filter(v => statusFilter === 'all' || v.isActive)
+    const activeVessels = vessels.filter(v => v.isActive)
+    const inactiveVessels = vessels.filter(v => !v.isActive)
+
+    // Filter vessels not already in this fleet for quick-add
+    const availableVessels = quickAddSearch.trim()
+        ? allVessels.filter(v =>
+            v.fleetId !== fleet.id &&
+            (v.name.toLowerCase().includes(quickAddSearch.toLowerCase()) ||
+                v.imoNumber.toLowerCase().includes(quickAddSearch.toLowerCase()))
+        ).slice(0, 8)
+        : []
+
+    const renderVesselTable = (vesselList: Vessel[], title: string, showRemove: boolean) => {
+        if (vesselList.length === 0) return null
+        return (
+            <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ marginBottom: '12px', fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                    {title} ({vesselList.length})
+                </h3>
+                <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                        <caption className="sr-only">{title}</caption>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                <th scope="col" style={{ padding: '16px' }}>Vessel Name</th>
+                                <th scope="col" style={{ padding: '16px' }}>IMO Number</th>
+                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {vesselList.map(v => (
+                                <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                    <td style={{ padding: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
+                                                <Ship size={20} color="var(--accent-primary)" />
+                                            </div>
+                                            <span
+                                                style={{ fontWeight: '600', cursor: 'pointer', color: 'var(--accent-primary)' }}
+                                                onClick={() => setSelectedVessel(v)}
+                                            >
+                                                {v.name}
+                                            </span>
+                                            {!v.isActive && (
+                                                <span style={{
+                                                    fontSize: '0.65rem',
+                                                    background: 'rgba(0,0,0,0.1)',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '3px',
+                                                    color: 'var(--text-secondary)',
+                                                    border: '1px solid rgba(0,0,0,0.1)'
+                                                }}>
+                                                    INACTIVE
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <Hash size={14} /> {v.imoNumber}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                            <button
+                                                className="btn-secondary"
+                                                style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                                                onClick={() => setSelectedVessel(v)}
+                                            >
+                                                Details <ExternalLink size={14} />
+                                            </button>
+                                            {showRemove && (
+                                                <button
+                                                    onClick={() => handleRemoveVessel(v)}
+                                                    style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center' }}
+                                                    title="Remove from fleet"
+                                                    aria-label="Remove from fleet"
+                                                >
+                                                    <UserMinus size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="fade-in">
@@ -52,28 +165,26 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
                     <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>{fleet.name}</h1>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <p style={{ color: 'var(--text-secondary)' }}>{vessels.length} Vessels in this fleet</p>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value as 'active' | 'all')}
-                            className="input-field"
-                            style={{ padding: '4px 12px', fontSize: '0.85rem', width: 'auto' }}
-                            aria-label="Filter by status"
-                        >
-                            <option value="active">Active Only</option>
-                            <option value="all">Show All</option>
-                        </select>
-                    </div>
+                    <p style={{ color: 'var(--text-secondary)' }}>
+                        {activeVessels.length} active vessel{activeVessels.length !== 1 ? 's' : ''}
+                        {inactiveVessels.length > 0 && ` · ${inactiveVessels.length} inactive`}
+                    </p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                        onClick={() => setShowQuickAdd(!showQuickAdd)}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        <Plus size={18} /> Add Vessel
+                    </button>
                     <button
                         onClick={() => ReportService.exportFleetToExcel(fleet, vessels, docTypes, allDocs)}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         disabled={loading}
                     >
-                        <FileSpreadsheet size={18} /> Export Excel
+                        <FileSpreadsheet size={18} /> Excel
                     </button>
                     <button
                         onClick={() => ReportService.exportFleetToPDF(fleet, vessels, docTypes, allDocs)}
@@ -81,79 +192,81 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         disabled={loading}
                     >
-                        <FileText size={18} /> Export PDF
+                        <FileText size={18} /> PDF
                     </button>
                 </div>
             </header>
 
+            {/* Quick-add vessel search */}
+            {showQuickAdd && (
+                <div className="glass-card" style={{ padding: '16px', marginBottom: '24px', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <Search size={16} color="var(--text-secondary)" />
+                        <input
+                            type="text"
+                            value={quickAddSearch}
+                            onChange={e => setQuickAddSearch(e.target.value)}
+                            placeholder="Search vessels by name or IMO to add..."
+                            style={{ flex: 1 }}
+                            autoFocus
+                            aria-label="Search vessels to add"
+                        />
+                        <button
+                            onClick={() => { setShowQuickAdd(false); setQuickAddSearch('') }}
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                    {availableVessels.length > 0 && (
+                        <div style={{ borderTop: '1px solid var(--table-border)', paddingTop: '8px' }}>
+                            {availableVessels.map(v => (
+                                <div
+                                    key={v.id}
+                                    onClick={() => handleAddVessel(v)}
+                                    style={{
+                                        padding: '10px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        cursor: 'pointer',
+                                        borderRadius: '6px'
+                                    }}
+                                    className="hover-effect"
+                                >
+                                    <Ship size={16} color="var(--accent-primary)" />
+                                    <span style={{ fontWeight: '600' }}>{v.name}</span>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>IMO {v.imoNumber}</span>
+                                    {!v.isActive && (
+                                        <span style={{ fontSize: '0.6rem', background: 'rgba(0,0,0,0.1)', padding: '1px 5px', borderRadius: '3px', color: 'var(--text-secondary)' }}>INACTIVE</span>
+                                    )}
+                                    <Plus size={14} color="var(--accent-primary)" style={{ marginLeft: 'auto' }} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {quickAddSearch.trim() && availableVessels.length === 0 && (
+                        <div style={{ padding: '12px', color: 'var(--text-secondary)', textAlign: 'center', fontSize: '0.9rem' }}>
+                            No matching vessels found outside this fleet.
+                        </div>
+                    )}
+                </div>
+            )}
+
             {loading ? (
                 <div style={{ color: 'var(--text-secondary)' }}>Loading fleet details...</div>
             ) : (
-                <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-                        <caption className="sr-only">Vessels in fleet</caption>
-                        <thead>
-                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th scope="col" style={{ padding: '16px' }}>Vessel Name</th>
-                                <th scope="col" style={{ padding: '16px' }}>IMO Number</th>
-                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredVessels.length === 0 ? (
-                                <tr>
-                                    <td colSpan={3} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                        No {statusFilter === 'active' ? 'active' : ''} vessels found.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredVessels.map(v => (
-                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
-                                        <td style={{ padding: '16px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
-                                                    <Ship size={20} color="var(--accent-primary)" />
-                                                </div>
-                                                <span
-                                                    style={{ fontWeight: '600', cursor: 'pointer', color: 'var(--accent-primary)' }}
-                                                    onClick={() => setSelectedVessel(v)}
-                                                >
-                                                    {v.name}
-                                                </span>
-                                                {!v.isActive && (
-                                                    <span style={{
-                                                        fontSize: '0.65rem',
-                                                        background: 'rgba(0,0,0,0.1)',
-                                                        padding: '1px 6px',
-                                                        borderRadius: '3px',
-                                                        color: 'var(--text-secondary)',
-                                                        border: '1px solid rgba(0,0,0,0.1)'
-                                                    }}>
-                                                        INACTIVE
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Hash size={14} /> {v.imoNumber}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <button
-                                                className="btn-secondary"
-                                                style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                                                onClick={() => setSelectedVessel(v)}
-                                            >
-                                                Details <ExternalLink size={14} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                <>
+                    {renderVesselTable(activeVessels, 'Active Vessels', true)}
+                    {renderVesselTable(inactiveVessels, 'Inactive Vessels', true)}
+
+                    {vessels.length === 0 && (
+                        <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <Ship size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                            <p>No vessels in this fleet yet. Use &quot;Add Vessel&quot; to assign vessels.</p>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     )

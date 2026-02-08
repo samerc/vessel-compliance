@@ -823,7 +823,8 @@ app.whenReady().then(() => {
       return { success: false, message: error.message }
     }
   })
-  safeHandle('db:updateVessel', (event, id, updates) => { requireSession(event); return db.updateVessel(id, updates) })
+  safeHandle('db:updateVessel', (event, id, updates) => { const user = requireSession(event); return db.updateVessel(id, updates, user.username) })
+  safeHandle('db:getVesselNameHistory', (event, vesselId) => { requireSession(event); return db.getVesselNameHistory(vesselId) })
   safeHandle('db:deleteVessel', async (event, id) => {
     requireAdmin(event)
     await db.deleteVessel(id)
@@ -840,6 +841,8 @@ app.whenReady().then(() => {
   })
   safeHandle('db:updateVesselDocumentExpiry', (event, vesselId, docTypeId, expiryDate) => { requireSession(event); return db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate) })
   safeHandle('db:updateVesselDocumentReceivedDate', (event, vesselId, docTypeId, receivedDate) => { requireSession(event); return db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate) })
+  safeHandle('db:duplicateVesselDocument', (event, docId, uploadedBy) => { requireSession(event); return db.duplicateVesselDocument(docId, uploadedBy) })
+  safeHandle('db:deleteVesselDocumentById', (event, docId) => { requireSession(event); return db.deleteVesselDocumentById(docId) })
 
   // Entity IPC Handlers
   safeHandle('db:getEntities', (event) => { requireSession(event); return db.getEntities() })
@@ -862,6 +865,15 @@ app.whenReady().then(() => {
   safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })
   safeHandle('db:updateAssuredRole', (event, id, updates) => { requireSession(event); return db.updateAssuredRole(id, updates) })
   safeHandle('db:deleteAssuredRole', (event, id) => { requireSession(event); return db.deleteAssuredRole(id) })
+  safeHandle('db:reorderAssuredRoles', (event, orderedIds) => { requireSession(event); return db.reorderAssuredRoles(orderedIds) })
+  safeHandle('db:getVesselsByRole', (event, roleName) => { requireSession(event); return db.getVesselsByRole(roleName) })
+
+  // Flag States
+  safeHandle('db:getFlagStates', (event) => { requireSession(event); return db.getFlagStates() })
+  safeHandle('db:addFlagState', (event, flagState) => { requireSession(event); return db.addFlagState(flagState) })
+  safeHandle('db:updateFlagState', (event, id, updates) => { requireSession(event); return db.updateFlagState(id, updates) })
+  safeHandle('db:deleteFlagState', (event, id) => { requireSession(event); return db.deleteFlagState(id) })
+  safeHandle('db:getVesselsByFlagState', (event, flagStateId) => { requireSession(event); return db.getVesselsByFlagState(flagStateId) })
 
   safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
   safeHandle('db:addVesselAssured', (event, assured) => { requireSession(event); return db.addVesselAssured(assured) })
@@ -933,6 +945,19 @@ app.whenReady().then(() => {
       throw new Error(validation.reason || 'File type not allowed')
     }
     return shell.openPath(normalized)
+  })
+
+  // General file picker (for document uploads)
+  safeHandle('dialog:openFileAny', async (event) => {
+    requireSession(event)
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+    return result.canceled ? null : result.filePaths[0]
   })
 
   // Excel Import Handlers (session required)
@@ -1047,6 +1072,20 @@ app.whenReady().then(() => {
       const session = auth.getSessionData(sessionId)
       if (session) {
         session.user.sanctionsThreshold = threshold
+      }
+    }
+  })
+
+  safeHandle('users:updateAppVersion', async (event, version: string) => {
+    const user = requireSession(event)
+    await db.updateUserAppVersion(user.id, version)
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (windowId) {
+      const sessionId = windowSessions.get(windowId)
+      const session = auth.getSessionData(sessionId)
+      if (session) {
+        session.user.lastAppVersion = version
       }
     }
   })

@@ -443,7 +443,8 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
                                 onClick={() => toggleClosureNotes(defect.id)}
                                 aria-expanded={expandedClosureIds.has(defect.id)}
                                 aria-label={`${expandedClosureIds.has(defect.id) ? 'Hide' : 'View'} closure notes for defect ${defect.defectNumber}`}
-                                style={{ padding: '6px 12px', background: 'var(--primary-color)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
+                                className="btn-secondary"
+                                style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
                                 title="View closure details"
                               >
                                 {expandedClosureIds.has(defect.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}

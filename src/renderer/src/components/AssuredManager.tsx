@@ -5,6 +5,7 @@ import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
+import ConfirmationModal from './ConfirmationModal'
 
 interface AssuredManagerProps {
     vessel: Vessel
@@ -53,6 +54,16 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         matches: SanctionsMatch[]
         entityId?: string
     }>({ show: false, searchedName: '', matches: [] })
+
+    // Confirmation modal state
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{
+        show: boolean
+        id: string | null
+        title: string
+        message: string
+        type: 'assured' | 'ubo'
+        uboParentId?: string // For UBO deletion we need parent assured ID
+    }>({ show: false, id: null, title: '', message: '', type: 'assured' })
 
     useEffect(() => {
         loadData()
@@ -181,6 +192,21 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         }
     }
 
+    const handleLinkExistingUBO = async (assuredEntityId: string, uboEntityId: string) => {
+        setIsAddingUBO(true)
+        try {
+            await window.api.addEntityUBO({ assuredEntityId, uboEntityId })
+            setNewUBOName('')
+            setSelectedUBOId(null)
+            showSuccess('UBO linked successfully')
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to link UBO.')
+        } finally {
+            setIsAddingUBO(false)
+        }
+    }
+
     const handleUpdateRole = async (id: string) => {
         if (!editRoleValue.trim()) return
         setIsUpdatingRole(true)
@@ -203,28 +229,50 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     }
 
     const handleDeleteAssured = async (id: string) => {
-        if (confirm('Remove this assured from this vessel?')) {
-            window.focus()
+        setDeleteConfirmation({
+            show: true,
+            id,
+            title: 'Remove Assured?',
+            message: 'Are you sure you want to remove this assured from this vessel? This will also remove any linked UBOs.',
+            type: 'assured'
+        })
+    }
+
+    const handleDeleteUBO = async (assuredEntityId: string, uboEntityId: string) => {
+        setDeleteConfirmation({
+            show: true,
+            id: uboEntityId,
+            uboParentId: assuredEntityId,
+            title: 'Remove UBO?',
+            message: 'Are you sure you want to remove this UBO?',
+            type: 'ubo'
+        })
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!deleteConfirmation.id) return
+
+        if (deleteConfirmation.type === 'assured') {
             try {
-                await window.api.deleteVesselAssured(id)
+                await window.api.deleteVesselAssured(deleteConfirmation.id)
                 showSuccess('Assured removed successfully')
+                setIsAddingAssured(false)
+                setIsAddingUBO(false)
                 loadData()
             } catch (error: any) {
                 showError(error.message || 'Failed to remove assured. You may need admin privileges.')
             }
-        } else {
-            window.focus()
+        } else if (deleteConfirmation.type === 'ubo' && deleteConfirmation.uboParentId) {
+            try {
+                await window.api.deleteEntityUBO({ assuredEntityId: deleteConfirmation.uboParentId, uboEntityId: deleteConfirmation.id })
+                showSuccess('UBO removed successfully')
+                setIsAddingUBO(false)
+                loadData()
+            } catch (error: any) {
+                showError(error.message || 'Failed to remove UBO.')
+            }
         }
-    }
-
-    const handleDeleteUBO = async (assuredEntityId: string, uboEntityId: string) => {
-        try {
-            await window.api.deleteEntityUBO({ assuredEntityId, uboEntityId })
-            showSuccess('UBO removed successfully')
-            loadData()
-        } catch (error: any) {
-            showError(error.message || 'Failed to remove UBO.')
-        }
+        setDeleteConfirmation(prev => ({ ...prev, show: false }))
     }
 
     const handleUploadPassport = async (e: React.DragEvent, entityId: string) => {
@@ -511,7 +559,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                     <Users size={20} color="var(--accent-primary)" /> Assureds & UBOs
                 </h3>
                 <button
-                    onClick={() => { setShowAddForm(!showAddForm); setSelectedEntityId(null); }}
+                    onClick={() => { setShowAddForm(!showAddForm); setSelectedEntityId(null); setIsAddingAssured(false); }}
                     className="btn-primary"
                     style={{ padding: '8px 16px', fontSize: '0.85rem' }}
                 >
@@ -668,7 +716,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                         </tr>
                     </thead>
                     <tbody>
-                        {vesselAssureds.map(va => {
+                        {[...vesselAssureds].sort((a, b) => {
+                            const aOrder = roles.findIndex(r => r.name === a.role)
+                            const bOrder = roles.findIndex(r => r.name === b.role)
+                            return (aOrder === -1 ? 999 : aOrder) - (bOrder === -1 ? 999 : bOrder)
+                        }).map(va => {
                             const entity = entities.find(e => e.id === va.entityId)
                             const ubos = entityUBOs
                                 .filter(u => u.assuredEntityId === va.entityId)
@@ -880,7 +932,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     {matchingUBOs.map(ent => (
                                                                         <div
                                                                             key={ent.id}
-                                                                            onClick={() => { setSelectedUBOId(ent.id); setNewUBOName(ent.name); }}
+                                                                            onClick={() => handleLinkExistingUBO(va.entityId, ent.id)}
                                                                             style={{ padding: '6px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                                                                             className="hover-effect"
                                                                         >
@@ -918,9 +970,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                 <option value="person">Person</option>
                                                             </select>
                                                         ) : <div />}
-                                                        <button onClick={() => handleAddUBO(va.entityId)} className="btn-secondary" disabled={isAddingUBO} style={{ padding: '0 20px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <button onClick={() => handleAddUBO(va.entityId)} className="btn-secondary" disabled={isAddingUBO || !!selectedUBOId} style={{ padding: '0 20px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                             {isAddingUBO && <Loader2 size={14} className="spinner" />}
-                                                            {isAddingUBO ? 'Adding...' : selectedUBOId ? 'Link' : 'New'}
+                                                            {isAddingUBO ? 'Adding...' : 'Add New'}
                                                         </button>
                                                     </div>
 
@@ -1060,6 +1112,17 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                     onClose={() => setSanctionsModal({ show: false, searchedName: '', matches: [] })}
                     onMarkClean={handleMarkClean}
                     onConfirmMatch={handleConfirmMatch}
+                />
+            )}
+
+            {deleteConfirmation.show && (
+                <ConfirmationModal
+                    title={deleteConfirmation.title}
+                    message={deleteConfirmation.message}
+                    confirmLabel="Remove"
+                    isDangerous={true}
+                    onConfirm={handleConfirmDelete}
+                    onCancel={() => setDeleteConfirmation(prev => ({ ...prev, show: false }))}
                 />
             )}
         </section>

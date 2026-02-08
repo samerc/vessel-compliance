@@ -18,7 +18,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function VesselManager() {
+export default function VesselManager({ initialVesselId, onClearInitialVessel }: { initialVesselId?: string | null; onClearInitialVessel?: () => void } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
@@ -48,6 +48,13 @@ export default function VesselManager() {
     const [isAdding, setIsAdding] = useState(false)
     const [showQuickAdd, setShowQuickAdd] = useState(false)
 
+    // Customer search state
+    const [customerSearch, setCustomerSearch] = useState('')
+    const [customerTypePrompt, setCustomerTypePrompt] = useState<{ vesselId: string; customerId: string } | null>(null)
+    // Per-vessel customer search in table
+    const [editingCustomerVesselId, setEditingCustomerVesselId] = useState<string | null>(null)
+    const [tableCustomerSearch, setTableCustomerSearch] = useState('')
+
     // Sanctions checking state
     const [checkingVesselId, setCheckingVesselId] = useState<string | null>(null)
 
@@ -71,6 +78,18 @@ export default function VesselManager() {
         }
         loadStaticData()
     }, [])
+
+    // Open vessel by ID from external navigation
+    useEffect(() => {
+        if (initialVesselId) {
+            (async () => {
+                const allVessels = await window.api.getVessels()
+                const vessel = allVessels.find((v: Vessel) => v.id === initialVesselId)
+                if (vessel) setSelectedVessel(vessel)
+                if (onClearInitialVessel) onClearInitialVessel()
+            })()
+        }
+    }, [initialVesselId])
 
     // Load vessels when params change
     useEffect(() => {
@@ -406,27 +425,52 @@ export default function VesselManager() {
                                 <option key={f.id} value={f.id}>{f.name}</option>
                             ))}
                         </select>
-                        <select
-                            value={newVessel.customerId}
-                            onChange={e => setNewVessel({ ...newVessel, customerId: e.target.value })}
-                            style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
-                            aria-label="Customer"
-                        >
-                            <option value="">No Customer</option>
-                            {entities.map(e => (
-                                <option key={e.id} value={e.id}>{e.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={newVessel.customerType}
-                            onChange={e => setNewVessel({ ...newVessel, customerType: e.target.value as any })}
-                            style={{ flex: 1, minWidth: '120px', color: 'var(--text-primary)' }}
-                            aria-label="Customer type"
-                        >
-                            <option value="">Type</option>
-                            <option value="broker">Broker</option>
-                            <option value="direct">Direct</option>
-                        </select>
+                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                            <input
+                                type="text"
+                                value={newVessel.customerId ? (entities.find(e => e.id === newVessel.customerId)?.name || '') + (newVessel.customerType ? ` (${newVessel.customerType})` : '') : customerSearch}
+                                onChange={e => { setCustomerSearch(e.target.value); setNewVessel({ ...newVessel, customerId: '', customerType: '' }); }}
+                                style={{ width: '100%', color: 'var(--text-primary)' }}
+                                placeholder="Search or create customer..."
+                                aria-label="Customer"
+                            />
+                            {customerSearch && !newVessel.customerId && (
+                                <div style={{
+                                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                                    marginTop: '4px', padding: '8px', maxHeight: '200px', overflowY: 'auto',
+                                    background: isLight ? '#ffffff' : '#1e222a',
+                                    border: '1px solid var(--accent-primary)', borderRadius: '8px',
+                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                }}>
+                                    {entities.filter(e => e.name.toLowerCase().includes(customerSearch.toLowerCase())).map(ent => (
+                                        <div key={ent.id} onClick={() => { setCustomerTypePrompt({ vesselId: '', customerId: ent.id }); }}
+                                            style={{ padding: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }} className="hover-effect">
+                                            {ent.name} {ent.identifier ? `[${ent.identifier}]` : ''}
+                                        </div>
+                                    ))}
+                                    {entities.filter(e => e.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
+                                        <div
+                                            onClick={async () => {
+                                                const newEntity = await window.api.addEntity({ name: customerSearch, type: 'company' })
+                                                const eData = await window.api.getEntities()
+                                                setEntities(eData)
+                                                setCustomerTypePrompt({ vesselId: '', customerId: newEntity.id })
+                                            }}
+                                            style={{ padding: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--accent-primary)' }}
+                                            className="hover-effect"
+                                        >
+                                            + Create &quot;{customerSearch}&quot; as customer
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {newVessel.customerId && (
+                                <button onClick={() => { setNewVessel({ ...newVessel, customerId: '', customerType: '' }); setCustomerSearch(''); }}
+                                    style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
                         <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {isAdding && <Loader2 size={16} className="spinner" />}
                             {isAdding ? 'Registering...' : 'Register'}
@@ -551,28 +595,62 @@ export default function VesselManager() {
                                             <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                <select
-                                                    value={v.customerId || ''}
-                                                    onChange={e => handleUpdateCustomer(v.id, e.target.value, v.customerType || '')}
-                                                    style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)', maxWidth: '160px' }}
-                                                    aria-label="Assign customer"
-                                                >
-                                                    <option value="">None</option>
-                                                    {entities.map(ent => (
-                                                        <option key={ent.id} value={ent.id}>{ent.name}</option>
-                                                    ))}
-                                                </select>
-                                                <select
-                                                    value={v.customerType || ''}
-                                                    onChange={e => handleUpdateCustomer(v.id, v.customerId || '', e.target.value as any)}
-                                                    style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)', width: '90px' }}
-                                                    aria-label="Customer type"
-                                                >
-                                                    <option value="">Type</option>
-                                                    <option value="broker">Broker</option>
-                                                    <option value="direct">Direct</option>
-                                                </select>
+                                            <div style={{ position: 'relative' }}>
+                                                {editingCustomerVesselId === v.id ? (
+                                                    <>
+                                                        <input
+                                                            type="text"
+                                                            value={tableCustomerSearch}
+                                                            onChange={e => setTableCustomerSearch(e.target.value)}
+                                                            autoFocus
+                                                            onBlur={() => setTimeout(() => setEditingCustomerVesselId(null), 200)}
+                                                            placeholder="Search customer..."
+                                                            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', width: '160px' }}
+                                                            aria-label="Search customer"
+                                                        />
+                                                        <div style={{
+                                                            position: 'absolute', top: '100%', left: 0, zIndex: 100,
+                                                            marginTop: '4px', padding: '4px', maxHeight: '150px', overflowY: 'auto',
+                                                            background: isLight ? '#ffffff' : '#1e222a', minWidth: '200px',
+                                                            border: '1px solid var(--accent-primary)', borderRadius: '8px',
+                                                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                                        }}>
+                                                            <div onClick={() => { handleUpdateCustomer(v.id, '', ''); setEditingCustomerVesselId(null); }}
+                                                                style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-secondary)' }} className="hover-effect">
+                                                                None
+                                                            </div>
+                                                            {entities.filter(e => !tableCustomerSearch || e.name.toLowerCase().includes(tableCustomerSearch.toLowerCase())).map(ent => (
+                                                                <div key={ent.id}
+                                                                    onClick={() => { setCustomerTypePrompt({ vesselId: v.id, customerId: ent.id }); setEditingCustomerVesselId(null); }}
+                                                                    style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }} className="hover-effect">
+                                                                    {ent.name}
+                                                                </div>
+                                                            ))}
+                                                            {tableCustomerSearch && entities.filter(e => e.name.toLowerCase().includes(tableCustomerSearch.toLowerCase())).length === 0 && (
+                                                                <div
+                                                                    onClick={async () => {
+                                                                        const newEntity = await window.api.addEntity({ name: tableCustomerSearch, type: 'company' })
+                                                                        const eData = await window.api.getEntities()
+                                                                        setEntities(eData)
+                                                                        setCustomerTypePrompt({ vesselId: v.id, customerId: newEntity.id })
+                                                                        setEditingCustomerVesselId(null)
+                                                                    }}
+                                                                    style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--accent-primary)' }}
+                                                                    className="hover-effect">
+                                                                    + Create &quot;{tableCustomerSearch}&quot;
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <span
+                                                        onClick={() => { setEditingCustomerVesselId(v.id); setTableCustomerSearch(''); }}
+                                                        style={{ cursor: 'pointer', fontSize: '0.85rem', color: v.customerId ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+                                                    >
+                                                        {v.customerId ? `${entities.find(e => e.id === v.customerId)?.name || 'Unknown'}` : 'None'}
+                                                        {v.customerType ? ` (${v.customerType})` : ''}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td style={{ padding: '16px' }}>
@@ -677,6 +755,51 @@ export default function VesselManager() {
                     onMarkClean={handleMarkClean}
                     onConfirmMatch={handleConfirmMatch}
                 />
+            )}
+
+            {customerTypePrompt && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                }}>
+                    <div className="glass-card" style={{ padding: '24px', maxWidth: '360px', width: '90%' }}>
+                        <h3 style={{ marginBottom: '16px' }}>Customer Type</h3>
+                        <p style={{ marginBottom: '20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                            How is this customer related?
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={() => {
+                                    if (customerTypePrompt.vesselId) {
+                                        handleUpdateCustomer(customerTypePrompt.vesselId, customerTypePrompt.customerId, 'broker')
+                                    } else {
+                                        setNewVessel({ ...newVessel, customerId: customerTypePrompt.customerId, customerType: 'broker' })
+                                        setCustomerSearch('')
+                                    }
+                                    setCustomerTypePrompt(null)
+                                }}
+                                className="btn-primary" style={{ flex: 1, padding: '12px' }}>
+                                Broker
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (customerTypePrompt.vesselId) {
+                                        handleUpdateCustomer(customerTypePrompt.vesselId, customerTypePrompt.customerId, 'direct')
+                                    } else {
+                                        setNewVessel({ ...newVessel, customerId: customerTypePrompt.customerId, customerType: 'direct' })
+                                        setCustomerSearch('')
+                                    }
+                                    setCustomerTypePrompt(null)
+                                }}
+                                className="btn-primary" style={{ flex: 1, padding: '12px' }}>
+                                Direct
+                            </button>
+                        </div>
+                        <button onClick={() => setCustomerTypePrompt(null)} className="btn-secondary" style={{ width: '100%', marginTop: '12px' }}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     )

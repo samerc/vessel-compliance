@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronUp, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell, RefreshCw, ClipboardCheck } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, Shield, X, Database, Clock, Play, Loader2, Bell, RefreshCw, ClipboardCheck, ArrowLeft, Ship, GripVertical } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
-export default function AdminPanel() {
+export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?: (vesselId: string) => void }) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newName, setNewName] = useState('')
     const [newDescription, setNewDescription] = useState('')
     const [required, setRequired] = useState(false)
-    const [newOrder, setNewOrder] = useState(0)
+    const [annualRenewal, setAnnualRenewal] = useState(false)
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [newRole, setNewRole] = useState('')
     const [surveyTypes, setSurveyTypes] = useState<ConditionSurveyType[]>([])
@@ -152,10 +152,10 @@ export default function AdminPanel() {
             return oa - ob
         })
 
-        // Check if we need to fix the orders (if they are not unique sequential 0, 1, 2...)
+        // Check if we need to fix the orders (if they are not unique sequential 1, 2, 3...)
         let needsFix = false
         for (let i = 0; i < sorted.length; i++) {
-            if (sorted[i].order !== i) {
+            if (sorted[i].order !== i + 1) {
                 needsFix = true
                 break
             }
@@ -171,7 +171,6 @@ export default function AdminPanel() {
         }
 
         setDocTypes(sorted)
-        setNewOrder(sorted.length + 1)
     }
 
     const loadRoles = async () => {
@@ -187,10 +186,11 @@ export default function AdminPanel() {
     const handleAddDocType = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newName.trim()) return
-        await window.api.addDocumentType({ name: newName, description: newDescription, required, order: newOrder })
+        await window.api.addDocumentType({ name: newName, description: newDescription, required, annualRenewal, order: docTypes.length + 1 })
         setNewName('')
         setNewDescription('')
         setRequired(false)
+        setAnnualRenewal(false)
         await loadDocTypes()
     }
 
@@ -201,36 +201,72 @@ export default function AdminPanel() {
         }
     }
 
-    const handleUpdateOrder = async (id: string, val: string) => {
-        const order = parseInt(val)
-        if (isNaN(order)) return
-        await window.api.updateDocumentType(id, { order })
-        // After manual order edit, we should probably re-sort and re-normalize to avoid conflicts
-        await loadDocTypes()
+    const handleDocDragStart = (index: number) => {
+        dragDocIndex.current = index
     }
 
-    const moveStep = async (index: number, direction: 'up' | 'down') => {
-        const newDocTypes = [...docTypes]
-        const targetIndex = direction === 'up' ? index - 1 : index + 1
+    const handleDocDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault()
+        if (dragOverDocIndex !== index) setDragOverDocIndex(index)
+    }
 
-        if (targetIndex < 0 || targetIndex >= newDocTypes.length) return
+    const handleDocDrop = async (e: React.DragEvent, targetIndex: number) => {
+        e.preventDefault()
+        setDragOverDocIndex(null)
+        const fromIndex = dragDocIndex.current
+        if (fromIndex === null || fromIndex === targetIndex) return
+        dragDocIndex.current = null
 
-        // Swap entries in local array
-        const temp = newDocTypes[index]
-        newDocTypes[index] = newDocTypes[targetIndex]
-        newDocTypes[targetIndex] = temp
+        const reordered = [...docTypes]
+        const [moved] = reordered.splice(fromIndex, 1)
+        reordered.splice(targetIndex, 0, moved)
 
-        // Save new sequential orders starting at 1
-        for (let i = 0; i < newDocTypes.length; i++) {
-            await window.api.updateDocumentType(newDocTypes[i].id, { order: i + 1 })
+        // Optimistic UI update
+        for (let i = 0; i < reordered.length; i++) {
+            reordered[i] = { ...reordered[i], order: i + 1 }
         }
+        setDocTypes(reordered)
 
-        await loadDocTypes()
+        // Persist to DB
+        for (let i = 0; i < reordered.length; i++) {
+            await window.api.updateDocumentType(reordered[i].id, { order: i + 1 })
+        }
+    }
+
+    const handleRoleDragStart = (index: number) => {
+        dragRoleIndex.current = index
+    }
+
+    const handleRoleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault()
+        if (dragOverRoleIndex !== index) setDragOverRoleIndex(index)
+    }
+
+    const handleRoleDrop = async (e: React.DragEvent, targetIndex: number) => {
+        e.preventDefault()
+        setDragOverRoleIndex(null)
+        const fromIndex = dragRoleIndex.current
+        if (fromIndex === null || fromIndex === targetIndex) return
+        dragRoleIndex.current = null
+
+        const reordered = [...roles]
+        const [moved] = reordered.splice(fromIndex, 1)
+        reordered.splice(targetIndex, 0, moved)
+
+        // Optimistic UI update
+        setRoles(reordered)
+
+        // Persist to DB
+        await window.api.reorderAssuredRoles(reordered.map(r => r.id))
     }
 
     const handleAddRole = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newRole.trim()) return
+        if (roles.some(r => r.name.toLowerCase() === newRole.trim().toLowerCase())) {
+            showError('This role already exists')
+            return
+        }
         await window.api.addAssuredRole({ name: newRole })
         setNewRole('')
         await loadRoles()
@@ -241,6 +277,14 @@ export default function AdminPanel() {
             await window.api.deleteAssuredRole(id)
             await loadRoles()
         }
+    }
+
+    const [roleVesselPopup, setRoleVesselPopup] = useState<{ roleName: string; vessels: { id: string; name: string; imoNumber: string }[] } | null>(null)
+
+    const handleShowRoleVessels = async (role: AssuredRole) => {
+        if ((role.vesselCount || 0) === 0) return
+        const vessels = await window.api.getVesselsByRole(role.name)
+        setRoleVesselPopup({ roleName: role.name, vessels })
     }
 
     const handleAddSurveyType = async (e: React.FormEvent) => {
@@ -295,6 +339,12 @@ export default function AdminPanel() {
     const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
     const [editRoleName, setEditRoleName] = useState('')
 
+    // Drag-to-reorder state
+    const dragDocIndex = useRef<number | null>(null)
+    const dragRoleIndex = useRef<number | null>(null)
+    const [dragOverDocIndex, setDragOverDocIndex] = useState<number | null>(null)
+    const [dragOverRoleIndex, setDragOverRoleIndex] = useState<number | null>(null)
+
     const startEditingDoc = (doc: DocumentType) => {
         setEditingDocId(doc.id)
         setEditDocName(doc.name)
@@ -322,6 +372,11 @@ export default function AdminPanel() {
 
     const handleToggleDocRequired = async (doc: DocumentType) => {
         await window.api.updateDocumentType(doc.id, { required: !doc.required })
+        await loadDocTypes()
+    }
+
+    const handleToggleAnnualRenewal = async (doc: DocumentType) => {
+        await window.api.updateDocumentType(doc.id, { annualRenewal: !doc.annualRenewal })
         await loadDocTypes()
     }
 
@@ -426,6 +481,62 @@ export default function AdminPanel() {
         }
     }
 
+    // Full-page view for vessels by role
+    if (roleVesselPopup) {
+        return (
+            <div className="fade-in">
+                <button onClick={() => setRoleVesselPopup(null)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+                    <ArrowLeft size={18} /> Back to Settings
+                </button>
+                <header style={{ marginBottom: '24px' }}>
+                    <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Vessels with role: {roleVesselPopup.roleName}</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>{roleVesselPopup.vessels.length} vessel{roleVesselPopup.vessels.length !== 1 ? 's' : ''} assigned</p>
+                </header>
+                {roleVesselPopup.vessels.length === 0 ? (
+                    <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <Ship size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                        <p>No vessels found with this role.</p>
+                    </div>
+                ) : (
+                    <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <caption className="sr-only">Vessels with role {roleVesselPopup.roleName}</caption>
+                            <thead>
+                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                    <th scope="col" style={{ padding: '16px' }}>Vessel Name</th>
+                                    <th scope="col" style={{ padding: '16px' }}>IMO Number</th>
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {roleVesselPopup.vessels.map(v => (
+                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                        <td style={{ padding: '16px', fontWeight: '600' }}>{v.name}</td>
+                                        <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{v.imoNumber}</td>
+                                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                                            {onNavigateToVessel && (
+                                                <button
+                                                    onClick={() => {
+                                                        setRoleVesselPopup(null)
+                                                        onNavigateToVessel(v.id)
+                                                    }}
+                                                    className="btn-primary"
+                                                    style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                                >
+                                                    Open
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
     return (
         <div className="fade-in">
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -486,16 +597,7 @@ export default function AdminPanel() {
                             aria-label="Document type description"
                         />
                     </div>
-                    <div style={{ width: '80px' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Order</label>
-                        <input
-                            type="number"
-                            value={newOrder}
-                            onChange={e => setNewOrder(parseInt(e.target.value))}
-                            style={{ width: '100%' }}
-                            aria-label="Document type display order"
-                        />
-                    </div>
+                    <div style={{ width: '1px' }}></div>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%', marginTop: '12px' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                             <input
@@ -506,6 +608,16 @@ export default function AdminPanel() {
                                 aria-label="Required by default"
                             />
                             Required by default
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                            <input
+                                type="checkbox"
+                                checked={annualRenewal}
+                                onChange={e => setAnnualRenewal(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                aria-label="Annual renewal"
+                            />
+                            Annual Renewal
                         </label>
                         <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
                             <Plus size={18} /> Add Document Type
@@ -518,7 +630,7 @@ export default function AdminPanel() {
                             <caption className="sr-only">Document types configuration</caption>
                             <thead>
                                 <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th scope="col" style={{ padding: '16px', width: '120px' }}>Order</th>
+                                    <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
                                     <th scope="col" style={{ padding: '16px' }}>Document Type</th>
                                     <th scope="col" style={{ padding: '16px' }}>Status</th>
                                     <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
@@ -526,36 +638,24 @@ export default function AdminPanel() {
                             </thead>
                             <tbody>
                                 {docTypes.map((doc, index) => (
-                                    <tr key={doc.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                    <tr
+                                        key={doc.id}
+                                        draggable
+                                        onDragStart={() => handleDocDragStart(index)}
+                                        onDragOver={(e) => handleDocDragOver(e, index)}
+                                        onDrop={(e) => handleDocDrop(e, index)}
+                                        onDragEnd={() => { dragDocIndex.current = null; setDragOverDocIndex(null) }}
+                                        style={{
+                                            borderBottom: '1px solid var(--table-border)',
+                                            opacity: dragDocIndex.current === index ? 0.5 : 1,
+                                            background: dragOverDocIndex === index ? 'rgba(0, 210, 255, 0.1)' : 'transparent',
+                                            cursor: 'grab'
+                                        }}
+                                    >
                                         <td style={{ padding: '20px 16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.preventDefault(); moveStep(index, 'up'); }}
-                                                        style={{ background: 'transparent', padding: 0, color: index === 0 ? '#333' : 'var(--accent-primary)', cursor: index === 0 ? 'default' : 'pointer', border: 'none' }}
-                                                        disabled={index === 0}
-                                                        aria-label="Move up"
-                                                    >
-                                                        <ChevronUp size={16} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.preventDefault(); moveStep(index, 'down'); }}
-                                                        style={{ background: 'transparent', padding: 0, color: index === docTypes.length - 1 ? '#333' : 'var(--accent-primary)', cursor: index === docTypes.length - 1 ? 'default' : 'pointer', border: 'none' }}
-                                                        disabled={index === docTypes.length - 1}
-                                                        aria-label="Move down"
-                                                    >
-                                                        <ChevronDown size={16} />
-                                                    </button>
-                                                </div>
-                                                <input
-                                                    type="number"
-                                                    value={doc.order}
-                                                    onChange={(e) => handleUpdateOrder(doc.id, e.target.value)}
-                                                    style={{ width: '50px', background: 'transparent', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: '0.9rem' }}
-                                                    aria-label="Display order"
-                                                />
+                                                <GripVertical size={16} color="var(--text-secondary)" style={{ opacity: 0.5 }} />
+                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '20px', textAlign: 'center' }}>{index + 1}</span>
                                             </div>
                                         </td>
                                         <td style={{ padding: '20px 16px' }}>
@@ -601,6 +701,20 @@ export default function AdminPanel() {
                                                     cursor: 'pointer'
                                                 }}
                                             >{doc.required ? 'REQUIRED' : 'OPTIONAL'}</span>
+                                            {' '}
+                                            <span
+                                                onClick={() => handleToggleAnnualRenewal(doc)}
+                                                style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.75rem',
+                                                    background: doc.annualRenewal ? 'rgba(59, 130, 246, 0.1)' : 'var(--table-header-bg)',
+                                                    color: doc.annualRenewal ? '#60a5fa' : 'var(--text-secondary)',
+                                                    border: doc.annualRenewal ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid var(--table-border)',
+                                                    cursor: 'pointer',
+                                                    marginLeft: '4px'
+                                                }}
+                                            >{doc.annualRenewal ? 'ANNUAL' : 'ONE-TIME'}</span>
                                         </td>
                                         <td style={{ padding: '20px 16px', textAlign: 'right' }}>
                                             <button onClick={() => handleDeleteDocType(doc.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete document type"><Trash2 size={18} /></button>
@@ -641,14 +755,34 @@ export default function AdminPanel() {
                             <caption className="sr-only">Assured roles</caption>
                             <thead>
                                 <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                    <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
                                     <th scope="col" style={{ padding: '16px' }}>Role</th>
                                     <th scope="col" style={{ padding: '16px', width: '120px' }}>Vessels</th>
                                     <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {roles.map(role => (
-                                    <tr key={role.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                {roles.map((role, index) => (
+                                    <tr
+                                        key={role.id}
+                                        draggable
+                                        onDragStart={() => handleRoleDragStart(index)}
+                                        onDragOver={(e) => handleRoleDragOver(e, index)}
+                                        onDrop={(e) => handleRoleDrop(e, index)}
+                                        onDragEnd={() => { dragRoleIndex.current = null; setDragOverRoleIndex(null) }}
+                                        style={{
+                                            borderBottom: '1px solid var(--table-border)',
+                                            opacity: dragRoleIndex.current === index ? 0.5 : 1,
+                                            background: dragOverRoleIndex === index ? 'rgba(0, 210, 255, 0.1)' : 'transparent',
+                                            cursor: 'grab'
+                                        }}
+                                    >
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <GripVertical size={16} color="var(--text-secondary)" style={{ opacity: 0.5 }} />
+                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '20px', textAlign: 'center' }}>{index + 1}</span>
+                                            </div>
+                                        </td>
                                         <td style={{ padding: '16px' }}>
                                             {editingRoleId === role.id ? (
                                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -670,11 +804,16 @@ export default function AdminPanel() {
                                             )}
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            <span style={{
-                                                fontSize: '0.85rem',
-                                                color: (role.vesselCount || 0) > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                                                fontWeight: (role.vesselCount || 0) > 0 ? '600' : '400'
-                                            }}>
+                                            <span
+                                                onClick={() => handleShowRoleVessels(role)}
+                                                style={{
+                                                    fontSize: '0.85rem',
+                                                    color: (role.vesselCount || 0) > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                                    fontWeight: (role.vesselCount || 0) > 0 ? '600' : '400',
+                                                    cursor: (role.vesselCount || 0) > 0 ? 'pointer' : 'default',
+                                                    textDecoration: (role.vesselCount || 0) > 0 ? 'underline' : 'none'
+                                                }}
+                                            >
                                                 {role.vesselCount || 0}
                                             </span>
                                         </td>
