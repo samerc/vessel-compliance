@@ -145,13 +145,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         }
 
         const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
+        const isCustom = customDocTypes.some(c => c.id === docTypeId)
 
         const newDoc: VesselDocument = {
             vesselId: vessel.id,
             documentTypeId: docTypeId,
             filePath: filePath,
             sent: existing?.sent || false,
-            required: existing ? existing.required : (docTypes.find(t => t.id === docTypeId)?.required || false),
+            required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
+            expiryDate: existing?.expiryDate || undefined,
             uploadedDate: new Date().toISOString(),
             uploadedBy: user?.username || 'Unknown',
             receivedDate: new Date().toISOString().split('T')[0]
@@ -163,7 +165,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         }
 
         await window.api.upsertVesselDocument(newDoc)
-        loadData()
+        await loadData()
     }
 
     const handleClickUpload = async (docTypeId: string) => {
@@ -177,13 +179,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         }
 
         const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
+        const isCustom = customDocTypes.some(c => c.id === docTypeId)
 
         const newDoc: VesselDocument = {
             vesselId: vessel.id,
             documentTypeId: docTypeId,
             filePath: filePath,
             sent: existing?.sent || false,
-            required: existing ? existing.required : (docTypes.find(t => t.id === docTypeId)?.required || false),
+            required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
+            expiryDate: existing?.expiryDate || undefined,
             uploadedDate: new Date().toISOString(),
             uploadedBy: user?.username || 'Unknown',
             receivedDate: new Date().toISOString().split('T')[0]
@@ -191,7 +195,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
         await window.api.upsertVesselDocument(newDoc)
         showSuccess('Document linked successfully')
-        loadData()
+        await loadData()
     }
 
     const handleToggleRequired = async (docTypeId: string) => {
@@ -425,17 +429,17 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Policy Expiry:</span>
                                 <input
-                                    type="date"
+                                    type="datetime-local"
                                     value={policyExpiry}
                                     onChange={async (e) => {
                                         const val = e.target.value
                                         setPolicyExpiry(val)
                                         vessel.policyExpiryDate = val
                                         await window.api.updateVessel(vessel.id, { policyExpiryDate: val })
-                                        showSuccess('Policy expiry date updated')
+                                        showSuccess('Policy expiry updated')
                                     }}
                                     style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
-                                    aria-label="Policy expiry date"
+                                    aria-label="Policy expiry date and time"
                                 />
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
@@ -808,26 +812,26 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             </span>
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Calendar size={14} color="var(--text-secondary)" />
-                                                <input
-                                                    type="date"
-                                                    value={rowDoc?.expiryDate || ''}
-                                                    onChange={e => handleUpdateExpiry(rowType.id, e.target.value)}
-                                                    onFocus={() => {
-                                                        if (rowType.annualRenewal && !rowDoc?.expiryDate && vessel.policyExpiryDate) {
-                                                            handleUpdateExpiry(rowType.id, vessel.policyExpiryDate)
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        padding: '4px 8px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '0.85rem',
-                                                        ...(rowType.annualRenewal ? { borderColor: 'rgba(59, 130, 246, 0.3)' } : {})
-                                                    }}
-                                                    aria-label={`Expiry date for ${rowType.name}`}
-                                                />
-                                            </div>
+                                            {rowType.annualRenewal ? (
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual</span>
+                                            ) : !rowHasFile ? (
+                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Calendar size={14} color="var(--text-secondary)" />
+                                                    <input
+                                                        type="date"
+                                                        value={rowDoc?.expiryDate || ''}
+                                                        onChange={e => handleUpdateExpiry(rowType.id, e.target.value)}
+                                                        style={{
+                                                            padding: '4px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '0.85rem'
+                                                        }}
+                                                        aria-label={`Expiry date for ${rowType.name}`}
+                                                    />
+                                                </div>
+                                            )}
                                         </td>
                                         <td style={{ padding: '16px', textAlign: 'right' }}>
                                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -971,20 +975,24 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         </span>
                                     </td>
                                     <td style={{ padding: '16px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Calendar size={14} color="var(--text-secondary)" />
-                                            <input
-                                                type="date"
-                                                value={doc?.expiryDate || ''}
-                                                onChange={e => handleUpdateExpiry(customType.id, e.target.value)}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '0.85rem'
-                                                }}
-                                                aria-label={`Expiry date for ${customType.name}`}
-                                            />
-                                        </div>
+                                        {!rowHasFile ? (
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
+                                        ) : (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Calendar size={14} color="var(--text-secondary)" />
+                                                <input
+                                                    type="date"
+                                                    value={doc?.expiryDate || ''}
+                                                    onChange={e => handleUpdateExpiry(customType.id, e.target.value)}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '0.85rem'
+                                                    }}
+                                                    aria-label={`Expiry date for ${customType.name}`}
+                                                />
+                                            </div>
+                                        )}
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>

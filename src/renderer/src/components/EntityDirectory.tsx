@@ -555,7 +555,7 @@ export default function EntityDirectory() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '28px', alignItems: 'start' }}>
                 {/* Left Side: Search & List */}
-                <div className="glass-card" style={{ padding: '0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 300px)' }}>
+                <div className="glass-card" style={{ padding: '0', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 100px)' }}>
                     <div style={{ padding: '16px', borderBottom: '1px solid var(--table-border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ position: 'relative' }}>
                             <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={16} />

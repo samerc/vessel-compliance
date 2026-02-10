@@ -66,9 +66,10 @@ export default function FleetManager() {
     const handleAddFleet = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newFleetName.trim()) return
-        await window.api.addFleet({ name: newFleetName })
+        const fleet = await window.api.addFleet({ name: newFleetName })
         setNewFleetName('')
-        loadData()
+        await loadData()
+        setSelectedFleet(fleet)
     }
 
     const handleDeleteFleet = async (id: string) => {

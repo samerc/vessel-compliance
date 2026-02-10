@@ -97,6 +97,7 @@ export interface FlagState {
   name: string
   iso3Code: string
   address?: string
+  email?: string
   vesselCount?: number
 }
 

@@ -11,6 +11,35 @@ const isExpired = (expiryDate: string | null | undefined): boolean => {
   return expiry < today
 }
 
+const isExpiringSoon = (expiryDate: string | null | undefined, days = 90): boolean => {
+  if (!expiryDate) return false
+  const expiry = new Date(expiryDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const threshold = new Date(today)
+  threshold.setDate(today.getDate() + days)
+  return expiry >= today && expiry <= threshold
+}
+
+const getDocStatus = (hasFile: boolean, expiryDate: string | null | undefined): string => {
+  if (!hasFile) return 'Missing'
+  if (isExpired(expiryDate)) return 'Expired'
+  if (isExpiringSoon(expiryDate)) return 'Expiring Soon'
+  return 'Compliant'
+}
+
+const getExcelDocStatus = (hasFile: boolean, expiryDate: string | null | undefined): string => {
+  if (!hasFile) return 'MISSING'
+  if (isExpired(expiryDate)) return 'EXPIRED'
+  if (isExpiringSoon(expiryDate)) return 'EXPIRING SOON'
+  return 'COMPLIANT'
+}
+
+const dateOnly = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return ''
+  return dateStr.split('T')[0]
+}
+
 export const ReportService = {
   exportVesselToExcel: async (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[]) => {
     const complianceData: any[] = []
@@ -25,11 +54,11 @@ export const ReportService = {
         requiredCount++
         if (doc?.filePath) compliantCount++
 
-        const expiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? vessel.policyExpiryDate : (doc?.expiryDate || 'N/A')
+        const expiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? dateOnly(vessel.policyExpiryDate) : (doc?.expiryDate || 'N/A')
         complianceData.push({
           'Document Name': type.name,
           'Description': type.description || '',
-          'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
+          'Status': getExcelDocStatus(!!doc?.filePath, expiryToShow === 'N/A' ? null : expiryToShow),
           'Date of Receipt': doc?.receivedDate || 'N/A',
           'Expiry Date': expiryToShow,
           'Uploaded Date': doc?.uploadedDate ? new Date(doc.uploadedDate).toLocaleDateString() : 'N/A'
@@ -46,7 +75,7 @@ export const ReportService = {
       complianceData.push({
         'Document Name': `${customType.name} (Custom)`,
         'Description': customType.description || '',
-        'Status': vDoc?.filePath ? 'COMPLIANT' : 'MISSING',
+        'Status': getExcelDocStatus(!!vDoc?.filePath, vDoc?.expiryDate),
         'Date of Receipt': vDoc?.receivedDate || 'N/A',
         'Expiry Date': vDoc?.expiryDate || 'N/A',
         'Uploaded Date': vDoc?.uploadedDate ? new Date(vDoc.uploadedDate).toLocaleDateString() : 'N/A'
@@ -225,11 +254,11 @@ export const ReportService = {
         requiredCount++
         if (vDoc?.filePath) compliantCount++
 
-        const pdfExpiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? vessel.policyExpiryDate : (vDoc?.expiryDate || '-')
+        const pdfExpiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? dateOnly(vessel.policyExpiryDate) : (vDoc?.expiryDate || '-')
         tableData.push([
           type.name,
           type.description || '',
-          vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
+          getDocStatus(!!vDoc?.filePath, pdfExpiryToShow === '-' ? null : pdfExpiryToShow),
           pdfExpiryToShow
         ])
       }
@@ -244,7 +273,7 @@ export const ReportService = {
       tableData.push([
         `${customType.name} (Custom)`,
         customType.description || '',
-        vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
+        getDocStatus(!!vDoc?.filePath, vDoc?.expiryDate),
         vDoc?.expiryDate || '-'
       ])
     })
@@ -358,8 +387,11 @@ export const ReportService = {
           if (status === 'Missing') {
             data.cell.styles.textColor = [255, 0, 0]
             data.cell.styles.fontStyle = 'bold'
-          } else if (status === 'File Expired (Warning)') {
+          } else if (status === 'Expired') {
             data.cell.styles.textColor = [255, 100, 0]
+            data.cell.styles.fontStyle = 'bold'
+          } else if (status === 'Expiring Soon') {
+            data.cell.styles.textColor = [200, 150, 0]
             data.cell.styles.fontStyle = 'bold'
           } else {
             data.cell.styles.textColor = [0, 150, 0]
@@ -532,13 +564,13 @@ export const ReportService = {
           totalRequired++
           if (doc?.filePath) totalCompliant++
 
-          const fleetExcelExpiry = (type.annualRenewal && v.policyExpiryDate) ? v.policyExpiryDate : (doc?.expiryDate || 'N/A')
+          const fleetExcelExpiry = (type.annualRenewal && v.policyExpiryDate) ? dateOnly(v.policyExpiryDate) : (doc?.expiryDate || 'N/A')
           data.push({
             'Vessel': v.name,
             'IMO': v.imoNumber,
             'Document Name': type.name,
             'Description': type.description || '',
-            'Status': doc?.filePath ? 'COMPLIANT' : 'MISSING',
+            'Status': getExcelDocStatus(!!doc?.filePath, fleetExcelExpiry === 'N/A' ? null : fleetExcelExpiry),
             'Date of Receipt': doc?.receivedDate || 'N/A',
             'Expiry Date': fleetExcelExpiry
           })
@@ -767,11 +799,11 @@ export const ReportService = {
           totalRequired++
           if (vDoc?.filePath) totalCompliant++
 
-          const fleetPdfExpiry = (type.annualRenewal && v.policyExpiryDate) ? v.policyExpiryDate : (vDoc?.expiryDate || '-')
+          const fleetPdfExpiry = (type.annualRenewal && v.policyExpiryDate) ? dateOnly(v.policyExpiryDate) : (vDoc?.expiryDate || '-')
           tableData.push([
             v.name,
             type.name,
-            vDoc?.filePath ? (isExpired(vDoc.expiryDate) ? 'File Expired (Warning)' : 'Compliant') : 'Missing',
+            getDocStatus(!!vDoc?.filePath, fleetPdfExpiry === '-' ? null : fleetPdfExpiry),
             fleetPdfExpiry
           ])
         }
@@ -807,76 +839,37 @@ export const ReportService = {
     // Sort assureds by role order
     const sortedAssureds = [...assuredMap.entries()].sort((a, b) => (fleetRoleOrderMap.get(a[1].role) ?? 999) - (fleetRoleOrderMap.get(b[1].role) ?? 999))
 
-    // Build assured data for PDF
-    const assuredTableData: any[] = []
-    for (const [, { entity, vessels: vesselNames, role }] of sortedAssureds) {
-      const vesselList = vesselNames.length > 2 ? `${vesselNames.slice(0, 2).join(', ')}...` : vesselNames.join(', ')
-
-      // Entity header row
-      assuredTableData.push([
-        entity.name,
-        entity.type.toUpperCase(),
-        role,
-        vesselList,
-        ''
-      ])
-
-      // Company documents
+    // Count entity documents for compliance rate
+    for (const [, { entity }] of sortedAssureds) {
       if (entity.type === 'company') {
-        totalRequired++
+        totalRequired += 3
         if (entity.certificateOfIncorporationPath) totalCompliant++
-        assuredTableData.push(['', '', '  Certificate of Incorporation', '', entity.certificateOfIncorporationPath ? 'On File' : 'Missing'])
-
-        totalRequired++
         if (entity.articlesOfAssociationPath) totalCompliant++
-        assuredTableData.push(['', '', '  Articles of Association', '', entity.articlesOfAssociationPath ? 'On File' : 'Missing'])
-
-        totalRequired++
         if (entity.kycFilePath) totalCompliant++
-        assuredTableData.push(['', '', '  KYC', '', entity.kycFilePath ? 'On File' : 'Missing'])
       }
-
-      // Person passport
       if (entity.type === 'person') {
-        totalRequired++
+        totalRequired += 1
         if (entity.passportFilePath) totalCompliant++
-        assuredTableData.push(['', '', '  ID/Passport', '', entity.passportFilePath ? 'On File' : 'Missing'])
       }
 
-      // UBOs for this entity
       const ubos = allEntityUBOs
         .filter(u => u.assuredEntityId === entity.id)
         .map(u => allEntities.find(e => e.id === u.uboEntityId))
         .filter(Boolean)
 
-      if (ubos.length > 0) {
-        ubos.forEach((ubo) => {
-          if (!ubo) return
-          assuredTableData.push([`  UBO: ${ubo.name}`, ubo.type.toUpperCase(), '', '', ''])
-
-          if (ubo.type === 'company') {
-            totalRequired++
-            if (ubo.certificateOfIncorporationPath) totalCompliant++
-            assuredTableData.push(['', '', '    Certificate of Incorporation', '', ubo.certificateOfIncorporationPath ? 'On File' : 'Missing'])
-
-            totalRequired++
-            if (ubo.articlesOfAssociationPath) totalCompliant++
-            assuredTableData.push(['', '', '    Articles of Association', '', ubo.articlesOfAssociationPath ? 'On File' : 'Missing'])
-
-            totalRequired++
-            if (ubo.kycFilePath) totalCompliant++
-            assuredTableData.push(['', '', '    KYC', '', ubo.kycFilePath ? 'On File' : 'Missing'])
-          }
-
-          if (ubo.type === 'person') {
-            totalRequired++
-            if (ubo.passportFilePath) totalCompliant++
-            assuredTableData.push(['', '', '    ID/Passport', '', ubo.passportFilePath ? 'On File' : 'Missing'])
-          }
-        })
-      } else {
-        assuredTableData.push(['', '', '  No Ultimate Beneficial Owner on record', '', 'Warning'])
-      }
+      ubos.forEach((ubo) => {
+        if (!ubo) return
+        if (ubo.type === 'company') {
+          totalRequired += 3
+          if (ubo.certificateOfIncorporationPath) totalCompliant++
+          if (ubo.articlesOfAssociationPath) totalCompliant++
+          if (ubo.kycFilePath) totalCompliant++
+        }
+        if (ubo.type === 'person') {
+          totalRequired += 1
+          if (ubo.passportFilePath) totalCompliant++
+        }
+      })
     }
 
     const complianceRate = totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
@@ -926,35 +919,34 @@ export const ReportService = {
     doc.setTextColor(100, 100, 100)
     doc.text(`${totalCompliant} / ${totalRequired} Docs`, 142, 74)
 
-    // Section 1: Vessel Documents Table
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Vessel Documents', 14, 83)
-
     let finalY = 85
-
     autoTable(doc, {
-      startY: 87,
+      startY: finalY,
       head: [['Vessel', 'Document', 'Status', 'Expires']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [58, 123, 213], textColor: 255 },
+      columnStyles: {
+        0: { cellWidth: 50 },
+      },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 2) {
           const status = data.cell.raw
           if (status === 'Missing') {
             data.cell.styles.textColor = [255, 0, 0]
             data.cell.styles.fontStyle = 'bold'
-          } else if (status === 'File Expired (Warning)') {
+          } else if (status === 'Expired') {
             data.cell.styles.textColor = [255, 100, 0]
+            data.cell.styles.fontStyle = 'bold'
+          } else if (status === 'Expiring Soon') {
+            data.cell.styles.textColor = [200, 150, 0]
             data.cell.styles.fontStyle = 'bold'
           } else {
             data.cell.styles.textColor = [0, 150, 0]
           }
         }
       },
-      styles: { fontSize: 9, cellPadding: 3 },
+      styles: { fontSize: 10, cellPadding: 5 },
       didDrawPage: (data) => {
         if (data.cursor) {
           finalY = data.cursor.y
@@ -962,51 +954,143 @@ export const ReportService = {
       }
     })
 
-    // Section 2: Fleet Assureds Table
-    if (assuredTableData.length > 0) {
-      // Check if we need a new page
+    // Section 2: Fleet Assureds
+    if (sortedAssureds.length > 0) {
+      // Add page break if needed
       if (finalY > 240) {
         doc.addPage()
         finalY = 20
       } else {
-        finalY += 10
+        finalY += 15
       }
 
-      doc.setTextColor(0, 0, 0)
-      doc.setFontSize(12)
+      doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.text('Fleet Assureds (Deduplicated)', 14, finalY)
+      doc.setTextColor(0, 0, 0)
+      doc.text('Fleet Assureds & Documents', 14, finalY)
+      finalY += 10
 
-      autoTable(doc, {
-        startY: finalY + 4,
-        head: [['Entity', 'Type', 'Document/Role', 'Vessels', 'Status']],
-        body: assuredTableData,
-        theme: 'striped',
-        headStyles: { fillColor: [100, 100, 100], textColor: 255 },
-        didParseCell: (data) => {
-          if (data.section === 'body' && data.column.index === 4) {
-            const status = data.cell.raw
-            if (status === 'Missing') {
-              data.cell.styles.textColor = [255, 0, 0]
-              data.cell.styles.fontStyle = 'bold'
-            } else if (status === 'On File') {
-              data.cell.styles.textColor = [0, 150, 0]
-            }
-          }
-          // Bold entity name rows
-          if (data.section === 'body' && data.column.index === 0 && data.cell.raw && !String(data.cell.raw).startsWith(' ')) {
-            data.cell.styles.fontStyle = 'bold'
-          }
-        },
-        styles: { fontSize: 8, cellPadding: 2 },
-        columnStyles: {
-          0: { cellWidth: 45 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 50 },
-          3: { cellWidth: 40 },
-          4: { cellWidth: 25 }
+      let assuredIndex = 0
+      for (const [, { entity, vessels: vesselNames, role }] of sortedAssureds) {
+        assuredIndex++
+
+        // Check if we need a new page
+        if (finalY > 260) {
+          doc.addPage()
+          finalY = 20
         }
-      })
+
+        // Assured entity header
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(0, 0, 0)
+        doc.text(`Assured ${assuredIndex}: ${entity.name}`, 14, finalY)
+        finalY += 5
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.setTextColor(100, 100, 100)
+        doc.text(`Role: ${role} | Type: ${entity.type.toUpperCase()} | Vessels: ${vesselNames.join(', ')}`, 14, finalY)
+        finalY += 8
+
+        // Entity documents
+        doc.setFontSize(9)
+        doc.setTextColor(0, 0, 0)
+        if (entity.type === 'company') {
+          doc.text('\u2022 Certificate of Incorporation:', 20, finalY)
+          doc.setTextColor(entity.certificateOfIncorporationPath ? 0 : 255, entity.certificateOfIncorporationPath ? 150 : 0, 0)
+          doc.text(entity.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING', 85, finalY)
+          finalY += 5
+
+          doc.setTextColor(0, 0, 0)
+          doc.text('\u2022 Articles of Association:', 20, finalY)
+          doc.setTextColor(entity.articlesOfAssociationPath ? 0 : 255, entity.articlesOfAssociationPath ? 150 : 0, 0)
+          doc.text(entity.articlesOfAssociationPath ? 'ON FILE' : 'MISSING', 85, finalY)
+          finalY += 5
+
+          doc.setTextColor(0, 0, 0)
+          doc.text('\u2022 KYC:', 20, finalY)
+          doc.setTextColor(entity.kycFilePath ? 0 : 255, entity.kycFilePath ? 150 : 0, 0)
+          doc.text(entity.kycFilePath ? 'ON FILE' : 'MISSING', 85, finalY)
+          finalY += 5
+        }
+
+        if (entity.type === 'person') {
+          doc.text('\u2022 ID/Passport:', 20, finalY)
+          doc.setTextColor(entity.passportFilePath ? 0 : 255, entity.passportFilePath ? 150 : 0, 0)
+          doc.text(entity.passportFilePath ? 'ON FILE' : 'MISSING', 85, finalY)
+          finalY += 5
+        }
+
+        // UBOs for this entity
+        const ubos = allEntityUBOs
+          .filter(u => u.assuredEntityId === entity.id)
+          .map(u => allEntities.find(e => e.id === u.uboEntityId))
+          .filter(Boolean)
+
+        if (ubos.length > 0) {
+          finalY += 3
+          doc.setFontSize(9)
+          doc.setTextColor(0, 0, 0)
+          doc.setFont('helvetica', 'bold')
+          doc.text('UBOs:', 20, finalY)
+          doc.setFont('helvetica', 'normal')
+          finalY += 5
+
+          ubos.forEach((ubo, uboIndex) => {
+            if (!ubo) return
+
+            // Check if we need a new page
+            if (finalY > 270) {
+              doc.addPage()
+              finalY = 20
+            }
+
+            doc.setFontSize(9)
+            doc.setTextColor(0, 0, 0)
+            doc.text(`   ${uboIndex + 1}. ${ubo.name}`, 25, finalY)
+            doc.setTextColor(100, 100, 100)
+            doc.text(`(${ubo.type.toUpperCase()})`, 90, finalY)
+            finalY += 5
+
+            if (ubo.type === 'company') {
+              doc.setTextColor(0, 0, 0)
+              doc.text('      - Certificate of Incorporation:', 30, finalY)
+              doc.setTextColor(ubo.certificateOfIncorporationPath ? 0 : 255, ubo.certificateOfIncorporationPath ? 150 : 0, 0)
+              doc.text(ubo.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING', 105, finalY)
+              finalY += 4
+
+              doc.setTextColor(0, 0, 0)
+              doc.text('      - Articles of Association:', 30, finalY)
+              doc.setTextColor(ubo.articlesOfAssociationPath ? 0 : 255, ubo.articlesOfAssociationPath ? 150 : 0, 0)
+              doc.text(ubo.articlesOfAssociationPath ? 'ON FILE' : 'MISSING', 105, finalY)
+              finalY += 4
+
+              doc.setTextColor(0, 0, 0)
+              doc.text('      - KYC:', 30, finalY)
+              doc.setTextColor(ubo.kycFilePath ? 0 : 255, ubo.kycFilePath ? 150 : 0, 0)
+              doc.text(ubo.kycFilePath ? 'ON FILE' : 'MISSING', 105, finalY)
+              finalY += 4
+            }
+
+            if (ubo.type === 'person') {
+              doc.setTextColor(0, 0, 0)
+              doc.text('      - ID/Passport:', 30, finalY)
+              doc.setTextColor(ubo.passportFilePath ? 0 : 255, ubo.passportFilePath ? 150 : 0, 0)
+              doc.text(ubo.passportFilePath ? 'ON FILE' : 'MISSING', 105, finalY)
+              finalY += 4
+            }
+          })
+        } else {
+          finalY += 3
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(255, 0, 0)
+          doc.text('No Ultimate Beneficial Owner on record', 20, finalY)
+          finalY += 5
+        }
+
+        finalY += 8
+      }
     }
 
     doc.save(`${fleet.name}_Fleet_Report.pdf`)

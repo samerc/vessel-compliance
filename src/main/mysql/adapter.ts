@@ -410,6 +410,14 @@ export class MySQLAdapter {
             if (!vesselColNames.includes('policy_expiry_date')) {
                 await this.pool.query("ALTER TABLE vessels ADD COLUMN policy_expiry_date DATE NULL AFTER customer_type")
             }
+            // Migration: Change policy_expiry_date from DATE to VARCHAR to support datetime
+            if (vesselColNames.includes('policy_expiry_date')) {
+                const [peColType] = await this.pool.query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vessels' AND COLUMN_NAME = 'policy_expiry_date'") as any[]
+                if (peColType.length > 0 && peColType[0].COLUMN_TYPE === 'date') {
+                    await this.pool.query("ALTER TABLE vessels MODIFY COLUMN policy_expiry_date VARCHAR(30) NULL")
+                }
+            }
+
             if (!vesselColNames.includes('notes')) {
                 await this.pool.query("ALTER TABLE vessels ADD COLUMN notes TEXT NULL")
             }
@@ -454,6 +462,12 @@ export class MySQLAdapter {
                 address TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )`)
+
+            // Migration: Add email to flag_states
+            const [fsEmailCols] = await this.pool.query("SHOW COLUMNS FROM flag_states LIKE 'email'")
+            if ((fsEmailCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE flag_states ADD COLUMN email TEXT NULL")
+            }
 
             // Migration: Add flag_state_id to vessels
             const [vFlagCols] = await this.pool.query("SHOW COLUMNS FROM vessels LIKE 'flag_state_id'")
@@ -878,33 +892,34 @@ export class MySQLAdapter {
     async getFlagStates(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`
-            SELECT fs.id, fs.name, fs.iso3_code as iso3Code, fs.address,
+            SELECT fs.id, fs.name, fs.iso3_code as iso3Code, fs.address, fs.email,
                    COUNT(v.id) as vesselCount
             FROM flag_states fs
             LEFT JOIN vessels v ON fs.id = v.flag_state_id
-            GROUP BY fs.id, fs.name, fs.iso3_code, fs.address
+            GROUP BY fs.id, fs.name, fs.iso3_code, fs.address, fs.email
             ORDER BY fs.name ASC
         `)
         return (rows as any[]).map(r => ({ ...r, vesselCount: Number(r.vesselCount) }))
     }
 
-    async addFlagState(flagState: { name: string; iso3Code: string; address?: string }): Promise<any> {
+    async addFlagState(flagState: { name: string; iso3Code: string; address?: string; email?: string }): Promise<any> {
         if (!this.pool) throw new Error('No database connection')
         const id = require('crypto').randomUUID()
         await this.pool.execute(
-            'INSERT INTO flag_states (id, name, iso3_code, address) VALUES (?, ?, ?, ?)',
-            [id, flagState.name, flagState.iso3Code.toUpperCase(), flagState.address || null]
+            'INSERT INTO flag_states (id, name, iso3_code, address, email) VALUES (?, ?, ?, ?, ?)',
+            [id, flagState.name, flagState.iso3Code.toUpperCase(), flagState.address || null, flagState.email || null]
         )
         return { id, ...flagState, iso3Code: flagState.iso3Code.toUpperCase(), vesselCount: 0 }
     }
 
-    async updateFlagState(id: string, updates: { name?: string; iso3Code?: string; address?: string }): Promise<void> {
+    async updateFlagState(id: string, updates: { name?: string; iso3Code?: string; address?: string; email?: string }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.iso3Code !== undefined) { fields.push('iso3_code = ?'); values.push(updates.iso3Code.toUpperCase()) }
         if (updates.address !== undefined) { fields.push('address = ?'); values.push(updates.address || null) }
+        if (updates.email !== undefined) { fields.push('email = ?'); values.push(updates.email || null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE flag_states SET ${fields.join(', ')} WHERE id = ?`, values)

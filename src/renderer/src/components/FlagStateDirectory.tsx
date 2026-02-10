@@ -15,12 +15,14 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
     const [newName, setNewName] = useState('')
     const [newIso3, setNewIso3] = useState('')
     const [newAddress, setNewAddress] = useState('')
+    const [newEmail, setNewEmail] = useState('')
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [expandedVessels, setExpandedVessels] = useState<{ id: string; name: string; imoNumber: string }[]>([])
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
     const [editIso3, setEditIso3] = useState('')
     const [editAddress, setEditAddress] = useState('')
+    const [editEmail, setEditEmail] = useState('')
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
 
@@ -47,10 +49,11 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
             return
         }
         try {
-            await window.api.addFlagState({ name: newName, iso3Code: newIso3.toUpperCase(), address: newAddress || undefined })
+            await window.api.addFlagState({ name: newName, iso3Code: newIso3.toUpperCase(), address: newAddress || undefined, email: newEmail || undefined })
             setNewName('')
             setNewIso3('')
             setNewAddress('')
+            setNewEmail('')
             showSuccess('Flag state added')
             loadData()
         } catch (err: any) {
@@ -66,6 +69,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
         setEditName('')
         setEditIso3('')
         setEditAddress('')
+        setEditEmail('')
         setDeleteConfirmId(null)
         showSuccess('Flag state deleted')
         loadData()
@@ -87,6 +91,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
         setEditName(fs.name)
         setEditIso3(fs.iso3Code)
         setEditAddress(fs.address || '')
+        setEditEmail(fs.email || '')
     }
 
     const saveEdit = async (id: string) => {
@@ -96,7 +101,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
             return
         }
         try {
-            await window.api.updateFlagState(id, { name: editName, iso3Code: editIso3.toUpperCase(), address: editAddress || undefined })
+            await window.api.updateFlagState(id, { name: editName, iso3Code: editIso3.toUpperCase(), address: editAddress || undefined, email: editEmail || undefined })
             setEditingId(null)
             showSuccess('Flag state updated')
             loadData()
@@ -146,14 +151,24 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                             <Plus size={18} /> Add
                         </button>
                     </div>
-                    <textarea
-                        value={newAddress}
-                        onChange={e => setNewAddress(e.target.value)}
-                        placeholder="Address (optional)"
-                        rows={2}
-                        style={{ width: '100%', resize: 'vertical' }}
-                        aria-label="Flag state address"
-                    />
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <textarea
+                            value={newAddress}
+                            onChange={e => setNewAddress(e.target.value)}
+                            placeholder="Address (optional)"
+                            rows={2}
+                            style={{ flex: 1, resize: 'vertical' }}
+                            aria-label="Flag state address"
+                        />
+                        <textarea
+                            value={newEmail}
+                            onChange={e => setNewEmail(e.target.value)}
+                            placeholder="Email addresses (comma-separated, optional)"
+                            rows={2}
+                            style={{ flex: 1, resize: 'vertical' }}
+                            aria-label="Flag state emails"
+                        />
+                    </div>
                 </form>
             </section>
 
@@ -221,6 +236,13 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                                                         rows={2}
                                                         style={{ width: '100%', resize: 'vertical' }}
                                                     />
+                                                    <input
+                                                        type="text"
+                                                        value={editEmail}
+                                                        onChange={e => setEditEmail(e.target.value)}
+                                                        placeholder="Email addresses (comma-separated)"
+                                                        style={{ width: '100%' }}
+                                                    />
                                                     <div style={{ display: 'flex', gap: '6px' }}>
                                                         <button onClick={(e) => { e.stopPropagation(); saveEdit(fs.id) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Save</button>
                                                         <button onClick={(e) => { e.stopPropagation(); setEditingId(null) }} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Cancel</button>
@@ -270,9 +292,23 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                                     {isExpanded && (
                                         <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
                                             <td colSpan={5} style={{ padding: '0 16px 16px 56px', borderTop: '1px solid var(--table-border)' }}>
-                                                {fs.address && (
-                                                    <div style={{ marginBottom: '12px', marginTop: '12px', color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-line' }}>
-                                                        {fs.address}
+                                                {(fs.address || fs.email) && (
+                                                    <div style={{ marginBottom: '12px', marginTop: '12px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                                        {fs.address && <div style={{ whiteSpace: 'pre-line', marginBottom: fs.email ? '8px' : '0' }}>{fs.address}</div>}
+                                                        {fs.email && (
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                                                                <span style={{ fontWeight: '600', fontSize: '0.8rem' }}>Email:</span>
+                                                                {fs.email.split(',').map((e, i) => (
+                                                                    <span key={i} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                        background: 'rgba(0, 210, 255, 0.08)',
+                                                                        border: '1px solid rgba(0, 210, 255, 0.15)',
+                                                                        fontSize: '0.8rem'
+                                                                    }}>{e.trim()}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                                 {expandedVessels.length === 0 ? (
