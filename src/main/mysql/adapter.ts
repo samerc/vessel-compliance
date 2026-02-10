@@ -1089,6 +1089,107 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM entities WHERE id = ?', [id])
     }
 
+    async mergeEntities(sourceId: string, targetId: string, keepName?: string): Promise<{ mergedAssuredLinks: number; mergedUBOLinks: number; mergedCustomerLinks: number }> {
+        if (!this.pool) throw new Error('DB Not connected')
+
+        const conn = await this.pool.getConnection()
+        try {
+            await conn.beginTransaction()
+
+            // Optionally update the target entity name
+            if (keepName) {
+                await conn.execute('UPDATE entities SET name = ? WHERE id = ?', [keepName, targetId])
+            }
+
+            // Copy file paths from source to target if target doesn't have them
+            const [sourceRows] = await conn.query('SELECT * FROM entities WHERE id = ?', [sourceId])
+            const [targetRows] = await conn.query('SELECT * FROM entities WHERE id = ?', [targetId])
+            const source = (sourceRows as any[])[0]
+            const target = (targetRows as any[])[0]
+
+            if (!source || !target) throw new Error('One or both entities not found')
+
+            const fileCols = ['passport_file_path', 'certificate_of_incorporation_path', 'articles_of_association_path', 'kyc_file_path']
+            for (const col of fileCols) {
+                if (source[col] && !target[col]) {
+                    await conn.execute(`UPDATE entities SET ${col} = ? WHERE id = ?`, [source[col], targetId])
+                }
+            }
+
+            // 1. Update vessel_assureds: move source entity's assured links to target
+            // First, find duplicates (same vessel + same role for both entities)
+            const [dupeAssureds] = await conn.query(
+                `SELECT va1.id FROM vessel_assureds va1
+                 INNER JOIN vessel_assureds va2 ON va1.vessel_id = va2.vessel_id AND va1.role = va2.role
+                 WHERE va1.entity_id = ? AND va2.entity_id = ?`,
+                [sourceId, targetId]
+            )
+            // Delete duplicates from source
+            for (const dupe of dupeAssureds as any[]) {
+                await conn.execute('DELETE FROM vessel_assureds WHERE id = ?', [dupe.id])
+            }
+            // Move remaining
+            const [assuredResult] = await conn.execute(
+                'UPDATE vessel_assureds SET entity_id = ? WHERE entity_id = ?',
+                [targetId, sourceId]
+            )
+            const mergedAssuredLinks = (assuredResult as any).affectedRows || 0
+
+            // 2. Update entity_ubos: reassign UBO relationships
+            // As assured parent: move UBOs from source to target (skip duplicates)
+            const [dupeUbosParent] = await conn.query(
+                `SELECT eu1.ubo_entity_id FROM entity_ubos eu1
+                 INNER JOIN entity_ubos eu2 ON eu1.ubo_entity_id = eu2.ubo_entity_id
+                 WHERE eu1.assured_entity_id = ? AND eu2.assured_entity_id = ?`,
+                [sourceId, targetId]
+            )
+            for (const dupe of dupeUbosParent as any[]) {
+                await conn.execute('DELETE FROM entity_ubos WHERE assured_entity_id = ? AND ubo_entity_id = ?', [sourceId, dupe.ubo_entity_id])
+            }
+            await conn.execute('UPDATE entity_ubos SET assured_entity_id = ? WHERE assured_entity_id = ?', [targetId, sourceId])
+
+            // As UBO child: update references where source is someone's UBO
+            const [dupeUbosChild] = await conn.query(
+                `SELECT eu1.assured_entity_id FROM entity_ubos eu1
+                 INNER JOIN entity_ubos eu2 ON eu1.assured_entity_id = eu2.assured_entity_id
+                 WHERE eu1.ubo_entity_id = ? AND eu2.ubo_entity_id = ?`,
+                [sourceId, targetId]
+            )
+            for (const dupe of dupeUbosChild as any[]) {
+                await conn.execute('DELETE FROM entity_ubos WHERE assured_entity_id = ? AND ubo_entity_id = ?', [dupe.assured_entity_id, sourceId])
+            }
+            const [uboResult] = await conn.execute('UPDATE entity_ubos SET ubo_entity_id = ? WHERE ubo_entity_id = ?', [targetId, sourceId])
+            const mergedUBOLinks = (uboResult as any).affectedRows || 0
+
+            // Remove self-referencing UBOs (entity can't be its own UBO)
+            await conn.execute('DELETE FROM entity_ubos WHERE assured_entity_id = ubo_entity_id')
+
+            // 3. Update vessels customer_id
+            const [custResult] = await conn.execute(
+                'UPDATE vessels SET customer_id = ? WHERE customer_id = ?',
+                [targetId, sourceId]
+            )
+            const mergedCustomerLinks = (custResult as any).affectedRows || 0
+
+            // 4. Update compliance_check_results
+            await conn.execute(
+                `UPDATE compliance_check_results SET entity_id = ? WHERE entity_type = 'entity' AND entity_id = ?`,
+                [targetId, sourceId]
+            )
+
+            // 5. Delete the source entity
+            await conn.execute('DELETE FROM entities WHERE id = ?', [sourceId])
+
+            await conn.commit()
+            return { mergedAssuredLinks, mergedUBOLinks, mergedCustomerLinks }
+        } catch (error) {
+            await conn.rollback()
+            throw error
+        } finally {
+            conn.release()
+        }
+    }
+
     // --- Roles ---
     async getAssuredRoles(): Promise<AssuredRole[]> {
         if (!this.pool) return []

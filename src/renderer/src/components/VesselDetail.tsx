@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy } from '../../../shared/types'
-import { getFlagClass } from '../utils/countryCodeMap'
+import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 
 import { ReportService } from '../services/ReportService'
@@ -277,6 +277,11 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [vesselNotes, setVesselNotes] = useState(vessel.notes || '')
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
     const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
+    const [showAddFlagModal, setShowAddFlagModal] = useState(false)
+    const [newFlagName, setNewFlagName] = useState('')
+    const [newFlagIso3, setNewFlagIso3] = useState('')
+    const [newFlagAddress, setNewFlagAddress] = useState('')
+    const [newFlagEmail, setNewFlagEmail] = useState('')
     const [policyExpiry, setPolicyExpiry] = useState(vessel.policyExpiryDate || '')
     const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
     const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
@@ -304,6 +309,30 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             }
         } catch (err: any) {
             showError(err.message || 'Failed to update policies')
+        }
+    }
+
+    const handleAddFlag = async () => {
+        if (!newFlagName.trim() || !newFlagIso3.trim()) return
+        try {
+            const created = await window.api.addFlagState({
+                name: newFlagName.trim(),
+                iso3Code: newFlagIso3.trim().toUpperCase(),
+                address: newFlagAddress.trim() || undefined,
+                email: newFlagEmail.trim() || undefined
+            })
+            setFlagStates(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+            setSelectedFlagStateId(created.id)
+            vessel.flagStateId = created.id
+            await window.api.updateVessel(vessel.id, { flagStateId: created.id as any })
+            setShowAddFlagModal(false)
+            setNewFlagName('')
+            setNewFlagIso3('')
+            setNewFlagAddress('')
+            setNewFlagEmail('')
+            showSuccess('Flag state created and assigned')
+        } catch (err: any) {
+            showError(err.message || 'Failed to create flag state')
         }
     }
 
@@ -467,6 +496,13 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         <option key={fs.id} value={fs.id}>{fs.name} ({fs.iso3Code})</option>
                                     ))}
                                 </select>
+                                <button
+                                    onClick={() => setShowAddFlagModal(true)}
+                                    title="Add new flag state"
+                                    style={{ background: 'none', border: '1px solid var(--glass-border)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'flex', alignItems: 'center' }}
+                                >
+                                    <Plus size={14} />
+                                </button>
                             </div>
                             {allPolicyTypes.length > 0 && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
@@ -1066,6 +1102,73 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     onConfirm={confirmation.onConfirm}
                     onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
                 />
+            )}
+
+            {showAddFlagModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', zIndex: 1000
+                }} onClick={() => setShowAddFlagModal(false)}>
+                    <div style={{
+                        background: isLight ? '#ffffff' : '#1e222a',
+                        borderRadius: '16px', padding: '24px', width: '420px', maxWidth: '90vw',
+                        border: '1px solid var(--glass-border)',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+                    }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: '16px' }}>Add Flag State</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Country *</label>
+                                <select
+                                    value={newFlagIso3}
+                                    onChange={e => {
+                                        const iso3 = e.target.value
+                                        setNewFlagIso3(iso3)
+                                        const country = countryNameToIso3.find(c => c.iso3 === iso3)
+                                        setNewFlagName(country ? country.name : '')
+                                    }}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                                    autoFocus
+                                >
+                                    <option value="">Select a country...</option>
+                                    {countryNameToIso3.map(c => (
+                                        <option key={c.iso3} value={c.iso3}>{c.name} ({c.iso3})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Address</label>
+                                <input
+                                    value={newFlagAddress}
+                                    onChange={e => setNewFlagAddress(e.target.value)}
+                                    placeholder="Optional"
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Email</label>
+                                <input
+                                    value={newFlagEmail}
+                                    onChange={e => setNewFlagEmail(e.target.value)}
+                                    placeholder="Optional"
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button onClick={() => setShowAddFlagModal(false)} className="btn-secondary">Cancel</button>
+                            <button
+                                onClick={handleAddFlag}
+                                disabled={!newFlagName.trim() || !newFlagIso3.trim()}
+                                className="btn-primary"
+                                style={{ opacity: (!newFlagName.trim() || !newFlagIso3.trim()) ? 0.5 : 1 }}
+                            >
+                                Add Flag State
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {showPoliciesModal && (

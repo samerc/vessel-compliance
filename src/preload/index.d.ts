@@ -52,6 +52,7 @@ export interface Api {
   addEntity: (entity: Omit<Entity, 'id'>) => Promise<Entity>
   updateEntity: (id: string, updates: Partial<Entity>) => Promise<void>
   deleteEntity: (id: string) => Promise<void>
+  mergeEntities: (sourceId: string, targetId: string, keepName?: string) => Promise<{ mergedAssuredLinks: number; mergedUBOLinks: number; mergedCustomerLinks: number }>
   purgeAllVesselsAndEntities: () => Promise<{ vesselsDeleted: number; entitiesDeleted: number }>
 
   getAssuredRoles: () => Promise<AssuredRole[]>

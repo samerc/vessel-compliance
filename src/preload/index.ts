@@ -34,6 +34,7 @@ const api = {
   addEntity: (entity) => ipcRenderer.invoke('db:addEntity', entity),
   updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),
+  mergeEntities: (sourceId, targetId, keepName?) => ipcRenderer.invoke('db:mergeEntities', sourceId, targetId, keepName),
   purgeAllVesselsAndEntities: () => ipcRenderer.invoke('db:purgeAllVesselsAndEntities'),
 
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),

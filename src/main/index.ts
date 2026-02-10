@@ -862,6 +862,7 @@ app.whenReady().then(() => {
     }
   })
   safeHandle('db:deleteEntity', (event, id) => { requireSession(event); return db.deleteEntity(id) })
+  safeHandle('db:mergeEntities', (event, sourceId, targetId, keepName) => { requireSession(event); return db.mergeEntities(sourceId, targetId, keepName) })
   safeHandle('db:purgeAllVesselsAndEntities', (event) => { requireAdmin(event); return db.purgeAllVesselsAndEntities() })
   safeHandle('maintenance:syncSettings', (event) => { requireAdmin(event); return db.syncAssuredRoles() })
 

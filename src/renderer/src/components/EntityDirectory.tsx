@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload } from 'lucide-react'
+import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload, Merge } from 'lucide-react'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -70,6 +70,51 @@ export default function EntityDirectory() {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [createForm, setCreateForm] = useState({ name: '', type: 'company' as 'company' | 'person', identifier: '', email: '', phone: '' })
     const [isCreating, setIsCreating] = useState(false)
+
+    // Merge entity state
+    const [showMergeModal, setShowMergeModal] = useState(false)
+    const [mergeSource, setMergeSource] = useState<Entity | null>(null)
+    const [mergeTarget, setMergeTarget] = useState<Entity | null>(null)
+    const [mergeSearch, setMergeSearch] = useState('')
+    const [mergeKeepName, setMergeKeepName] = useState<'source' | 'target'>('target')
+    const [isMerging, setIsMerging] = useState(false)
+    const [allEntitiesForMerge, setAllEntitiesForMerge] = useState<Entity[]>([])
+
+    const openMergeModal = async (entity: Entity) => {
+        setMergeSource(entity)
+        setMergeTarget(null)
+        setMergeSearch('')
+        setMergeKeepName('target')
+        const all = await window.api.getEntities()
+        setAllEntitiesForMerge(all.filter(e => e.id !== entity.id))
+        setShowMergeModal(true)
+    }
+
+    const mergeSearchResults = useMemo(() => {
+        if (!mergeSearch.trim()) return []
+        return allEntitiesForMerge
+            .filter(e => e.name.toLowerCase().includes(mergeSearch.toLowerCase()))
+            .slice(0, 20)
+    }, [mergeSearch, allEntitiesForMerge])
+
+    const handleMerge = async () => {
+        if (!mergeSource || !mergeTarget) return
+        setIsMerging(true)
+        try {
+            const keepName = mergeKeepName === 'source' ? mergeSource.name : mergeTarget.name
+            const result = await window.api.mergeEntities(mergeSource.id, mergeTarget.id, keepName)
+            showSuccess(`Merged successfully. Reassigned ${result.mergedAssuredLinks} assured links, ${result.mergedUBOLinks} UBO links, ${result.mergedCustomerLinks} customer links.`)
+            setShowMergeModal(false)
+            setMergeSource(null)
+            setMergeTarget(null)
+            setSelectedEntity(null)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to merge entities')
+        } finally {
+            setIsMerging(false)
+        }
+    }
 
     const startEditing = (entity: Entity) => {
         setEditingEntity(entity)
@@ -793,6 +838,14 @@ export default function EntityDirectory() {
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                                         <button
+                                            onClick={() => openMergeModal(selectedEntity)}
+                                            className="btn-secondary"
+                                            style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            title="Merge with another entity"
+                                        >
+                                            <Merge size={14} /> Merge
+                                        </button>
+                                        <button
                                             onClick={() => startEditing(selectedEntity)}
                                             className="btn-secondary"
                                             style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -1180,6 +1233,134 @@ export default function EntityDirectory() {
                     onConfirm={handleConfirmDelete}
                     onCancel={() => setDeleteConfirmation({ show: false, entity: null, message: '' })}
                 />
+            )}
+
+            {/* Merge Entity Modal */}
+            {showMergeModal && mergeSource && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }} onClick={() => setShowMergeModal(false)}>
+                    <div className="glass-card" style={{ padding: '32px', width: '560px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h3 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Merge size={20} /> Merge Entities
+                            </h3>
+                            <button onClick={() => setShowMergeModal(false)} className="btn-secondary" style={{ padding: '6px' }}><X size={18} /></button>
+                        </div>
+
+                        <div style={{ marginBottom: '20px', padding: '14px', borderRadius: '10px', background: isLight ? 'rgba(200, 120, 0, 0.08)' : 'rgba(255, 193, 7, 0.08)', border: isLight ? '1px solid rgba(200, 120, 0, 0.2)' : '1px solid rgba(255, 193, 7, 0.15)', fontSize: '0.82rem', color: isLight ? '#8a6d00' : '#ffc107' }}>
+                            <AlertTriangle size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                            This will merge the source entity INTO the target. All vessel links, UBOs, and customer assignments will be transferred. The source entity will be deleted.
+                        </div>
+
+                        {/* Source entity */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Source (will be deleted)</label>
+                            <div style={{ padding: '12px', borderRadius: '8px', background: isLight ? 'rgba(200, 0, 0, 0.05)' : 'rgba(255, 77, 77, 0.05)', border: isLight ? '1px solid rgba(200, 0, 0, 0.15)' : '1px solid rgba(255, 77, 77, 0.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {mergeSource.type === 'company' ? <Building2 size={18} color="var(--accent-primary)" /> : <User size={18} color={isLight ? '#9c27b0' : '#ba68c8'} />}
+                                <div>
+                                    <div style={{ fontWeight: '600' }}>{mergeSource.name}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{mergeSource.type}{mergeSource.identifier ? ` - ${mergeSource.identifier}` : ''}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Target entity */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Target (will be kept)</label>
+                            {mergeTarget ? (
+                                <div style={{ padding: '12px', borderRadius: '8px', background: isLight ? 'rgba(0, 140, 70, 0.05)' : 'rgba(0, 255, 136, 0.05)', border: isLight ? '1px solid rgba(0, 140, 70, 0.15)' : '1px solid rgba(0, 255, 136, 0.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {mergeTarget.type === 'company' ? <Building2 size={18} color="var(--accent-primary)" /> : <User size={18} color={isLight ? '#9c27b0' : '#ba68c8'} />}
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: '600' }}>{mergeTarget.name}</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{mergeTarget.type}{mergeTarget.identifier ? ` - ${mergeTarget.identifier}` : ''}</div>
+                                    </div>
+                                    <button onClick={() => { setMergeTarget(null); setMergeSearch('') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Change</button>
+                                </div>
+                            ) : (
+                                <div style={{ position: 'relative' }}>
+                                    <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={14} />
+                                    <input
+                                        type="text"
+                                        value={mergeSearch}
+                                        onChange={e => setMergeSearch(e.target.value)}
+                                        placeholder="Search for target entity..."
+                                        style={{ width: '100%', paddingLeft: '34px' }}
+                                        autoFocus
+                                    />
+                                    {mergeSearchResults.length > 0 && (
+                                        <div style={{
+                                            marginTop: '4px',
+                                            maxHeight: '200px',
+                                            overflowY: 'auto',
+                                            border: '1px solid var(--glass-border)',
+                                            borderRadius: '8px',
+                                            background: isLight ? '#fff' : '#1e222a'
+                                        }}>
+                                            {mergeSearchResults.map(e => (
+                                                <div
+                                                    key={e.id}
+                                                    onClick={() => { setMergeTarget(e); setMergeSearch('') }}
+                                                    style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--table-border)' }}
+                                                    className="hover-effect"
+                                                >
+                                                    {e.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
+                                                    <span style={{ flex: 1 }}>{e.name}</span>
+                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{e.type}{e.identifier ? ` - ${e.identifier}` : ''}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Name choice */}
+                        {mergeTarget && (
+                            <div style={{ marginBottom: '24px' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Keep which name?</label>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={() => setMergeKeepName('target')}
+                                        className={mergeKeepName === 'target' ? 'btn-primary' : 'btn-secondary'}
+                                        style={{ flex: 1, padding: '10px', fontSize: '0.82rem' }}
+                                    >
+                                        {mergeTarget.name}
+                                    </button>
+                                    <button
+                                        onClick={() => setMergeKeepName('source')}
+                                        className={mergeKeepName === 'source' ? 'btn-primary' : 'btn-secondary'}
+                                        style={{ flex: 1, padding: '10px', fontSize: '0.82rem' }}
+                                    >
+                                        {mergeSource.name}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowMergeModal(false)} className="btn-secondary">Cancel</button>
+                            <button
+                                onClick={handleMerge}
+                                className="btn-primary"
+                                disabled={!mergeTarget || isMerging}
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                            >
+                                {isMerging ? <Loader2 size={14} className="spinner" /> : <Merge size={14} />}
+                                {isMerging ? 'Merging...' : 'Merge Entities'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     )

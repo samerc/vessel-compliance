@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save } from 'lucide-react'
+import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Upload } from 'lucide-react'
 import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
@@ -378,6 +378,34 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         showSuccess('KYC uploaded successfully')
         loadData()
     }
+
+    const handleClickUploadDoc = async (entityId: string, field: string, label: string) => {
+        try {
+            const filePath = await window.api.dialogOpenFileAny()
+            if (!filePath) return
+            const validation = await window.api.fileTypesValidateFile(filePath)
+            if (!validation.valid) {
+                showError(`File rejected: ${validation.reason}`)
+                return
+            }
+            await window.api.updateEntity(entityId, { [field]: filePath })
+            showSuccess(`${label} uploaded successfully`)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || `Failed to upload ${label}`)
+        }
+    }
+
+    const handleDeleteDoc = async (entityId: string, field: string) => {
+        try {
+            await window.api.updateEntity(entityId, { [field]: null })
+            showSuccess('Document removed')
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to remove document')
+        }
+    }
+
     const handleOfacRecheck = async (entity: Entity) => {
         setCheckingId(entity.id)
         try {
@@ -850,13 +878,24 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                         borderRadius: '6px',
                                                                         background: entity.certificateOfIncorporationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
                                                                         border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                        cursor: entity.certificateOfIncorporationPath ? 'pointer' : 'default',
                                                                         fontSize: '0.8rem',
                                                                         textAlign: 'center'
                                                                     }}
-                                                                    onClick={() => entity.certificateOfIncorporationPath && window.api.fsOpen(entity.certificateOfIncorporationPath)}
                                                                 >
-                                                                    {entity.certificateOfIncorporationPath ? '📄 Certificate of Incorporation (Click to view)' : '📎 Drop Certificate of Incorporation here'}
+                                                                    {entity.certificateOfIncorporationPath ? (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                                                                            <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.certificateOfIncorporationPath!)}>📄 Cert. of Incorporation</span>
+                                                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'certificateOfIncorporationPath', 'COI') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                                            <span>📎 Drop COI here</span>
+                                                                            <button onClick={() => handleClickUploadDoc(entity.id, 'certificateOfIncorporationPath', 'COI')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                                 <div
                                                                     onDragOver={(e) => e.preventDefault()}
@@ -866,13 +905,24 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                         borderRadius: '6px',
                                                                         background: entity.articlesOfAssociationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
                                                                         border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                        cursor: entity.articlesOfAssociationPath ? 'pointer' : 'default',
                                                                         fontSize: '0.8rem',
                                                                         textAlign: 'center'
                                                                     }}
-                                                                    onClick={() => entity.articlesOfAssociationPath && window.api.fsOpen(entity.articlesOfAssociationPath)}
                                                                 >
-                                                                    {entity.articlesOfAssociationPath ? '📄 Articles of Association (Click to view)' : '📎 Drop Articles of Association here'}
+                                                                    {entity.articlesOfAssociationPath ? (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                                                                            <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.articlesOfAssociationPath!)}>📄 Articles of Assoc.</span>
+                                                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'articlesOfAssociationPath', 'AOA') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                                            <span>📎 Drop AOA here</span>
+                                                                            <button onClick={() => handleClickUploadDoc(entity.id, 'articlesOfAssociationPath', 'AOA')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                                 <div
                                                                     onDragOver={(e) => e.preventDefault()}
@@ -882,13 +932,24 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                         borderRadius: '6px',
                                                                         background: entity.kycFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
                                                                         border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                        cursor: entity.kycFilePath ? 'pointer' : 'default',
                                                                         fontSize: '0.8rem',
                                                                         textAlign: 'center'
                                                                     }}
-                                                                    onClick={() => entity.kycFilePath && window.api.fsOpen(entity.kycFilePath)}
                                                                 >
-                                                                    {entity.kycFilePath ? '📄 KYC (Click to view)' : '📎 Drop KYC here'}
+                                                                    {entity.kycFilePath ? (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                                                                            <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.kycFilePath!)}>📄 KYC</span>
+                                                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'kycFilePath', 'KYC') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                                            <span>📎 Drop KYC here</span>
+                                                                            <button onClick={() => handleClickUploadDoc(entity.id, 'kycFilePath', 'KYC')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -904,13 +965,24 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                     borderRadius: '6px',
                                                                     background: entity.passportFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
                                                                     border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                    cursor: entity.passportFilePath ? 'pointer' : 'default',
                                                                     fontSize: '0.8rem',
                                                                     textAlign: 'center'
                                                                 }}
-                                                                onClick={() => entity.passportFilePath && window.api.fsOpen(entity.passportFilePath)}
                                                             >
-                                                                {entity.passportFilePath ? '📄 ID/Passport (Click to view)' : '📎 Drop ID/Passport here'}
+                                                                {entity.passportFilePath ? (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                                                                        <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.passportFilePath!)}>📄 ID/Passport (Click to view)</span>
+                                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'passportFilePath', 'ID/Passport') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                                        <span>📎 Drop ID/Passport here</span>
+                                                                        <button onClick={() => handleClickUploadDoc(entity.id, 'passportFilePath', 'ID/Passport')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     )}
@@ -1045,12 +1117,21 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                 padding: '4px 6px',
                                                                                 borderRadius: '4px',
                                                                                 background: ubo!.passportFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                                cursor: ubo!.passportFilePath ? 'pointer' : 'default'
+                                                                                border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
                                                                             }}
-                                                                            onClick={() => ubo!.passportFilePath && window.api.fsOpen(ubo!.passportFilePath)}
                                                                         >
-                                                                            {ubo!.passportFilePath ? '📄 ID/Passport (Click to view)' : '📎 Drop ID/Passport here'}
+                                                                            {ubo!.passportFilePath ? (
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.passportFilePath!)}>📄 ID/Passport</span>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'passportFilePath', 'ID/Passport') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                    <span style={{ flex: 1 }}>📎 Drop ID/Passport</span>
+                                                                                    <button onClick={() => handleClickUploadDoc(ubo!.id, 'passportFilePath', 'ID/Passport')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                     {ubo!.type === 'company' && (
@@ -1063,12 +1144,21 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     padding: '4px 6px',
                                                                                     borderRadius: '4px',
                                                                                     background: ubo!.certificateOfIncorporationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                                    cursor: ubo!.certificateOfIncorporationPath ? 'pointer' : 'default'
+                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
                                                                                 }}
-                                                                                onClick={() => ubo!.certificateOfIncorporationPath && window.api.fsOpen(ubo!.certificateOfIncorporationPath)}
                                                                             >
-                                                                                {ubo!.certificateOfIncorporationPath ? '📄 COI (Click to view)' : '📎 Drop Cert. of Inc.'}
+                                                                                {ubo!.certificateOfIncorporationPath ? (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.certificateOfIncorporationPath!)}>📄 COI</span>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'certificateOfIncorporationPath', 'COI') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                        <span style={{ flex: 1 }}>📎 Drop COI</span>
+                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, 'certificateOfIncorporationPath', 'COI')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                             <div
                                                                                 onDragOver={(e) => e.preventDefault()}
@@ -1078,12 +1168,21 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     padding: '4px 6px',
                                                                                     borderRadius: '4px',
                                                                                     background: ubo!.articlesOfAssociationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                                    cursor: ubo!.articlesOfAssociationPath ? 'pointer' : 'default'
+                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
                                                                                 }}
-                                                                                onClick={() => ubo!.articlesOfAssociationPath && window.api.fsOpen(ubo!.articlesOfAssociationPath)}
                                                                             >
-                                                                                {ubo!.articlesOfAssociationPath ? '📄 AOA (Click to view)' : '📎 Drop Art. of Assoc.'}
+                                                                                {ubo!.articlesOfAssociationPath ? (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.articlesOfAssociationPath!)}>📄 AOA</span>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'articlesOfAssociationPath', 'AOA') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                        <span style={{ flex: 1 }}>📎 Drop AOA</span>
+                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, 'articlesOfAssociationPath', 'AOA')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                             <div
                                                                                 onDragOver={(e) => e.preventDefault()}
@@ -1093,12 +1192,21 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     padding: '4px 6px',
                                                                                     borderRadius: '4px',
                                                                                     background: ubo!.kycFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                                    cursor: ubo!.kycFilePath ? 'pointer' : 'default'
+                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
                                                                                 }}
-                                                                                onClick={() => ubo!.kycFilePath && window.api.fsOpen(ubo!.kycFilePath)}
                                                                             >
-                                                                                {ubo!.kycFilePath ? '📄 KYC (Click to view)' : '📎 Drop KYC here'}
+                                                                                {ubo!.kycFilePath ? (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.kycFilePath!)}>📄 KYC</span>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'kycFilePath', 'KYC') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                        <span style={{ flex: 1 }}>📎 Drop KYC</span>
+                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, 'kycFilePath', 'KYC')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     )}
