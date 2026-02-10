@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Trash2, Mail, Phone, FileText, AlertTriangle, CheckCircle2, Hash, Plus, Upload } from 'lucide-react'
+import { Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload } from 'lucide-react'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -185,6 +185,17 @@ export default function EntityDirectory() {
             loadData()
         } catch (error: any) {
             showError(error.message || 'Failed to upload document')
+        }
+    }
+
+    const handleDeleteEntityDoc = async (entityId: string, field: string) => {
+        try {
+            await window.api.updateEntity(entityId, { [field]: null })
+            showSuccess('Document removed')
+            setSelectedEntity(prev => prev?.id === entityId ? { ...prev, [field]: undefined } : prev)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to remove document')
         }
     }
 
@@ -451,7 +462,7 @@ export default function EntityDirectory() {
         )
     }
 
-    const DocBadge = ({ label, hasFile, onClick, onUpload }: { label: string; hasFile: boolean; onClick?: () => void; onUpload?: () => void }) => (
+    const DocBadge = ({ label, hasFile, onClick, onUpload, onDelete, onReplace }: { label: string; hasFile: boolean; onClick?: () => void; onUpload?: () => void; onDelete?: () => void; onReplace?: () => void }) => (
         <div
             style={{
                 padding: '8px 14px',
@@ -479,7 +490,26 @@ export default function EntityDirectory() {
             <span style={{ color: hasFile ? (isLight ? '#008c46' : 'rgba(0, 255, 136, 0.85)') : (isLight ? '#c00000' : 'rgba(255, 77, 77, 0.85)') }}>
                 {label}
             </span>
-            {hasFile && <FileText size={13} style={{ marginLeft: 'auto', opacity: 0.4 }} />}
+            {hasFile && (
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onReplace?.() }}
+                        className="btn-secondary"
+                        style={{ padding: '3px 6px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                        title={`Replace ${label}`}
+                    >
+                        <Upload size={11} />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete?.() }}
+                        className="btn-secondary"
+                        style={{ padding: '3px 6px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px', color: isLight ? '#c00000' : '#ff4d4d' }}
+                        title={`Remove ${label}`}
+                    >
+                        <Trash2 size={11} />
+                    </button>
+                </div>
+            )}
             {!hasFile && onUpload && (
                 <button
                     onClick={(e) => { e.stopPropagation(); onUpload() }}
@@ -791,6 +821,8 @@ export default function EntityDirectory() {
                                                 hasFile={!!selectedEntity.passportFilePath}
                                                 onClick={selectedEntity.passportFilePath ? () => window.api.fsOpen(selectedEntity.passportFilePath!) : undefined}
                                                 onUpload={!selectedEntity.passportFilePath ? () => handleUploadEntityDoc(selectedEntity.id, 'passportFilePath') : undefined}
+                                                onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'passportFilePath')}
+                                                onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'passportFilePath')}
                                             />
                                         ) : (
                                             <>
@@ -799,18 +831,24 @@ export default function EntityDirectory() {
                                                     hasFile={!!selectedEntity.certificateOfIncorporationPath}
                                                     onClick={selectedEntity.certificateOfIncorporationPath ? () => window.api.fsOpen(selectedEntity.certificateOfIncorporationPath!) : undefined}
                                                     onUpload={!selectedEntity.certificateOfIncorporationPath ? () => handleUploadEntityDoc(selectedEntity.id, 'certificateOfIncorporationPath') : undefined}
+                                                    onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'certificateOfIncorporationPath')}
+                                                    onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'certificateOfIncorporationPath')}
                                                 />
                                                 <DocBadge
                                                     label="Articles of Association"
                                                     hasFile={!!selectedEntity.articlesOfAssociationPath}
                                                     onClick={selectedEntity.articlesOfAssociationPath ? () => window.api.fsOpen(selectedEntity.articlesOfAssociationPath!) : undefined}
                                                     onUpload={!selectedEntity.articlesOfAssociationPath ? () => handleUploadEntityDoc(selectedEntity.id, 'articlesOfAssociationPath') : undefined}
+                                                    onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'articlesOfAssociationPath')}
+                                                    onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'articlesOfAssociationPath')}
                                                 />
                                                 <DocBadge
                                                     label="KYC"
                                                     hasFile={!!selectedEntity.kycFilePath}
                                                     onClick={selectedEntity.kycFilePath ? () => window.api.fsOpen(selectedEntity.kycFilePath!) : undefined}
                                                     onUpload={!selectedEntity.kycFilePath ? () => handleUploadEntityDoc(selectedEntity.id, 'kycFilePath') : undefined}
+                                                    onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'kycFilePath')}
+                                                    onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'kycFilePath')}
                                                 />
                                             </>
                                         )}
