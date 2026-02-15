@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -646,6 +646,14 @@ export class MySQLAdapter {
                 FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
                 FOREIGN KEY (classification_society_id) REFERENCES classification_societies(id) ON DELETE CASCADE,
                 UNIQUE KEY unique_vessel_class (vessel_id, classification_society_id)
+            )`)
+
+            // Vessel types
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_types (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )`)
 
             // Vessel audit log
@@ -4030,6 +4038,46 @@ export class MySQLAdapter {
                 'INSERT INTO vessel_classifications (id, vessel_id, classification_society_id) VALUES (?, ?, ?)',
                 [uuidv4(), vesselId, csId]
             )
+        }
+    }
+
+    // --- Vessel Types ---
+    async getVesselTypes(): Promise<VesselType[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, order_index as `order` FROM vessel_types ORDER BY order_index ASC')
+        return rows as VesselType[]
+    }
+
+    async addVesselType(vt: Omit<VesselType, 'id'>): Promise<VesselType> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO vessel_types (id, name, order_index) VALUES (?, ?, ?)',
+            [id, vt.name, vt.order || 0]
+        )
+        return { id, ...vt }
+    }
+
+    async updateVesselType(id: string, updates: Partial<VesselType>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE vessel_types SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteVesselType(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM vessel_types WHERE id = ?', [id])
+    }
+
+    async reorderVesselTypes(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE vessel_types SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
     }
 

@@ -1568,6 +1568,97 @@ app.whenReady().then(() => {
     return { imported, skippedCancelled: 0, totalRows: parsed.length, unmatched }
   })
 
+  // Re-import vessel type, flag, and class from Excel
+  safeHandle('vessels:reimportVesselDetails', async (event, filePath: string) => {
+    requireAdmin(event)
+    const { parseVesselExcel } = await import('./vesselExcelImport')
+    const parsed = parseVesselExcel(filePath)
+    const vessels = await db.getVessels()
+    const imoMap = new Map<string, any>()
+    for (const v of vessels) {
+      if (v.imoNumber) imoMap.set(v.imoNumber, v)
+    }
+
+    // Build lookup maps
+    const flagStates = await db.getFlagStates()
+    const flagNameMap = new Map<string, string>()
+    for (const fs of flagStates) {
+      flagNameMap.set(fs.name.toLowerCase(), fs.id)
+    }
+
+    const classSocieties = await db.getClassificationSocieties()
+    const classNameMap = new Map<string, string>()
+    for (const cs of classSocieties) {
+      classNameMap.set(cs.name.toLowerCase(), cs.name)
+      if (cs.abbreviation) classNameMap.set(cs.abbreviation.toLowerCase(), cs.name)
+    }
+
+    const vesselTypes = await db.getVesselTypes()
+    const vtNameMap = new Map<string, string>()
+    for (const vt of vesselTypes) {
+      vtNameMap.set(vt.name.toLowerCase(), vt.name)
+    }
+
+    let updated = 0
+    let createdFlags = 0, createdClasses = 0, createdTypes = 0
+
+    for (const row of parsed) {
+      const vessel = row.imo ? imoMap.get(row.imo) : undefined
+      if (!vessel) continue
+
+      const updates: Record<string, any> = {}
+
+      // Flag state - auto-create if missing
+      if (row.flag) {
+        let flagId = flagNameMap.get(row.flag.toLowerCase())
+        if (!flagId) {
+          const created = await db.addFlagState({ name: row.flag, iso3Code: '' })
+          flagId = created.id as string
+          flagNameMap.set(row.flag.toLowerCase(), flagId)
+          createdFlags++
+        }
+        updates.flagStateId = flagId
+      }
+
+      // Classification society - auto-create if missing
+      if (row.classification) {
+        let className = classNameMap.get(row.classification.toLowerCase())
+        if (!className) {
+          const created = await db.addClassificationSociety({ name: row.classification, abbreviation: row.classification, isIacs: false, order: classSocieties.length + createdClasses })
+          className = created.name
+          classNameMap.set(row.classification.toLowerCase(), className)
+          createdClasses++
+        }
+        updates.classificationSociety = className
+      }
+
+      // Vessel type - auto-create if missing
+      if (row.vesselType) {
+        let typeName = vtNameMap.get(row.vesselType.toLowerCase())
+        if (!typeName) {
+          const created = await db.addVesselType({ name: row.vesselType, order: vesselTypes.length + createdTypes })
+          typeName = created.name
+          vtNameMap.set(row.vesselType.toLowerCase(), typeName)
+          createdTypes++
+        }
+        updates.vesselType = typeName
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.updateVessel(vessel.id, updates)
+        updated++
+      }
+    }
+
+    return {
+      updated,
+      totalRows: parsed.length,
+      createdFlags,
+      createdClasses,
+      createdTypes
+    }
+  })
+
   // Classification Societies
   safeHandle('db:getClassificationSocieties', (event) => { requireSession(event); return db.getClassificationSocieties() })
   safeHandle('db:addClassificationSociety', (event, cs) => { requireAdmin(event); return db.addClassificationSociety(cs) })
@@ -1576,6 +1667,13 @@ app.whenReady().then(() => {
   safeHandle('db:reorderClassificationSocieties', (event, ids) => { requireAdmin(event); return db.reorderClassificationSocieties(ids) })
   safeHandle('vessels:getClassifications', (event, vesselId) => { requireSession(event); return db.getVesselClassifications(vesselId) })
   safeHandle('vessels:setClassifications', (event, vesselId, csIds) => { requireSession(event); return db.setVesselClassifications(vesselId, csIds) })
+
+  // Vessel Types
+  safeHandle('db:getVesselTypes', (event) => { requireSession(event); return db.getVesselTypes() })
+  safeHandle('db:addVesselType', (event, vt) => { requireAdmin(event); return db.addVesselType(vt) })
+  safeHandle('db:updateVesselType', (event, id, updates) => { requireAdmin(event); return db.updateVesselType(id, updates) })
+  safeHandle('db:deleteVesselType', (event, id) => { requireAdmin(event); return db.deleteVesselType(id) })
+  safeHandle('db:reorderVesselTypes', (event, ids) => { requireAdmin(event); return db.reorderVesselTypes(ids) })
 
   // Vessel Audit Log
   safeHandle('vessels:getAuditLog', (event, vesselId) => { requireSession(event); return db.getVesselAuditLog(vesselId) })

@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -254,6 +254,16 @@ export interface Api {
   reorderClassificationSocieties: (ids: string[]) => Promise<void>
   getVesselClassifications: (vesselId: string) => Promise<VesselClassification[]>
   setVesselClassifications: (vesselId: string, csIds: string[]) => Promise<void>
+
+  // Vessel Types
+  getVesselTypes: () => Promise<VesselType[]>
+  addVesselType: (vt: Omit<VesselType, 'id'>) => Promise<VesselType>
+  updateVesselType: (id: string, updates: Partial<VesselType>) => Promise<void>
+  deleteVesselType: (id: string) => Promise<void>
+  reorderVesselTypes: (ids: string[]) => Promise<void>
+
+  // Re-import vessel details
+  reimportVesselDetails: (filePath: string) => Promise<{ updated: number; totalRows: number; createdFlags: number; createdClasses: number; createdTypes: number }>
 
   // Vessel Audit Log
   getVesselAuditLog: (vesselId: string) => Promise<VesselAuditEntry[]>

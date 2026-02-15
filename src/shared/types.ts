@@ -584,6 +584,14 @@ export interface InstalmentDefaults {
   [count: string]: number[] // e.g. { "2": [0, 180], "3": [0, 90, 180] }
 }
 
+// ==================== Vessel Types ====================
+
+export interface VesselType {
+  id: string
+  name: string
+  order: number
+}
+
 // ==================== Classification Societies ====================
 
 export interface ClassificationSociety {

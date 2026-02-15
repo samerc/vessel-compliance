@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Upload } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, PolicyTypeCharacteristic, PolicyTypeCondition } from '../../../shared/types'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
 export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?: (vesselId: string) => void }) {
@@ -48,6 +48,12 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [editClassAbbr, setEditClassAbbr] = useState('')
     const [editClassIacs, setEditClassIacs] = useState(false)
 
+    // Vessel Types
+    const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
+    const [newVesselTypeName, setNewVesselTypeName] = useState('')
+    const [editingVesselTypeId, setEditingVesselTypeId] = useState<string | null>(null)
+    const [editVesselTypeName, setEditVesselTypeName] = useState('')
+
     // Policy type characteristics and conditions
     const [expandedPolicyTypeId, setExpandedPolicyTypeId] = useState<string | null>(null)
     const [ptCharacteristics, setPtCharacteristics] = useState<PolicyTypeCharacteristic[]>([])
@@ -57,7 +63,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [newCharRequired, setNewCharRequired] = useState(false)
     const [newCondName, setNewCondName] = useState('')
 
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'classSocieties', 'policyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dataImport', 'dangerZone']))
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'vesselTypes', 'classSocieties', 'policyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dataImport', 'dangerZone']))
     const toggleSection = (id: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev)
@@ -149,6 +155,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         await loadRoles()
         await loadSurveyTypes()
         await loadClassSocieties()
+        await loadVesselTypes()
         await loadPolicyTypes()
     }
 
@@ -232,6 +239,45 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         setEditingClassId(null)
         loadClassSocieties()
         showSuccess('Classification society updated')
+    }
+
+    // --- Vessel Types ---
+    const loadVesselTypes = async () => {
+        const data = await window.api.getVesselTypes()
+        setVesselTypes(data)
+    }
+
+    const handleAddVesselType = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newVesselTypeName.trim()) return
+        await window.api.addVesselType({ name: newVesselTypeName.trim(), order: vesselTypes.length })
+        setNewVesselTypeName('')
+        loadVesselTypes()
+        showSuccess('Vessel type added')
+    }
+
+    const handleDeleteVesselType = async (id: string) => {
+        if (!confirm('Delete this vessel type?')) return
+        await window.api.deleteVesselType(id)
+        loadVesselTypes()
+        showSuccess('Vessel type deleted')
+    }
+
+    const handleMoveVesselType = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...vesselTypes]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setVesselTypes(newOrder)
+        await window.api.reorderVesselTypes(newOrder.map(v => v.id))
+    }
+
+    const saveVesselTypeEdit = async (id: string) => {
+        if (!editVesselTypeName.trim()) return
+        await window.api.updateVesselType(id, { name: editVesselTypeName.trim() })
+        setEditingVesselTypeId(null)
+        loadVesselTypes()
+        showSuccess('Vessel type updated')
     }
 
     // --- Policy Type Characteristics & Conditions ---
@@ -1384,7 +1430,78 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                 </>}
             </section>
 
-            {/* 7. Classification Societies */}
+            {/* 7. Vessel Types */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3
+                    onClick={() => toggleSection('vesselTypes')}
+                    style={{ marginBottom: collapsedSections.has('vesselTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('vesselTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                    <Ship size={20} color="var(--accent-primary)" /> Vessel Types
+                </h3>
+                {!collapsedSections.has('vesselTypes') && <>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+                        Manage vessel types (e.g. Bulk Carrier, Container Ship, Tanker).
+                    </p>
+                    <form onSubmit={handleAddVesselType} style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                        <input type="text" value={newVesselTypeName} onChange={e => setNewVesselTypeName(e.target.value)} placeholder="Vessel type name" style={{ flex: 1 }} aria-label="Vessel type name" />
+                        <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Plus size={18} /> Add
+                        </button>
+                    </form>
+                    {vesselTypes.length > 0 && (
+                        <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <caption className="sr-only">Vessel types</caption>
+                                <thead>
+                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                        <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
+                                        <th scope="col" style={{ padding: '16px' }}>Name</th>
+                                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {vesselTypes.map((vt, index) => (
+                                        <tr key={vt.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                            <td style={{ padding: '16px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <button onClick={() => handleMoveVesselType(index, 'up')} disabled={index === 0} style={{ background: 'transparent', border: 'none', cursor: index === 0 ? 'default' : 'pointer', padding: '0', opacity: index === 0 ? 0.3 : 1 }} aria-label="Move up"><ChevronUp size={14} color="var(--text-secondary)" /></button>
+                                                        <button onClick={() => handleMoveVesselType(index, 'down')} disabled={index === vesselTypes.length - 1} style={{ background: 'transparent', border: 'none', cursor: index === vesselTypes.length - 1 ? 'default' : 'pointer', padding: '0', opacity: index === vesselTypes.length - 1 ? 0.3 : 1 }} aria-label="Move down"><ChevronDown size={14} color="var(--text-secondary)" /></button>
+                                                    </div>
+                                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{index + 1}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '16px' }}>
+                                                {editingVesselTypeId === vt.id ? (
+                                                    <input type="text" value={editVesselTypeName} onChange={e => setEditVesselTypeName(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveVesselTypeEdit(vt.id)} autoFocus style={{ width: '100%' }} />
+                                                ) : vt.name}
+                                            </td>
+                                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                                    {editingVesselTypeId === vt.id ? (
+                                                        <>
+                                                            <button onClick={() => saveVesselTypeEdit(vt.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
+                                                            <button onClick={() => setEditingVesselTypeId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => { setEditingVesselTypeId(vt.id); setEditVesselTypeName(vt.name) }} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }} aria-label="Edit"><Edit3 size={18} /></button>
+                                                            <button onClick={() => handleDeleteVesselType(vt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete"><Trash2 size={18} /></button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </>}
+            </section>
+
+            {/* 8. Classification Societies */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3
                     onClick={() => toggleSection('classSocieties')}

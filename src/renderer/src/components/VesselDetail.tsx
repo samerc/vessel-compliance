@@ -3,7 +3,7 @@ import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, Fil
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, VesselDynamicPolicy, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, Entity } from '../../../shared/types'
+import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, VesselDynamicPolicy, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, Entity, ClassificationSociety, VesselType } from '../../../shared/types'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 
@@ -83,6 +83,14 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         try {
             const fs = await window.api.getFlagStates()
             setFlagStates(fs || [])
+        } catch { /* ignore */ }
+        try {
+            const cs = await window.api.getClassificationSocieties()
+            setClassSocieties(cs || [])
+        } catch { /* ignore */ }
+        try {
+            const vt = await window.api.getVesselTypes()
+            setVesselTypes(vt || [])
         } catch { /* ignore */ }
         try {
             const [pt, vp] = await Promise.all([
@@ -303,6 +311,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editVesselType, setEditVesselType] = useState(vessel.vesselType || '')
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
     const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
+    const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
+    const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
     const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
     const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
     const [newCustomDocName, setNewCustomDocName] = useState('')
@@ -485,11 +495,31 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Type:</span>
-                                    <input type="text" value={editVesselType} onChange={e => setEditVesselType(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', width: '140px' }} aria-label="Vessel type" />
+                                    <select
+                                        value={editVesselType}
+                                        onChange={e => setEditVesselType(e.target.value)}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', width: '160px' }}
+                                        aria-label="Vessel type"
+                                    >
+                                        <option value="">No type</option>
+                                        {vesselTypes.map(vt => (
+                                            <option key={vt.id} value={vt.name}>{vt.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Class:</span>
-                                    <input type="text" value={editClassification} onChange={e => setEditClassification(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', width: '140px' }} aria-label="Classification society" />
+                                    <select
+                                        value={editClassification}
+                                        onChange={e => setEditClassification(e.target.value)}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', width: '160px' }}
+                                        aria-label="Classification society"
+                                    >
+                                        <option value="">No class</option>
+                                        {classSocieties.map(cs => (
+                                            <option key={cs.id} value={cs.abbreviation || cs.name}>{cs.name}{cs.abbreviation ? ` (${cs.abbreviation})` : ''}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Call Sign:</span>

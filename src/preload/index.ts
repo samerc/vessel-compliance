@@ -271,6 +271,16 @@ const api = {
   getVesselClassifications: (vesselId: string) => ipcRenderer.invoke('vessels:getClassifications', vesselId),
   setVesselClassifications: (vesselId: string, csIds: string[]) => ipcRenderer.invoke('vessels:setClassifications', vesselId, csIds),
 
+  // Vessel Types
+  getVesselTypes: () => ipcRenderer.invoke('db:getVesselTypes'),
+  addVesselType: (vt: any) => ipcRenderer.invoke('db:addVesselType', vt),
+  updateVesselType: (id: string, updates: any) => ipcRenderer.invoke('db:updateVesselType', id, updates),
+  deleteVesselType: (id: string) => ipcRenderer.invoke('db:deleteVesselType', id),
+  reorderVesselTypes: (ids: string[]) => ipcRenderer.invoke('db:reorderVesselTypes', ids),
+
+  // Re-import vessel details (type, flag, class) from Excel
+  reimportVesselDetails: (filePath: string) => ipcRenderer.invoke('vessels:reimportVesselDetails', filePath),
+
   // Vessel Audit Log
   getVesselAuditLog: (vesselId: string) => ipcRenderer.invoke('vessels:getAuditLog', vesselId),
 
