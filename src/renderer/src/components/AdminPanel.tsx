@@ -1775,7 +1775,9 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
 
 function DataImportSection({ showSuccess, showError }: { showSuccess: (m: string) => void; showError: (m: string) => void }) {
     const [importing, setImporting] = useState(false)
+    const [reimporting, setReimporting] = useState(false)
     const [result, setResult] = useState<{ imported: number; totalRows: number; unmatched: { ship: string; imo: string; broker: string; fleet: string }[] } | null>(null)
+    const [reimportResult, setReimportResult] = useState<{ updated: number; totalRows: number; createdFlags: number; createdClasses: number; createdTypes: number } | null>(null)
 
     const handleImport = async () => {
         try {
@@ -1793,20 +1795,53 @@ function DataImportSection({ showSuccess, showError }: { showSuccess: (m: string
         }
     }
 
+    const handleReimportDetails = async () => {
+        try {
+            const filePath = await window.api.dialogOpenFile()
+            if (!filePath) return
+            setReimporting(true)
+            setReimportResult(null)
+            const res = await window.api.reimportVesselDetails(filePath)
+            setReimportResult(res)
+            const parts: string[] = [`Updated ${res.updated} vessels from ${res.totalRows} rows.`]
+            if (res.createdFlags) parts.push(`Created ${res.createdFlags} flag states.`)
+            if (res.createdClasses) parts.push(`Created ${res.createdClasses} classification societies.`)
+            if (res.createdTypes) parts.push(`Created ${res.createdTypes} vessel types.`)
+            showSuccess(parts.join(' '))
+        } catch (err: any) {
+            showError(err.message || 'Re-import failed')
+        } finally {
+            setReimporting(false)
+        }
+    }
+
     return (
         <div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
                 Import vessel insurance policy data from an Excel file. Matches vessels by IMO number. Cancelled vessels are skipped.
             </p>
 
-            <button
-                onClick={handleImport}
-                disabled={importing}
-                className="btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}
-            >
-                {importing ? <><Loader2 size={16} className="spinning" /> Importing...</> : <><Upload size={16} /> Import Vessel Excel</>}
-            </button>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <button
+                    onClick={handleImport}
+                    disabled={importing}
+                    className="btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                    {importing ? <><Loader2 size={16} className="spinning" /> Importing...</> : <><Upload size={16} /> Import Vessel Excel</>}
+                </button>
+                <button
+                    onClick={handleReimportDetails}
+                    disabled={reimporting}
+                    className="btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                    {reimporting ? <><Loader2 size={16} className="spinning" /> Re-importing...</> : <><Upload size={16} /> Re-import Vessel Details</>}
+                </button>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px', marginTop: '-8px' }}>
+                <strong>Re-import Vessel Details</strong> updates Type, Flag, and Class from an Excel file for all matched vessels (overwrites existing values). Missing settings entries are auto-created.
+            </p>
 
             {result && (
                 <div>
@@ -1854,6 +1889,29 @@ function DataImportSection({ showSuccess, showError }: { showSuccess: (m: string
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {reimportResult && (
+                <div style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(46, 204, 113, 0.1)', border: '1px solid rgba(46, 204, 113, 0.3)' }}>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{reimportResult.updated}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Vessels updated</div>
+                        </div>
+                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(52, 152, 219, 0.1)', border: '1px solid rgba(52, 152, 219, 0.3)' }}>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{reimportResult.totalRows}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Rows processed</div>
+                        </div>
+                        {(reimportResult.createdFlags > 0 || reimportResult.createdClasses > 0 || reimportResult.createdTypes > 0) && (
+                            <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(155, 89, 182, 0.1)', border: '1px solid rgba(155, 89, 182, 0.3)' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                    {reimportResult.createdFlags + reimportResult.createdClasses + reimportResult.createdTypes}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Settings auto-created</div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
