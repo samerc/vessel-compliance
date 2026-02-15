@@ -145,6 +145,7 @@ Required documents vary by entity type:
 ### Compliance Center
 Centralized compliance monitoring with two tabs:
 - **Document Alerts Tab**: Missing required files, expired documents, expiring soon (30 days)
+- **Policy Alerts Tab**: View button navigates to vessel's policies section
 - **Sanctions Screening Tab**:
   - Pending reviews table with expandable match details
   - Mark as reviewed action updates result status
@@ -231,6 +232,29 @@ Classification system for vessel insurance policies:
 - **Policy Types**: Admin-managed list with CRUD and reorder (`policy_types` table)
 - **Vessel Policies**: Many-to-many assignment via `vessel_policies` table
 - **VesselDetail**: Modal with checkbox list to assign/remove policy types per vessel
+- **Dynamic Policies**: `vessel_dynamic_policies` with configurable characteristics per policy type (`policy_type_characteristics`)
+- **Policy Values**: `vessel_policy_values` stores field values (text, date, number) per policy
+- **Date Storage**: All policy dates stored in ISO `YYYY-MM-DD` format for MySQL comparison compatibility
+
+### Policy Renewals
+
+Monthly view of expiring policies (`src/renderer/src/components/PolicyRenewals.tsx`):
+
+- **Month Selector**: Navigate months with arrows, "Today" button to jump to current month
+- **Table Columns**: Vessel, IMO, Customer, Fleet, Policy Type, Policy Number, End Date, Actions (View)
+- **Query**: Joins `vessel_dynamic_policies` → `vessel_policy_values` where characteristic name contains "end" and field_type is date
+- **Filters**: Only active vessels (`v.is_active = TRUE`) and active policies (`vdp.status = 'active'`)
+- **Export**: Excel export via `xlsx` library
+- **IPC Handler**: `policies:getRenewalsByMonth`
+
+### Vessel Active Status
+
+Vessel lifecycle management with cascade behavior:
+
+- **Field**: `vessels.is_active` (BOOLEAN, default TRUE)
+- **Deactivation Cascade**: Setting `is_active = false` automatically sets all vessel's active policies to `'inactive'`
+- **Filtered Views**: Renewals, survey list, and open defects queries all filter by `v.is_active = TRUE`
+- **Audit Logged**: Status changes recorded in vessel audit history
 
 ### Dynamic Address Book (DAB)
 
@@ -242,11 +266,38 @@ Query builder for finding entity contacts across the fleet:
 - **Export**: Email only (default), phone only, or both; copy to clipboard
 - **Results**: Table with entity name, type, contacts, associated vessels
 
+### Vessel Excel Import
+
+Bulk vessel import from Excel files (`src/main/vesselExcelImport.ts`):
+
+- **Date Handling**: Excel serial dates converted to ISO `YYYY-MM-DD` via `excelDateToISO()` with Lotus 123 leap year bug correction
+- **Fallback Parsing**: Text dates parsed via `new Date()` constructor
+- **Migration**: Startup migration in `initializeSchema()` normalizes existing non-ISO dates in `vessel_policy_values`
+
+### Vessel Filter
+
+Advanced vessel search page (`src/renderer/src/components/VesselFilter.tsx`):
+
+- **Filters**: Multiple criteria for filtering the vessel list
+- **Navigation**: View button navigates to vessel detail
+
+### Quotations
+
+Quotation management system:
+
+- **QuotationManager** (`src/renderer/src/components/QuotationManager.tsx`): Main quotation list and management
+- **QuotationEditor** (`src/renderer/src/components/QuotationEditor.tsx`): Create/edit quotation details
+- **QuotationList** (`src/renderer/src/components/QuotationList.tsx`): Quotation listing view
+- **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Quotation configuration
+- **RichTextEditor** (`src/renderer/src/components/RichTextEditor.tsx`): Rich text editing for quotation content
+- **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export
+
 ### Vessel Detail Navigation
 
-- **Sections**: Toggle between Documents and Surveys views via `detailView` state
-- **External Navigation**: `initialSection` prop allows navigating directly to surveys tab (used by ConditionSurveyList)
+- **Sections**: Toggle between Documents, Surveys, and Policies views via `detailView` state
+- **External Navigation**: `initialSection` prop allows navigating directly to surveys or policies tab
 - **Navigation Chain**: App.tsx → VesselManager (initialVesselSection) → VesselDetail (initialSection)
+- **Section Values**: `'documents'`, `'surveys'`, `'policies'`
 
 ### Vessel List
 
@@ -270,8 +321,11 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - `document_types`, `vessel_documents` - Document requirements and uploads
 - `vessel_custom_doc_types` - Per-vessel custom document types
 - `flag_states` - Vessel flag state registries
-- `policy_types`, `vessel_policies` - Insurance policy type classifications
+- `policy_types`, `policy_type_characteristics` - Insurance policy type classifications and configurable fields
+- `vessel_dynamic_policies`, `vessel_policy_values` - Dynamic policy instances and their field values
 - `surveyors`, `condition_surveys`, `survey_defects`, `survey_attachments` - Survey management
 - `compliance_check_logs` - History of scheduled/manual compliance runs
 - `compliance_check_results` - Individual sanctions matches pending review
+- `vessel_name_history`, `vessel_audit_log` - Vessel change tracking
+- `quotations` - Insurance quotation records
 - `settings` - Key-value store for app settings (file types, compliance schedule, etc.)

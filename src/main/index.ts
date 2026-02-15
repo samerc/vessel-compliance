@@ -1260,6 +1260,416 @@ app.whenReady().then(() => {
   safeHandle('reminders:snoozeVessel', (event, vesselId, username, periodDays) => { requireSession(event); return db.snoozeVessel(vesselId, username, periodDays) })
   safeHandle('reminders:unsnoozeVessel', (event, vesselId) => { requireSession(event); return db.unsnoozeVessel(vesselId) })
 
+  // P&I Clauses
+  safeHandle('pi:getClauses', (event) => { requireSession(event); return db.getPIClauses() })
+  safeHandle('pi:addClause', (event, clause) => { requireAdmin(event); return db.addPIClause(clause) })
+  safeHandle('pi:updateClause', (event, id, updates) => { requireAdmin(event); return db.updatePIClause(id, updates) })
+  safeHandle('pi:deleteClause', (event, id) => { requireAdmin(event); return db.deletePIClause(id) })
+  safeHandle('pi:reorderClauses', (event, orderedIds) => { requireAdmin(event); return db.reorderPIClauses(orderedIds) })
+
+  // P&I Clause Sets
+  safeHandle('pi:getClauseSets', (event) => { requireSession(event); return db.getPIClauseSets() })
+  safeHandle('pi:addClauseSet', (event, name, clauseIds) => { requireAdmin(event); return db.addPIClauseSet(name, clauseIds) })
+  safeHandle('pi:updateClauseSet', (event, id, name, clauseIds) => { requireAdmin(event); return db.updatePIClauseSet(id, name, clauseIds) })
+  safeHandle('pi:deleteClauseSet', (event, id) => { requireAdmin(event); return db.deletePIClauseSet(id) })
+
+  // P&I Warranty Tags
+  safeHandle('pi:getWarrantyTags', (event) => { requireSession(event); return db.getPIWarrantyTags() })
+  safeHandle('pi:addWarrantyTag', (event, name) => { requireAdmin(event); return db.addPIWarrantyTag(name) })
+  safeHandle('pi:updateWarrantyTag', (event, id, name) => { requireAdmin(event); return db.updatePIWarrantyTag(id, name) })
+  safeHandle('pi:deleteWarrantyTag', (event, id) => { requireAdmin(event); return db.deletePIWarrantyTag(id) })
+  safeHandle('pi:reorderWarrantyTags', (event, orderedIds) => { requireAdmin(event); return db.reorderPIWarrantyTags(orderedIds) })
+
+  // P&I Warranties
+  safeHandle('pi:getWarranties', (event) => { requireSession(event); return db.getPIWarranties() })
+  safeHandle('pi:addWarranty', (event, warranty) => { requireAdmin(event); return db.addPIWarranty(warranty) })
+  safeHandle('pi:updateWarranty', (event, id, updates) => { requireAdmin(event); return db.updatePIWarranty(id, updates) })
+  safeHandle('pi:deleteWarranty', (event, id) => { requireAdmin(event); return db.deletePIWarranty(id) })
+  safeHandle('pi:reorderWarranties', (event, orderedIds) => { requireAdmin(event); return db.reorderPIWarranties(orderedIds) })
+
+  // P&I Deductibles
+  safeHandle('pi:getDeductibles', (event) => { requireSession(event); return db.getPIDeductibles() })
+  safeHandle('pi:addDeductible', (event, ded) => { requireAdmin(event); return db.addPIDeductible(ded) })
+  safeHandle('pi:updateDeductible', (event, id, updates) => { requireAdmin(event); return db.updatePIDeductible(id, updates) })
+  safeHandle('pi:deleteDeductible', (event, id) => { requireAdmin(event); return db.deletePIDeductible(id) })
+  safeHandle('pi:reorderDeductibles', (event, orderedIds) => { requireAdmin(event); return db.reorderPIDeductibles(orderedIds) })
+
+  // P&I Deductible Sets
+  safeHandle('pi:getDeductibleSets', (event) => { requireSession(event); return db.getPIDeductibleSets() })
+  safeHandle('pi:getDeductibleSetItems', (event, setId) => { requireSession(event); return db.getPIDeductibleSetItems(setId) })
+  safeHandle('pi:addDeductibleSet', (event, name, items) => { requireAdmin(event); return db.addPIDeductibleSet(name, items) })
+  safeHandle('pi:updateDeductibleSet', (event, id, name, items) => { requireAdmin(event); return db.updatePIDeductibleSet(id, name, items) })
+  safeHandle('pi:deleteDeductibleSet', (event, id) => { requireAdmin(event); return db.deletePIDeductibleSet(id) })
+
+  // P&I Exclusions
+  safeHandle('pi:getExclusions', (event) => { requireSession(event); return db.getPIExclusions() })
+  safeHandle('pi:addExclusion', (event, text) => { requireAdmin(event); return db.addPIExclusion(text) })
+  safeHandle('pi:updateExclusion', (event, id, text) => { requireAdmin(event); return db.updatePIExclusion(id, text) })
+  safeHandle('pi:deleteExclusion', (event, id) => { requireAdmin(event); return db.deletePIExclusion(id) })
+  safeHandle('pi:reorderExclusions', (event, orderedIds) => { requireAdmin(event); return db.reorderPIExclusions(orderedIds) })
+
+  // P&I Sub-Limit Templates
+  safeHandle('pi:getSubLimitTemplates', (event) => { requireSession(event); return db.getPISubLimitTemplates() })
+  safeHandle('pi:addSubLimitTemplate', (event, tmpl) => { requireAdmin(event); return db.addPISubLimitTemplate(tmpl) })
+  safeHandle('pi:updateSubLimitTemplate', (event, id, updates) => { requireAdmin(event); return db.updatePISubLimitTemplate(id, updates) })
+  safeHandle('pi:deleteSubLimitTemplate', (event, id) => { requireAdmin(event); return db.deletePISubLimitTemplate(id) })
+  safeHandle('pi:reorderSubLimitTemplates', (event, orderedIds) => { requireAdmin(event); return db.reorderPISubLimitTemplates(orderedIds) })
+
+  // P&I Additional Clauses
+  safeHandle('pi:getAdditionalClauses', (event) => { requireSession(event); return db.getPIAdditionalClauses() })
+  safeHandle('pi:addAdditionalClause', (event, text) => { requireAdmin(event); return db.addPIAdditionalClause(text) })
+  safeHandle('pi:updateAdditionalClause', (event, id, text) => { requireAdmin(event); return db.updatePIAdditionalClause(id, text) })
+  safeHandle('pi:deleteAdditionalClause', (event, id) => { requireAdmin(event); return db.deletePIAdditionalClause(id) })
+  safeHandle('pi:reorderAdditionalClauses', (event, orderedIds) => { requireAdmin(event); return db.reorderPIAdditionalClauses(orderedIds) })
+
+  // Trading Excluded Countries
+  safeHandle('pi:getTradingExcludedCountries', (event) => { requireSession(event); return db.getTradingExcludedCountries() })
+  safeHandle('pi:addTradingExcludedCountry', (event, country) => { requireAdmin(event); return db.addTradingExcludedCountry(country) })
+  safeHandle('pi:updateTradingExcludedCountry', (event, id, updates) => { requireAdmin(event); return db.updateTradingExcludedCountry(id, updates) })
+  safeHandle('pi:deleteTradingExcludedCountry', (event, id) => { requireAdmin(event); return db.deleteTradingExcludedCountry(id) })
+
+  // P&I Section Texts
+  safeHandle('pi:getSectionTexts', (event) => { requireSession(event); return db.getPISectionTexts() })
+  safeHandle('pi:setSectionTexts', (event, texts) => { requireAdmin(event); return db.setPISectionTexts(texts) })
+
+  // Instalment Defaults & Logo
+  safeHandle('pi:getInstalmentDefaults', (event) => { requireSession(event); return db.getInstalmentDefaults() })
+  safeHandle('pi:setInstalmentDefaults', (event, defaults) => { requireAdmin(event); return db.setInstalmentDefaults(defaults) })
+  safeHandle('pi:getQuotationLogoPath', (event) => { requireSession(event); return db.getQuotationLogoPath() })
+  safeHandle('pi:setQuotationLogoPath', (event, path) => { requireAdmin(event); return db.setQuotationLogoPath(path) })
+
+  // P&I Sanctions Versions
+  safeHandle('pi:getSanctionsVersions', (event) => { requireSession(event); return db.getPISanctionsVersions() })
+  safeHandle('pi:addSanctionsVersion', (event, data) => { requireAdmin(event); return db.addPISanctionsVersion(data) })
+  safeHandle('pi:updateSanctionsVersion', (event, id, updates) => { requireAdmin(event); return db.updatePISanctionsVersion(id, updates) })
+  safeHandle('pi:deleteSanctionsVersion', (event, id) => { requireAdmin(event); return db.deletePISanctionsVersion(id) })
+  safeHandle('pi:reorderSanctionsVersions', (event, orderedIds) => { requireAdmin(event); return db.reorderPISanctionsVersions(orderedIds) })
+
+  // Vessel Insurance Policies (imported)
+  safeHandle('vessels:getInsurancePolicies', (event, vesselId) => { requireSession(event); return db.getVesselInsurancePolicies(vesselId) })
+  safeHandle('vessels:importInsurancePoliciesFromExcel', async (event, filePath: string) => {
+    requireAdmin(event)
+    const { parseVesselExcel } = await import('./vesselExcelImport')
+    const parsed = parseVesselExcel(filePath)
+    const vessels = await db.getVessels()
+    const imoMap = new Map<string, string>()
+    for (const v of vessels) {
+      if (v.imoNumber) imoMap.set(v.imoNumber, v.id)
+    }
+    // Build flag state name → id map for matching
+    const flagStates = await db.getFlagStates()
+    const flagNameMap = new Map<string, string>()
+    for (const fs of flagStates) {
+      flagNameMap.set(fs.name.toLowerCase(), fs.id)
+    }
+
+    // Build policy type name → id map and load characteristics
+    const policyTypes = await db.getPolicyTypes()
+    const ptMap = new Map<string, string>() // lowercase name → id
+    for (const pt of policyTypes) {
+      ptMap.set(pt.name.toLowerCase(), pt.id)
+    }
+
+    // Field mappings for each policy category → characteristic names
+    const hullFields = [
+      { key: 'coverageCode', name: 'Coverage Code', type: 'text' },
+      { key: 'inceptionDate', name: 'Inception Date', type: 'date' },
+      { key: 'endDate', name: 'End Date', type: 'date' },
+      { key: 'hmValue', name: 'H&M Value', type: 'amount' },
+      { key: 'ivValue', name: 'IV Value', type: 'amount' },
+      { key: 'hmPremium', name: 'H&M Premium', type: 'amount' },
+      { key: 'ivPremium', name: 'IV Premium', type: 'amount' },
+      { key: 'deductible', name: 'Deductible', type: 'amount' },
+      { key: 'amd', name: 'AMD', type: 'amount' },
+      { key: 'generalAverage', name: 'General Average', type: 'amount' },
+      { key: 'upcc', name: 'UPCC', type: 'text' },
+      { key: 'ncb', name: 'NCB', type: 'text' },
+      { key: 'ourShare', name: 'Our Share', type: 'text' }
+    ]
+    const piFields = [
+      { key: 'coverageCode', name: 'Coverage Code', type: 'text' },
+      { key: 'inceptionDate', name: 'Inception Date', type: 'date' },
+      { key: 'endDate', name: 'End Date', type: 'date' },
+      { key: 'limitOfLiability', name: 'Limit of Liability', type: 'amount' },
+      { key: 'premium', name: 'Premium', type: 'amount' },
+      { key: 'upcc', name: 'UPCC', type: 'text' },
+      { key: 'ncb', name: 'NCB', type: 'text' },
+      { key: 'ourShare', name: 'Our Share', type: 'text' }
+    ]
+    const warFields = [
+      { key: 'policyNumber', name: 'Policy Number', type: 'text' },
+      { key: 'warRate', name: 'War Rate', type: 'text' },
+      { key: 'ourShare', name: 'Our Share', type: 'text' }
+    ]
+
+    const categoryFieldMap: Record<string, { key: string; name: string; type: string }[]> = {
+      hull: hullFields,
+      pi: piFields,
+      war: warFields
+    }
+    const categoryNameMap: Record<string, string> = { hull: 'Hull', pi: 'P&I', war: 'War' }
+
+    // Ensure policy types exist and build characteristic maps
+    const charMaps: Record<string, Map<string, string>> = {} // category → (charName → charId)
+    for (const cat of ['hull', 'pi', 'war']) {
+      const ptName = categoryNameMap[cat]
+      let ptId = ptMap.get(ptName.toLowerCase())
+      if (!ptId) {
+        const newPt = await db.addPolicyType(ptName)
+        ptId = newPt.id
+        ptMap.set(ptName.toLowerCase(), ptId)
+      }
+
+      // Get existing characteristics
+      const existingChars = await db.getPolicyTypeCharacteristics(ptId)
+      const charNameMap = new Map<string, string>()
+      for (const c of existingChars) {
+        charNameMap.set(c.name.toLowerCase(), c.id)
+      }
+
+      // Auto-create missing characteristics
+      const fields = categoryFieldMap[cat]
+      for (let i = 0; i < fields.length; i++) {
+        const f = fields[i]
+        if (!charNameMap.has(f.name.toLowerCase())) {
+          const newChar = await db.addPolicyTypeCharacteristic({
+            policyTypeId: ptId,
+            name: f.name,
+            fieldType: f.type as any,
+            isRequired: false,
+            order: existingChars.length + i
+          })
+          charNameMap.set(f.name.toLowerCase(), newChar.id)
+        }
+      }
+      charMaps[cat] = charNameMap
+    }
+
+    // Build entity name → id map for broker matching
+    const entities = await db.getEntities()
+    const entityNameMap = new Map<string, string>()
+    for (const e of entities) {
+      entityNameMap.set(e.name.toLowerCase(), e.id)
+    }
+
+    // Build surveyor map for condition survey creation
+    const surveyors = await db.getSurveyors()
+    const surveyorNameMap = new Map<string, string>()
+    for (const s of surveyors) {
+      surveyorNameMap.set(s.companyName.toLowerCase(), s.id)
+    }
+
+    const unmatched: { ship: string; imo: string; broker: string; fleet: string }[] = []
+    let imported = 0
+    const processedVessels = new Set<string>()
+
+    for (const row of parsed) {
+      const vesselId = row.imo ? imoMap.get(row.imo) : undefined
+      if (!vesselId) {
+        unmatched.push({ ship: row.shipName, imo: row.imo, broker: row.broker, fleet: row.fleetName })
+        continue
+      }
+
+      // Update vessel details if currently missing
+      const vessel = vessels.find(v => v.id === vesselId)
+      if (vessel) {
+        const updates: Record<string, any> = {}
+        if ((!vessel.grossTonnage || vessel.grossTonnage === 0) && row.grossTonnage) updates.grossTonnage = row.grossTonnage
+        if ((!vessel.builtYear || vessel.builtYear === 0) && row.year) updates.builtYear = row.year
+        if (!vessel.vesselType && row.vesselType) updates.vesselType = row.vesselType
+        if (!vessel.classificationSociety && row.classification) updates.classificationSociety = row.classification
+        if (!vessel.flagStateId && row.flag) {
+          const matchedFlagId = flagNameMap.get(row.flag.toLowerCase())
+          if (matchedFlagId) updates.flagStateId = matchedFlagId
+        }
+        if (Object.keys(updates).length > 0) {
+          await db.updateVessel(vesselId, updates)
+        }
+      }
+
+      // Clear existing dynamic policies for this vessel on first encounter
+      if (!processedVessels.has(vesselId)) {
+        const existingPolicies = await db.getVesselDynamicPolicies(vesselId)
+        for (const ep of existingPolicies) {
+          await db.deleteVesselDynamicPolicy(ep.id)
+        }
+        processedVessels.add(vesselId)
+      }
+
+      // Match broker
+      const brokerId = row.broker ? entityNameMap.get(row.broker.toLowerCase()) : undefined
+
+      // Import each policy record as a dynamic policy
+      const records = [row.hull, row.pi, row.war].filter(Boolean) as any[]
+      for (const r of records) {
+        const cat = r.policyCategory as string
+        const ptName = categoryNameMap[cat]
+        const ptId = ptMap.get(ptName.toLowerCase())
+        if (!ptId) continue
+
+        const charMap = charMaps[cat]
+        const fields = categoryFieldMap[cat]
+
+        // Create the dynamic policy
+        const policyId = await db.addVesselDynamicPolicy({
+          vesselId,
+          policyTypeId: ptId,
+          policyNumber: cat === 'war' ? undefined : (r.policyNumber || undefined),
+          status: 'active',
+          currency: r.currency || 'USD',
+          brokerEntityId: brokerId || undefined,
+          notes: r.notes || undefined
+        })
+
+        // Set characteristic values
+        const charValues: { characteristicId: string; valueText?: string; valueAmount?: number; valueDate?: string; valueBoolean?: boolean }[] = []
+        for (const f of fields) {
+          const charId = charMap.get(f.name.toLowerCase())
+          if (!charId) continue
+          const val = r[f.key]
+          if (val == null || val === '' || val === undefined) continue
+
+          if (f.type === 'amount') {
+            charValues.push({ characteristicId: charId, valueAmount: typeof val === 'number' ? val : parseFloat(val) })
+          } else if (f.type === 'date') {
+            charValues.push({ characteristicId: charId, valueDate: String(val) })
+          } else {
+            charValues.push({ characteristicId: charId, valueText: String(val) })
+          }
+        }
+        if (charValues.length > 0) {
+          await db.setVesselPolicyValues(policyId, charValues)
+        }
+        imported++
+      }
+
+      // Create condition survey if survey data exists (#2 - separate from policies)
+      if (row.conditionSurvey || row.surveyDate || row.surveyReference) {
+        try {
+          // Find or use a default surveyor
+          let surveyorId = ''
+          if (row.conditionSurvey) {
+            surveyorId = surveyorNameMap.get(row.conditionSurvey.toLowerCase()) || ''
+          }
+          if (surveyorId && row.surveyDate) {
+            await db.addConditionSurvey({
+              vesselId,
+              surveyDate: row.surveyDate,
+              surveyorId,
+              surveyType: 'Condition Survey',
+              reference: row.surveyReference || undefined,
+              notes: row.surveyDone ? `Survey Done: ${row.surveyDone}` : undefined
+            })
+          }
+        } catch { /* skip survey creation errors */ }
+      }
+    }
+
+    return { imported, skippedCancelled: 0, totalRows: parsed.length, unmatched }
+  })
+
+  // Classification Societies
+  safeHandle('db:getClassificationSocieties', (event) => { requireSession(event); return db.getClassificationSocieties() })
+  safeHandle('db:addClassificationSociety', (event, cs) => { requireAdmin(event); return db.addClassificationSociety(cs) })
+  safeHandle('db:updateClassificationSociety', (event, id, updates) => { requireAdmin(event); return db.updateClassificationSociety(id, updates) })
+  safeHandle('db:deleteClassificationSociety', (event, id) => { requireAdmin(event); return db.deleteClassificationSociety(id) })
+  safeHandle('db:reorderClassificationSocieties', (event, ids) => { requireAdmin(event); return db.reorderClassificationSocieties(ids) })
+  safeHandle('vessels:getClassifications', (event, vesselId) => { requireSession(event); return db.getVesselClassifications(vesselId) })
+  safeHandle('vessels:setClassifications', (event, vesselId, csIds) => { requireSession(event); return db.setVesselClassifications(vesselId, csIds) })
+
+  // Vessel Audit Log
+  safeHandle('vessels:getAuditLog', (event, vesselId) => { requireSession(event); return db.getVesselAuditLog(vesselId) })
+
+  // Policy Type Characteristics
+  safeHandle('db:getPolicyTypeCharacteristics', (event, policyTypeId) => { requireSession(event); return db.getPolicyTypeCharacteristics(policyTypeId) })
+  safeHandle('db:addPolicyTypeCharacteristic', (event, c) => { requireAdmin(event); return db.addPolicyTypeCharacteristic(c) })
+  safeHandle('db:updatePolicyTypeCharacteristic', (event, id, updates) => { requireAdmin(event); return db.updatePolicyTypeCharacteristic(id, updates) })
+  safeHandle('db:deletePolicyTypeCharacteristic', (event, id) => { requireAdmin(event); return db.deletePolicyTypeCharacteristic(id) })
+  safeHandle('db:reorderPolicyTypeCharacteristics', (event, ids) => { requireAdmin(event); return db.reorderPolicyTypeCharacteristics(ids) })
+
+  // Policy Type Conditions
+  safeHandle('db:getPolicyTypeConditions', (event, policyTypeId) => { requireSession(event); return db.getPolicyTypeConditions(policyTypeId) })
+  safeHandle('db:addPolicyTypeCondition', (event, c) => { requireAdmin(event); return db.addPolicyTypeCondition(c) })
+  safeHandle('db:updatePolicyTypeCondition', (event, id, updates) => { requireAdmin(event); return db.updatePolicyTypeCondition(id, updates) })
+  safeHandle('db:deletePolicyTypeCondition', (event, id) => { requireAdmin(event); return db.deletePolicyTypeCondition(id) })
+
+  // Vessel Dynamic Policies
+  safeHandle('vessels:getDynamicPolicies', (event, vesselId) => { requireSession(event); return db.getVesselDynamicPolicies(vesselId) })
+  safeHandle('vessels:addDynamicPolicy', (event, policy) => { requireSession(event); return db.addVesselDynamicPolicy(policy) })
+  safeHandle('vessels:updateDynamicPolicy', (event, id, updates) => { requireSession(event); return db.updateVesselDynamicPolicy(id, updates) })
+  safeHandle('vessels:deleteDynamicPolicy', (event, id) => { requireSession(event); return db.deleteVesselDynamicPolicy(id) })
+  safeHandle('vessels:setDynamicPolicyValues', (event, policyId, values) => { requireSession(event); return db.setVesselPolicyValues(policyId, values) })
+
+  // Policy Expiry Alerts
+  safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
+  safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })
+
+  // Quotations
+  safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })
+  safeHandle('db:addQuotation', (event, q) => { requireSession(event); return db.addQuotation(q) })
+  safeHandle('db:updateQuotation', (event, id, updates) => { requireSession(event); return db.updateQuotation(id, updates) })
+  safeHandle('db:deleteQuotation', (event, id) => { requireSession(event); return db.deleteQuotation(id) })
+
+  // Quotation Sub-Tables
+  safeHandle('db:getQuotationAssureds', (event, qId) => { requireSession(event); return db.getQuotationAssureds(qId) })
+  safeHandle('db:addQuotationAssured', (event, data) => { requireSession(event); return db.addQuotationAssured(data) })
+  safeHandle('db:updateQuotationAssured', (event, id, updates) => { requireSession(event); return db.updateQuotationAssured(id, updates) })
+  safeHandle('db:deleteQuotationAssured', (event, id) => { requireSession(event); return db.deleteQuotationAssured(id) })
+  safeHandle('db:reorderQuotationAssureds', (event, ids) => { requireSession(event); return db.reorderQuotationAssureds(ids) })
+
+  safeHandle('db:getQuotationNewVessel', (event, qId) => { requireSession(event); return db.getQuotationNewVessel(qId) })
+  safeHandle('db:upsertQuotationNewVessel', (event, qId, data) => { requireSession(event); return db.upsertQuotationNewVessel(qId, data) })
+  safeHandle('db:deleteQuotationNewVessel', (event, qId) => { requireSession(event); return db.deleteQuotationNewVessel(qId) })
+
+  safeHandle('db:getQuotationSubLimits', (event, qId) => { requireSession(event); return db.getQuotationSubLimits(qId) })
+  safeHandle('db:addQuotationSubLimit', (event, data) => { requireSession(event); return db.addQuotationSubLimit(data) })
+  safeHandle('db:updateQuotationSubLimit', (event, id, updates) => { requireSession(event); return db.updateQuotationSubLimit(id, updates) })
+  safeHandle('db:deleteQuotationSubLimit', (event, id) => { requireSession(event); return db.deleteQuotationSubLimit(id) })
+
+  safeHandle('db:getQuotationClauses', (event, qId) => { requireSession(event); return db.getQuotationClauses(qId) })
+  safeHandle('db:setQuotationClauses', (event, qId, ids, overrides) => { requireSession(event); return db.setQuotationClauses(qId, ids, overrides) })
+  safeHandle('db:getQuotationClauseOverrides', (event, qId) => { requireSession(event); return db.getQuotationClauseOverrides(qId) })
+  safeHandle('db:updateQuotationClauseOverride', (event, qId, clauseId, override) => { requireSession(event); return db.updateQuotationClauseOverride(qId, clauseId, override) })
+
+  safeHandle('db:getQuotationAdditionalClauses', (event, qId) => { requireSession(event); return db.getQuotationAdditionalClauses(qId) })
+  safeHandle('db:addQuotationAdditionalClause', (event, data) => { requireSession(event); return db.addQuotationAdditionalClause(data) })
+  safeHandle('db:deleteQuotationAdditionalClause', (event, id) => { requireSession(event); return db.deleteQuotationAdditionalClause(id) })
+
+  safeHandle('db:getQuotationWarranties', (event, qId) => { requireSession(event); return db.getQuotationWarranties(qId) })
+  safeHandle('db:setQuotationWarranties', (event, qId, ids) => { requireSession(event); return db.setQuotationWarranties(qId, ids) })
+
+  safeHandle('db:getQuotationDeductibles', (event, qId) => { requireSession(event); return db.getQuotationDeductibles(qId) })
+  safeHandle('db:addQuotationDeductible', (event, data) => { requireSession(event); return db.addQuotationDeductible(data) })
+  safeHandle('db:updateQuotationDeductible', (event, id, updates) => { requireSession(event); return db.updateQuotationDeductible(id, updates) })
+  safeHandle('db:deleteQuotationDeductible', (event, id) => { requireSession(event); return db.deleteQuotationDeductible(id) })
+
+  safeHandle('db:getQuotationTextDeductibles', (event, qId) => { requireSession(event); return db.getQuotationTextDeductibles(qId) })
+  safeHandle('db:addQuotationTextDeductible', (event, data) => { requireSession(event); return db.addQuotationTextDeductible(data) })
+  safeHandle('db:deleteQuotationTextDeductible', (event, id) => { requireSession(event); return db.deleteQuotationTextDeductible(id) })
+
+  safeHandle('db:getQuotationExclusions', (event, qId) => { requireSession(event); return db.getQuotationExclusions(qId) })
+  safeHandle('db:setQuotationExclusions', (event, qId, items) => { requireSession(event); return db.setQuotationExclusions(qId, items) })
+
+  safeHandle('db:getQuotationExcludedCountries', (event, qId) => { requireSession(event); return db.getQuotationExcludedCountries(qId) })
+  safeHandle('db:setQuotationExcludedCountries', (event, qId, countries) => { requireSession(event); return db.setQuotationExcludedCountries(qId, countries) })
+
+  safeHandle('db:getQuotationSubjectivities', (event, qId) => { requireSession(event); return db.getQuotationSubjectivities(qId) })
+  safeHandle('db:addQuotationSubjectivity', (event, data) => { requireSession(event); return db.addQuotationSubjectivity(data) })
+  safeHandle('db:updateQuotationSubjectivity', (event, id, text) => { requireSession(event); return db.updateQuotationSubjectivity(id, text) })
+  safeHandle('db:deleteQuotationSubjectivity', (event, id) => { requireSession(event); return db.deleteQuotationSubjectivity(id) })
+
+  safeHandle('db:getQuotationInstalments', (event, qId) => { requireSession(event); return db.getQuotationInstalments(qId) })
+  safeHandle('db:setQuotationInstalments', (event, qId, instalments) => { requireSession(event); return db.setQuotationInstalments(qId, instalments) })
+
+  safeHandle('db:getQuotationInformation', (event, qId) => { requireSession(event); return db.getQuotationInformation(qId) })
+  safeHandle('db:addQuotationInformation', (event, data) => { requireSession(event); return db.addQuotationInformation(data) })
+  safeHandle('db:deleteQuotationInformation', (event, id) => { requireSession(event); return db.deleteQuotationInformation(id) })
+
+  safeHandle('db:getQuotationNotes', (event, qId) => { requireSession(event); return db.getQuotationNotes(qId) })
+  safeHandle('db:addQuotationNote', (event, data) => { requireSession(event); return db.addQuotationNote(data) })
+  safeHandle('db:updateQuotationNote', (event, id, updates) => { requireSession(event); return db.updateQuotationNote(id, updates) })
+  safeHandle('db:deleteQuotationNote', (event, id) => { requireSession(event); return db.deleteQuotationNote(id) })
+
   createWindow()
 
   // Start the compliance scheduler after window is created

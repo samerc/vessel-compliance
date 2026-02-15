@@ -99,3 +99,4 @@ Thumbs.db
 # Project Specific
 *.md
 db/db-config.json
+documents

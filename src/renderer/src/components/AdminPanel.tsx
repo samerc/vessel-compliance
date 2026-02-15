@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3 } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Upload } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, PolicyTypeCharacteristic, PolicyTypeCondition } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
 export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?: (vesselId: string) => void }) {
@@ -38,7 +38,26 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [editingPolicyTypeId, setEditingPolicyTypeId] = useState<string | null>(null)
     const [editPolicyTypeName, setEditPolicyTypeName] = useState('')
 
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'policyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dangerZone']))
+    // Classification Societies
+    const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
+    const [newClassName, setNewClassName] = useState('')
+    const [newClassAbbr, setNewClassAbbr] = useState('')
+    const [newClassIacs, setNewClassIacs] = useState(false)
+    const [editingClassId, setEditingClassId] = useState<string | null>(null)
+    const [editClassName, setEditClassName] = useState('')
+    const [editClassAbbr, setEditClassAbbr] = useState('')
+    const [editClassIacs, setEditClassIacs] = useState(false)
+
+    // Policy type characteristics and conditions
+    const [expandedPolicyTypeId, setExpandedPolicyTypeId] = useState<string | null>(null)
+    const [ptCharacteristics, setPtCharacteristics] = useState<PolicyTypeCharacteristic[]>([])
+    const [ptConditions, setPtConditions] = useState<PolicyTypeCondition[]>([])
+    const [newCharName, setNewCharName] = useState('')
+    const [newCharType, setNewCharType] = useState<'text' | 'date' | 'amount' | 'boolean' | 'select'>('text')
+    const [newCharRequired, setNewCharRequired] = useState(false)
+    const [newCondName, setNewCondName] = useState('')
+
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'classSocieties', 'policyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dataImport', 'dangerZone']))
     const toggleSection = (id: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev)
@@ -129,6 +148,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         await loadDocTypes()
         await loadRoles()
         await loadSurveyTypes()
+        await loadClassSocieties()
         await loadPolicyTypes()
     }
 
@@ -173,6 +193,106 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
         setPolicyTypes(newOrder)
         await window.api.reorderPolicyTypes(newOrder.map(p => p.id))
+    }
+
+    // --- Classification Societies ---
+    const loadClassSocieties = async () => {
+        const data = await window.api.getClassificationSocieties()
+        setClassSocieties(data)
+    }
+
+    const handleAddClassSociety = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newClassName.trim()) return
+        await window.api.addClassificationSociety({ name: newClassName.trim(), abbreviation: newClassAbbr.trim(), isIacs: newClassIacs, order: classSocieties.length })
+        setNewClassName(''); setNewClassAbbr(''); setNewClassIacs(false)
+        loadClassSocieties()
+        showSuccess('Classification society added')
+    }
+
+    const handleDeleteClassSociety = async (id: string) => {
+        if (!confirm('Delete this classification society?')) return
+        await window.api.deleteClassificationSociety(id)
+        loadClassSocieties()
+        showSuccess('Classification society deleted')
+    }
+
+    const handleMoveClassSociety = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...classSocieties]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setClassSocieties(newOrder)
+        await window.api.reorderClassificationSocieties(newOrder.map(c => c.id))
+    }
+
+    const saveClassSocietyEdit = async (id: string) => {
+        if (!editClassName.trim()) return
+        await window.api.updateClassificationSociety(id, { name: editClassName.trim(), abbreviation: editClassAbbr.trim(), isIacs: editClassIacs })
+        setEditingClassId(null)
+        loadClassSocieties()
+        showSuccess('Classification society updated')
+    }
+
+    // --- Policy Type Characteristics & Conditions ---
+    const loadPolicyTypeDetails = async (policyTypeId: string) => {
+        const [chars, conds] = await Promise.all([
+            window.api.getPolicyTypeCharacteristics(policyTypeId),
+            window.api.getPolicyTypeConditions(policyTypeId)
+        ])
+        setPtCharacteristics(chars)
+        setPtConditions(conds)
+    }
+
+    const toggleExpandPolicyType = async (ptId: string) => {
+        if (expandedPolicyTypeId === ptId) {
+            setExpandedPolicyTypeId(null)
+        } else {
+            setExpandedPolicyTypeId(ptId)
+            await loadPolicyTypeDetails(ptId)
+        }
+    }
+
+    const handleAddCharacteristic = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newCharName.trim() || !expandedPolicyTypeId) return
+        await window.api.addPolicyTypeCharacteristic({
+            policyTypeId: expandedPolicyTypeId,
+            name: newCharName.trim(),
+            fieldType: newCharType,
+            isRequired: newCharRequired,
+            order: ptCharacteristics.length
+        })
+        setNewCharName(''); setNewCharType('text'); setNewCharRequired(false)
+        loadPolicyTypeDetails(expandedPolicyTypeId)
+        showSuccess('Characteristic added')
+    }
+
+    const handleDeleteCharacteristic = async (id: string) => {
+        if (!expandedPolicyTypeId) return
+        await window.api.deletePolicyTypeCharacteristic(id)
+        loadPolicyTypeDetails(expandedPolicyTypeId)
+        showSuccess('Characteristic deleted')
+    }
+
+    const handleAddCondition = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newCondName.trim() || !expandedPolicyTypeId) return
+        await window.api.addPolicyTypeCondition({
+            policyTypeId: expandedPolicyTypeId,
+            name: newCondName.trim(),
+            order: ptConditions.length
+        })
+        setNewCondName('')
+        loadPolicyTypeDetails(expandedPolicyTypeId)
+        showSuccess('Condition added')
+    }
+
+    const handleDeleteCondition = async (id: string) => {
+        if (!expandedPolicyTypeId) return
+        await window.api.deletePolicyTypeCondition(id)
+        loadPolicyTypeDetails(expandedPolicyTypeId)
+        showSuccess('Condition deleted')
     }
 
     const loadDocTypes = async () => {
@@ -1264,7 +1384,94 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                 </>}
             </section>
 
-            {/* 7. Policy Types */}
+            {/* 7. Classification Societies */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3
+                    onClick={() => toggleSection('classSocieties')}
+                    style={{ marginBottom: collapsedSections.has('classSocieties') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('classSocieties') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                    <Shield size={20} color="var(--accent-primary)" /> Classification Societies
+                </h3>
+                {!collapsedSections.has('classSocieties') && <>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+                        Manage classification societies. Vessels can be assigned to one or more classes.
+                    </p>
+                    <form onSubmit={handleAddClassSociety} style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                        <input type="text" value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="Name (e.g. Lloyd's Register)" style={{ flex: 2, minWidth: '150px' }} aria-label="Class name" />
+                        <input type="text" value={newClassAbbr} onChange={e => setNewClassAbbr(e.target.value)} placeholder="Abbreviation (e.g. LR)" style={{ flex: 1, minWidth: '80px' }} aria-label="Abbreviation" />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            <input type="checkbox" checked={newClassIacs} onChange={e => setNewClassIacs(e.target.checked)} /> IACS
+                        </label>
+                        <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Plus size={18} /> Add
+                        </button>
+                    </form>
+                    {classSocieties.length > 0 && (
+                        <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <caption className="sr-only">Classification societies</caption>
+                                <thead>
+                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                        <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
+                                        <th scope="col" style={{ padding: '16px' }}>Name</th>
+                                        <th scope="col" style={{ padding: '16px' }}>Abbreviation</th>
+                                        <th scope="col" style={{ padding: '16px' }}>IACS</th>
+                                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {classSocieties.map((cs, index) => (
+                                        <tr key={cs.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                            <td style={{ padding: '16px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <button onClick={() => handleMoveClassSociety(index, 'up')} disabled={index === 0} style={{ background: 'transparent', border: 'none', cursor: index === 0 ? 'default' : 'pointer', padding: '0', opacity: index === 0 ? 0.3 : 1 }} aria-label="Move up"><ChevronUp size={14} color="var(--text-secondary)" /></button>
+                                                        <button onClick={() => handleMoveClassSociety(index, 'down')} disabled={index === classSocieties.length - 1} style={{ background: 'transparent', border: 'none', cursor: index === classSocieties.length - 1 ? 'default' : 'pointer', padding: '0', opacity: index === classSocieties.length - 1 ? 0.3 : 1 }} aria-label="Move down"><ChevronDown size={14} color="var(--text-secondary)" /></button>
+                                                    </div>
+                                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{index + 1}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '16px' }}>
+                                                {editingClassId === cs.id ? (
+                                                    <input type="text" value={editClassName} onChange={e => setEditClassName(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveClassSocietyEdit(cs.id)} autoFocus style={{ width: '100%' }} />
+                                                ) : cs.name}
+                                            </td>
+                                            <td style={{ padding: '16px' }}>
+                                                {editingClassId === cs.id ? (
+                                                    <input type="text" value={editClassAbbr} onChange={e => setEditClassAbbr(e.target.value)} style={{ width: '80px' }} />
+                                                ) : cs.abbreviation}
+                                            </td>
+                                            <td style={{ padding: '16px' }}>
+                                                {editingClassId === cs.id ? (
+                                                    <input type="checkbox" checked={editClassIacs} onChange={e => setEditClassIacs(e.target.checked)} />
+                                                ) : cs.isIacs ? 'Yes' : 'No'}
+                                            </td>
+                                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                                    {editingClassId === cs.id ? (
+                                                        <>
+                                                            <button onClick={() => saveClassSocietyEdit(cs.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
+                                                            <button onClick={() => setEditingClassId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => { setEditingClassId(cs.id); setEditClassName(cs.name); setEditClassAbbr(cs.abbreviation); setEditClassIacs(cs.isIacs) }} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }} aria-label="Edit"><Edit3 size={18} /></button>
+                                                            <button onClick={() => handleDeleteClassSociety(cs.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete"><Trash2 size={18} /></button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </>}
+            </section>
+
+            {/* 8. Policy Types */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3
                     onClick={() => toggleSection('policyTypes')}
@@ -1292,78 +1499,116 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                     </form>
 
                     {policyTypes.length > 0 && (
-                        <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <caption className="sr-only">Policy types</caption>
-                                <thead>
-                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                        <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
-                                        <th scope="col" style={{ padding: '16px' }}>Policy Type</th>
-                                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {policyTypes.map((pt, index) => (
-                                        <tr key={pt.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                            <td style={{ padding: '16px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                        <button
-                                                            onClick={() => handleMovePolicyType(index, 'up')}
-                                                            disabled={index === 0}
-                                                            style={{ background: 'transparent', border: 'none', cursor: index === 0 ? 'default' : 'pointer', padding: '0', opacity: index === 0 ? 0.3 : 1 }}
-                                                            aria-label="Move up"
-                                                        >
-                                                            <ChevronUp size={14} color="var(--text-secondary)" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleMovePolicyType(index, 'down')}
-                                                            disabled={index === policyTypes.length - 1}
-                                                            style={{ background: 'transparent', border: 'none', cursor: index === policyTypes.length - 1 ? 'default' : 'pointer', padding: '0', opacity: index === policyTypes.length - 1 ? 0.3 : 1 }}
-                                                            aria-label="Move down"
-                                                        >
-                                                            <ChevronDown size={14} color="var(--text-secondary)" />
-                                                        </button>
-                                                    </div>
-                                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '20px', textAlign: 'center' }}>{index + 1}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {policyTypes.map((pt, index) => (
+                                <div key={pt.id} style={{ border: '1px solid var(--table-border)', borderRadius: '8px', overflow: 'hidden' }}>
+                                    {/* Policy type header row */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: expandedPolicyTypeId === pt.id ? 'var(--table-header-bg)' : 'transparent' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <button onClick={() => handleMovePolicyType(index, 'up')} disabled={index === 0} style={{ background: 'transparent', border: 'none', cursor: index === 0 ? 'default' : 'pointer', padding: '0', opacity: index === 0 ? 0.3 : 1 }} aria-label="Move up"><ChevronUp size={14} color="var(--text-secondary)" /></button>
+                                            <button onClick={() => handleMovePolicyType(index, 'down')} disabled={index === policyTypes.length - 1} style={{ background: 'transparent', border: 'none', cursor: index === policyTypes.length - 1 ? 'default' : 'pointer', padding: '0', opacity: index === policyTypes.length - 1 ? 0.3 : 1 }} aria-label="Move down"><ChevronDown size={14} color="var(--text-secondary)" /></button>
+                                        </div>
+                                        <button onClick={() => toggleExpandPolicyType(pt.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0' }}>
+                                            {expandedPolicyTypeId === pt.id ? <ChevronDown size={16} color="var(--accent-primary)" /> : <ChevronRight size={16} color="var(--text-secondary)" />}
+                                        </button>
+                                        <div style={{ flex: 1 }}>
+                                            {editingPolicyTypeId === pt.id ? (
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <input type="text" value={editPolicyTypeName} onChange={e => setEditPolicyTypeName(e.target.value)} onKeyDown={e => e.key === 'Enter' && savePolicyTypeEdit(pt.id)} autoFocus style={{ flex: 1 }} aria-label="Edit policy type name" />
+                                                    <button onClick={() => savePolicyTypeEdit(pt.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
+                                                    <button onClick={() => setEditingPolicyTypeId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
                                                 </div>
-                                            </td>
-                                            <td style={{ padding: '16px' }}>
-                                                {editingPolicyTypeId === pt.id ? (
-                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                        <input
-                                                            type="text"
-                                                            value={editPolicyTypeName}
-                                                            onChange={e => setEditPolicyTypeName(e.target.value)}
-                                                            onKeyDown={e => e.key === 'Enter' && savePolicyTypeEdit(pt.id)}
-                                                            onKeyDownCapture={e => e.key === 'Escape' && setEditingPolicyTypeId(null)}
-                                                            autoFocus
-                                                            style={{ flex: 1 }}
-                                                            aria-label="Edit policy type name"
-                                                        />
-                                                        <button onClick={() => savePolicyTypeEdit(pt.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
-                                                        <button onClick={() => setEditingPolicyTypeId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
+                                            ) : (
+                                                <span onClick={() => toggleExpandPolicyType(pt.id)} style={{ cursor: 'pointer', fontWeight: '600' }}>{pt.name}</span>
+                                            )}
+                                        </div>
+                                        {expandedPolicyTypeId !== pt.id && (
+                                            <span onClick={() => toggleExpandPolicyType(pt.id)} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.7 }}>Click to configure fields &amp; conditions</span>
+                                        )}
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button onClick={() => startEditingPolicyType(pt)} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }} aria-label="Edit"><Edit3 size={16} /></button>
+                                            <button onClick={() => handleDeletePolicyType(pt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete"><Trash2 size={16} /></button>
+                                        </div>
+                                    </div>
+
+                                    {/* Expanded: Characteristics + Conditions */}
+                                    {expandedPolicyTypeId === pt.id && (
+                                        <div style={{ padding: '16px', borderTop: '1px solid var(--table-border)', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                                            {/* Characteristics */}
+                                            <div style={{ flex: 2, minWidth: '300px' }}>
+                                                <h4 style={{ fontSize: '0.9rem', marginBottom: '12px', color: 'var(--text-secondary)' }}>Characteristics (Fields)</h4>
+                                                <form onSubmit={handleAddCharacteristic} style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                                                    <input type="text" value={newCharName} onChange={e => setNewCharName(e.target.value)} placeholder="Field name" style={{ flex: 2, minWidth: '120px', fontSize: '0.85rem', padding: '4px 8px' }} />
+                                                    <select value={newCharType} onChange={e => setNewCharType(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                                        <option value="text">Text</option>
+                                                        <option value="date">Date</option>
+                                                        <option value="amount">Amount</option>
+                                                        <option value="boolean">Boolean</option>
+                                                        <option value="select">Select</option>
+                                                    </select>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                        <input type="checkbox" checked={newCharRequired} onChange={e => setNewCharRequired(e.target.checked)} /> Req
+                                                    </label>
+                                                    <button type="submit" className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Add</button>
+                                                </form>
+                                                {ptCharacteristics.length > 0 ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        {ptCharacteristics.map(c => (
+                                                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px', background: 'rgba(128,128,128,0.05)', border: '1px solid var(--table-border)' }}>
+                                                                <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
+                                                                <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{c.fieldType}</span>
+                                                                {c.isRequired && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>req</span>}
+                                                                <button onClick={() => handleDeleteCharacteristic(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={14} /></button>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 ) : (
-                                                    <span onClick={() => startEditingPolicyType(pt)} style={{ cursor: 'pointer' }}>{pt.name}</span>
+                                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No characteristics defined</p>
                                                 )}
-                                            </td>
-                                            <td style={{ padding: '16px', textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                                    <button onClick={() => startEditingPolicyType(pt)} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }} aria-label="Edit policy type"><Edit3 size={18} /></button>
-                                                    <button onClick={() => handleDeletePolicyType(pt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete policy type"><Trash2 size={18} /></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                            </div>
+
+                                            {/* Conditions */}
+                                            <div style={{ flex: 1, minWidth: '200px' }}>
+                                                <h4 style={{ fontSize: '0.9rem', marginBottom: '12px', color: 'var(--text-secondary)' }}>Conditions</h4>
+                                                <form onSubmit={handleAddCondition} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                                                    <input type="text" value={newCondName} onChange={e => setNewCondName(e.target.value)} placeholder="Condition name" style={{ flex: 1, fontSize: '0.85rem', padding: '4px 8px' }} />
+                                                    <button type="submit" className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Add</button>
+                                                </form>
+                                                {ptConditions.length > 0 ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        {ptConditions.map(c => (
+                                                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px', background: 'rgba(128,128,128,0.05)', border: '1px solid var(--table-border)' }}>
+                                                                <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
+                                                                <button onClick={() => handleDeleteCondition(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={14} /></button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No conditions defined</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     )}
                 </>}
             </section>
 
-            {/* 8. Danger Zone – Purge Data */}
+            {/* 8. Data Import */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3
+                    onClick={() => toggleSection('dataImport')}
+                    style={{ marginBottom: collapsedSections.has('dataImport') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('dataImport') ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
+                    <Upload size={20} /> Data Import
+                </h3>
+                {!collapsedSections.has('dataImport') && <DataImportSection showSuccess={showSuccess} showError={showError} />}
+            </section>
+
+            {/* 9. Danger Zone – Purge Data */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3
                     onClick={() => toggleSection('dangerZone')}
@@ -1406,5 +1651,94 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
             </section>
 
         </div >
+    )
+}
+
+// ==================== Data Import Section ====================
+
+function DataImportSection({ showSuccess, showError }: { showSuccess: (m: string) => void; showError: (m: string) => void }) {
+    const [importing, setImporting] = useState(false)
+    const [result, setResult] = useState<{ imported: number; totalRows: number; unmatched: { ship: string; imo: string; broker: string; fleet: string }[] } | null>(null)
+
+    const handleImport = async () => {
+        try {
+            const filePath = await window.api.dialogOpenFile()
+            if (!filePath) return
+            setImporting(true)
+            setResult(null)
+            const res = await window.api.importInsurancePoliciesFromExcel(filePath)
+            setResult(res)
+            showSuccess(`Imported ${res.imported} policy records from ${res.totalRows} rows. ${res.unmatched.length} unmatched.`)
+        } catch (err: any) {
+            showError(err.message || 'Import failed')
+        } finally {
+            setImporting(false)
+        }
+    }
+
+    return (
+        <div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+                Import vessel insurance policy data from an Excel file. Matches vessels by IMO number. Cancelled vessels are skipped.
+            </p>
+
+            <button
+                onClick={handleImport}
+                disabled={importing}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}
+            >
+                {importing ? <><Loader2 size={16} className="spinning" /> Importing...</> : <><Upload size={16} /> Import Vessel Excel</>}
+            </button>
+
+            {result && (
+                <div>
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(46, 204, 113, 0.1)', border: '1px solid rgba(46, 204, 113, 0.3)' }}>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{result.imported}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Policy records imported</div>
+                        </div>
+                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(52, 152, 219, 0.1)', border: '1px solid rgba(52, 152, 219, 0.3)' }}>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{result.totalRows}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Active rows processed</div>
+                        </div>
+                        {result.unmatched.length > 0 && (
+                            <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(231, 76, 60, 0.1)', border: '1px solid rgba(231, 76, 60, 0.3)' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{result.unmatched.length}</div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Unmatched vessels</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {result.unmatched.length > 0 && (
+                        <div>
+                            <h4 style={{ fontSize: '0.9rem', marginBottom: '8px' }}>Unmatched Vessels (no matching IMO found)</h4>
+                            <div style={{ maxHeight: '300px', overflow: 'auto', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--table-header-bg)' }}>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>Ship Name</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>IMO</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>Broker</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>Fleet</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.unmatched.map((u, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                                <td style={{ padding: '6px 12px' }}>{u.ship}</td>
+                                                <td style={{ padding: '6px 12px', fontFamily: 'monospace' }}>{u.imo || '-'}</td>
+                                                <td style={{ padding: '6px 12px' }}>{u.broker || '-'}</td>
+                                                <td style={{ padding: '6px 12px' }}>{u.fleet || '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     )
 }

@@ -88,3 +88,295 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   updated_by VARCHAR(255)
 );
+
+-- P&I Quotation Settings Tables
+
+CREATE TABLE IF NOT EXISTS pi_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  clause_number INT NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  is_cargo_related BOOLEAN DEFAULT FALSE,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_clause_sets (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_clause_set_items (
+  id VARCHAR(36) PRIMARY KEY,
+  set_id VARCHAR(36) NOT NULL,
+  clause_id VARCHAR(36) NOT NULL,
+  FOREIGN KEY (set_id) REFERENCES pi_clause_sets(id) ON DELETE CASCADE,
+  FOREIGN KEY (clause_id) REFERENCES pi_clauses(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pi_warranty_tags (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_warranties (
+  id VARCHAR(36) PRIMARY KEY,
+  text TEXT NOT NULL,
+  is_cargo_related BOOLEAN DEFAULT FALSE,
+  default_selected BOOLEAN DEFAULT FALSE,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_warranty_tag_assignments (
+  warranty_id VARCHAR(36) NOT NULL,
+  tag_id VARCHAR(36) NOT NULL,
+  PRIMARY KEY (warranty_id, tag_id),
+  FOREIGN KEY (warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES pi_warranty_tags(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pi_deductibles (
+  id VARCHAR(36) PRIMARY KEY,
+  description TEXT NOT NULL,
+  default_amount DECIMAL(12,2) DEFAULT 0,
+  default_currency VARCHAR(10) DEFAULT 'USD',
+  has_secondary BOOLEAN DEFAULT FALSE,
+  secondary_description TEXT,
+  secondary_default_amount DECIMAL(12,2),
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_deductible_sets (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_deductible_set_items (
+  id VARCHAR(36) PRIMARY KEY,
+  set_id VARCHAR(36) NOT NULL,
+  deductible_id VARCHAR(36) NOT NULL,
+  amount DECIMAL(12,2) DEFAULT 0,
+  currency VARCHAR(10) DEFAULT 'USD',
+  secondary_amount DECIMAL(12,2),
+  FOREIGN KEY (set_id) REFERENCES pi_deductible_sets(id) ON DELETE CASCADE,
+  FOREIGN KEY (deductible_id) REFERENCES pi_deductibles(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pi_exclusions (
+  id VARCHAR(36) PRIMARY KEY,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_sub_limit_templates (
+  id VARCHAR(36) PRIMARY KEY,
+  text_template TEXT NOT NULL,
+  default_amount DECIMAL(12,2) DEFAULT 0,
+  default_currency VARCHAR(10) DEFAULT 'USD',
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pi_additional_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS trading_excluded_countries (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  iso3_code VARCHAR(3) NOT NULL,
+  list_type VARCHAR(20) NOT NULL DEFAULT 'excluded',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Quotation Tables
+
+CREATE TABLE IF NOT EXISTS quotations (
+  id VARCHAR(36) PRIMARY KEY,
+  reference_number VARCHAR(100),
+  quotation_date DATE,
+  policy_type_id VARCHAR(36),
+  vessel_id VARCHAR(36),
+  is_renewal BOOLEAN DEFAULT FALSE,
+  status VARCHAR(20) DEFAULT 'draft',
+  period_text VARCHAR(255),
+  limit_of_liability_amount DECIMAL(15,2),
+  limit_of_liability_currency VARCHAR(10) DEFAULT 'USD',
+  limit_of_liability_text TEXT,
+  premium_amount DECIMAL(15,2),
+  premium_currency VARCHAR(10) DEFAULT 'USD',
+  num_instalments INT DEFAULT 1,
+  trading_warranty_intro TEXT,
+  sanctions_clause_version VARCHAR(50) DEFAULT 'standard',
+  section_texts_override TEXT,
+  sanctions_text_override TEXT,
+  vdr_deductible_enabled BOOLEAN DEFAULT TRUE,
+  deductible_aggregate_text TEXT,
+  validity_days INT DEFAULT 14,
+  premium_additional_text TEXT,
+  ncb_enabled BOOLEAN DEFAULT FALSE,
+  ncb_discount_percent DECIMAL(5,2),
+  ncb_text TEXT,
+  cpc_enabled BOOLEAN DEFAULT FALSE,
+  cpc_discount_percent DECIMAL(5,2),
+  cpc_text TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by VARCHAR(100),
+  FOREIGN KEY (policy_type_id) REFERENCES policy_types(id) ON DELETE SET NULL,
+  FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS quotation_new_vessels (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  imo_number VARCHAR(20),
+  built_year INT,
+  gross_tonnage DECIMAL(12,2),
+  flag VARCHAR(100),
+  vessel_type VARCHAR(100),
+  classification VARCHAR(100),
+  call_sign VARCHAR(50),
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_assureds (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  entity_id VARCHAR(36),
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(100),
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS quotation_sub_limits (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  text TEXT NOT NULL,
+  amount DECIMAL(15,2) DEFAULT 0,
+  currency VARCHAR(10) DEFAULT 'USD',
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  pi_clause_id VARCHAR(36) NOT NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (pi_clause_id) REFERENCES pi_clauses(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_additional_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  pi_additional_clause_id VARCHAR(36),
+  custom_text TEXT,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (pi_additional_clause_id) REFERENCES pi_additional_clauses(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS quotation_warranties (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  pi_warranty_id VARCHAR(36) NOT NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (pi_warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_deductibles (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  pi_deductible_id VARCHAR(36),
+  description TEXT,
+  amount DECIMAL(15,2) DEFAULT 0,
+  currency VARCHAR(10) DEFAULT 'USD',
+  secondary_amount DECIMAL(15,2),
+  secondary_description TEXT,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (pi_deductible_id) REFERENCES pi_deductibles(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS quotation_text_deductibles (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_exclusions (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  pi_exclusion_id VARCHAR(36),
+  custom_text TEXT,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (pi_exclusion_id) REFERENCES pi_exclusions(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS quotation_excluded_countries (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  list_type VARCHAR(20) NOT NULL DEFAULT 'excluded',
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_subjectivities (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_instalments (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  instalment_number INT NOT NULL,
+  days_from_inception INT DEFAULT 0,
+  description VARCHAR(255),
+  non_refundable BOOLEAN DEFAULT FALSE,
+  non_refundable_percent DECIMAL(5,2),
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pi_sanctions_versions (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  key_name VARCHAR(50) NOT NULL UNIQUE,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS quotation_information (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS quotation_notes (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  content TEXT,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);

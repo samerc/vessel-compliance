@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 
-export default function ComplianceCenter() {
+interface ComplianceCenterProps {
+    onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
+}
+
+export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCenterProps) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [docs, setDocs] = useState<VesselDocument[]>([])
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
-    const [activeTab, setActiveTab] = useState<'documents' | 'sanctions'>('documents')
+    const [activeTab, setActiveTab] = useState<'documents' | 'policies' | 'sanctions'>('documents')
     const { showSuccess } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
@@ -17,6 +21,7 @@ export default function ComplianceCenter() {
     // Sanctions compliance state
     const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
     const [checkLogs, setCheckLogs] = useState<ComplianceCheckLog[]>([])
+    const [policyAlerts, setPolicyAlerts] = useState<any[]>([])
     const [expandedResult, setExpandedResult] = useState<string | null>(null)
     const [resultsPage, setResultsPage] = useState(1)
     const [resultsLimit, setResultsLimit] = useState(10)
@@ -27,6 +32,7 @@ export default function ComplianceCenter() {
         console.log('ComplianceCenter: Component mounted, loading data...')
         loadData()
         loadSanctionsData()
+        loadPolicyAlerts()
     }, [])
 
     useEffect(() => { loadSanctionsData() }, [resultsPage, resultsLimit])
@@ -74,6 +80,15 @@ export default function ComplianceCenter() {
             setResultsTotal(0)
             setResultsTotalPages(0)
             setCheckLogs([])
+        }
+    }
+
+    const loadPolicyAlerts = async () => {
+        try {
+            const alerts = await window.api.getExpiredActivePolicies()
+            setPolicyAlerts(alerts || [])
+        } catch {
+            setPolicyAlerts([])
         }
     }
 
@@ -186,6 +201,33 @@ export default function ComplianceCenter() {
                         )}
                     </button>
                     <button
+                        id="tab-policies"
+                        role="tab"
+                        aria-selected={activeTab === 'policies'}
+                        aria-controls="panel-policies"
+                        onClick={() => setActiveTab('policies')}
+                        style={{
+                            padding: '10px 24px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: activeTab === 'policies' ? 'var(--bg-card)' : 'transparent',
+                            color: activeTab === 'policies' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontWeight: activeTab === 'policies' ? '600' : '400',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}
+                    >
+                        <FileWarning size={16} />
+                        Policy Alerts
+                        {policyAlerts.length > 0 && (
+                            <span style={{ background: 'rgba(255, 165, 0, 0.2)', color: '#ffa500', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
+                                {policyAlerts.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
                         id="tab-sanctions"
                         role="tab"
                         aria-selected={activeTab === 'sanctions'}
@@ -279,6 +321,74 @@ export default function ComplianceCenter() {
                                             <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
                                             <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
                                             <p style={{ color: 'var(--text-secondary)' }}>No alerts found for the selected filter.</p>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'policies' && (
+                <div role="tabpanel" id="panel-policies" aria-labelledby="tab-policies">
+                    <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <caption className="sr-only">Policy expiry alerts</caption>
+                            <thead>
+                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                    <th scope="col" style={{ padding: '16px' }}>Vessel</th>
+                                    <th scope="col" style={{ padding: '16px' }}>IMO</th>
+                                    <th scope="col" style={{ padding: '16px' }}>Policy Type</th>
+                                    <th scope="col" style={{ padding: '16px' }}>Policy Number</th>
+                                    <th scope="col" style={{ padding: '16px' }}>End Date</th>
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Days Overdue</th>
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'center' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {policyAlerts.map((alert: any, idx: number) => {
+                                    const endDate = alert.endDate ? new Date(alert.endDate) : null
+                                    const today = new Date()
+                                    const daysOverdue = endDate ? Math.floor((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
+                                    return (
+                                        <tr key={alert.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                            <td style={{ padding: '16px', fontWeight: '600' }}>{alert.vesselName}</td>
+                                            <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{alert.imoNumber}</td>
+                                            <td style={{ padding: '16px' }}>{alert.policyTypeName}</td>
+                                            <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{alert.policyNumber || '-'}</td>
+                                            <td style={{ padding: '16px', color: '#ff784d' }}>{alert.endDate || '-'}</td>
+                                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                                                <span style={{
+                                                    padding: '4px 10px',
+                                                    borderRadius: '20px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '700',
+                                                    background: daysOverdue > 30 ? 'rgba(255, 77, 77, 0.2)' : 'rgba(255, 165, 0, 0.2)',
+                                                    color: daysOverdue > 30 ? '#ff4d4d' : '#ffa500'
+                                                }}>
+                                                    {daysOverdue > 0 ? `${daysOverdue} days` : 'Today'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                <button
+                                                    onClick={() => onNavigateToVessel?.(alert.vesselId, 'policies')}
+                                                    className="btn-secondary"
+                                                    style={{ padding: '4px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                >
+                                                    <Eye size={14} />
+                                                    View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                                {policyAlerts.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} style={{ padding: '64px', textAlign: 'center' }}>
+                                            <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
+                                            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>No policy alerts</div>
+                                            <p style={{ color: 'var(--text-secondary)' }}>All active policies have valid end dates.</p>
                                         </td>
                                     </tr>
                                 )}

@@ -34,6 +34,11 @@ export interface Vessel {
   customerType?: 'broker' | 'direct'
   notes?: string
   flagStateId?: string
+  builtYear?: number
+  grossTonnage?: number
+  vesselType?: string
+  classificationSociety?: string
+  callSign?: string
 }
 
 export interface VesselDocument {
@@ -261,6 +266,7 @@ export interface EntityQueryParams {
   ofacStatus?: 'all' | 'CLEARED' | 'MATCH' | 'PENDING' | 'POTENTIAL_MATCH'
   sortField?: 'name' | 'type'
   sortOrder?: 'asc' | 'desc'
+  customersOnly?: boolean
 }
 
 export interface SurveyorQueryParams {
@@ -338,4 +344,355 @@ export interface DABQueryCriteria {
   customerType?: 'broker' | 'direct' | 'both'
   exportType: 'email' | 'phone' | 'both'
   vesselStatus?: 'active' | 'inactive' | 'all'
+}
+
+// ==================== P&I Quotation Settings ====================
+
+export interface PIClause {
+  id: string
+  clauseNumber: number
+  name: string
+  description?: string
+  isCargoRelated: boolean
+  order: number
+}
+
+export interface PIClauseSet {
+  id: string
+  name: string
+  clauseIds?: string[]
+}
+
+export interface PIWarrantyTag {
+  id: string
+  name: string
+  order: number
+}
+
+export interface PIWarranty {
+  id: string
+  text: string
+  isCargoRelated: boolean // legacy, kept for migration compatibility
+  defaultSelected: boolean
+  tagIds?: string[]
+  order: number
+}
+
+export interface PIDeductible {
+  id: string
+  description: string
+  defaultAmount: number
+  defaultCurrency: string
+  hasSecondary: boolean
+  secondaryDescription?: string
+  secondaryDefaultAmount?: number
+  order: number
+}
+
+export interface PIDeductibleSet {
+  id: string
+  name: string
+}
+
+export interface PIDeductibleSetItem {
+  id: string
+  setId: string
+  deductibleId: string
+  amount: number
+  currency: string
+  secondaryAmount?: number
+}
+
+export interface PIExclusion {
+  id: string
+  text: string
+  order: number
+}
+
+export interface PISubLimitTemplate {
+  id: string
+  textTemplate: string
+  defaultAmount: number
+  defaultCurrency: string
+  order: number
+}
+
+export interface PIAdditionalClause {
+  id: string
+  text: string
+  order: number
+}
+
+export interface TradingExcludedCountry {
+  id: string
+  name: string
+  iso3Code: string
+  listType: 'excluded' | 'ddq'
+}
+
+// ==================== Quotation ====================
+
+export type QuotationStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'converted'
+
+export interface Quotation {
+  id: string
+  referenceNumber: string
+  quotationDate: string
+  policyTypeId: string
+  policyTypeName?: string
+  vesselId?: string
+  vesselName?: string
+  isRenewal: boolean
+  status: QuotationStatus
+  periodText?: string
+  limitOfLiabilityAmount?: number
+  limitOfLiabilityCurrency?: string
+  limitOfLiabilityText?: string
+  premiumAmount?: number
+  premiumCurrency?: string
+  numInstalments?: number
+  tradingWarrantyIntro?: string
+  tradingShowDdqList: boolean
+  tradingShowDdqWarranties: boolean
+  tradingShowIsrael: boolean
+  tradingCustomText?: string
+  sanctionsClauseVersion: string
+  vdrDeductibleEnabled: boolean
+  deductibleAggregateText?: string
+  validityDays: number
+  premiumAdditionalText?: string
+  ncbEnabled: boolean
+  ncbDiscountPercent?: number
+  ncbText?: string
+  cpcEnabled: boolean
+  cpcDiscountPercent?: number
+  cpcText?: string
+  discountPercent?: number
+  discountLabel?: string
+  sectionTextsOverride?: PISectionTexts
+  sanctionsTextOverride?: string
+  createdAt?: string
+  updatedAt?: string
+  createdBy?: string
+}
+
+export interface QuotationNewVessel {
+  id: string
+  quotationId: string
+  name: string
+  imoNumber?: string
+  builtYear?: number
+  grossTonnage?: number
+  flag?: string
+  vesselType?: string
+  classification?: string
+  callSign?: string
+}
+
+export interface QuotationAssured {
+  id: string
+  quotationId: string
+  entityId?: string
+  name: string
+  role: string
+  order: number
+}
+
+export interface QuotationSubLimit {
+  id: string
+  quotationId: string
+  text: string
+  amount: number
+  currency: string
+}
+
+export interface QuotationDeductible {
+  id: string
+  quotationId: string
+  piDeductibleId?: string
+  description: string
+  amount: number
+  currency: string
+  secondaryAmount?: number
+  secondaryDescription?: string
+  order: number
+}
+
+export interface QuotationTextDeductible {
+  id: string
+  quotationId: string
+  text: string
+  order: number
+}
+
+export interface QuotationExcludedCountry {
+  id: string
+  quotationId: string
+  name: string
+  listType: 'excluded' | 'ddq'
+}
+
+export interface QuotationInstalment {
+  id: string
+  quotationId: string
+  instalmentNumber: number
+  daysFromInception: number
+  description?: string
+  nonRefundable?: boolean
+  nonRefundablePercent?: number
+}
+
+export interface QuotationNote {
+  id: string
+  quotationId: string
+  title: string
+  content: string
+  order: number
+}
+
+export interface PISectionTexts {
+  insuredFooter?: string
+  conditionsIntro?: string
+  limitOfLiabilityDefaultText?: string
+  tradingIntro?: string
+  tradingConditions?: string
+  tradingIsrael?: string
+  ddqCountriesIntro?: string
+  warrantiesBreach?: string
+  warrantiesNote?: string
+  deductiblesAggregate?: string
+  deductiblesVDR?: string
+  subjectivitiesIntro?: string
+  subjectivitiesNote?: string
+  premiumPaymentIntro?: string
+  premiumCondition?: string
+  premiumEarned?: string
+  continuationPiClubText?: string
+  informationNote?: string
+  importantNotice?: string
+}
+
+export interface PISanctionsVersion {
+  id: string
+  name: string
+  key: string
+  text: string
+  order: number
+}
+
+export interface InstalmentDefaults {
+  [count: string]: number[] // e.g. { "2": [0, 180], "3": [0, 90, 180] }
+}
+
+// ==================== Classification Societies ====================
+
+export interface ClassificationSociety {
+  id: string
+  name: string
+  abbreviation: string
+  isIacs: boolean
+  order: number
+}
+
+export interface VesselClassification {
+  id: string
+  vesselId: string
+  classificationSocietyId: string
+  classificationSocietyName?: string
+  abbreviation?: string
+  isIacs?: boolean
+}
+
+// ==================== Vessel Audit Log ====================
+
+export interface VesselAuditEntry {
+  id: string
+  vesselId: string
+  fieldName: string
+  oldValue: string | null
+  newValue: string | null
+  changedBy: string
+  changedAt: string
+}
+
+// ==================== Dynamic Policy System ====================
+
+export interface PolicyTypeCharacteristic {
+  id: string
+  policyTypeId: string
+  name: string
+  fieldType: 'date' | 'amount' | 'text' | 'boolean' | 'select'
+  selectOptions?: string[] // For 'select' type
+  isRequired: boolean
+  order: number
+}
+
+export interface PolicyTypeCondition {
+  id: string
+  policyTypeId: string
+  name: string
+  order: number
+}
+
+export interface VesselDynamicPolicy {
+  id: string
+  vesselId: string
+  policyTypeId: string
+  policyTypeName?: string
+  policyNumber?: string
+  conditionId?: string
+  conditionName?: string
+  status: 'active' | 'expired' | 'cancelled'
+  currency: string
+  brokerEntityId?: string
+  brokerName?: string
+  notes?: string
+  createdAt?: string
+  updatedAt?: string
+  values?: VesselPolicyValue[]
+}
+
+export interface VesselPolicyValue {
+  id: string
+  policyId: string
+  characteristicId: string
+  characteristicName?: string
+  fieldType?: string
+  valueText?: string
+  valueAmount?: number
+  valueDate?: string
+  valueBoolean?: boolean
+}
+
+export interface VesselInsurancePolicy {
+  id: string
+  vesselId: string
+  policyCategory: 'hull' | 'pi' | 'war'
+  policyNumber?: string
+  coverageCode?: string
+  inceptionDate?: string
+  inceptionTime?: string
+  endDate?: string
+  endTime?: string
+  currency: string
+  hmValue?: number
+  ivValue?: number
+  hmPremium?: number
+  ivPremium?: number
+  deductible?: number
+  amd?: number
+  generalAverage?: number
+  limitOfLiability?: number
+  premium?: number
+  warRate?: string
+  upcc?: string
+  ncb?: string
+  ourShare?: string
+  notes?: string
+  conditionSurvey?: string
+  surveyDone?: string
+  surveyDate?: string
+  surveyReference?: string
+  broker?: string
+  fleetName?: string
 }

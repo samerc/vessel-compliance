@@ -37,6 +37,7 @@ export default function EntityDirectory() {
     const [isLoading, setIsLoading] = useState(false)
 
     // Filter state
+    const [viewMode, setViewMode] = useState<'all' | 'customers'>('all')
     const [typeFilter, setTypeFilter] = useState<'all' | 'company' | 'person'>('all')
     const [ofacStatusFilter, setOfacStatusFilter] = useState<string>('all')
 
@@ -253,7 +254,8 @@ export default function EntityDirectory() {
                     limit,
                     search: debouncedSearch,
                     type: typeFilter,
-                    ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus']
+                    ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus'],
+                    customersOnly: viewMode === 'customers' ? true : undefined
                 }),
                 window.api.getVessels(),
                 window.api.getVesselAssureds(),
@@ -270,8 +272,8 @@ export default function EntityDirectory() {
         }
     }
 
-    useEffect(() => { loadData() }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter])
-    useEffect(() => { setPage(1) }, [debouncedSearch, typeFilter, ofacStatusFilter, limit])
+    useEffect(() => { loadData() }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode])
+    useEffect(() => { setPage(1) }, [debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
 
     // Clear selected entity on page change (but not initial load)
     const [hasInitialized, setHasInitialized] = useState(false)
@@ -597,6 +599,40 @@ export default function EntityDirectory() {
                 </button>
             </header>
 
+            {/* View Mode Toggle */}
+            <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '10px', width: 'fit-content', marginBottom: '20px' }}>
+                <button
+                    onClick={() => setViewMode('all')}
+                    style={{
+                        padding: '8px 20px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: viewMode === 'all' ? 'var(--bg-card)' : 'transparent',
+                        color: viewMode === 'all' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        fontWeight: viewMode === 'all' ? '600' : '400',
+                        fontSize: '0.85rem'
+                    }}
+                >
+                    All Entities
+                </button>
+                <button
+                    onClick={() => setViewMode('customers')}
+                    style={{
+                        padding: '8px 20px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: viewMode === 'customers' ? 'var(--bg-card)' : 'transparent',
+                        color: viewMode === 'customers' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        fontWeight: viewMode === 'customers' ? '600' : '400',
+                        fontSize: '0.85rem'
+                    }}
+                >
+                    Customers
+                </button>
+            </div>
+
             {/* Stats Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
                 <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -605,7 +641,7 @@ export default function EntityDirectory() {
                     </div>
                     <div>
                         <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>{total}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Total Entities</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{viewMode === 'customers' ? 'Total Customers' : 'Total Entities'}</div>
                     </div>
                 </div>
                 <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>

@@ -42,6 +42,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [editRoleValue, setEditRoleValue] = useState('')
     const [isUpdatingRole, setIsUpdatingRole] = useState(false)
 
+    // Editing state for entity/UBO names
+    const [editingEntityId, setEditingEntityId] = useState<string | null>(null)
+    const [editEntityName, setEditEntityName] = useState('')
+    const [isSavingName, setIsSavingName] = useState(false)
+
     // Loading states
     const [isAddingAssured, setIsAddingAssured] = useState(false)
     const [isAddingUBO, setIsAddingUBO] = useState(false)
@@ -225,6 +230,21 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             showError(error.message || 'Failed to update role.')
         } finally {
             setIsUpdatingRole(false)
+        }
+    }
+
+    const handleRenameEntity = async (entityId: string) => {
+        if (!editEntityName.trim()) return
+        setIsSavingName(true)
+        try {
+            await window.api.updateEntity(entityId, { name: editEntityName.trim() })
+            showSuccess('Name updated successfully')
+            setEditingEntityId(null)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to rename entity.')
+        } finally {
+            setIsSavingName(false)
         }
     }
 
@@ -763,11 +783,42 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {entity?.type === 'company' ? <Building2 size={16} opacity={0.5} /> : <User size={16} opacity={0.5} />}
-                                                <div>
-                                                    <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        {entity?.name}
-                                                        {entity && <OfacBadge entity={entity} />}
-                                                    </div>
+                                                <div style={{ flex: 1 }}>
+                                                    {editingEntityId === entity?.id ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <input
+                                                                type="text"
+                                                                value={editEntityName}
+                                                                onChange={e => setEditEntityName(e.target.value)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') handleRenameEntity(entity!.id)
+                                                                    if (e.key === 'Escape') setEditingEntityId(null)
+                                                                }}
+                                                                style={{ padding: '4px 8px', fontSize: '0.85rem', width: '200px' }}
+                                                                autoFocus
+                                                            />
+                                                            <button onClick={() => handleRenameEntity(entity!.id)} style={{ background: 'transparent', color: 'var(--success)', padding: '2px' }} title="Save" disabled={isSavingName}>
+                                                                {isSavingName ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}
+                                                            </button>
+                                                            <button onClick={() => setEditingEntityId(null)} style={{ background: 'transparent', color: 'var(--danger)', padding: '2px' }} title="Cancel">
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            {entity?.name}
+                                                            {entity && <OfacBadge entity={entity} />}
+                                                            {entity && (
+                                                                <button
+                                                                    onClick={() => { setEditingEntityId(entity.id); setEditEntityName(entity.name) }}
+                                                                    style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px', opacity: 0.5 }}
+                                                                    title="Rename"
+                                                                >
+                                                                    <Pencil size={12} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {entity?.identifier && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entity.identifier}</div>}
                                                 </div>
                                             </div>
@@ -1102,10 +1153,39 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                             >
                                                                 {ubo!.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
                                                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                        <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{ubo!.name}</span>
-                                                                        <OfacBadge entity={ubo!} />
-                                                                    </div>
+                                                                    {editingEntityId === ubo!.id ? (
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editEntityName}
+                                                                                onChange={e => setEditEntityName(e.target.value)}
+                                                                                onKeyDown={e => {
+                                                                                    if (e.key === 'Enter') handleRenameEntity(ubo!.id)
+                                                                                    if (e.key === 'Escape') setEditingEntityId(null)
+                                                                                }}
+                                                                                style={{ padding: '2px 6px', fontSize: '0.8rem', width: '140px' }}
+                                                                                autoFocus
+                                                                            />
+                                                                            <button onClick={() => handleRenameEntity(ubo!.id)} style={{ background: 'transparent', color: 'var(--success)', padding: '1px' }} title="Save" disabled={isSavingName}>
+                                                                                {isSavingName ? <Loader2 size={12} className="spinner" /> : <Save size={12} />}
+                                                                            </button>
+                                                                            <button onClick={() => setEditingEntityId(null)} style={{ background: 'transparent', color: 'var(--danger)', padding: '1px' }} title="Cancel">
+                                                                                <X size={12} />
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                            <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{ubo!.name}</span>
+                                                                            <OfacBadge entity={ubo!} />
+                                                                            <button
+                                                                                onClick={() => { setEditingEntityId(ubo!.id); setEditEntityName(ubo!.name) }}
+                                                                                style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '1px', opacity: 0.5 }}
+                                                                                title="Rename"
+                                                                            >
+                                                                                <Pencil size={10} />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                     {ubo!.identifier && <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>{ubo!.identifier}</span>}
                                                                     {ubo!.type === 'person' && (
                                                                         <div

@@ -13,6 +13,7 @@ export default function DynamicAddressBook() {
     const [results, setResults] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [hasSearched, setHasSearched] = useState(false)
+    const [contactMode, setContactMode] = useState<'all' | 'customers'>('all')
 
     // Query criteria
     const [logic, setLogic] = useState<'AND' | 'OR'>('AND')
@@ -78,9 +79,10 @@ export default function DynamicAddressBook() {
         return results.filter(r => {
             if (exportType === 'email' && !r.email) return false
             if (exportType === 'phone' && !r.phone) return false
+            if (contactMode === 'customers' && !r.isCustomer && !r.isBroker) return false
             return true
         })
-    }, [results, exportType])
+    }, [results, exportType, contactMode])
 
     const handleCopyToClipboard = () => {
         const lines = filteredResults.map(r => {
@@ -160,6 +162,15 @@ export default function DynamicAddressBook() {
                 </h3>
 
                 {!queryCollapsed && <>
+                {/* Contact Mode Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Contact scope:</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => setContactMode('all')} style={chipStyle(contactMode === 'all')}>All Entities</button>
+                        <button onClick={() => setContactMode('customers')} style={chipStyle(contactMode === 'customers')}>Customers / Brokers</button>
+                    </div>
+                </div>
+
                 {/* Logic Toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Match logic:</span>
@@ -345,6 +356,7 @@ export default function DynamicAddressBook() {
                                     <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                         <th scope="col" style={{ padding: '12px 16px' }}>Name</th>
                                         <th scope="col" style={{ padding: '12px 16px' }}>Type</th>
+                                        {contactMode === 'customers' && <th scope="col" style={{ padding: '12px 16px' }}>Role</th>}
                                         {(exportType === 'email' || exportType === 'both') && <th scope="col" style={{ padding: '12px 16px' }}>Email</th>}
                                         {(exportType === 'phone' || exportType === 'both') && <th scope="col" style={{ padding: '12px 16px' }}>Phone</th>}
                                         <th scope="col" style={{ padding: '12px 16px' }}>Associated Vessels</th>
@@ -367,6 +379,11 @@ export default function DynamicAddressBook() {
                                                     {r.entityType}
                                                 </span>
                                             </td>
+                                            {contactMode === 'customers' && (
+                                                <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                                                    {[r.isCustomer && 'Customer', r.isBroker && 'Broker'].filter(Boolean).join(', ') || '-'}
+                                                </td>
+                                            )}
                                             {(exportType === 'email' || exportType === 'both') && (
                                                 <td style={{ padding: '12px 16px', color: r.email ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '0.9rem' }}>
                                                     {r.email || '-'}

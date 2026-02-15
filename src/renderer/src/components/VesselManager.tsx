@@ -20,7 +20,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'surveys'; onClearInitialVessel?: () => void } = {}) {
+export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'surveys' | 'policies'; onClearInitialVessel?: () => void } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [entities, setEntities] = useState<Entity[]>([])

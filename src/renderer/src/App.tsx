@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, KeyRound, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -14,13 +14,16 @@ import UserProfileModal from './components/UserProfileModal'
 import SanctionsSearch from './components/SanctionsSearch'
 import ReminderCenter from './components/ReminderCenter'
 import Calculators from './components/Calculators'
+import QuotationManager from './components/QuotationManager'
 import ConditionSurveyList from './components/ConditionSurveyList'
+import VesselFilter from './components/VesselFilter'
+import PolicyRenewals from './components/PolicyRenewals'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'calculators'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -28,7 +31,7 @@ function App(): React.JSX.Element {
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
-  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'surveys' | undefined>(undefined)
+  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'surveys' | 'policies' | undefined>(undefined)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -228,6 +231,12 @@ function App(): React.JSX.Element {
               onClick={() => setActiveTab('vessels')}
             />
             <NavItem
+              icon={<SlidersHorizontal size={20} />}
+              label="Vessel Filter"
+              active={activeTab === 'vessel-filter'}
+              onClick={() => setActiveTab('vessel-filter')}
+            />
+            <NavItem
               icon={<LayoutDashboard size={20} />}
               label="Fleets"
               active={activeTab === 'fleets'}
@@ -238,6 +247,12 @@ function App(): React.JSX.Element {
               label="Compliance Center"
               active={activeTab === 'compliance'}
               onClick={() => setActiveTab('compliance')}
+            />
+            <NavItem
+              icon={<Calendar size={20} />}
+              label="Renewals"
+              active={activeTab === 'renewals'}
+              onClick={() => setActiveTab('renewals')}
             />
             <NavItem
               icon={<Search size={20} />}
@@ -269,6 +284,12 @@ function App(): React.JSX.Element {
               active={activeTab === 'calculators'}
               onClick={() => setActiveTab('calculators')}
             />
+            <NavItem
+              icon={<FileText size={20} />}
+              label="Quotations"
+              active={activeTab === 'quotations'}
+              onClick={() => setActiveTab('quotations')}
+            />
 
             {isAdmin && (
               <>
@@ -297,15 +318,18 @@ function App(): React.JSX.Element {
         <main id="main-content" className="main-content">
           {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
           {activeTab === 'vessels' && <VesselManager initialVesselId={navigateToVesselId} initialVesselSection={navigateToVesselSection} onClearInitialVessel={() => { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }} />}
+          {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
           {activeTab === 'fleets' && <FleetManager />}
           {activeTab === 'admin' && isAdmin && <AdminPanel onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
           {activeTab === 'users' && isAdmin && <UserManager />}
           {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
-          {activeTab === 'compliance' && <ComplianceCenter />}
+          {activeTab === 'compliance' && <ComplianceCenter onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setActiveTab('vessels') }} />}
           {activeTab === 'sanctions-search' && <SanctionsSearch />}
           {activeTab === 'reminders' && <ReminderCenter />}
           {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setActiveTab('vessels') }} />}
           {activeTab === 'calculators' && <Calculators />}
+          {activeTab === 'quotations' && <QuotationManager />}
+          {activeTab === 'renewals' && <PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setActiveTab('vessels') }} />}
         </main>
         <UpdateNotification />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}

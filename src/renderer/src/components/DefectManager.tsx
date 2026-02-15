@@ -7,9 +7,10 @@ import { useTheme } from '../contexts/ThemeContext'
 interface DefectManagerProps {
   survey: ConditionSurvey
   onUpdate: () => void
+  refreshKey?: number
 }
 
-export default function DefectManager({ survey, onUpdate }: DefectManagerProps) {
+export default function DefectManager({ survey, onUpdate, refreshKey }: DefectManagerProps) {
   const { user } = useAuth()
   const [defects, setDefects] = useState<SurveyDefect[]>([])
   const [sortField, setSortField] = useState<'defectNumber' | 'createdAt'>('defectNumber')
@@ -58,7 +59,7 @@ export default function DefectManager({ survey, onUpdate }: DefectManagerProps) 
 
   useEffect(() => {
     loadDefects()
-  }, [sortField, sortOrder, survey.id])
+  }, [sortField, sortOrder, survey.id, refreshKey])
 
   const handleAddDefect = async (e: React.FormEvent) => {
     e.preventDefault()

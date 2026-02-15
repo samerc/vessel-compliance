@@ -1,0 +1,101 @@
+.rte-wrapper {
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-input, var(--table-header-bg));
+}
+
+.rte-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--table-header-bg);
+}
+
+.rte-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.rte-btn svg {
+  stroke: currentColor !important;
+  color: inherit !important;
+  display: block;
+}
+
+.rte-btn:hover {
+  background: rgba(128, 128, 128, 0.25);
+  color: var(--text-primary);
+}
+
+.rte-btn-active {
+  background: var(--accent-primary) !important;
+  color: #fff !important;
+}
+
+.rte-btn-active:hover {
+  background: var(--accent-primary) !important;
+  color: #fff !important;
+  opacity: 0.9;
+}
+
+.rte-separator {
+  width: 1px;
+  margin: 2px 4px;
+  background: var(--glass-border);
+}
+
+.rte-content {
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.rte-content .tiptap {
+  outline: none;
+  min-height: inherit;
+}
+
+.rte-content .tiptap p {
+  margin: 0 0 0.3em 0;
+}
+
+.rte-content .tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.rte-content .tiptap ul,
+.rte-content .tiptap ol {
+  padding-left: 1.2em;
+  margin: 0.3em 0;
+}
+
+.rte-content .tiptap li {
+  margin-bottom: 0.15em;
+}
+
+.rte-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Use the wrapper's data-placeholder for the empty state */
+.rte-content[data-placeholder] .tiptap > p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+}
