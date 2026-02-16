@@ -865,6 +865,7 @@ app.whenReady().then(() => {
   safeHandle('db:mergeEntities', (event, sourceId, targetId, keepName) => { requireSession(event); return db.mergeEntities(sourceId, targetId, keepName) })
   safeHandle('db:purgeAllVesselsAndEntities', (event) => { requireAdmin(event); return db.purgeAllVesselsAndEntities() })
   safeHandle('maintenance:syncSettings', (event) => { requireAdmin(event); return db.syncAssuredRoles() })
+  safeHandle('maintenance:addOneDayToAllPolicies', (event) => { requireAdmin(event); return db.addOneDayToAllPolicies() })
 
   safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
   safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })

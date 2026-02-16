@@ -53,6 +53,7 @@ const api = {
   addEntityUBO: (ubo) => ipcRenderer.invoke('db:addEntityUBO', ubo),
   deleteEntityUBO: (ubo) => ipcRenderer.invoke('db:deleteEntityUBO', ubo),
   maintenanceSyncSettings: () => ipcRenderer.invoke('maintenance:syncSettings'),
+  maintenanceAddOneDayToAllPolicies: () => ipcRenderer.invoke('maintenance:addOneDayToAllPolicies'),
 
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   fsOpen: (filePath) => ipcRenderer.invoke('fs:open', filePath),

@@ -4327,6 +4327,39 @@ export class MySQLAdapter {
         )
         return rows as any[]
     }
+
+    async addOneDayToAllPolicies(): Promise<{ updatedValues: number; updatedVessels: number }> {
+        if (!this.pool) throw new Error('DB Not connected')
+
+        // 1. Update vessel_policy_values for the dynamic policy system
+        // We find all characteristics that are date fields and likely inception/expiry
+        const [dateChars] = await this.pool.query(
+            "SELECT id FROM policy_type_characteristics WHERE field_type = 'date' AND (LOWER(name) LIKE '%inception%' OR LOWER(name) LIKE '%end%' OR LOWER(name) LIKE '%expiry%')"
+        )
+        const charIds = (dateChars as any[]).map(c => c.id)
+
+        let updatedValues = 0
+        if (charIds.length > 0) {
+            // MySQL's DATE_ADD works on ISO date strings
+            const [result] = await this.pool.query(
+                `UPDATE vessel_policy_values 
+                 SET value_date = DATE_FORMAT(DATE_ADD(STR_TO_DATE(value_date, '%Y-%m-%d'), INTERVAL 1 DAY), '%Y-%m-%d')
+                 WHERE characteristic_id IN (?) AND value_date REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`,
+                [charIds]
+            )
+            updatedValues = (result as any).affectedRows
+        }
+
+        // 2. Update vessels.policy_expiry_date (legacy/summary field)
+        const [vessResult] = await this.pool.query(
+            `UPDATE vessels 
+             SET policy_expiry_date = DATE_FORMAT(DATE_ADD(STR_TO_DATE(policy_expiry_date, '%Y-%m-%d'), INTERVAL 1 DAY), '%Y-%m-%d')
+             WHERE policy_expiry_date REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`
+        )
+        const updatedVessels = (vessResult as any).affectedRows
+
+        return { updatedValues, updatedVessels }
+    }
 }
 
 export const db = new MySQLAdapter()

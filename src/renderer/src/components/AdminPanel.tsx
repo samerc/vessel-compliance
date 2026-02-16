@@ -197,7 +197,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         const newOrder = [...policyTypes]
         const swapIndex = direction === 'up' ? index - 1 : index + 1
         if (swapIndex < 0 || swapIndex >= newOrder.length) return
-        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+            ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
         setPolicyTypes(newOrder)
         await window.api.reorderPolicyTypes(newOrder.map(p => p.id))
     }
@@ -228,7 +228,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         const newOrder = [...classSocieties]
         const swapIndex = direction === 'up' ? index - 1 : index + 1
         if (swapIndex < 0 || swapIndex >= newOrder.length) return
-        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+            ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
         setClassSocieties(newOrder)
         await window.api.reorderClassificationSocieties(newOrder.map(c => c.id))
     }
@@ -267,7 +267,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         const newOrder = [...vesselTypes]
         const swapIndex = direction === 'up' ? index - 1 : index + 1
         if (swapIndex < 0 || swapIndex >= newOrder.length) return
-        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+            ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
         setVesselTypes(newOrder)
         await window.api.reorderVesselTypes(newOrder.map(v => v.id))
     }
@@ -1758,11 +1758,41 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             gap: '8px',
                             background: 'rgba(231, 76, 60, 0.15)',
                             border: '1px solid rgba(231, 76, 60, 0.4)',
-                            color: '#e74c3c'
+                            color: '#e74c3c',
+                            marginBottom: '16px'
                         }}
                     >
                         <Trash2 size={18} /> Purge All Vessels & Entities
                     </button>
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0', paddingTop: '16px' }}>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+                            Adjust all policy inception and expiry dates by adding exactly one day. Use this to fix date offsets from imports.
+                        </p>
+                        <button
+                            onClick={async () => {
+                                const confirmed = confirm('Are you sure you want to add 1 day to ALL policy inception and expiry dates?')
+                                if (!confirmed) return
+                                try {
+                                    const result = await window.api.maintenanceAddOneDayToAllPolicies()
+                                    showSuccess(`Successfully updated ${result.updatedValues} policy field values and ${result.updatedVessels} vessel summary records.`)
+                                } catch (err: any) {
+                                    showError(err.message || 'Failed to update policy dates')
+                                }
+                            }}
+                            className="btn-secondary"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: 'rgba(52, 152, 219, 0.15)',
+                                border: '1px solid rgba(52, 152, 219, 0.4)',
+                                color: '#3498db'
+                            }}
+                        >
+                            <Calendar size={18} /> Add 1 Day to All Policy Dates
+                        </button>
+                    </div>
 
                 </>}
             </section>
