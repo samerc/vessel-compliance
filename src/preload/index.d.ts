@@ -71,6 +71,7 @@ export interface Api {
   addEntityUBO: (ubo: EntityUBO) => Promise<void>
   deleteEntityUBO: (ubo: EntityUBO) => Promise<void>
   maintenanceSyncSettings: () => Promise<{ added: number }>
+  maintenanceAddOneDayToAllPolicies: () => Promise<{ updatedValues: number; updatedVessels: number }>
 
   fsExists: (filePath: string) => Promise<boolean>
   fsOpen: (filePath: string) => Promise<void>
