@@ -1,7 +1,8 @@
 import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { Vessel, Fleet, VesselDocument, DocumentType } from '../../../shared/types'
+import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy } from '../../../shared/types'
+import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 
 const isExpired = (expiryDate: string | null | undefined): boolean => {
   if (!expiryDate) return false
@@ -11,7 +12,7 @@ const isExpired = (expiryDate: string | null | undefined): boolean => {
   return expiry < today
 }
 
-const isExpiringSoon = (expiryDate: string | null | undefined, days = 90): boolean => {
+const isExpiringSoon = (expiryDate: string | null | undefined, days = 60): boolean => {
   if (!expiryDate) return false
   const expiry = new Date(expiryDate)
   const today = new Date()
@@ -46,7 +47,10 @@ export const ReportService = {
     let compliantCount = 0
     let requiredCount = 0
 
-    docTypes.forEach(type => {
+    const dynamicPolicies = await window.api.getVesselDynamicPolicies(vessel.id)
+    const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
+
+    for (const type of docTypes) {
       const doc = docs.find(d => d.documentTypeId === type.id)
       const isRequired = doc ? doc.required : type.required
 
@@ -54,17 +58,19 @@ export const ReportService = {
         requiredCount++
         if (doc?.filePath) compliantCount++
 
-        const expiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? dateOnly(vessel.policyExpiryDate) : (doc?.expiryDate || 'N/A')
+        const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || doc?.expiryDate) : doc?.expiryDate
+        const expiryToShow = (!!doc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : 'N/A'
+
         complianceData.push({
           'Document Name': type.name,
           'Description': type.description || '',
-          'Status': getExcelDocStatus(!!doc?.filePath, expiryToShow === 'N/A' ? null : expiryToShow),
+          'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry),
           'Date of Receipt': doc?.receivedDate || 'N/A',
           'Expiry Date': expiryToShow,
           'Uploaded Date': doc?.uploadedDate ? new Date(doc.uploadedDate).toLocaleDateString() : 'N/A'
         })
       }
-    })
+    }
 
     // Custom document types
     const customDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
@@ -246,7 +252,10 @@ export const ReportService = {
     let compliantCount = 0
     let requiredCount = 0
 
-    docTypes.forEach(type => {
+    const dynamicPolicies = await window.api.getVesselDynamicPolicies(vessel.id)
+    const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
+
+    for (const type of docTypes) {
       const vDoc = docs.find(d => d.documentTypeId === type.id)
       const isRequired = vDoc ? vDoc.required : type.required
 
@@ -254,15 +263,17 @@ export const ReportService = {
         requiredCount++
         if (vDoc?.filePath) compliantCount++
 
-        const pdfExpiryToShow = (type.annualRenewal && vessel.policyExpiryDate) ? dateOnly(vessel.policyExpiryDate) : (vDoc?.expiryDate || '-')
+        const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || vDoc?.expiryDate) : vDoc?.expiryDate
+        const pdfExpiryToShow = (!!vDoc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : '-'
+
         tableData.push([
           type.name,
           type.description || '',
-          getDocStatus(!!vDoc?.filePath, pdfExpiryToShow === '-' ? null : pdfExpiryToShow),
+          getDocStatus(!!vDoc?.filePath, resolvedExpiry),
           pdfExpiryToShow
         ])
       }
-    })
+    }
 
     // Custom document types for PDF
     const pdfCustomDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
@@ -553,10 +564,21 @@ export const ReportService = {
     let totalCompliant = 0
     let totalRequired = 0
     const activeVessels = vessels.filter(v => v.isActive)
+    const allDynamicPolicies = await window.api.getAllVesselDynamicPolicies()
+    
+    // Group policies by vesselId
+    const policyMap = new Map<string, VesselDynamicPolicy[]>()
+    for (const p of allDynamicPolicies) {
+      if (!policyMap.has(p.vesselId)) policyMap.set(p.vesselId, [])
+      policyMap.get(p.vesselId)!.push(p)
+    }
 
     // Section 1: Vessel Documents
-    activeVessels.forEach(v => {
-      docTypes.forEach(type => {
+    for (const v of activeVessels) {
+      const vesselPolicies = policyMap.get(v.id) || []
+      const effectiveExpiry = resolveEffectivePolicyExpiry(vesselPolicies)
+
+      for (const type of docTypes) {
         const doc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
         const isRequired = doc ? doc.required : type.required
 
@@ -564,19 +586,21 @@ export const ReportService = {
           totalRequired++
           if (doc?.filePath) totalCompliant++
 
-          const fleetExcelExpiry = (type.annualRenewal && v.policyExpiryDate) ? dateOnly(v.policyExpiryDate) : (doc?.expiryDate || 'N/A')
+          const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || doc?.expiryDate) : doc?.expiryDate
+          const expiryToShow = (!!doc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : 'N/A'
+
           data.push({
             'Vessel': v.name,
             'IMO': v.imoNumber,
             'Document Name': type.name,
             'Description': type.description || '',
-            'Status': getExcelDocStatus(!!doc?.filePath, fleetExcelExpiry === 'N/A' ? null : fleetExcelExpiry),
+            'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry),
             'Date of Receipt': doc?.receivedDate || 'N/A',
-            'Expiry Date': fleetExcelExpiry
+            'Expiry Date': expiryToShow
           })
         }
-      })
-    })
+      }
+    }
 
     // Section 2: Fleet Assureds (Deduplicated)
     const allEntities = await window.api.getEntities()
@@ -789,9 +813,19 @@ export const ReportService = {
     let totalRequired = 0
     const activeVessels = vessels.filter(v => v.isActive)
 
+    const allDynamicPolicies = await window.api.getAllVesselDynamicPolicies()
+    const policyMap = new Map<string, VesselDynamicPolicy[]>()
+    for (const p of allDynamicPolicies) {
+      if (!policyMap.has(p.vesselId)) policyMap.set(p.vesselId, [])
+      policyMap.get(p.vesselId)!.push(p)
+    }
+
     // Section 1: Vessel Documents
-    activeVessels.forEach(v => {
-      docTypes.forEach(type => {
+    for (const v of activeVessels) {
+      const vesselPolicies = policyMap.get(v.id) || []
+      const effectiveExpiry = resolveEffectivePolicyExpiry(vesselPolicies)
+
+      for (const type of docTypes) {
         const vDoc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
         const isRequired = vDoc ? vDoc.required : type.required
 
@@ -799,16 +833,18 @@ export const ReportService = {
           totalRequired++
           if (vDoc?.filePath) totalCompliant++
 
-          const fleetPdfExpiry = (type.annualRenewal && v.policyExpiryDate) ? dateOnly(v.policyExpiryDate) : (vDoc?.expiryDate || '-')
+          const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || vDoc?.expiryDate) : vDoc?.expiryDate
+          const fleetPdfExpiry = (!!vDoc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : '-'
+
           tableData.push([
             v.name,
             type.name,
-            getDocStatus(!!vDoc?.filePath, fleetPdfExpiry === '-' ? null : fleetPdfExpiry),
+            getDocStatus(!!vDoc?.filePath, resolvedExpiry),
             fleetPdfExpiry
           ])
         }
-      })
-    })
+      }
+    }
 
     // Section 2: Fleet Assureds (Deduplicated)
     const allEntities = await window.api.getEntities()

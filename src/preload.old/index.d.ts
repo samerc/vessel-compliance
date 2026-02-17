@@ -284,7 +284,6 @@ export interface Api {
 
   // Vessel Dynamic Policies
   getVesselDynamicPolicies: (vesselId: string) => Promise<VesselDynamicPolicy[]>
-  getAllVesselDynamicPolicies: () => Promise<VesselDynamicPolicy[]>
   addVesselDynamicPolicy: (policy: Omit<VesselDynamicPolicy, 'id' | 'createdAt' | 'updatedAt' | 'policyTypeName' | 'conditionName' | 'brokerName' | 'values'>) => Promise<string>
   updateVesselDynamicPolicy: (id: string, updates: Partial<VesselDynamicPolicy>) => Promise<void>
   deleteVesselDynamicPolicy: (id: string) => Promise<void>

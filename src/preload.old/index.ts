@@ -300,7 +300,6 @@ const api = {
 
   // Vessel Dynamic Policies
   getVesselDynamicPolicies: (vesselId: string) => ipcRenderer.invoke('vessels:getDynamicPolicies', vesselId),
-  getAllVesselDynamicPolicies: () => ipcRenderer.invoke('vessels:getAllDynamicPolicies'),
   addVesselDynamicPolicy: (policy: any) => ipcRenderer.invoke('vessels:addDynamicPolicy', policy),
   updateVesselDynamicPolicy: (id: string, updates: any) => ipcRenderer.invoke('vessels:updateDynamicPolicy', id, updates),
   deleteVesselDynamicPolicy: (id: string) => ipcRenderer.invoke('vessels:deleteDynamicPolicy', id),

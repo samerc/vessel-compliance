@@ -1694,7 +1694,6 @@ app.whenReady().then(() => {
 
   // Vessel Dynamic Policies
   safeHandle('vessels:getDynamicPolicies', (event, vesselId) => { requireSession(event); return db.getVesselDynamicPolicies(vesselId) })
-  safeHandle('vessels:getAllDynamicPolicies', (event) => { requireSession(event); return db.getAllVesselDynamicPolicies() })
   safeHandle('vessels:addDynamicPolicy', (event, policy) => { requireSession(event); return db.addVesselDynamicPolicy(policy) })
   safeHandle('vessels:updateDynamicPolicy', (event, id, updates) => { requireSession(event); return db.updateVesselDynamicPolicy(id, updates) })
   safeHandle('vessels:deleteDynamicPolicy', (event, id) => { requireSession(event); return db.deleteVesselDynamicPolicy(id) })

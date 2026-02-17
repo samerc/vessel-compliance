@@ -168,7 +168,22 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE users ADD COLUMN theme_preference VARCHAR(10) DEFAULT 'dark' AFTER role")
             }
 
-            // Migration: Add window preferences to users (handled in schema.sql for new installs)
+            // Migration: Add window preferences to users
+            if (!userColNames.includes('window_width')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN window_width INT DEFAULT NULL AFTER theme_preference")
+            }
+            if (!userColNames.includes('window_height')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN window_height INT DEFAULT NULL AFTER window_width")
+            }
+            if (!userColNames.includes('window_y')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN window_y INT DEFAULT NULL AFTER window_x")
+            }
+            if (!userColNames.includes('sanctions_threshold')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN sanctions_threshold INT DEFAULT 60 AFTER theme_preference")
+            }
+            if (!userColNames.includes('last_app_version')) {
+                await this.pool.query("ALTER TABLE users ADD COLUMN last_app_version VARCHAR(20) DEFAULT NULL AFTER sanctions_threshold")
+            }
 
             // Migration: Add surveyors table
             const [surveyorsTables] = await this.pool.query("SHOW TABLES LIKE 'surveyors'")
@@ -439,11 +454,45 @@ export class MySQLAdapter {
                 `)
             } catch { /* ignore if no duplicates */ }
 
+            // Migration: Create flag_states table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS flag_states (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                iso3_code VARCHAR(3) NOT NULL UNIQUE,
+                address TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
+            // Migration: Add email to flag_states
+            const [fsEmailCols] = await this.pool.query("SHOW COLUMNS FROM flag_states LIKE 'email'")
+            if ((fsEmailCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE flag_states ADD COLUMN email TEXT NULL")
+            }
+
             // Migration: Add flag_state_id to vessels
             const [vFlagCols] = await this.pool.query("SHOW COLUMNS FROM vessels LIKE 'flag_state_id'")
             if ((vFlagCols as any[]).length === 0) {
                 await this.pool.query("ALTER TABLE vessels ADD COLUMN flag_state_id VARCHAR(36) NULL")
             }
+
+            // Create policy_types table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_types (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
+            // Create vessel_policies table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_policies (
+                id VARCHAR(36) PRIMARY KEY,
+                vessel_id VARCHAR(36) NOT NULL,
+                policy_type_id VARCHAR(36) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_vessel_policy (vessel_id, policy_type_id),
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+                FOREIGN KEY (policy_type_id) REFERENCES policy_types(id) ON DELETE CASCADE
+            )`)
 
             // Migration: Add vessel detail fields
             if (!vesselColNames.includes('built_year')) {
@@ -490,6 +539,33 @@ export class MySQLAdapter {
                 await this.pool.query('ALTER TABLE quotation_instalments ADD COLUMN non_refundable_percent DECIMAL(5,2) NULL')
             }
 
+            // Migration: Create pi_sanctions_versions table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_sanctions_versions (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                key_name VARCHAR(50) NOT NULL UNIQUE,
+                text TEXT NOT NULL,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
+            // Migration: Create pi_warranty_tags table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_warranty_tags (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
+            // Migration: Create pi_warranty_tag_assignments junction table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_warranty_tag_assignments (
+                warranty_id VARCHAR(36) NOT NULL,
+                tag_id VARCHAR(36) NOT NULL,
+                PRIMARY KEY (warranty_id, tag_id),
+                FOREIGN KEY (warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES pi_warranty_tags(id) ON DELETE CASCADE
+            )`)
+
             // Migration: Add default_selected column to pi_warranties
             const [wDefSelCol] = await this.pool.query("SHOW COLUMNS FROM pi_warranties LIKE 'default_selected'")
             if ((wDefSelCol as any[]).length === 0) {
@@ -518,6 +594,131 @@ export class MySQLAdapter {
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_custom_text TEXT NULL')
             }
             // Vessel insurance policies (imported from Excel)
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_insurance_policies (
+                id VARCHAR(36) PRIMARY KEY,
+                vessel_id VARCHAR(36) NOT NULL,
+                policy_category VARCHAR(10) NOT NULL,
+                policy_number VARCHAR(100),
+                coverage_code VARCHAR(50),
+                inception_date VARCHAR(30),
+                inception_time VARCHAR(10),
+                end_date VARCHAR(30),
+                end_time VARCHAR(10),
+                currency VARCHAR(10) DEFAULT 'USD',
+                hm_value DECIMAL(15,2),
+                iv_value DECIMAL(15,2),
+                hm_premium DECIMAL(15,2),
+                iv_premium DECIMAL(15,2),
+                deductible DECIMAL(15,2),
+                amd DECIMAL(15,2),
+                general_average DECIMAL(15,2),
+                limit_of_liability DECIMAL(15,2),
+                premium DECIMAL(15,2),
+                war_rate VARCHAR(50),
+                upcc VARCHAR(50),
+                ncb VARCHAR(50),
+                our_share VARCHAR(50),
+                notes TEXT,
+                condition_survey TEXT,
+                survey_done VARCHAR(10),
+                survey_date VARCHAR(50),
+                survey_reference VARCHAR(100),
+                broker VARCHAR(255),
+                fleet_name VARCHAR(255),
+                imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE
+            )`)
+
+            // Classification societies
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS classification_societies (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                abbreviation VARCHAR(20) NOT NULL DEFAULT '',
+                is_iacs BOOLEAN DEFAULT 0,
+                order_index INT DEFAULT 0
+            )`)
+
+            // Vessel classifications (many-to-many)
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_classifications (
+                id VARCHAR(36) PRIMARY KEY,
+                vessel_id VARCHAR(36) NOT NULL,
+                classification_society_id VARCHAR(36) NOT NULL,
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+                FOREIGN KEY (classification_society_id) REFERENCES classification_societies(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_vessel_class (vessel_id, classification_society_id)
+            )`)
+
+            // Vessel types
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_types (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
+            // Vessel audit log
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_audit_log (
+                id VARCHAR(36) PRIMARY KEY,
+                vessel_id VARCHAR(36) NOT NULL,
+                field_name VARCHAR(100) NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                changed_by VARCHAR(100) DEFAULT 'system',
+                changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE
+            )`)
+
+            // Dynamic policy characteristics
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_type_characteristics (
+                id VARCHAR(36) PRIMARY KEY,
+                policy_type_id VARCHAR(36) NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                field_type VARCHAR(20) NOT NULL DEFAULT 'text',
+                select_options TEXT,
+                is_required BOOLEAN DEFAULT 0,
+                order_index INT DEFAULT 0,
+                FOREIGN KEY (policy_type_id) REFERENCES policy_types(id) ON DELETE CASCADE
+            )`)
+
+            // Policy type conditions
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_type_conditions (
+                id VARCHAR(36) PRIMARY KEY,
+                policy_type_id VARCHAR(36) NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                order_index INT DEFAULT 0,
+                FOREIGN KEY (policy_type_id) REFERENCES policy_types(id) ON DELETE CASCADE
+            )`)
+
+            // Vessel dynamic policies
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_dynamic_policies (
+                id VARCHAR(36) PRIMARY KEY,
+                vessel_id VARCHAR(36) NOT NULL,
+                policy_type_id VARCHAR(36) NOT NULL,
+                policy_number VARCHAR(100),
+                condition_id VARCHAR(36),
+                status VARCHAR(20) DEFAULT 'active',
+                currency VARCHAR(10) DEFAULT 'USD',
+                broker_entity_id VARCHAR(36),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
+                FOREIGN KEY (policy_type_id) REFERENCES policy_types(id) ON DELETE CASCADE
+            )`)
+
+            // Vessel policy values (EAV)
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_policy_values (
+                id VARCHAR(36) PRIMARY KEY,
+                policy_id VARCHAR(36) NOT NULL,
+                characteristic_id VARCHAR(36) NOT NULL,
+                value_text TEXT,
+                value_amount DECIMAL(15,2),
+                value_date VARCHAR(30),
+                value_boolean BOOLEAN,
+                FOREIGN KEY (policy_id) REFERENCES vessel_dynamic_policies(id) ON DELETE CASCADE,
+                FOREIGN KEY (characteristic_id) REFERENCES policy_type_characteristics(id) ON DELETE CASCADE
+            )`)
+
             // --- Migrate legacy vessel_insurance_policies → vessel_dynamic_policies ---
             try {
                 const [legacyRows] = await this.pool.query(
@@ -4024,51 +4225,6 @@ export class MySQLAdapter {
                 [p.id]
             )
             p.values = (vals as any[]).map(v => ({ ...v, valueBoolean: v.valueBoolean != null ? Boolean(v.valueBoolean) : undefined, valueAmount: v.valueAmount != null ? Number(v.valueAmount) : undefined }))
-        }
-
-        return policies
-    }
-
-    async getAllVesselDynamicPolicies(): Promise<VesselDynamicPolicy[]> {
-        if (!this.pool) return []
-        const [rows] = await this.pool.query(
-            `SELECT vdp.id, vdp.vessel_id as vesselId, vdp.policy_type_id as policyTypeId,
-                    pt.name as policyTypeName, vdp.policy_number as policyNumber,
-                    vdp.condition_id as conditionId, ptc.name as conditionName,
-                    vdp.status, vdp.currency, vdp.broker_entity_id as brokerEntityId,
-                    e.name as brokerName, vdp.notes,
-                    vdp.created_at as createdAt, vdp.updated_at as updatedAt
-             FROM vessel_dynamic_policies vdp
-             LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
-             LEFT JOIN policy_type_conditions ptc ON vdp.condition_id = ptc.id
-             LEFT JOIN entities e ON vdp.broker_entity_id = e.id
-             ORDER BY vdp.vessel_id, pt.order_index ASC`
-        )
-        const policies = rows as VesselDynamicPolicy[]
-
-        // Load all values for all policies in one efficient query
-        const [vals] = await this.pool.query(
-            `SELECT vpv.id, vpv.policy_id as policyId, vpv.characteristic_id as characteristicId,
-                    ptch.name as characteristicName, ptch.field_type as fieldType,
-                    vpv.value_text as valueText, vpv.value_amount as valueAmount,
-                    vpv.value_date as valueDate, vpv.value_boolean as valueBoolean
-             FROM vessel_policy_values vpv
-             JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
-             ORDER BY vpv.policy_id, ptch.order_index ASC`
-        )
-        
-        const valuesByPolicy = new Map<string, any[]>()
-        for (const v of vals as any[]) {
-            if (!valuesByPolicy.has(v.policyId)) valuesByPolicy.set(v.policyId, [])
-            valuesByPolicy.get(v.policyId)!.push({
-                ...v,
-                valueBoolean: v.valueBoolean != null ? Boolean(v.valueBoolean) : undefined,
-                valueAmount: v.valueAmount != null ? Number(v.valueAmount) : undefined
-            })
-        }
-
-        for (const p of policies) {
-            p.values = valuesByPolicy.get(p.id) || []
         }
 
         return policies
