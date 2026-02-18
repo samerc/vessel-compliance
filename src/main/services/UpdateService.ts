@@ -145,6 +145,29 @@ export class UpdateService {
     getCurrentVersion(): string {
         return app.getVersion()
     }
+
+    /**
+     * Fetch changelogs from GitHub Releases API
+     */
+    async getChangelogs(): Promise<any[]> {
+        try {
+            const response = await fetch('https://api.github.com/repos/samerc/vessel-compliance/releases')
+            if (!response.ok) {
+                throw new Error(`Failed to fetch releases: ${response.statusText}`)
+            }
+            const releases = await response.json() as any[]
+            return releases.map(r => ({
+                version: r.tag_name,
+                name: r.name,
+                date: r.published_at,
+                notes: r.body,
+                url: r.html_url
+            }))
+        } catch (error) {
+            log.error('Error fetching changelogs:', error)
+            throw error
+        }
+    }
 }
 
 // Export singleton instance

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -21,12 +21,14 @@ import PolicyRenewals from './components/PolicyRenewals'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
+import ChangelogModal from './components/ChangelogModal'
 
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
+  const [showChangelog, setShowChangelog] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -50,7 +52,7 @@ function App(): React.JSX.Element {
   // Store app version for the logged-in user
   useEffect(() => {
     if (isAuthenticated && appVersion) {
-      window.api.updateUserAppVersion(appVersion).catch(() => {})
+      window.api.updateUserAppVersion(appVersion).catch(() => { })
     }
   }, [isAuthenticated, appVersion])
 
@@ -310,8 +312,37 @@ function App(): React.JSX.Element {
             )}
           </nav>
 
-          <div style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.5, paddingTop: '8px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            fontSize: '0.7rem',
+            color: 'var(--text-secondary)',
+            opacity: 0.5,
+            paddingTop: '8px'
+          }}>
             v{appVersion}
+            <button
+              onClick={() => setShowChangelog(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--accent-primary)',
+                cursor: 'pointer',
+                fontSize: '0.65rem',
+                padding: '2px 4px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px'
+              }}
+              className="hover-effect"
+              title="View Changelog"
+            >
+              <RefreshCw size={10} />
+              Changelog
+            </button>
           </div>
         </aside>
 
@@ -333,6 +364,7 @@ function App(): React.JSX.Element {
         </main>
         <UpdateNotification />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
+        {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
       </div>
     </ErrorBoundary>
   )

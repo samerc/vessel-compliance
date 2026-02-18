@@ -364,6 +364,7 @@ export interface Api {
   updateCheckForUpdates: () => Promise<void>
   updateQuitAndInstall: () => Promise<void>
   updateGetCurrentVersion: () => Promise<string>
+  updateGetChangelogs: () => Promise<any>
   updateUserAppVersion: (version: string) => Promise<void>
   onUpdateChecking: (callback: () => void) => void
   onUpdateAvailable: (callback: (info: { version: string; releaseDate?: string; releaseName?: string; releaseNotes?: string }) => void) => void

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, StickyNote, Plus, X, Shield } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, StickyNote, Plus, X, Shield, RefreshCcw } from 'lucide-react'
+//import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, StickyNote, Plus, X, Shield, RefreshCcw } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -1395,10 +1396,41 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     const [formBrokerId, setFormBrokerId] = useState('')
     const [formNotes, setFormNotes] = useState('')
     const [formValues, setFormValues] = useState<Record<string, any>>({})
+    const modalRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         loadMeta()
     }, [])
+
+    // Focus trap for modal
+    useEffect(() => {
+        if (!showAddModal) return
+        const modal = modalRef.current
+        if (!modal) return
+
+        // Small timeout to allow render
+        setTimeout(() => {
+            const focusable = modal.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+            const first = focusable[0]
+            const last = focusable[focusable.length - 1]
+            first?.focus()
+
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') { setShowAddModal(false); return }
+                if (e.key === 'Tab') {
+                    if (e.shiftKey) {
+                        if (document.activeElement === first) { e.preventDefault(); last?.focus() }
+                    } else {
+                        if (document.activeElement === last) { e.preventDefault(); first?.focus() }
+                    }
+                }
+            }
+            document.addEventListener('keydown', handleKeyDown)
+            return () => document.removeEventListener('keydown', handleKeyDown)
+        }, 50)
+    }, [showAddModal])
 
     const loadMeta = async () => {
         try {
@@ -1447,13 +1479,17 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
         setFormBrokerId('')
         setFormNotes('')
         setFormValues({})
+
         setShowAddModal(true)
     }
 
     const openEditModal = (p: VesselDynamicPolicy) => {
+        console.log('Opening edit modal for policy:', p)
         setEditingPolicyId(p.id)
         setFormTypeId(p.policyTypeId)
-        setFormNumber(p.policyNumber || '')
+        // Strip the warning suffix if present so it doesn't persist after edit
+        const rawNumber = p.policyNumber || ''
+        setFormNumber(rawNumber.replace(' (RENEWED - PLEASE VERIFY)', ''))
         setFormConditionId(p.conditionId || '')
         setFormStatus(p.status)
         setFormCurrency(p.currency)
@@ -1468,7 +1504,9 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                 else vals[v.characteristicId] = v.valueText
             }
         }
+        console.log('Initial form values:', vals)
         setFormValues(vals)
+
         setShowAddModal(true)
     }
 
@@ -1521,6 +1559,76 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
         onReload()
     }
 
+    const handleRenewPolicy = async (p: VesselDynamicPolicy) => {
+        if (!confirm('Renew this policy? A new copy will be created with incremented dates.')) return
+
+        try {
+            // 1. Conditionally expire old policy
+            // Find expiry date characteristic
+            const expiryChar = characteristics.find(c => c.name.toLowerCase().includes('expiry') || c.name.toLowerCase().includes('expiration'))
+            let shouldExpire = false
+
+            if (expiryChar && p.values) {
+                const expiryVal = p.values.find(v => v.characteristicId === expiryChar.id)
+                if (expiryVal && expiryVal.valueDate) {
+                    const todayStr = new Date().toISOString().split('T')[0]
+                    if (expiryVal.valueDate > todayStr) {
+                        shouldExpire = true
+                    }
+                }
+            }
+
+            if (shouldExpire) {
+                await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' })
+            }
+
+            // 2. Create new policy
+            const newId = await window.api.addVesselDynamicPolicy({
+                vesselId: p.vesselId,
+                policyTypeId: p.policyTypeId,
+                policyNumber: (p.policyNumber || '') + ' (RENEWED - PLEASE VERIFY)',
+                conditionId: p.conditionId,
+                status: 'active',
+                currency: p.currency,
+                brokerEntityId: p.brokerEntityId,
+                notes: p.notes
+            })
+
+            // 3. Copy and increment values
+            if (p.values) {
+                const newVals = p.values.map(v => {
+                    let valDate = v.valueDate
+                    // Increment date by 1 year if it's a date field
+                    if (v.fieldType === 'date' && v.valueDate) {
+                        try {
+                            const d = new Date(v.valueDate)
+                            d.setFullYear(d.getFullYear() + 1)
+                            valDate = d.toISOString().split('T')[0]
+                        } catch (e) {
+                            console.error("Failed to parse date", v.valueDate)
+                        }
+                    }
+
+                    return {
+                        characteristicId: v.characteristicId,
+                        valueText: v.valueText,
+                        valueAmount: v.valueAmount,
+                        valueDate: valDate,
+                        valueBoolean: v.valueBoolean
+                    }
+                })
+                await window.api.setVesselDynamicPolicyValues(newId, newVals)
+            }
+
+            // 4. Reload and notify
+            onReload()
+            showSuccess('Policy renewed. Please review and edit the new policy details.')
+
+        } catch (err: any) {
+            showError(err.message || 'Failed to renew policy')
+        }
+    }
+
     const typeCharsForForm = characteristics.filter(c => c.policyTypeId === formTypeId)
     const typeCondsForForm = conditions.filter(c => c.policyTypeId === formTypeId)
 
@@ -1559,9 +1667,14 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 <div onClick={() => toggleCollapse(p.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', background: isCollapsed ? 'transparent' : 'rgba(0,210,255,0.03)' }}>
                                     <ChevronDown size={16} style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.2s', color: 'var(--text-secondary)' }} />
                                     <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.policyTypeName}</span>
-                                    {p.policyNumber && <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>#{p.policyNumber}</span>}
+                                    {p.policyNumber && <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>#{p.policyNumber.replace(' (RENEWED - PLEASE VERIFY)', '')}</span>}
                                     {p.conditionName && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{p.conditionName}</span>}
                                     <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: sc.bg, color: sc.color, fontWeight: '600', textTransform: 'uppercase' }}>{p.status}</span>
+                                    {p.policyNumber && p.policyNumber.includes('RENEWED') && (
+                                        <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: 'var(--danger)', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <AlertCircle size={10} /> NEEDS EDITING
+                                        </span>
+                                    )}
                                     {p.brokerName && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>via {p.brokerName}</span>}
                                 </div>
                                 {/* Body */}
@@ -1573,9 +1686,9 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{v.characteristicName}</span>
                                                     <div style={{ fontWeight: '500' }}>
                                                         {v.fieldType === 'amount' ? formatCurrency(v.valueAmount, p.currency) :
-                                                         v.fieldType === 'boolean' ? (v.valueBoolean ? 'Yes' : 'No') :
-                                                         v.fieldType === 'date' ? (v.valueDate || '-') :
-                                                         (v.valueText || '-')}
+                                                            v.fieldType === 'boolean' ? (v.valueBoolean ? 'Yes' : 'No') :
+                                                                v.fieldType === 'date' ? (v.valueDate || '-') :
+                                                                    (v.valueText || '-')}
                                                     </div>
                                                 </div>
                                             ))}
@@ -1587,6 +1700,9 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                         {p.notes && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>{p.notes}</p>}
                                         <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                                             <button onClick={() => openEditModal(p)} className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px' }}>Edit</button>
+                                            <button onClick={() => handleRenewPolicy(p)} className="btn-primary" style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <RefreshCcw size={14} /> Renew
+                                            </button>
                                             <button onClick={() => handleDeletePolicy(p.id)} style={{ background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: '4px', fontSize: '0.8rem', padding: '4px 12px', cursor: 'pointer' }}>Delete</button>
                                         </div>
                                     </div>
@@ -1602,15 +1718,22 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
             )}
 
             {/* Add/Edit Modal */}
+            {/* Add/Edit Modal */}
             {showAddModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowAddModal(false)}>
-                    <div onClick={e => e.stopPropagation()} style={{ background: isLight ? '#ffffff' : '#1a1e26', borderRadius: '12px', padding: '24px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--glass-border)' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setShowAddModal(false)}>
+                    <div
+                        ref={modalRef}
+                        role="dialog"
+                        aria-modal="true"
+                        onClick={e => e.stopPropagation()}
+                        style={{ background: isLight ? '#ffffff' : '#1a1e26', borderRadius: '12px', padding: '24px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--glass-border)' }}
+                    >
                         <h3 style={{ marginBottom: '16px' }}>{editingPolicyId ? 'Edit Policy' : 'Add Policy'}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {!editingPolicyId && (
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Policy Type</label>
-                                    <select value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
                                         {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
                                     </select>
                                 </div>
@@ -1618,7 +1741,16 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Policy Number</label>
-                                    <input type="text" value={formNumber} onChange={e => setFormNumber(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
+                                    <input
+                                        type="text"
+                                        value={formNumber}
+                                        onChange={e => {
+                                            console.log('Policy Number Change:', e.target.value)
+                                            setFormNumber(e.target.value)
+                                        }}
+                                        onFocus={() => console.log('Policy Number Focused')}
+                                        style={{ width: '100%', padding: '8px', borderRadius: '4px' }}
+                                    />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status</label>
@@ -1663,7 +1795,10 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                             <div key={c.id}>
                                                 <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{c.name} {c.isRequired && '*'}</label>
                                                 {c.fieldType === 'text' && (
-                                                    <input type="text" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
+                                                    <input type="text" name={`policy_${c.id}`} value={formValues[c.id] || ''} onChange={e => {
+                                                        console.log('Changing text input:', c.id, e.target.value)
+                                                        setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))
+                                                    }} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
                                                 )}
                                                 {c.fieldType === 'date' && (
                                                     <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }} />

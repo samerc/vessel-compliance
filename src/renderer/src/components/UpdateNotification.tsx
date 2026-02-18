@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, Download, RefreshCw, AlertCircle } from 'lucide-react'
+import { X, Download, RefreshCw, AlertCircle, FileText } from 'lucide-react'
+import ChangelogModal from './ChangelogModal'
 
 interface UpdateInfo {
     version: string
@@ -26,6 +27,7 @@ type UpdateState =
 export function UpdateNotification(): React.ReactElement | null {
     const [updateState, setUpdateState] = useState<UpdateState>({ type: 'idle' })
     const [dismissed, setDismissed] = useState(false)
+    const [showNotes, setShowNotes] = useState(false)
 
     useEffect(() => {
         // Listen for update events
@@ -114,6 +116,26 @@ export function UpdateNotification(): React.ReactElement | null {
                             <div className="update-description">
                                 Version {updateState.info.version} is available. Downloading...
                             </div>
+                            {updateState.info.releaseNotes && (
+                                <button
+                                    className="update-notes-link"
+                                    onClick={() => setShowNotes(true)}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--accent-primary)',
+                                        cursor: 'pointer',
+                                        fontSize: '0.75rem',
+                                        padding: '4px 0',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        textDecoration: 'underline'
+                                    }}
+                                >
+                                    <FileText size={12} /> View Release Notes
+                                </button>
+                            )}
                         </div>
                         <button className="update-dismiss-btn" onClick={handleDismiss}>
                             <X size={16} />
@@ -150,13 +172,35 @@ export function UpdateNotification(): React.ReactElement | null {
                             <div className="update-description">
                                 Version {updateState.info.version} has been downloaded
                             </div>
+                            {updateState.info.releaseNotes && (
+                                <button
+                                    className="update-notes-link"
+                                    onClick={() => setShowNotes(true)}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--accent-primary)',
+                                        cursor: 'pointer',
+                                        fontSize: '0.75rem',
+                                        padding: '4px 0',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        textDecoration: 'underline'
+                                    }}
+                                >
+                                    <FileText size={12} /> View Release Notes
+                                </button>
+                            )}
                         </div>
-                        <button className="update-install-btn" onClick={handleInstall}>
-                            Restart & Update
-                        </button>
-                        <button className="update-dismiss-btn" onClick={handleDismiss}>
-                            <X size={16} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button className="update-install-btn" onClick={handleInstall}>
+                                Restart & Update
+                            </button>
+                            <button className="update-dismiss-btn" onClick={handleDismiss}>
+                                <X size={16} />
+                            </button>
+                        </div>
                     </>
                 )}
 
@@ -176,6 +220,7 @@ export function UpdateNotification(): React.ReactElement | null {
                     </>
                 )}
             </div>
+            {showNotes && <ChangelogModal onClose={() => setShowNotes(false)} />}
         </div>
     )
 }

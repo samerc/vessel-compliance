@@ -169,6 +169,7 @@ const api = {
   updateCheckForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),
   updateQuitAndInstall: () => ipcRenderer.invoke('update:quitAndInstall'),
   updateGetCurrentVersion: () => ipcRenderer.invoke('update:getCurrentVersion'),
+  updateGetChangelogs: () => ipcRenderer.invoke('update:getChangelogs'),
   onUpdateChecking: (callback) => ipcRenderer.on('update:checking', () => callback()),
   onUpdateAvailable: (callback) => ipcRenderer.on('update:available', (_, info) => callback(info)),
   onUpdateNotAvailable: (callback) => ipcRenderer.on('update:not-available', (_, info) => callback(info)),

@@ -260,6 +260,10 @@ app.whenReady().then(() => {
     return updateService.getCurrentVersion()
   })
 
+  safeHandle('update:getChangelogs', async () => {
+    return await updateService.getChangelogs()
+  })
+
   // Auth Handlers (no session required - these create/destroy sessions)
   safeHandle('auth:login', async (event, { username, password }) => {
     const result = await auth.login(username, password)
