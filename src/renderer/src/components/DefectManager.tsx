@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
-import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, ChevronDown, ChevronUp } from 'lucide-react'
-import { SurveyDefect, ConditionSurvey } from '../../../shared/types'
+import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, ChevronDown, ChevronUp, Printer } from 'lucide-react'
+import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import ConfirmationModal from './ConfirmationModal'
 
 interface DefectManagerProps {
   survey: ConditionSurvey
+  vessel: Vessel
   onUpdate: () => void
   refreshKey?: number
 }
 
-export default function DefectManager({ survey, onUpdate, refreshKey }: DefectManagerProps) {
+export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: DefectManagerProps) {
   const { user } = useAuth()
   const [defects, setDefects] = useState<SurveyDefect[]>([])
   const [sortField, setSortField] = useState<'defectNumber' | 'createdAt'>('defectNumber')
@@ -22,6 +24,15 @@ export default function DefectManager({ survey, onUpdate, refreshKey }: DefectMa
   const [expandedClosureIds, setExpandedClosureIds] = useState<Set<string>>(new Set())
   const { theme } = useTheme()
   const isLight = theme === 'light'
+
+  // Confirmation modal state
+  const [confirmation, setConfirmation] = useState<{
+    show: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    isDangerous?: boolean
+  }>({ show: false, title: '', message: '', onConfirm: () => { } })
 
   // New defect form
   const [newNumber, setNewNumber] = useState('')
@@ -131,20 +142,33 @@ export default function DefectManager({ survey, onUpdate, refreshKey }: DefectMa
     onUpdate()
   }
 
-  const handleReopenDefect = async (defect: SurveyDefect) => {
-    if (confirm('Reopen this defect?')) {
-      await window.api.reopenDefect(defect.id)
-      loadDefects()
-      onUpdate()
-    }
+  const handleReopenDefect = (defect: SurveyDefect) => {
+    setConfirmation({
+      show: true,
+      title: 'Reopen Defect',
+      message: `Reopen defect #${defect.defectNumber}?`,
+      onConfirm: async () => {
+        setConfirmation(prev => ({ ...prev, show: false }))
+        await window.api.reopenDefect(defect.id)
+        loadDefects()
+        onUpdate()
+      }
+    })
   }
 
-  const handleDeleteDefect = async (defect: SurveyDefect) => {
-    if (confirm(`Delete defect #${defect.defectNumber}?`)) {
-      await window.api.deleteSurveyDefect(defect.id)
-      loadDefects()
-      onUpdate()
-    }
+  const handleDeleteDefect = (defect: SurveyDefect) => {
+    setConfirmation({
+      show: true,
+      title: 'Delete Defect',
+      message: `Delete defect #${defect.defectNumber}? This cannot be undone.`,
+      isDangerous: true,
+      onConfirm: async () => {
+        setConfirmation(prev => ({ ...prev, show: false }))
+        await window.api.deleteSurveyDefect(defect.id)
+        loadDefects()
+        onUpdate()
+      }
+    })
   }
 
   const toggleClosureNotes = (defectId: string) => {
@@ -177,6 +201,86 @@ export default function DefectManager({ survey, onUpdate, refreshKey }: DefectMa
     return text.length > maxLen ? text.substring(0, maxLen) + '...' : text
   }
 
+  const generateReport = () => {
+    const reportWindow = window.open('', '_blank')
+    if (!reportWindow) return
+
+    const severityColor = (sev?: string) => {
+      switch (sev) {
+        case 'Critical': return '#ff4d4d'
+        case 'Major': return '#ff8c00'
+        case 'Minor': return '#e6b800'
+        case 'Observation': return '#0099cc'
+        default: return '#888'
+      }
+    }
+
+    const rows = defects.map(d => `
+      <tr>
+        <td>${d.defectNumber}</td>
+        <td style="max-width:350px">${d.description}</td>
+        <td><span style="padding:2px 8px;border-radius:4px;background:${severityColor(d.severity)};color:${d.severity === 'Minor' || d.severity === 'Observation' ? '#000' : '#fff'};font-weight:600;font-size:12px">${d.severity || 'Not Set'}</span></td>
+        <td><span style="padding:2px 8px;border-radius:4px;background:${d.status === 'OPEN' ? '#ffe0e0' : '#e0ffe0'};color:${d.status === 'OPEN' ? '#c00' : '#006600'};font-weight:600;font-size:12px">${d.status}</span></td>
+        <td>${d.dueDate || ''}</td>
+        <td>${d.closedBy || ''}</td>
+        <td>${d.closedAt ? new Date(d.closedAt).toLocaleDateString() : ''}</td>
+      </tr>
+    `).join('')
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Defect Report – ${vessel.name}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #222; margin: 32px; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .meta { color: #555; font-size: 12px; margin-bottom: 24px; }
+    .meta span { margin-right: 24px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #1a1e26; color: #fff; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 10px 12px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+    tr:nth-child(even) td { background: #f9f9f9; }
+    @media print {
+      body { margin: 16px; }
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Condition Survey – Defect Report</h1>
+  <div class="meta">
+    <span><strong>Vessel:</strong> ${vessel.name} (IMO: ${vessel.imoNumber})</span>
+    <span><strong>Survey Type:</strong> ${survey.surveyType}</span>
+    <span><strong>Survey Date:</strong> ${survey.surveyDate}</span>
+    ${survey.reference ? `<span><strong>Reference:</strong> ${survey.reference}</span>` : ''}
+    ${survey.location ? `<span><strong>Location:</strong> ${survey.location}</span>` : ''}
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Description</th>
+        <th>Severity</th>
+        <th>Status</th>
+        <th>Due Date</th>
+        <th>Closed By</th>
+        <th>Closed At</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || '<tr><td colspan="7" style="text-align:center;color:#888">No defects recorded</td></tr>'}
+    </tbody>
+  </table>
+  <p style="margin-top:24px;font-size:11px;color:#888">Generated: ${new Date().toLocaleString()}</p>
+  <script>window.onload = () => window.print()</script>
+</body>
+</html>`
+
+    reportWindow.document.write(html)
+    reportWindow.document.close()
+  }
+
   return (
     <div style={{ marginTop: '20px', padding: '20px', background: 'var(--bg-card)', borderRadius: '12px', border: 'var(--glass-border)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -205,19 +309,32 @@ export default function DefectManager({ survey, onUpdate, refreshKey }: DefectMa
             <option value="createdAt-asc">Oldest First</option>
           </select>
         </h4>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className={showAddForm ? 'btn-secondary' : 'btn-primary'}
-          style={{
-            padding: '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          {showAddForm ? <X size={16} /> : <Plus size={16} />}
-          {showAddForm ? 'Cancel' : 'Add Defect'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {defects.length > 0 && (
+            <button
+              onClick={generateReport}
+              className="btn-secondary"
+              style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              title="Generate printable defect report"
+            >
+              <Printer size={16} />
+              Defect Report
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className={showAddForm ? 'btn-secondary' : 'btn-primary'}
+            style={{
+              padding: '8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            {showAddForm ? <X size={16} /> : <Plus size={16} />}
+            {showAddForm ? 'Cancel' : 'Add Defect'}
+          </button>
+        </div>
       </div>
 
       {showAddForm && (
@@ -256,6 +373,8 @@ export default function DefectManager({ survey, onUpdate, refreshKey }: DefectMa
               placeholder="Due Date"
               value={newDueDate}
               onChange={(e) => setNewDueDate(e.target.value)}
+              min="1900-01-01"
+              max="2100-12-31"
               aria-label="Due date"
             />
           </div>
@@ -325,6 +444,8 @@ export default function DefectManager({ survey, onUpdate, refreshKey }: DefectMa
                             placeholder="Due Date"
                             value={editDueDate}
                             onChange={(e) => setEditDueDate(e.target.value)}
+                            min="1900-01-01"
+                            max="2100-12-31"
                             aria-label="Due date"
                           />
                         </div>
@@ -527,6 +648,17 @@ export default function DefectManager({ survey, onUpdate, refreshKey }: DefectMa
           onClosureNotesChange={setClosureNotes}
           onClose={() => { setCloseModalDefect(null); setClosureNotes('') }}
           onConfirm={handleCloseDefect}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmation.show && (
+        <ConfirmationModal
+          title={confirmation.title}
+          message={confirmation.message}
+          isDangerous={confirmation.isDangerous}
+          onConfirm={confirmation.onConfirm}
+          onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
         />
       )}
     </div>

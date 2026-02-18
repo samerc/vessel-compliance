@@ -163,7 +163,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         // Security: Validate file type
         const validation = await window.api.fileTypesValidateFile(filePath)
         if (!validation.valid) {
-            alert(`File rejected: ${validation.reason}`)
+            showError(`File rejected: ${validation.reason}`)
             return
         }
 
@@ -943,6 +943,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         type="date"
                                                         value={rowDoc?.expiryDate || ''}
                                                         onChange={e => handleUpdateExpiry(rowType.id, e.target.value)}
+                                                        min="1900-01-01"
+                                                        max="2100-12-31"
                                                         style={{
                                                             padding: '4px 8px',
                                                             borderRadius: '4px',
@@ -1398,6 +1400,15 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     const [formValues, setFormValues] = useState<Record<string, any>>({})
     const modalRef = useRef<HTMLDivElement>(null)
 
+    // Confirmation modal state
+    const [confirmation, setConfirmation] = useState<{
+        show: boolean
+        title: string
+        message: string
+        onConfirm: () => void
+        isDangerous?: boolean
+    }>({ show: false, title: '', message: '', onConfirm: () => { } })
+
     useEffect(() => {
         loadMeta()
     }, [])
@@ -1552,81 +1563,95 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
         }
     }
 
-    const handleDeletePolicy = async (id: string) => {
-        if (!confirm('Delete this policy?')) return
-        await window.api.deleteVesselDynamicPolicy(id)
-        showSuccess('Policy deleted')
-        onReload()
+    const handleDeletePolicy = (id: string) => {
+        setConfirmation({
+            show: true,
+            title: 'Delete Policy',
+            message: 'Delete this policy? This cannot be undone.',
+            isDangerous: true,
+            onConfirm: async () => {
+                setConfirmation(prev => ({ ...prev, show: false }))
+                await window.api.deleteVesselDynamicPolicy(id)
+                showSuccess('Policy deleted')
+                onReload()
+            }
+        })
     }
 
-    const handleRenewPolicy = async (p: VesselDynamicPolicy) => {
-        if (!confirm('Renew this policy? A new copy will be created with incremented dates.')) return
+    const handleRenewPolicy = (p: VesselDynamicPolicy) => {
+        setConfirmation({
+            show: true,
+            title: 'Renew Policy',
+            message: 'Renew this policy? A new copy will be created with incremented dates.',
+            onConfirm: async () => {
+                setConfirmation(prev => ({ ...prev, show: false }))
+                try {
+                    // 1. Conditionally expire old policy
+                    // Find expiry date characteristic
+                    const expiryChar = characteristics.find(c => c.name.toLowerCase().includes('expiry') || c.name.toLowerCase().includes('expiration'))
+                    let shouldExpire = false
 
-        try {
-            // 1. Conditionally expire old policy
-            // Find expiry date characteristic
-            const expiryChar = characteristics.find(c => c.name.toLowerCase().includes('expiry') || c.name.toLowerCase().includes('expiration'))
-            let shouldExpire = false
-
-            if (expiryChar && p.values) {
-                const expiryVal = p.values.find(v => v.characteristicId === expiryChar.id)
-                if (expiryVal && expiryVal.valueDate) {
-                    const todayStr = new Date().toISOString().split('T')[0]
-                    if (expiryVal.valueDate > todayStr) {
-                        shouldExpire = true
-                    }
-                }
-            }
-
-            if (shouldExpire) {
-                await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' })
-            }
-
-            // 2. Create new policy
-            const newId = await window.api.addVesselDynamicPolicy({
-                vesselId: p.vesselId,
-                policyTypeId: p.policyTypeId,
-                policyNumber: (p.policyNumber || '') + ' (RENEWED - PLEASE VERIFY)',
-                conditionId: p.conditionId,
-                status: 'active',
-                currency: p.currency,
-                brokerEntityId: p.brokerEntityId,
-                notes: p.notes
-            })
-
-            // 3. Copy and increment values
-            if (p.values) {
-                const newVals = p.values.map(v => {
-                    let valDate = v.valueDate
-                    // Increment date by 1 year if it's a date field
-                    if (v.fieldType === 'date' && v.valueDate) {
-                        try {
-                            const d = new Date(v.valueDate)
-                            d.setFullYear(d.getFullYear() + 1)
-                            valDate = d.toISOString().split('T')[0]
-                        } catch (e) {
-                            console.error("Failed to parse date", v.valueDate)
+                    if (expiryChar && p.values) {
+                        const expiryVal = p.values.find(v => v.characteristicId === expiryChar.id)
+                        if (expiryVal && expiryVal.valueDate) {
+                            const todayStr = new Date().toISOString().split('T')[0]
+                            if (expiryVal.valueDate > todayStr) {
+                                shouldExpire = true
+                            }
                         }
                     }
 
-                    return {
-                        characteristicId: v.characteristicId,
-                        valueText: v.valueText,
-                        valueAmount: v.valueAmount,
-                        valueDate: valDate,
-                        valueBoolean: v.valueBoolean
+                    if (shouldExpire) {
+                        await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' })
                     }
-                })
-                await window.api.setVesselDynamicPolicyValues(newId, newVals)
+
+                    // 2. Create new policy
+                    const newId = await window.api.addVesselDynamicPolicy({
+                        vesselId: p.vesselId,
+                        policyTypeId: p.policyTypeId,
+                        policyNumber: (p.policyNumber || '') + ' (RENEWED - PLEASE VERIFY)',
+                        conditionId: p.conditionId,
+                        status: 'active',
+                        currency: p.currency,
+                        brokerEntityId: p.brokerEntityId,
+                        notes: p.notes
+                    })
+
+                    // 3. Copy and increment values
+                    if (p.values) {
+                        const newVals = p.values.map(v => {
+                            let valDate = v.valueDate
+                            // Increment date by 1 year if it's a date field
+                            if (v.fieldType === 'date' && v.valueDate) {
+                                try {
+                                    const d = new Date(v.valueDate)
+                                    d.setFullYear(d.getFullYear() + 1)
+                                    valDate = d.toISOString().split('T')[0]
+                                } catch (e) {
+                                    console.error("Failed to parse date", v.valueDate)
+                                }
+                            }
+
+                            return {
+                                characteristicId: v.characteristicId,
+                                valueText: v.valueText,
+                                valueAmount: v.valueAmount,
+                                valueDate: valDate,
+                                valueBoolean: v.valueBoolean
+                            }
+                        })
+                        await window.api.setVesselDynamicPolicyValues(newId, newVals)
+                    }
+
+                    // 4. Reload and notify
+                    onReload()
+                    showSuccess('Policy renewed. Please review and edit the new policy details.')
+
+                } catch (err: any) {
+                    showError(err.message || 'Failed to renew policy')
+                }
             }
-
-            // 4. Reload and notify
-            onReload()
-            showSuccess('Policy renewed. Please review and edit the new policy details.')
-
-        } catch (err: any) {
-            showError(err.message || 'Failed to renew policy')
-        }
+        })
     }
 
     const typeCharsForForm = characteristics.filter(c => c.policyTypeId === formTypeId)
@@ -1801,7 +1826,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     }} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
                                                 )}
                                                 {c.fieldType === 'date' && (
-                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }} />
+                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }} />
                                                 )}
                                                 {c.fieldType === 'amount' && (
                                                     <input type="number" step="0.01" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
@@ -1835,6 +1860,17 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Confirmation Modal */}
+            {confirmation.show && (
+                <ConfirmationModal
+                    title={confirmation.title}
+                    message={confirmation.message}
+                    isDangerous={confirmation.isDangerous}
+                    onConfirm={confirmation.onConfirm}
+                    onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
+                />
             )}
         </div>
     )
