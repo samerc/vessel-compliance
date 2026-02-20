@@ -1181,7 +1181,7 @@ export const ReportService = {
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(15)
     doc.setFont('helvetica', 'bold')
-    doc.text(vessel.name, 14, 58)
+    doc.text(vessel.name, 14, 67)
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
@@ -1189,11 +1189,11 @@ export const ReportService = {
     const vesselMeta: string[] = [`IMO: ${vessel.imoNumber}`]
     if (vessel.vesselType) vesselMeta.push(`Type: ${vessel.vesselType}`)
     if (flagState) vesselMeta.push(`Flag: ${flagState.name}`)
-    doc.text(vesselMeta.join('   •   '), 14, 65)
+    doc.text(vesselMeta.join('   •   '), 14, 74)
 
     // ── Summary stats box (top-right) ────────────────────────────────
     const boxX = 140
-    const boxY = 52
+    const boxY = 58
     const boxW = 56
     const boxH = 42
     doc.setDrawColor(220, 220, 220)
@@ -1224,7 +1224,7 @@ export const ReportService = {
     }
 
     // ── Survey detail fields (single left column, max X ~128 to avoid overlap with box) ──
-    let y = 74
+    let y = 84
     const lc: [number, number, number] = [55, 55, 55]
     const vc: [number, number, number] = [0, 0, 0]
 
@@ -1275,16 +1275,17 @@ export const ReportService = {
 
       autoTable(doc, {
         startY: y,
+        margin: { top: 14, right: 14, bottom: 42, left: 14 },
         head: [['#', 'Description', 'Severity', 'Status', 'Closed']],
         body: tableBody,
         theme: 'grid',
         headStyles: {
-          fillColor: [15, 18, 24],
+          fillColor: [28, 52, 95],
           textColor: [255, 255, 255],
           fontSize: 9,
           fontStyle: 'bold',
           cellPadding: { top: 5, right: 4, bottom: 5, left: 4 },
-          lineColor: [15, 18, 24],
+          lineColor: [28, 52, 95],
         },
         columnStyles: {
           0: { cellWidth: 16, halign: 'center' },

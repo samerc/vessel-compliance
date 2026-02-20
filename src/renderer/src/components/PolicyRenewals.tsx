@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import * as XLSX from 'xlsx'
@@ -20,6 +20,8 @@ type SortField = 'vesselName' | 'imoNumber' | 'customerName' | 'fleetName' | 'po
 type SortDir = 'asc' | 'desc'
 
 const DEFAULT_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
+// Default column widths: Vessel, IMO, Customer, Fleet, PolicyType, PolicyNo, EndDate, Premium, Status, Actions
+const DEFAULT_COL_WIDTHS = [160, 100, 140, 120, 150, 130, 110, 110, 150, 120]
 
 function formatPremium(value: number | null, currency: string | null): string {
     if (value == null) return '-'
@@ -47,9 +49,16 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const [editStatusName, setEditStatusName] = useState('')
     const [editStatusColor, setEditStatusColor] = useState('')
 
-    // Notes modal
-    const [notesModal, setNotesModal] = useState<{ id: string; vesselName: string; policyType: string; text: string } | null>(null)
+    // Renewal notes modal
+    const [notesModal, setNotesModal] = useState<{ id: string; vesselName: string; policyType: string; policyNumber: string } | null>(null)
+    const [renewalNotes, setRenewalNotes] = useState<any[]>([])
+    const [notesLoading, setNotesLoading] = useState(false)
+    const [newNoteText, setNewNoteText] = useState('')
     const [notesSaving, setNotesSaving] = useState(false)
+
+    // Column resizing
+    const [colWidths, setColWidths] = useState<number[]>(DEFAULT_COL_WIDTHS)
+    const resizeRef = useRef<{ colIdx: number; startX: number; startWidth: number } | null>(null)
 
     useEffect(() => {
         loadRenewals()
@@ -100,13 +109,28 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         loadRenewals()
     }
 
-    const handleSaveNotes = async () => {
-        if (!notesModal) return
+    const handleOpenNotes = async (r: any) => {
+        setNotesModal({ id: r.id, vesselName: r.vesselName, policyType: r.policyTypeName, policyNumber: r.policyNumber || '' })
+        setRenewalNotes([])
+        setNewNoteText('')
+        setNotesLoading(true)
+        try {
+            const data = await window.api.getPolicyRenewalNotes(r.id, r.policyNumber || '')
+            setRenewalNotes(data || [])
+        } finally {
+            setNotesLoading(false)
+        }
+    }
+
+    const handleAddNote = async () => {
+        if (!notesModal || !newNoteText.trim()) return
         setNotesSaving(true)
         try {
-            await window.api.updateVesselDynamicPolicy(notesModal.id, { notes: notesModal.text || undefined })
-            setRenewals(prev => prev.map(r => r.id === notesModal.id ? { ...r, notes: notesModal.text || null } : r))
-            setNotesModal(null)
+            const note = await window.api.addPolicyRenewalNote(notesModal.id, notesModal.policyNumber, newNoteText.trim())
+            setRenewalNotes(prev => [...prev, note])
+            setNewNoteText('')
+            // Update note count badge in the table
+            setRenewals(prev => prev.map(r => r.id === notesModal.id ? { ...r, noteCount: (r.noteCount || 0) + 1 } : r))
         } finally {
             setNotesSaving(false)
         }
@@ -119,6 +143,32 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             const st = statusId ? statusTypes.find(s => s.id === statusId) : null
             return { ...r, renewalStatusId: statusId, renewalStatusName: st?.name || null, renewalStatusColor: st?.color || null }
         }))
+    }
+
+    const handleResizeStart = (colIdx: number, e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        resizeRef.current = { colIdx, startX: e.clientX, startWidth: colWidths[colIdx] }
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            if (!resizeRef.current) return
+            const { colIdx: ci, startX, startWidth } = resizeRef.current
+            const delta = moveEvent.clientX - startX
+            setColWidths(prev => {
+                const next = [...prev]
+                next[ci] = Math.max(60, startWidth + delta)
+                return next
+            })
+        }
+
+        const onMouseUp = () => {
+            resizeRef.current = null
+            document.removeEventListener('mousemove', onMouseMove)
+            document.removeEventListener('mouseup', onMouseUp)
+        }
+
+        document.addEventListener('mousemove', onMouseMove)
+        document.addEventListener('mouseup', onMouseUp)
     }
 
     const goToPreviousMonth = () => {
@@ -187,15 +237,40 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDownIcon size={14} />
     }
 
-    const thStyle: React.CSSProperties = {
+    // Solid header background for sticky to work (CSS vars are semi-transparent)
+    const stickyHeaderBg = isLight ? '#eef0f3' : '#181b24'
+
+    const thBase: React.CSSProperties = {
         padding: '14px 16px',
         fontWeight: '600',
         color: 'var(--text-secondary)',
         fontSize: '0.8rem',
-        cursor: 'pointer',
         userSelect: 'none',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
+        position: 'sticky',
+        top: 0,
+        zIndex: 2,
+        background: stickyHeaderBg,
+        borderBottom: '1px solid var(--table-border)',
+        overflow: 'hidden',
     }
+
+    const ResizeHandle = ({ colIdx }: { colIdx: number }) => (
+        <div
+            onMouseDown={e => handleResizeStart(colIdx, e)}
+            style={{
+                position: 'absolute',
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: '5px',
+                cursor: 'col-resize',
+                zIndex: 3,
+            }}
+        />
+    )
+
+    const totalWidth = colWidths.reduce((a, b) => a + b, 0)
 
     return (
         <div className="fade-in">
@@ -305,34 +380,69 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                     <p style={{ color: 'var(--text-secondary)' }}>No active policies have an end date in this month.</p>
                 </div>
             ) : (
-                <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse' }}>
+                <div style={{
+                    background: 'var(--bg-card)', borderRadius: '12px',
+                    border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
+                    overflow: 'auto',
+                    maxHeight: 'calc(100vh - 320px)'
+                }}>
+                    <table style={{ width: `${totalWidth}px`, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <caption className="sr-only">Policy renewals for {MONTH_NAMES[selectedMonth - 1]} {selectedYear}</caption>
                         <thead>
-                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('vesselName')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Vessel <SortIcon field="vesselName" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('imoNumber')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>IMO <SortIcon field="imoNumber" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('customerName')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Customer <SortIcon field="customerName" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('fleetName')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Fleet <SortIcon field="fleetName" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('policyTypeName')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy Type <SortIcon field="policyTypeName" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('policyNumber')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy No. <SortIcon field="policyNumber" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('endDate')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>End Date <SortIcon field="endDate" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('premium')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Premium <SortIcon field="premium" /></span></th>
-                                <th scope="col" style={thStyle} onClick={() => handleSort('renewalStatusName')}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Status <SortIcon field="renewalStatusName" /></span></th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'center' }}>Actions</th>
+                            <tr style={{ textAlign: 'left' }}>
+                                <th scope="col" style={{ ...thBase, width: colWidths[0], cursor: 'pointer' }} onClick={() => handleSort('vesselName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Vessel <SortIcon field="vesselName" /></span>
+                                    <ResizeHandle colIdx={0} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[1], cursor: 'pointer' }} onClick={() => handleSort('imoNumber')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>IMO <SortIcon field="imoNumber" /></span>
+                                    <ResizeHandle colIdx={1} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[2], cursor: 'pointer' }} onClick={() => handleSort('customerName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Customer <SortIcon field="customerName" /></span>
+                                    <ResizeHandle colIdx={2} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[3], cursor: 'pointer' }} onClick={() => handleSort('fleetName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Fleet <SortIcon field="fleetName" /></span>
+                                    <ResizeHandle colIdx={3} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[4], cursor: 'pointer' }} onClick={() => handleSort('policyTypeName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy Type <SortIcon field="policyTypeName" /></span>
+                                    <ResizeHandle colIdx={4} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[5], cursor: 'pointer' }} onClick={() => handleSort('policyNumber')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy No. <SortIcon field="policyNumber" /></span>
+                                    <ResizeHandle colIdx={5} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[6], cursor: 'pointer' }} onClick={() => handleSort('endDate')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>End Date <SortIcon field="endDate" /></span>
+                                    <ResizeHandle colIdx={6} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[7], cursor: 'pointer' }} onClick={() => handleSort('premium')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Premium <SortIcon field="premium" /></span>
+                                    <ResizeHandle colIdx={7} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[8], cursor: 'pointer' }} onClick={() => handleSort('renewalStatusName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Status <SortIcon field="renewalStatusName" /></span>
+                                    <ResizeHandle colIdx={8} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[9], cursor: 'default', textAlign: 'center' }}>
+                                    Actions
+                                    <ResizeHandle colIdx={9} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {sortedRenewals.map((r: any, idx: number) => (
                                 <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                    <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary)' }}>{r.vesselName}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{r.imoNumber}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{r.customerName || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{r.fleetName || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{r.policyTypeName}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.85rem' }}>{r.policyNumber || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{r.endDate || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: '500' }}>{formatPremium(r.premium, r.currency)}</td>
+                                    <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</td>
+                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.imoNumber}</td>
+                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customerName || '-'}</td>
+                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.fleetName || '-'}</td>
+                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyTypeName}</td>
+                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>
+                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.endDate || '-'}</td>
+                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPremium(r.premium, r.currency)}</td>
                                     <td style={{ padding: '12px 16px' }}>
                                         <select
                                             value={r.renewalStatusId || ''}
@@ -346,7 +456,8 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                                 fontSize: '0.8rem',
                                                 fontWeight: r.renewalStatusId ? '600' : '400',
                                                 cursor: 'pointer',
-                                                minWidth: '120px'
+                                                minWidth: '100px',
+                                                maxWidth: '100%'
                                             }}
                                         >
                                             <option value="">— No status —</option>
@@ -358,14 +469,16 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                             <button
-                                                onClick={() => setNotesModal({ id: r.id, vesselName: r.vesselName, policyType: r.policyTypeName, text: r.notes || '' })}
+                                                onClick={() => handleOpenNotes(r)}
                                                 className="btn-secondary"
                                                 style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', position: 'relative' }}
-                                                title={r.notes ? 'View/edit notes' : 'Add notes'}
+                                                title={r.noteCount > 0 ? `${r.noteCount} note${r.noteCount > 1 ? 's' : ''}` : 'Add notes'}
                                             >
                                                 <MessageSquare size={14} />
-                                                {r.notes && (
-                                                    <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)' }} />
+                                                {r.noteCount > 0 && (
+                                                    <span style={{ position: 'absolute', top: '-5px', right: '-6px', minWidth: '16px', height: '16px', borderRadius: '8px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.65rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                                                        {r.noteCount}
+                                                    </span>
                                                 )}
                                             </button>
                                             <button
@@ -384,33 +497,72 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 </div>
             )}
 
-            {/* Notes modal */}
+            {/* Renewal Notes modal */}
             {notesModal && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{ background: 'var(--bg-sidebar)', borderRadius: '16px', padding: '28px', width: '480px', maxWidth: '95vw', border: 'var(--glass-border)', boxShadow: 'var(--shadow-lg)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                    <div style={{
+                        background: isLight ? '#ffffff' : '#1a1d28',
+                        borderRadius: '16px', padding: '28px', width: '520px', maxWidth: '95vw', maxHeight: '80vh',
+                        display: 'flex', flexDirection: 'column',
+                        border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+                    }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexShrink: 0 }}>
                             <div>
-                                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.05rem' }}>Renewal Notes</h3>
+                                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <MessageSquare size={16} color="var(--accent-primary)" /> Renewal Notes
+                                </h3>
                                 <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                                     {notesModal.vesselName} — {notesModal.policyType}
+                                    {notesModal.policyNumber && <span style={{ fontFamily: 'monospace', marginLeft: '6px', opacity: 0.7 }}>#{notesModal.policyNumber}</span>}
+                                </p>
+                                <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', opacity: 0.7 }}>
+                                    Notes are linked to this policy number and will not carry over on renewal.
                                 </p>
                             </div>
-                            <button onClick={() => setNotesModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                            <button onClick={() => setNotesModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
                                 <X size={18} />
                             </button>
                         </div>
-                        <textarea
-                            value={notesModal.text}
-                            onChange={e => setNotesModal(prev => prev ? { ...prev, text: e.target.value } : null)}
-                            rows={6}
-                            placeholder="Enter notes about this renewal..."
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.9rem' }}
-                        />
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                            <button onClick={() => setNotesModal(null)} className="btn-secondary">Cancel</button>
-                            <button onClick={handleSaveNotes} disabled={notesSaving} className="btn-primary">
-                                {notesSaving ? 'Saving...' : 'Save Notes'}
-                            </button>
+
+                        {/* New note input */}
+                        <div style={{ flexShrink: 0, marginBottom: '16px' }}>
+                            <textarea
+                                value={newNoteText}
+                                onChange={e => setNewNoteText(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddNote() }}
+                                rows={3}
+                                placeholder="Add a note about this renewal... (Ctrl+Enter to submit)"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'none', fontFamily: 'inherit', fontSize: '0.9rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)', boxSizing: 'border-box' }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                                <button onClick={handleAddNote} disabled={notesSaving || !newNoteText.trim()} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
+                                    {notesSaving ? 'Saving...' : 'Add Note'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Notes thread */}
+                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {notesLoading ? (
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px' }}>Loading...</p>
+                            ) : renewalNotes.length === 0 ? (
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px', fontStyle: 'italic' }}>No notes yet for this policy number.</p>
+                            ) : renewalNotes.map(n => (
+                                <div key={n.id} style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px', borderLeft: '3px solid var(--accent-primary)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                        <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
+                                            {(n.createdByUsername || '?').charAt(0).toUpperCase()}
+                                        </div>
+                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-primary)' }}>{n.createdByUsername || 'Unknown'}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
+                                            {new Date(n.createdAt).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{n.note}</p>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>

@@ -301,6 +301,10 @@ export interface Api {
   deleteRenewalStatusType: (id: string) => Promise<void>
   setRenewalStatusForPolicy: (policyId: string, statusId: string | null) => Promise<void>
 
+  // Policy Renewal Notes
+  getPolicyRenewalNotes: (policyId: string, policyNumber: string) => Promise<any[]>
+  addPolicyRenewalNote: (policyId: string, policyNumber: string, note: string) => Promise<any>
+
   // Quotations
   getQuotations: () => Promise<Quotation[]>
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>

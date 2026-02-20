@@ -772,6 +772,21 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN renewal_status_id VARCHAR(36) NULL")
             }
 
+            // Migration: Add policy_renewal_notes table
+            const [prnTable] = await this.pool.query("SHOW TABLES LIKE 'policy_renewal_notes'")
+            if ((prnTable as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE policy_renewal_notes (
+                    id VARCHAR(36) PRIMARY KEY,
+                    policy_id VARCHAR(36) NOT NULL,
+                    policy_number VARCHAR(255) NOT NULL DEFAULT '',
+                    note TEXT NOT NULL,
+                    created_by_user_id VARCHAR(36),
+                    created_by_username VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_prn_policy (policy_id, policy_number(100))
+                )`)
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -4171,9 +4186,9 @@ export class MySQLAdapter {
                     e.name as customerName, v.customer_type as customerType,
                     f.name as fleetName,
                     vdp.currency as currency,
-                    vdp.notes as notes,
                     vdp.renewal_status_id as renewalStatusId,
                     rst.name as renewalStatusName, rst.color as renewalStatusColor,
+                    COALESCE(rn.cnt, 0) as noteCount,
                     (SELECT vpv2.value_amount FROM vessel_policy_values vpv2
                      JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
                      WHERE vpv2.policy_id = vdp.id AND ptc2.field_type = 'amount'
@@ -4187,6 +4202,11 @@ export class MySQLAdapter {
              LEFT JOIN entities e ON v.customer_id = e.id
              LEFT JOIN fleets f ON v.fleet_id = f.id
              LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
+             LEFT JOIN (
+                 SELECT policy_id, policy_number, COUNT(*) as cnt
+                 FROM policy_renewal_notes
+                 GROUP BY policy_id, policy_number
+             ) rn ON rn.policy_id = vdp.id AND rn.policy_number = COALESCE(vdp.policy_number, '')
              WHERE vdp.status = 'active'
                AND v.is_active = TRUE
                AND ptc.field_type = 'date'
@@ -4198,6 +4218,27 @@ export class MySQLAdapter {
             [startDate, endDate]
         )
         return rows as any[]
+    }
+
+    // --- Policy Renewal Notes ---
+    async getPolicyRenewalNotes(policyId: string, policyNumber: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, policy_id as policyId, policy_number as policyNumber, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt FROM policy_renewal_notes WHERE policy_id = ? AND policy_number = ? ORDER BY created_at ASC',
+            [policyId, policyNumber ?? '']
+        )
+        return rows as any[]
+    }
+
+    async addPolicyRenewalNote(policyId: string, policyNumber: string, note: string, userId: string, username: string): Promise<any> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        const now = new Date()
+        await this.pool.execute(
+            'INSERT INTO policy_renewal_notes (id, policy_id, policy_number, note, created_by_user_id, created_by_username, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, policyId, policyNumber ?? '', note.trim(), userId, username, now]
+        )
+        return { id, policyId, policyNumber: policyNumber ?? '', note: note.trim(), createdByUserId: userId, createdByUsername: username, createdAt: now.toISOString() }
     }
 
     // --- Renewal Status Types ---

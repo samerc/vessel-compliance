@@ -1715,6 +1715,13 @@ app.whenReady().then(() => {
   safeHandle('renewalStates:delete', (event, id: string) => { requireSession(event); return db.deleteRenewalStatusType(id) })
   safeHandle('renewalStates:setForPolicy', (event, policyId: string, statusId: string | null) => { requireSession(event); return db.setRenewalStatusForPolicy(policyId, statusId) })
 
+  // Policy Renewal Notes
+  safeHandle('renewalNotes:get', (event, policyId: string, policyNumber: string) => { requireSession(event); return db.getPolicyRenewalNotes(policyId, policyNumber) })
+  safeHandle('renewalNotes:add', (event, policyId: string, policyNumber: string, note: string) => {
+    const user = requireSession(event)
+    return db.addPolicyRenewalNote(policyId, policyNumber, note, user.id, user.username)
+  })
+
   // Quotations
   safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })
   safeHandle('db:addQuotation', (event, q) => { requireSession(event); return db.addQuotation(q) })

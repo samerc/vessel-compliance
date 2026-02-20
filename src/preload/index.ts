@@ -318,6 +318,10 @@ const api = {
   deleteRenewalStatusType: (id: string) => ipcRenderer.invoke('renewalStates:delete', id),
   setRenewalStatusForPolicy: (policyId: string, statusId: string | null) => ipcRenderer.invoke('renewalStates:setForPolicy', policyId, statusId),
 
+  // Policy Renewal Notes
+  getPolicyRenewalNotes: (policyId: string, policyNumber: string) => ipcRenderer.invoke('renewalNotes:get', policyId, policyNumber),
+  addPolicyRenewalNote: (policyId: string, policyNumber: string, note: string) => ipcRenderer.invoke('renewalNotes:add', policyId, policyNumber, note),
+
   // Quotations
   getQuotations: () => ipcRenderer.invoke('db:getQuotations'),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
