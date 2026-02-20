@@ -1286,8 +1286,8 @@ export const ReportService = {
           cellPadding: 5,
         },
         columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 96 },
+          0: { cellWidth: 16, halign: 'center' },
+          1: { cellWidth: 90 },
           2: { cellWidth: 28, halign: 'center' },
           3: { cellWidth: 24, halign: 'center' },
           4: { cellWidth: 24 },
