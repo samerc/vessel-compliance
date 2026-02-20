@@ -1162,20 +1162,20 @@ export const ReportService = {
 
     // ── Header band ──────────────────────────────────────────────────
     doc.setFillColor(15, 18, 24)
-    doc.rect(0, 0, 210, 45, 'F')
+    doc.rect(0, 5, 210, 46, 'F')   // starts at y=5 so printer margin doesn't clip it
 
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
-    doc.text('Al Bahriah Insurance & Reinsurance SAL', 14, 15)
+    doc.text('Al Bahriah Insurance & Reinsurance SAL', 14, 20)
 
     doc.setFontSize(18)
-    doc.text('Condition Survey Report', 14, 28)
+    doc.text('Condition Survey Status', 14, 34)
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
-    doc.setTextColor(150, 150, 150)
-    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 37)
+    doc.setTextColor(190, 190, 190)
+    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 43)
 
     // ── Vessel name & IMO ────────────────────────────────────────────
     doc.setTextColor(0, 0, 0)
@@ -1185,7 +1185,7 @@ export const ReportService = {
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
-    doc.setTextColor(80, 80, 80)
+    doc.setTextColor(40, 40, 40)
     const vesselMeta: string[] = [`IMO: ${vessel.imoNumber}`]
     if (vessel.vesselType) vesselMeta.push(`Type: ${vessel.vesselType}`)
     if (flagState) vesselMeta.push(`Flag: ${flagState.name}`)
@@ -1202,7 +1202,7 @@ export const ReportService = {
 
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100, 100, 100)
+    doc.setTextColor(60, 60, 60)
     doc.text('Total Defects', boxX + 4, boxY + 9)
 
     doc.setFontSize(20)
@@ -1225,8 +1225,8 @@ export const ReportService = {
 
     // ── Survey detail fields (single left column, max X ~128 to avoid overlap with box) ──
     let y = 74
-    const lc: [number, number, number] = [100, 100, 100]
-    const vc: [number, number, number] = [20, 20, 20]
+    const lc: [number, number, number] = [55, 55, 55]
+    const vc: [number, number, number] = [0, 0, 0]
 
     const drawField = (label: string, value: string) => {
       doc.setFontSize(9)
@@ -1275,15 +1275,16 @@ export const ReportService = {
 
       autoTable(doc, {
         startY: y,
-        head: [['#', 'Description', 'Severity', 'Status', 'Closed At']],
+        head: [['#', 'Description', 'Severity', 'Status', 'Closed']],
         body: tableBody,
-        theme: 'striped',
+        theme: 'grid',
         headStyles: {
           fillColor: [15, 18, 24],
           textColor: [255, 255, 255],
           fontSize: 9,
           fontStyle: 'bold',
-          cellPadding: 5,
+          cellPadding: { top: 5, right: 4, bottom: 5, left: 4 },
+          lineColor: [15, 18, 24],
         },
         columnStyles: {
           0: { cellWidth: 16, halign: 'center' },
@@ -1292,21 +1293,46 @@ export const ReportService = {
           3: { cellWidth: 24, halign: 'center' },
           4: { cellWidth: 24 },
         },
-        styles: { fontSize: 9, cellPadding: 4 },
-        alternateRowStyles: { fillColor: [248, 249, 250] },
+        styles: {
+          fontSize: 9,
+          cellPadding: { top: 4, right: 4, bottom: 4, left: 4 },
+          lineColor: [200, 200, 200],
+          lineWidth: 0.3,
+          textColor: [20, 20, 20],
+        },
         didParseCell: (data) => {
           if (data.section !== 'body') return
           if (data.column.index === 2) {
             const sev = String(data.cell.raw)
-            if (sev === 'Critical') { data.cell.styles.textColor = [210, 0, 0]; data.cell.styles.fontStyle = 'bold' }
-            else if (sev === 'Major') { data.cell.styles.textColor = [200, 80, 0]; data.cell.styles.fontStyle = 'bold' }
-            else if (sev === 'Minor') { data.cell.styles.textColor = [150, 110, 0]; data.cell.styles.fontStyle = 'bold' }
-            else if (sev === 'Observation') { data.cell.styles.textColor = [0, 100, 180]; data.cell.styles.fontStyle = 'bold' }
+            if (sev === 'Critical') {
+              data.cell.styles.fillColor = [255, 228, 228]
+              data.cell.styles.textColor = [150, 0, 0]
+              data.cell.styles.fontStyle = 'bold'
+            } else if (sev === 'Major') {
+              data.cell.styles.fillColor = [255, 240, 220]
+              data.cell.styles.textColor = [130, 55, 0]
+              data.cell.styles.fontStyle = 'bold'
+            } else if (sev === 'Minor') {
+              data.cell.styles.fillColor = [255, 252, 210]
+              data.cell.styles.textColor = [100, 80, 0]
+              data.cell.styles.fontStyle = 'bold'
+            } else if (sev === 'Observation') {
+              data.cell.styles.fillColor = [220, 238, 255]
+              data.cell.styles.textColor = [0, 70, 140]
+              data.cell.styles.fontStyle = 'bold'
+            }
           }
           if (data.column.index === 3) {
             const st = String(data.cell.raw)
-            if (st === 'OPEN') { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold' }
-            else if (st === 'CLOSED') { data.cell.styles.textColor = [0, 150, 0]; data.cell.styles.fontStyle = 'bold' }
+            if (st === 'OPEN') {
+              data.cell.styles.fillColor = [255, 228, 228]
+              data.cell.styles.textColor = [150, 0, 0]
+              data.cell.styles.fontStyle = 'bold'
+            } else if (st === 'CLOSED') {
+              data.cell.styles.fillColor = [225, 255, 230]
+              data.cell.styles.textColor = [0, 110, 45]
+              data.cell.styles.fontStyle = 'bold'
+            }
           }
         },
       })
@@ -1337,12 +1363,12 @@ export const ReportService = {
         if (ny > 265) { doc.addPage(); ny = 20 }
         doc.setFontSize(9)
         doc.setFont('helvetica', 'bold')
-        doc.setTextColor(30, 30, 30)
+        doc.setTextColor(0, 0, 0)
         doc.text(`#${d.defectNumber} — ${d.description.substring(0, 90)}`, 14, ny)
         ny += 5
         if (d.notes) {
           doc.setFont('helvetica', 'normal')
-          doc.setTextColor(60, 60, 60)
+          doc.setTextColor(20, 20, 20)
           const lines = doc.splitTextToSize(d.notes, 175)
           doc.text(lines, 20, ny)
           ny += lines.length * 4.5 + 2
@@ -1358,15 +1384,29 @@ export const ReportService = {
       }
     }
 
-    // ── Page footers ─────────────────────────────────────────────────
+    // ── Closing sentence ─────────────────────────────────────────────
+    const tableEndY: number = (doc as any).lastAutoTable?.finalY ?? y + 10
+    const notesEndApprox = notesToShow.length > 0 ? tableEndY + notesToShow.length * 22 : tableEndY
+    let closingY = notesEndApprox + 12
+    if (closingY > 255) { doc.addPage(); closingY = 25 }
+    doc.setPage(doc.getNumberOfPages())
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'italic')
+    doc.setTextColor(40, 40, 40)
+    doc.text('Subject to the terms, conditions and warranties of the policy.', 14, closingY)
+
+    // ── Page footers (y=274 keeps footer within printable area) ──────
     const pageCount = doc.getNumberOfPages()
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i)
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.3)
+      doc.line(14, 270, 196, 270)
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      doc.setTextColor(160, 160, 160)
-      doc.text('Al Bahriah Insurance & Reinsurance SAL — Confidential', 14, 290)
-      doc.text(`Page ${i} of ${pageCount}`, 196, 290, { align: 'right' })
+      doc.setTextColor(100, 100, 100)
+      doc.text('Al Bahriah Insurance & Reinsurance SAL — Confidential', 14, 274)
+      doc.text(`Page ${i} of ${pageCount}`, 196, 274, { align: 'right' })
     }
 
     doc.save(`${vessel.name}_Survey_${survey.surveyDate}.pdf`)
