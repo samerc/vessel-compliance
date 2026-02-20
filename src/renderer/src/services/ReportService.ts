@@ -1132,7 +1132,7 @@ export const ReportService = {
     doc.save(`${fleet.name}_Fleet_Report.pdf`)
   },
 
-  exportSurveyToPDF: async (vessel: Vessel, survey: ConditionSurvey, defects: SurveyDefect[]) => {
+  exportSurveyToPDF: async (vessel: Vessel, survey: ConditionSurvey, defects: SurveyDefect[], includeNoteIds?: Set<string>) => {
     const doc = new jsPDF()
 
     // Fetch supplementary data
@@ -1310,6 +1310,52 @@ export const ReportService = {
           }
         },
       })
+    }
+
+    // ── Selected defect notes ─────────────────────────────────────────
+    const notesToShow = includeNoteIds && includeNoteIds.size > 0
+      ? sortedDefects.filter(d => (d.notes || d.closureNotes) && includeNoteIds.has(d.id))
+      : []
+
+    if (notesToShow.length > 0) {
+      const afterTableY = (doc as any).lastAutoTable?.finalY ?? y + 10
+      let ny = afterTableY + 10
+
+      if (ny > 265) { doc.addPage(); ny = 20 }
+
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 0, 0)
+      doc.text('Defect Notes', 14, ny)
+      ny += 5
+
+      doc.setDrawColor(220, 220, 220)
+      doc.line(14, ny, 196, ny)
+      ny += 6
+
+      for (const d of notesToShow) {
+        if (ny > 265) { doc.addPage(); ny = 20 }
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(30, 30, 30)
+        doc.text(`#${d.defectNumber} — ${d.description.substring(0, 90)}`, 14, ny)
+        ny += 5
+        if (d.notes) {
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(60, 60, 60)
+          const lines = doc.splitTextToSize(d.notes, 175)
+          doc.text(lines, 20, ny)
+          ny += lines.length * 4.5 + 2
+        }
+        if (d.closureNotes) {
+          doc.setFont('helvetica', 'italic')
+          doc.setTextColor(0, 120, 0)
+          const lines = doc.splitTextToSize(`Closure: ${d.closureNotes}`, 175)
+          doc.text(lines, 20, ny)
+          ny += lines.length * 4.5 + 2
+        }
+        ny += 4
+      }
     }
 
     // ── Page footers ─────────────────────────────────────────────────

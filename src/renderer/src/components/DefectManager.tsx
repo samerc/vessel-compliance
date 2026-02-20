@@ -203,8 +203,30 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     return text.length > maxLen ? text.substring(0, maxLen) + '...' : text
   }
 
+  const [showPdfModal, setShowPdfModal] = useState(false)
+  const [pdfNoteIds, setPdfNoteIds] = useState<Set<string>>(new Set())
+
   const exportToPDF = () => {
-    ReportService.exportSurveyToPDF(vessel, survey, defects)
+    const defectsWithNotes = defects.filter(d => d.notes || d.closureNotes)
+    if (defectsWithNotes.length === 0) {
+      ReportService.exportSurveyToPDF(vessel, survey, defects)
+    } else {
+      setPdfNoteIds(new Set(defectsWithNotes.map(d => d.id)))
+      setShowPdfModal(true)
+    }
+  }
+
+  const handlePdfExport = () => {
+    setShowPdfModal(false)
+    ReportService.exportSurveyToPDF(vessel, survey, defects, pdfNoteIds)
+  }
+
+  const togglePdfNoteId = (id: string) => {
+    setPdfNoteIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   const exportToExcel = () => {
@@ -604,6 +626,61 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
           onConfirm={handleCloseDefect}
         />
       )}
+
+      {/* PDF note selection modal */}
+      {showPdfModal && (() => {
+        const defectsWithNotes = defects.filter(d => d.notes || d.closureNotes)
+        const allSelected = defectsWithNotes.every(d => pdfNoteIds.has(d.id))
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: 'var(--bg-sidebar)', borderRadius: '16px', padding: '28px', width: '500px', maxWidth: '95vw', border: 'var(--glass-border)', boxShadow: 'var(--shadow-lg)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Export PDF</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Select which defect notes to include</p>
+                </div>
+                <button onClick={() => setShowPdfModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                <button
+                  onClick={() => setPdfNoteIds(allSelected ? new Set() : new Set(defectsWithNotes.map(d => d.id)))}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', fontSize: '0.82rem', cursor: 'pointer', padding: '2px 0' }}
+                >
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                {defectsWithNotes.map(d => (
+                  <label key={d.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer', padding: '10px 12px', borderRadius: '8px', background: pdfNoteIds.has(d.id) ? 'var(--bg-card-hover)' : 'var(--bg-card)', border: 'var(--glass-border)' }}>
+                    <input
+                      type="checkbox"
+                      checked={pdfNoteIds.has(d.id)}
+                      onChange={() => togglePdfNoteId(d.id)}
+                      style={{ marginTop: '2px', flexShrink: 0 }}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: '600', fontSize: '0.88rem', color: 'var(--text-primary)' }}>#{d.defectNumber} — {d.description.substring(0, 60)}{d.description.length > 60 ? '…' : ''}</div>
+                      {d.notes && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '3px' }}>{d.notes.substring(0, 80)}{d.notes.length > 80 ? '…' : ''}</div>}
+                      {d.closureNotes && <div style={{ fontSize: '0.8rem', color: '#2d8a4e', marginTop: '2px', fontStyle: 'italic' }}>Closure: {d.closureNotes.substring(0, 80)}{d.closureNotes.length > 80 ? '…' : ''}</div>}
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowPdfModal(false)} className="btn-secondary">Cancel</button>
+                <button onClick={handlePdfExport} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={15} /> Export PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Confirmation Modal */}
       {confirmation.show && (
