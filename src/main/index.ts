@@ -1708,6 +1708,13 @@ app.whenReady().then(() => {
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })
 
+  // Renewal Status Types
+  safeHandle('renewalStates:getAll', (event) => { requireSession(event); return db.getRenewalStatusTypes() })
+  safeHandle('renewalStates:add', (event, name: string, color: string) => { requireSession(event); return db.addRenewalStatusType(name, color) })
+  safeHandle('renewalStates:update', (event, id: string, name: string, color: string) => { requireSession(event); return db.updateRenewalStatusType(id, name, color) })
+  safeHandle('renewalStates:delete', (event, id: string) => { requireSession(event); return db.deleteRenewalStatusType(id) })
+  safeHandle('renewalStates:setForPolicy', (event, policyId: string, statusId: string | null) => { requireSession(event); return db.setRenewalStatusForPolicy(policyId, statusId) })
+
   // Quotations
   safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })
   safeHandle('db:addQuotation', (event, q) => { requireSession(event); return db.addQuotation(q) })

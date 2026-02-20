@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy } from '../../../shared/types'
+import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy, ConditionSurvey, SurveyDefect, Surveyor } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 
 const isExpired = (expiryDate: string | null | undefined): boolean => {
@@ -1130,6 +1130,200 @@ export const ReportService = {
     }
 
     doc.save(`${fleet.name}_Fleet_Report.pdf`)
+  },
+
+  exportSurveyToPDF: async (vessel: Vessel, survey: ConditionSurvey, defects: SurveyDefect[]) => {
+    const doc = new jsPDF()
+
+    // Fetch supplementary data
+    const [surveyors, flagStatesRaw] = await Promise.all([
+      window.api.getSurveyors(),
+      window.api.getFlagStates()
+    ])
+    const surveyor: Surveyor | undefined = surveyors.find((s: Surveyor) => s.id === survey.surveyorId)
+    const flagState = flagStatesRaw.find((f: any) => f.id === vessel.flagStateId)
+
+    const openCount = defects.filter(d => d.status === 'OPEN').length
+    const closedCount = defects.filter(d => d.status === 'CLOSED').length
+    const criticalCount = defects.filter(d => d.severity === 'Critical').length
+
+    // Sort: OPEN first, then CLOSED; within each group sort numerically by defect number
+    const sortedDefects = [...defects].sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'OPEN' ? -1 : 1
+      return a.defectNumber.localeCompare(b.defectNumber, undefined, { numeric: true })
+    })
+
+    // Determine if survey is closed (all defects closed) and find its closing date
+    const isSurveyClosed = defects.length > 0 && defects.every(d => d.status === 'CLOSED')
+    const latestCloseTs = isSurveyClosed
+      ? defects.filter(d => d.closedAt).map(d => d.closedAt!).sort().pop()
+      : undefined
+    const surveyClosedDisplay = latestCloseTs ? new Date(latestCloseTs).toLocaleDateString() : null
+
+    // ── Header band ──────────────────────────────────────────────────
+    doc.setFillColor(15, 18, 24)
+    doc.rect(0, 0, 210, 45, 'F')
+
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Al Bahriah Insurance & Reinsurance SAL', 14, 15)
+
+    doc.setFontSize(18)
+    doc.text('Condition Survey Report', 14, 28)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(150, 150, 150)
+    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 37)
+
+    // ── Vessel name & IMO ────────────────────────────────────────────
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(15)
+    doc.setFont('helvetica', 'bold')
+    doc.text(vessel.name, 14, 58)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(80, 80, 80)
+    const vesselMeta: string[] = [`IMO: ${vessel.imoNumber}`]
+    if (vessel.vesselType) vesselMeta.push(`Type: ${vessel.vesselType}`)
+    if (flagState) vesselMeta.push(`Flag: ${flagState.name}`)
+    doc.text(vesselMeta.join('   •   '), 14, 65)
+
+    // ── Summary stats box (top-right) ────────────────────────────────
+    const boxX = 140
+    const boxY = 52
+    const boxW = 56
+    const boxH = 42
+    doc.setDrawColor(220, 220, 220)
+    doc.setFillColor(245, 247, 249)
+    doc.roundedRect(boxX, boxY, boxW, boxH, 3, 3, 'FD')
+
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text('Total Defects', boxX + 4, boxY + 9)
+
+    doc.setFontSize(20)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text(String(defects.length), boxX + 4, boxY + 22)
+
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(200, 0, 0)
+    doc.text(`${openCount} Open`, boxX + 4, boxY + 32)
+    doc.setTextColor(0, 150, 0)
+    doc.text(`${closedCount} Closed`, boxX + 4, boxY + 39)
+
+    if (criticalCount > 0) {
+      doc.setTextColor(200, 0, 0)
+      doc.setFontSize(8)
+      doc.text(`${criticalCount} Critical`, boxX + 30, boxY + 32)
+    }
+
+    // ── Survey detail fields (single left column, max X ~128 to avoid overlap with box) ──
+    let y = 74
+    const lc: [number, number, number] = [100, 100, 100]
+    const vc: [number, number, number] = [20, 20, 20]
+
+    const drawField = (label: string, value: string) => {
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...lc)
+      doc.text(label + ':', 14, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...vc)
+      // Truncate value to stay left of the stats box
+      const safeValue = doc.splitTextToSize(value, 115)[0]
+      doc.text(safeValue, 52, y)
+      y += 7
+    }
+
+    drawField('Survey Type', survey.surveyType)
+    drawField('Survey Date', survey.surveyDate)
+    if (surveyor) {
+      drawField('Surveyor', surveyor.companyName)
+      if (surveyor.country) drawField('Country', surveyor.country)
+    }
+    if (survey.reference) drawField('Reference', survey.reference)
+    if (survey.location) drawField('Location', survey.location)
+    if (isSurveyClosed && surveyClosedDisplay) drawField('Survey Closed', surveyClosedDisplay)
+
+    // ── Divider ──────────────────────────────────────────────────────
+    y = Math.max(y, boxY + boxH + 4)
+    doc.setDrawColor(220, 220, 220)
+    doc.setLineWidth(0.5)
+    doc.line(14, y, 196, y)
+    y += 6
+
+    // ── Defects table ────────────────────────────────────────────────
+    if (defects.length === 0) {
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(150, 150, 150)
+      doc.text('No defects recorded for this survey.', 14, y + 8)
+    } else {
+      const tableBody = sortedDefects.map(d => [
+        d.defectNumber,
+        d.description,
+        d.severity || '—',
+        d.status,
+        d.closedAt ? new Date(d.closedAt).toLocaleDateString() : '—',
+      ])
+
+      autoTable(doc, {
+        startY: y,
+        head: [['#', 'Description', 'Severity', 'Status', 'Closed At']],
+        body: tableBody,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [15, 18, 24],
+          textColor: [255, 255, 255],
+          fontSize: 9,
+          fontStyle: 'bold',
+          cellPadding: 5,
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 96 },
+          2: { cellWidth: 28, halign: 'center' },
+          3: { cellWidth: 24, halign: 'center' },
+          4: { cellWidth: 24 },
+        },
+        styles: { fontSize: 9, cellPadding: 4 },
+        alternateRowStyles: { fillColor: [248, 249, 250] },
+        didParseCell: (data) => {
+          if (data.section !== 'body') return
+          if (data.column.index === 2) {
+            const sev = String(data.cell.raw)
+            if (sev === 'Critical') { data.cell.styles.textColor = [210, 0, 0]; data.cell.styles.fontStyle = 'bold' }
+            else if (sev === 'Major') { data.cell.styles.textColor = [200, 80, 0]; data.cell.styles.fontStyle = 'bold' }
+            else if (sev === 'Minor') { data.cell.styles.textColor = [150, 110, 0]; data.cell.styles.fontStyle = 'bold' }
+            else if (sev === 'Observation') { data.cell.styles.textColor = [0, 100, 180]; data.cell.styles.fontStyle = 'bold' }
+          }
+          if (data.column.index === 3) {
+            const st = String(data.cell.raw)
+            if (st === 'OPEN') { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold' }
+            else if (st === 'CLOSED') { data.cell.styles.textColor = [0, 150, 0]; data.cell.styles.fontStyle = 'bold' }
+          }
+        },
+      })
+    }
+
+    // ── Page footers ─────────────────────────────────────────────────
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(160, 160, 160)
+      doc.text('Al Bahriah Insurance & Reinsurance SAL — Confidential', 14, 290)
+      doc.text(`Page ${i} of ${pageCount}`, 196, 290, { align: 'right' })
+    }
+
+    doc.save(`${vessel.name}_Survey_${survey.surveyDate}.pdf`)
   },
 
   exportOpenDefectsToExcel: async () => {

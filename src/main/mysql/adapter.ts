@@ -754,6 +754,24 @@ export class MySQLAdapter {
                 console.warn('Date normalization migration skipped:', dateFixErr)
             }
 
+            // Migration: Add renewal_status_types table
+            const [rstTable] = await this.pool.query("SHOW TABLES LIKE 'renewal_status_types'")
+            if ((rstTable as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE renewal_status_types (
+                    id VARCHAR(36) PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    color VARCHAR(7) NOT NULL DEFAULT '#6366f1',
+                    order_index INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )`)
+            }
+
+            // Migration: Add renewal_status_id to vessel_dynamic_policies
+            const [vdpCols] = await this.pool.query("SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'renewal_status_id'")
+            if ((vdpCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN renewal_status_id VARCHAR(36) NULL")
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -4151,7 +4169,16 @@ export class MySQLAdapter {
                     pt.name as policyTypeName, vdp.policy_number as policyNumber,
                     vpv.value_date as endDate,
                     e.name as customerName, v.customer_type as customerType,
-                    f.name as fleetName
+                    f.name as fleetName,
+                    vdp.currency as currency,
+                    vdp.notes as notes,
+                    vdp.renewal_status_id as renewalStatusId,
+                    rst.name as renewalStatusName, rst.color as renewalStatusColor,
+                    (SELECT vpv2.value_amount FROM vessel_policy_values vpv2
+                     JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
+                     WHERE vpv2.policy_id = vdp.id AND ptc2.field_type = 'amount'
+                       AND LOWER(ptc2.name) LIKE '%premium%'
+                     LIMIT 1) as premium
              FROM vessel_dynamic_policies vdp
              JOIN vessels v ON vdp.vessel_id = v.id
              JOIN policy_types pt ON vdp.policy_type_id = pt.id
@@ -4159,6 +4186,7 @@ export class MySQLAdapter {
              JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
              LEFT JOIN entities e ON v.customer_id = e.id
              LEFT JOIN fleets f ON v.fleet_id = f.id
+             LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
              WHERE vdp.status = 'active'
                AND v.is_active = TRUE
                AND ptc.field_type = 'date'
@@ -4170,6 +4198,39 @@ export class MySQLAdapter {
             [startDate, endDate]
         )
         return rows as any[]
+    }
+
+    // --- Renewal Status Types ---
+    async getRenewalStatusTypes(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, color, order_index as `order` FROM renewal_status_types ORDER BY order_index ASC, name ASC')
+        return rows as any[]
+    }
+
+    async addRenewalStatusType(name: string, color: string): Promise<any> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        const [countRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM renewal_status_types')
+        const order = (countRows as any[])[0]?.cnt ?? 0
+        await this.pool.execute('INSERT INTO renewal_status_types (id, name, color, order_index) VALUES (?, ?, ?, ?)', [id, name.trim(), color, order])
+        return { id, name: name.trim(), color, order }
+    }
+
+    async updateRenewalStatusType(id: string, name: string, color: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE renewal_status_types SET name = ?, color = ? WHERE id = ?', [name.trim(), color, id])
+    }
+
+    async deleteRenewalStatusType(id: string): Promise<void> {
+        if (!this.pool) return
+        // Clear references on policies first
+        await this.pool.execute('UPDATE vessel_dynamic_policies SET renewal_status_id = NULL WHERE renewal_status_id = ?', [id])
+        await this.pool.execute('DELETE FROM renewal_status_types WHERE id = ?', [id])
+    }
+
+    async setRenewalStatusForPolicy(policyId: string, statusId: string | null): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE vessel_dynamic_policies SET renewal_status_id = ? WHERE id = ?', [statusId || null, policyId])
     }
 
     async addOneDayToAllPolicies(): Promise<{ updatedValues: number; updatedVessels: number }> {

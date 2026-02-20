@@ -36,6 +36,7 @@ export default function FleetManager() {
     // Filter/search state
     const [searchTerm, setSearchTerm] = useState('')
     const [typeFilter, setTypeFilter] = useState<'all' | 'broker' | 'direct'>('all')
+    const [fleetSearchTerm, setFleetSearchTerm] = useState('')
 
     // Expanded customers
     const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
@@ -470,6 +471,19 @@ export default function FleetManager() {
                         </form>
                     </section>
 
+                    {/* Fleet search */}
+                    <div style={{ marginBottom: '16px', position: 'relative', maxWidth: '400px' }}>
+                        <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={16} />
+                        <input
+                            type="text"
+                            value={fleetSearchTerm}
+                            onChange={e => setFleetSearchTerm(e.target.value)}
+                            placeholder="Search fleets..."
+                            style={{ width: '100%', paddingLeft: '36px' }}
+                            aria-label="Search fleets"
+                        />
+                    </div>
+
                     <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <caption className="sr-only">Fleets</caption>
@@ -481,13 +495,13 @@ export default function FleetManager() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {fleets.length === 0 ? (
+                                {fleets.filter(f => !fleetSearchTerm || f.name.toLowerCase().includes(fleetSearchTerm.toLowerCase())).length === 0 ? (
                                     <tr>
                                         <td colSpan={3} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                            No fleets created yet.
+                                            {fleetSearchTerm ? 'No fleets match your search.' : 'No fleets created yet.'}
                                         </td>
                                     </tr>
-                                ) : fleets.map(fleet => {
+                                ) : fleets.filter(f => !fleetSearchTerm || f.name.toLowerCase().includes(fleetSearchTerm.toLowerCase())).map(fleet => {
                                     const count = vessels.filter(v => v.fleetId === fleet.id).length
                                     return (
                                         <tr key={fleet.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">

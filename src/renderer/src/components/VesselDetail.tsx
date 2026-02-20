@@ -87,7 +87,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         } catch { /* ignore */ }
         try {
             const cs = await window.api.getClassificationSocieties()
-            setClassSocieties(cs || [])
+            setClassSocieties([...(cs || [])].sort((a, b) => a.name.localeCompare(b.name)))
         } catch { /* ignore */ }
         try {
             const vt = await window.api.getVesselTypes()
@@ -499,7 +499,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <select
                                         value={editVesselType}
                                         onChange={e => setEditVesselType(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', width: '160px' }}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)', width: '160px' }}
                                         aria-label="Vessel type"
                                     >
                                         <option value="">No type</option>
@@ -513,7 +513,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <select
                                         value={editClassification}
                                         onChange={e => setEditClassification(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', width: '160px' }}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)', width: '160px' }}
                                         aria-label="Classification society"
                                     >
                                         <option value="">No class</option>
@@ -531,7 +531,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <select
                                         value={selectedFlagStateId}
                                         onChange={e => setSelectedFlagStateId(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}
                                         aria-label="Flag state"
                                     >
                                         <option value="">No flag</option>
@@ -564,7 +564,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
                                     {[
                                         vessel.builtYear && `Built ${vessel.builtYear}`,
-                                        vessel.grossTonnage && `GT ${vessel.grossTonnage}`,
+                                        vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
                                         vessel.vesselType,
                                         vessel.classificationSociety && `Class: ${vessel.classificationSociety}`,
                                         vessel.callSign && `Call Sign: ${vessel.callSign}`
@@ -1192,7 +1192,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             )}
 
             {detailView === 'history' && (
-                <VesselHistoryView auditLog={auditLog} isLight={isLight} />
+                <VesselHistoryView auditLog={auditLog} isLight={isLight} flagStates={flagStates} />
             )}
 
             {confirmation.show && (
@@ -1368,7 +1368,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
 function formatCurrency(value?: number, currency?: string): string {
     if (value == null) return '-'
-    const sym = currency === 'EUR' ? '\u20AC' : '$'
+    const sym = currency === 'EUR' ? '\u20AC' : currency === 'GBP' ? '\u00A3' : '$'
     return `${sym}${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
@@ -1587,15 +1587,16 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                 setConfirmation(prev => ({ ...prev, show: false }))
                 try {
                     // 1. Conditionally expire old policy
-                    // Find expiry date characteristic
-                    const expiryChar = characteristics.find(c => c.name.toLowerCase().includes('expiry') || c.name.toLowerCase().includes('expiration'))
+                    // Find expiry date characteristic (only from THIS policy type's characteristics)
+                    const policyTypeChars = characteristics.filter(c => c.policyTypeId === p.policyTypeId)
+                    const expiryChar = policyTypeChars.find(c => c.name.toLowerCase().includes('expiry') || c.name.toLowerCase().includes('expiration') || c.name.toLowerCase().includes('end date'))
                     let shouldExpire = false
 
                     if (expiryChar && p.values) {
                         const expiryVal = p.values.find(v => v.characteristicId === expiryChar.id)
                         if (expiryVal && expiryVal.valueDate) {
                             const todayStr = new Date().toISOString().split('T')[0]
-                            if (expiryVal.valueDate > todayStr) {
+                            if (expiryVal.valueDate <= todayStr) {
                                 shouldExpire = true
                             }
                         }
@@ -1758,7 +1759,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                             {!editingPolicyId && (
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Policy Type</label>
-                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
                                         {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
                                     </select>
                                 </div>
@@ -1779,7 +1780,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status</label>
-                                    <select value={formStatus} onChange={e => setFormStatus(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                    <select value={formStatus} onChange={e => setFormStatus(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
                                         <option value="active">Active</option>
                                         <option value="expired">Expired</option>
                                         <option value="cancelled">Cancelled</option>
@@ -1787,7 +1788,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Currency</label>
-                                    <select value={formCurrency} onChange={e => setFormCurrency(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                    <select value={formCurrency} onChange={e => setFormCurrency(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
                                         <option value="USD">USD ($)</option>
                                         <option value="EUR">EUR (\u20AC)</option>
                                         <option value="GBP">GBP (\u00A3)</option>
@@ -1796,7 +1797,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 {typeCondsForForm.length > 0 && (
                                     <div>
                                         <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Condition</label>
-                                        <select value={formConditionId} onChange={e => setFormConditionId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                        <select value={formConditionId} onChange={e => setFormConditionId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
                                             <option value="">None</option>
                                             {typeCondsForForm.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
@@ -1804,7 +1805,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 )}
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Broker</label>
-                                    <select value={formBrokerId} onChange={e => setFormBrokerId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                    <select value={formBrokerId} onChange={e => setFormBrokerId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
                                         <option value="">Direct (No broker)</option>
                                         {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                                     </select>
@@ -1826,7 +1827,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     }} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
                                                 )}
                                                 {c.fieldType === 'date' && (
-                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }} />
+                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }} />
                                                 )}
                                                 {c.fieldType === 'amount' && (
                                                     <input type="number" step="0.01" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
@@ -1837,7 +1838,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     </label>
                                                 )}
                                                 {c.fieldType === 'select' && c.selectOptions && (
-                                                    <select value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                                    <select value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
                                                         <option value="">Select...</option>
                                                         {c.selectOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                     </select>
@@ -1878,9 +1879,15 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
 
 // ==================== Vessel History View ====================
 
-function VesselHistoryView({ auditLog, isLight }: { auditLog: VesselAuditEntry[]; isLight: boolean }) {
+function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: VesselAuditEntry[]; isLight: boolean; flagStates: FlagState[] }) {
     if (auditLog.length === 0) {
         return <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '32px' }}>No changes recorded yet.</p>
+    }
+
+    const resolveFlagValue = (val: string | null) => {
+        if (!val) return val
+        const match = flagStates.find(fs => fs.id === val)
+        return match ? `${match.name} (${match.iso3Code})` : val
     }
 
     return (
@@ -1890,6 +1897,9 @@ function VesselHistoryView({ auditLog, isLight }: { auditLog: VesselAuditEntry[]
 
             {auditLog.map((entry, i) => {
                 const date = new Date(entry.changedAt)
+                const isFlagField = entry.fieldName === 'Flag State'
+                const displayOld = isFlagField ? resolveFlagValue(entry.oldValue) : entry.oldValue
+                const displayNew = isFlagField ? resolveFlagValue(entry.newValue) : entry.newValue
                 return (
                     <div key={entry.id} style={{ position: 'relative', marginBottom: '16px', paddingLeft: '16px' }}>
                         {/* Dot */}
@@ -1907,11 +1917,11 @@ function VesselHistoryView({ auditLog, isLight }: { auditLog: VesselAuditEntry[]
                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>by {entry.changedBy}</span>
                             </div>
                             <div style={{ fontSize: '0.85rem' }}>
-                                {entry.oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{entry.oldValue}</span>}
-                                {entry.oldValue && entry.newValue && <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>&rarr;</span>}
-                                {entry.newValue && <span style={{ fontWeight: '500' }}>{entry.newValue}</span>}
-                                {!entry.oldValue && entry.newValue && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}> (set)</span>}
-                                {entry.oldValue && !entry.newValue && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}> (cleared)</span>}
+                                {displayOld && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{displayOld}</span>}
+                                {displayOld && displayNew && <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>&rarr;</span>}
+                                {displayNew && <span style={{ fontWeight: '500' }}>{displayNew}</span>}
+                                {!displayOld && displayNew && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}> (set)</span>}
+                                {displayOld && !displayNew && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}> (cleared)</span>}
                             </div>
                         </div>
                     </div>

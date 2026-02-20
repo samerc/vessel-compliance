@@ -311,6 +311,13 @@ const api = {
   getExpiredActivePolicies: () => ipcRenderer.invoke('policies:getExpiredActive'),
   getPolicyRenewalsByMonth: (year: number, month: number) => ipcRenderer.invoke('policies:getRenewalsByMonth', year, month),
 
+  // Renewal Status Types
+  getRenewalStatusTypes: () => ipcRenderer.invoke('renewalStates:getAll'),
+  addRenewalStatusType: (name: string, color: string) => ipcRenderer.invoke('renewalStates:add', name, color),
+  updateRenewalStatusType: (id: string, name: string, color: string) => ipcRenderer.invoke('renewalStates:update', id, name, color),
+  deleteRenewalStatusType: (id: string) => ipcRenderer.invoke('renewalStates:delete', id),
+  setRenewalStatusForPolicy: (policyId: string, statusId: string | null) => ipcRenderer.invoke('renewalStates:setForPolicy', policyId, statusId),
+
   // Quotations
   getQuotations: () => ipcRenderer.invoke('db:getQuotations'),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),

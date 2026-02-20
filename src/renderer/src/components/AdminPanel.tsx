@@ -205,7 +205,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     // --- Classification Societies ---
     const loadClassSocieties = async () => {
         const data = await window.api.getClassificationSocieties()
-        setClassSocieties(data)
+        setClassSocieties([...data].sort((a, b) => a.name.localeCompare(b.name)))
     }
 
     const handleAddClassSociety = async (e: React.FormEvent) => {
