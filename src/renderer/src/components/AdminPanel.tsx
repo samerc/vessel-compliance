@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Upload, Calendar } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Calendar } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings } from '../../../shared/types'
+import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 
 export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?: (vesselId: string) => void }) {
@@ -27,7 +28,8 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         timeOfDay: '09:00',
         threshold: 85,
         includeVessels: true,
-        skipCleared: true
+        skipCleared: true,
+        autoMarkCleanOnCheck: true
     })
     const [savingCompliance, setSavingCompliance] = useState(false)
     const [runningManualCheck, setRunningManualCheck] = useState(false)
@@ -63,7 +65,10 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [newCharRequired, setNewCharRequired] = useState(false)
     const [newCondName, setNewCondName] = useState('')
 
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'vesselTypes', 'classSocieties', 'policyTypes', 'compliance', 'reminders', 'fileTypes', 'dbConfig', 'dataImport', 'dangerZone']))
+    const [reportSettings, setReportSettings] = useState<ReportSettings>(REPORT_SETTINGS_DEFAULTS)
+    const [savingReportSettings, setSavingReportSettings] = useState(false)
+
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'vesselTypes', 'classSocieties', 'policyTypes', 'compliance', 'reminders', 'reportSettings', 'fileTypes', 'dbConfig', 'dangerZone']))
     const toggleSection = (id: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev)
@@ -84,6 +89,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         loadConfigPath()
         loadComplianceSettings()
         loadReminderSettings()
+        loadReportSettings()
     }, [])
 
     const loadConfigPath = async () => {
@@ -134,6 +140,23 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const loadReminderSettings = async () => {
         const settings = await window.api.remindersGetSettings()
         setReminderSettings(settings)
+    }
+
+    const loadReportSettings = async () => {
+        const settings = await window.api.reportSettingsGet()
+        setReportSettings({ ...REPORT_SETTINGS_DEFAULTS, ...settings })
+    }
+
+    const handleSaveReportSettings = async () => {
+        setSavingReportSettings(true)
+        try {
+            await window.api.reportSettingsSet(reportSettings)
+            showSuccess('Report settings saved')
+        } catch (error: any) {
+            showError(error.message || 'Failed to save report settings')
+        } finally {
+            setSavingReportSettings(false)
+        }
     }
 
     const handleSaveReminderSettings = async () => {
@@ -1057,7 +1080,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                     <select
                                         value={complianceSettings.dayOfWeek}
                                         onChange={e => setComplianceSettings({ ...complianceSettings, dayOfWeek: parseInt(e.target.value) })}
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
                                         disabled={!complianceSettings.enabled}
                                         aria-label="Day of week"
                                     >
@@ -1072,7 +1095,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                         type="time"
                                         value={complianceSettings.timeOfDay}
                                         onChange={e => setComplianceSettings({ ...complianceSettings, timeOfDay: e.target.value })}
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
                                         disabled={!complianceSettings.enabled}
                                         aria-label="Time of day"
                                     />
@@ -1123,6 +1146,21 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                         disabled={!complianceSettings.enabled}
                                     />
                                     <span>Skip already cleared/confirmed entities</span>
+                                </label>
+                            </div>
+
+                            <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(0, 210, 255, 0.05)', border: '1px solid rgba(0, 210, 255, 0.15)', borderRadius: '8px' }}>
+                                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px', margin: '0 0 10px 0' }}>
+                                    Manual pill check settings (applies to refresh buttons on sanctions badges):
+                                </p>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={complianceSettings.autoMarkCleanOnCheck ?? true}
+                                        onChange={e => setComplianceSettings({ ...complianceSettings, autoMarkCleanOnCheck: e.target.checked })}
+                                        style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                    />
+                                    <span>Auto-mark as Clean when no matches above threshold</span>
                                 </label>
                             </div>
 
@@ -1193,7 +1231,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                 max={90}
                                 value={reminderSettings.periodDays}
                                 onChange={e => setReminderSettings({ ...reminderSettings, periodDays: Number(e.target.value) })}
-                                style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                                style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
                             />
                         </div>
                         <div>
@@ -1208,7 +1246,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                 value={reminderSettings.reminderTemplate}
                                 onChange={e => setReminderSettings({ ...reminderSettings, reminderTemplate: e.target.value })}
                                 rows={6}
-                                style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}
+                                style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}
                             />
                         </div>
                     </div>
@@ -1221,6 +1259,80 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
                             {savingReminder && <Loader2 size={16} className="spinner" />}
+                            Save Settings
+                        </button>
+                    </div>
+                </>}
+            </section>
+
+            {/* Report Settings */}
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3
+                    onClick={() => toggleSection('reportSettings')}
+                    style={{ marginBottom: collapsedSections.has('reportSettings') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                    {collapsedSections.has('reportSettings') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                    <FileText size={20} color="var(--accent-primary)" /> Report Settings
+                </h3>
+                {!collapsedSections.has('reportSettings') && <>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                        Configure branding settings applied to all generated PDF reports.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Company Name</label>
+                            <input
+                                type="text"
+                                value={reportSettings.companyName}
+                                onChange={e => setReportSettings({ ...reportSettings, companyName: e.target.value })}
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Company Subtitle <span style={{ fontWeight: '400', opacity: 0.6 }}>(optional)</span></label>
+                            <input
+                                type="text"
+                                value={reportSettings.companySubtitle}
+                                onChange={e => setReportSettings({ ...reportSettings, companySubtitle: e.target.value })}
+                                placeholder="e.g. Marine Division"
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                            />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Footer Text</label>
+                            <input
+                                type="text"
+                                value={reportSettings.footerText}
+                                onChange={e => setReportSettings({ ...reportSettings, footerText: e.target.value })}
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Primary Color</label>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <input
+                                    type="color"
+                                    value={rgbToHex(reportSettings.primaryColor)}
+                                    onChange={e => setReportSettings({ ...reportSettings, primaryColor: hexToRgb(e.target.value) })}
+                                    style={{ width: '44px', height: '36px', padding: '2px', borderRadius: '6px', border: '1px solid var(--input-border)', cursor: 'pointer', background: 'none' }}
+                                />
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                                    {rgbToHex(reportSettings.primaryColor).toUpperCase()}
+                                </span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', opacity: 0.6 }}>
+                                    rgb({reportSettings.primaryColor.join(', ')})
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                            onClick={handleSaveReportSettings}
+                            disabled={savingReportSettings}
+                            className="btn-primary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            {savingReportSettings && <Loader2 size={16} className="spinner" />}
                             Save Settings
                         </button>
                     </div>
@@ -1656,7 +1768,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                                 <h4 style={{ fontSize: '0.9rem', marginBottom: '12px', color: 'var(--text-secondary)' }}>Characteristics (Fields)</h4>
                                                 <form onSubmit={handleAddCharacteristic} style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                                                     <input type="text" value={newCharName} onChange={e => setNewCharName(e.target.value)} placeholder="Field name" style={{ flex: 2, minWidth: '120px', fontSize: '0.85rem', padding: '4px 8px' }} />
-                                                    <select value={newCharType} onChange={e => setNewCharType(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                                                    <select value={newCharType} onChange={e => setNewCharType(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}>
                                                         <option value="text">Text</option>
                                                         <option value="date">Date</option>
                                                         <option value="amount">Amount</option>
@@ -1713,19 +1825,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                 </>}
             </section>
 
-            {/* 8. Data Import */}
-            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('dataImport')}
-                    style={{ marginBottom: collapsedSections.has('dataImport') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('dataImport') ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
-                    <Upload size={20} /> Data Import
-                </h3>
-                {!collapsedSections.has('dataImport') && <DataImportSection showSuccess={showSuccess} showError={showError} />}
-            </section>
-
-            {/* 9. Danger Zone – Purge Data */}
+            {/* 8. Danger Zone – Purge Data */}
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3
                     onClick={() => toggleSection('dangerZone')}
@@ -1801,149 +1901,3 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     )
 }
 
-// ==================== Data Import Section ====================
-
-function DataImportSection({ showSuccess, showError }: { showSuccess: (m: string) => void; showError: (m: string) => void }) {
-    const [importing, setImporting] = useState(false)
-    const [reimporting, setReimporting] = useState(false)
-    const [result, setResult] = useState<{ imported: number; totalRows: number; unmatched: { ship: string; imo: string; broker: string; fleet: string }[] } | null>(null)
-    const [reimportResult, setReimportResult] = useState<{ updated: number; totalRows: number; createdFlags: number; createdClasses: number; createdTypes: number } | null>(null)
-
-    const handleImport = async () => {
-        try {
-            const filePath = await window.api.dialogOpenFile()
-            if (!filePath) return
-            setImporting(true)
-            setResult(null)
-            const res = await window.api.importInsurancePoliciesFromExcel(filePath)
-            setResult(res)
-            showSuccess(`Imported ${res.imported} policy records from ${res.totalRows} rows. ${res.unmatched.length} unmatched.`)
-        } catch (err: any) {
-            showError(err.message || 'Import failed')
-        } finally {
-            setImporting(false)
-        }
-    }
-
-    const handleReimportDetails = async () => {
-        try {
-            const filePath = await window.api.dialogOpenFile()
-            if (!filePath) return
-            setReimporting(true)
-            setReimportResult(null)
-            const res = await window.api.reimportVesselDetails(filePath)
-            setReimportResult(res)
-            const parts: string[] = [`Updated ${res.updated} vessels from ${res.totalRows} rows.`]
-            if (res.createdFlags) parts.push(`Created ${res.createdFlags} flag states.`)
-            if (res.createdClasses) parts.push(`Created ${res.createdClasses} classification societies.`)
-            if (res.createdTypes) parts.push(`Created ${res.createdTypes} vessel types.`)
-            showSuccess(parts.join(' '))
-        } catch (err: any) {
-            showError(err.message || 'Re-import failed')
-        } finally {
-            setReimporting(false)
-        }
-    }
-
-    return (
-        <div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                Import vessel insurance policy data from an Excel file. Matches vessels by IMO number. Cancelled vessels are skipped.
-            </p>
-
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                <button
-                    onClick={handleImport}
-                    disabled={importing}
-                    className="btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                    {importing ? <><Loader2 size={16} className="spinning" /> Importing...</> : <><Upload size={16} /> Import Vessel Excel</>}
-                </button>
-                <button
-                    onClick={handleReimportDetails}
-                    disabled={reimporting}
-                    className="btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                    {reimporting ? <><Loader2 size={16} className="spinning" /> Re-importing...</> : <><Upload size={16} /> Re-import Vessel Details</>}
-                </button>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px', marginTop: '-8px' }}>
-                <strong>Re-import Vessel Details</strong> updates Type, Flag, and Class from an Excel file for all matched vessels (overwrites existing values). Missing settings entries are auto-created.
-            </p>
-
-            {result && (
-                <div>
-                    <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(46, 204, 113, 0.1)', border: '1px solid rgba(46, 204, 113, 0.3)' }}>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{result.imported}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Policy records imported</div>
-                        </div>
-                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(52, 152, 219, 0.1)', border: '1px solid rgba(52, 152, 219, 0.3)' }}>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{result.totalRows}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Active rows processed</div>
-                        </div>
-                        {result.unmatched.length > 0 && (
-                            <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(231, 76, 60, 0.1)', border: '1px solid rgba(231, 76, 60, 0.3)' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{result.unmatched.length}</div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Unmatched vessels</div>
-                            </div>
-                        )}
-                    </div>
-
-                    {result.unmatched.length > 0 && (
-                        <div>
-                            <h4 style={{ fontSize: '0.9rem', marginBottom: '8px' }}>Unmatched Vessels (no matching IMO found)</h4>
-                            <div style={{ maxHeight: '300px', overflow: 'auto', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                                    <thead>
-                                        <tr style={{ background: 'var(--table-header-bg)' }}>
-                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>Ship Name</th>
-                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>IMO</th>
-                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>Broker</th>
-                                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>Fleet</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {result.unmatched.map((u, i) => (
-                                            <tr key={i} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                                <td style={{ padding: '6px 12px' }}>{u.ship}</td>
-                                                <td style={{ padding: '6px 12px', fontFamily: 'monospace' }}>{u.imo || '-'}</td>
-                                                <td style={{ padding: '6px 12px' }}>{u.broker || '-'}</td>
-                                                <td style={{ padding: '6px 12px' }}>{u.fleet || '-'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {reimportResult && (
-                <div style={{ marginTop: '16px' }}>
-                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(46, 204, 113, 0.1)', border: '1px solid rgba(46, 204, 113, 0.3)' }}>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{reimportResult.updated}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Vessels updated</div>
-                        </div>
-                        <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(52, 152, 219, 0.1)', border: '1px solid rgba(52, 152, 219, 0.3)' }}>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{reimportResult.totalRows}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Rows processed</div>
-                        </div>
-                        {(reimportResult.createdFlags > 0 || reimportResult.createdClasses > 0 || reimportResult.createdTypes > 0) && (
-                            <div style={{ padding: '12px 20px', borderRadius: '8px', background: 'rgba(155, 89, 182, 0.1)', border: '1px solid rgba(155, 89, 182, 0.3)' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                    {reimportResult.createdFlags + reimportResult.createdClasses + reimportResult.createdTypes}
-                                </div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Settings auto-created</div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-}

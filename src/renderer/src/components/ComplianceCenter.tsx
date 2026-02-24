@@ -195,7 +195,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                         <AlertCircle size={16} />
                         Document Alerts
                         {alerts.length > 0 && (
-                            <span style={{ background: 'rgba(255, 77, 77, 0.2)', color: '#ff4d4d', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
+                            <span style={{ background: 'rgba(255, 77, 77, 0.2)', color: 'var(--danger)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
                                 {alerts.length}
                             </span>
                         )}
@@ -473,7 +473,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                                         <button
                                                             onClick={() => handleDecideMatch(result.id, 'sanctioned')}
                                                             title="True positive - this entity is sanctioned"
-                                                            style={{ background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.3)', color: '#ff4d4d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                                            style={{ background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.3)', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
                                                         >
                                                             <ShieldAlert size={14} />
                                                             Sanctioned
@@ -572,7 +572,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                             </span>
                                         </div>
                                         {log.error && (
-                                            <div style={{ color: '#ff4d4d', fontSize: '0.8rem', marginTop: '4px' }}>
+                                            <div style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}>
                                                 Error: {log.error}
                                             </div>
                                         )}

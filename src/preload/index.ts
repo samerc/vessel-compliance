@@ -90,6 +90,7 @@ const api = {
   updateUserWindowPreferences: (width: number, height: number, x?: number, y?: number) => ipcRenderer.invoke('users:updateWindowPreferences', width, height, x, y),
   updateSanctionsThreshold: (threshold: number) => ipcRenderer.invoke('users:updateSanctionsThreshold', threshold),
   updateUserAppVersion: (version: string) => ipcRenderer.invoke('users:updateAppVersion', version),
+  updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => ipcRenderer.invoke('users:updateSidebarState', sidebarCollapsed, collapsedGroups),
 
   // Window Preferences
   windowGetPreferences: () => ipcRenderer.invoke('window:getPreferences'),
@@ -386,7 +387,11 @@ const api = {
   getQuotationNotes: (qId: string) => ipcRenderer.invoke('db:getQuotationNotes', qId),
   addQuotationNote: (data: any) => ipcRenderer.invoke('db:addQuotationNote', data),
   updateQuotationNote: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationNote', id, updates),
-  deleteQuotationNote: (id: string) => ipcRenderer.invoke('db:deleteQuotationNote', id)
+  deleteQuotationNote: (id: string) => ipcRenderer.invoke('db:deleteQuotationNote', id),
+
+  // Report Settings
+  reportSettingsGet: () => ipcRenderer.invoke('reportSettings:get'),
+  reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),
 }
 
 // Expose curated API to renderer via context bridge

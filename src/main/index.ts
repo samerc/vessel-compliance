@@ -1106,6 +1106,21 @@ app.whenReady().then(() => {
     }
   })
 
+  safeHandle('users:updateSidebarState', async (event, sidebarCollapsed: boolean, collapsedGroups: string) => {
+    const user = requireSession(event)
+    await db.updateUserSidebarState(user.id, sidebarCollapsed, collapsedGroups)
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (windowId) {
+      const sessionId = windowSessions.get(windowId)
+      const session = auth.getSessionData(sessionId)
+      if (session) {
+        session.user.sidebarCollapsed = sidebarCollapsed
+        session.user.collapsedGroups = collapsedGroups
+      }
+    }
+  })
+
   safeHandle('users:updateAppVersion', async (event, version: string) => {
     const user = requireSession(event)
     await db.updateUserAppVersion(user.id, version)
@@ -1121,9 +1136,14 @@ app.whenReady().then(() => {
   })
 
   // OFAC/Sanctions Check Handler (session required)
-  safeHandle('ofac:checkSanctions', async (event, name: string, threshold = 0.6, sources?: string[]) => {
+  safeHandle('ofac:checkSanctions', async (event, name: string, threshold?: number, sources?: string[]) => {
     requireSession(event)
     try {
+      // Load compliance settings to get the configured threshold and auto-mark preference
+      const compSettings = await db.getComplianceScheduleSettings()
+      const effectiveThreshold = threshold ?? (compSettings.threshold || 85) / 100
+      const autoMarkCleanOnCheck = compSettings.autoMarkCleanOnCheck ?? true
+
       const apiKey = getSanctionsApiKey()
       if (!apiKey) {
         console.error('Sanctions API key not configured')
@@ -1132,6 +1152,7 @@ app.whenReady().then(() => {
           matchFound: false,
           timestamp: formatDateForMySQL(new Date()),
           matches: [],
+          autoMarkCleanOnCheck,
           error: 'Sanctions API key not configured. Add sanctionsApiKey to db-config.json'
         }
       }
@@ -1139,7 +1160,7 @@ app.whenReady().then(() => {
       const params = new URLSearchParams({
         q: name,
         mode: 'both',
-        threshold: threshold.toString(),
+        threshold: effectiveThreshold.toString(),
         limit: '20'
       })
 
@@ -1189,7 +1210,7 @@ app.whenReady().then(() => {
           }
         })
         // Strict filtering: Ensure API or mapping didn't include matches below threshold
-        .filter((match: any) => (match.score || 0) >= threshold)
+        .filter((match: any) => (match.score || 0) >= effectiveThreshold)
 
       const matchFound = matches.length > 0
 
@@ -1197,7 +1218,8 @@ app.whenReady().then(() => {
         status: matchFound ? 'POTENTIAL_MATCH' : 'CLEARED',
         matchFound,
         timestamp: formatDateForMySQL(new Date()),
-        matches
+        matches,
+        autoMarkCleanOnCheck
       }
     } catch (error) {
       console.error('OFAC check failed:', error)
@@ -1205,7 +1227,8 @@ app.whenReady().then(() => {
         status: 'ERROR',
         matchFound: false,
         timestamp: formatDateForMySQL(new Date()),
-        matches: []
+        matches: [],
+        autoMarkCleanOnCheck: true
       }
     }
   })
@@ -1787,6 +1810,27 @@ app.whenReady().then(() => {
   safeHandle('db:addQuotationNote', (event, data) => { requireSession(event); return db.addQuotationNote(data) })
   safeHandle('db:updateQuotationNote', (event, id, updates) => { requireSession(event); return db.updateQuotationNote(id, updates) })
   safeHandle('db:deleteQuotationNote', (event, id) => { requireSession(event); return db.deleteQuotationNote(id) })
+
+  // Report Settings
+  const REPORT_SETTINGS_KEY = 'reportSettings'
+  const REPORT_SETTINGS_DEFAULTS = {
+    companyName: 'Al Bahriah Insurance & Reinsurance SAL',
+    companySubtitle: '',
+    footerText: 'Al Bahriah Insurance & Reinsurance SAL — Confidential',
+    primaryColor: [28, 52, 95],
+    currency: 'USD',
+    showReserves: true,
+    showClaimSubtotals: true,
+  }
+  safeHandle('reportSettings:get', async (event) => {
+    requireSession(event)
+    const raw = await db.getSetting(REPORT_SETTINGS_KEY)
+    return raw ? { ...REPORT_SETTINGS_DEFAULTS, ...JSON.parse(raw) } : REPORT_SETTINGS_DEFAULTS
+  })
+  safeHandle('reportSettings:set', async (event, settings) => {
+    requireSession(event)
+    await db.setSetting(REPORT_SETTINGS_KEY, JSON.stringify(settings))
+  })
 
   createWindow()
 

@@ -312,12 +312,17 @@ export default function EntityDirectory() {
         setCheckingId(entity.id)
         try {
             const result = await OfacService.checkSanctions(entity.name)
-            await window.api.updateEntity(entity.id, {
-                ofacCheckedAt: result.timestamp,
-                ofacMatchFound: result.matchFound,
-                ofacStatus: result.status
-            })
-            loadData()
+            const autoMark = result.autoMarkCleanOnCheck ?? true
+            if (result.status !== 'CLEARED' || autoMark) {
+                await window.api.updateEntity(entity.id, {
+                    ofacCheckedAt: result.timestamp,
+                    ofacMatchFound: result.matchFound,
+                    ofacStatus: result.status
+                })
+                loadData()
+            } else {
+                showSuccess('Sanctions check complete: no matches found above threshold')
+            }
 
             if (result.matchFound && result.matches.length > 0) {
                 setSanctionsModal({ show: true, searchedName: entity.name, matches: result.matches, entityId: entity.id })
@@ -333,12 +338,17 @@ export default function EntityDirectory() {
         setCheckingId(vessel.id)
         try {
             const result = await OfacService.checkSanctions(vessel.name)
-            await window.api.updateVessel(vessel.id, {
-                ofacCheckedAt: result.timestamp,
-                ofacMatchFound: result.matchFound,
-                ofacStatus: result.status
-            })
-            loadData()
+            const autoMark = result.autoMarkCleanOnCheck ?? true
+            if (result.status !== 'CLEARED' || autoMark) {
+                await window.api.updateVessel(vessel.id, {
+                    ofacCheckedAt: result.timestamp,
+                    ofacMatchFound: result.matchFound,
+                    ofacStatus: result.status
+                })
+                loadData()
+            } else {
+                showSuccess('Sanctions check complete: no matches found above threshold')
+            }
 
             if (result.matchFound && result.matches.length > 0) {
                 setSanctionsModal({ show: true, searchedName: vessel.name, matches: result.matches, vesselId: vessel.id })

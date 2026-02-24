@@ -6,6 +6,7 @@ export interface OfacCheckResult {
     timestamp: string
     matches: SanctionsMatch[]
     error?: string
+    autoMarkCleanOnCheck?: boolean
 }
 
 // Sanctions check is performed via IPC to avoid CORS issues.

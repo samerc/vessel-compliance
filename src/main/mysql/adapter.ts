@@ -787,6 +787,13 @@ export class MySQLAdapter {
                 )`)
             }
 
+            // Migration: Add sidebar state columns to users
+            const [userSidebarCols] = await this.pool.query("SHOW COLUMNS FROM users LIKE 'sidebar_collapsed'")
+            if ((userSidebarCols as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE users ADD COLUMN sidebar_collapsed TINYINT(1) DEFAULT 0')
+                await this.pool.query("ALTER TABLE users ADD COLUMN collapsed_groups TEXT DEFAULT NULL")
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -1721,7 +1728,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE username = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -1744,7 +1751,7 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users ORDER BY username ASC'
+            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
@@ -1779,6 +1786,14 @@ export class MySQLAdapter {
         )
     }
 
+    async updateUserSidebarState(userId: string, sidebarCollapsed: boolean, collapsedGroups: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE users SET sidebar_collapsed = ?, collapsed_groups = ? WHERE id = ?',
+            [sidebarCollapsed ? 1 : 0, collapsedGroups, userId]
+        )
+    }
+
     async updateUserAppVersion(userId: string, version: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute(
@@ -1790,7 +1805,7 @@ export class MySQLAdapter {
     async getUserById(userId: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, created_at as createdAt FROM users WHERE id = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt FROM users WHERE id = ?',
             [userId]
         )
         return rows.length > 0 ? (rows[0] as User) : null

@@ -1,5 +1,32 @@
 import { useState, useMemo } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, Copy, Check } from 'lucide-react'
+
+// ── Number to words ────────────────────────────────────────────────────────────
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+
+function intToWords(n: number): string {
+  if (n === 0) return 'Zero'
+  function helper(num: number): string {
+    if (num === 0) return ''
+    if (num < 20) return ONES[num]
+    if (num < 100) return TENS[Math.floor(num / 10)] + (num % 10 ? ' ' + ONES[num % 10] : '')
+    if (num < 1000) return ONES[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + helper(num % 100) : '')
+    if (num < 1_000_000) return helper(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + helper(num % 1000) : '')
+    if (num < 1_000_000_000) return helper(Math.floor(num / 1_000_000)) + ' Million' + (num % 1_000_000 ? ' ' + helper(num % 1_000_000) : '')
+    return helper(Math.floor(num / 1_000_000_000)) + ' Billion' + (num % 1_000_000_000 ? ' ' + helper(num % 1_000_000_000) : '')
+  }
+  return helper(Math.round(n))
+}
+
+function numberToText(n: number): string {
+  const int = Math.floor(Math.abs(n))
+  const dec = Math.round((Math.abs(n) - int) * 100)
+  const words = int === 0 ? 'Zero' : intToWords(int)
+  const formatted = n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `${formatted} - ${words} and ${dec.toString().padStart(2, '0')}/100`
+}
 
 interface InstalmentRow {
   number: number
@@ -63,6 +90,14 @@ export default function PremiumCalculator() {
   const [standardPeriod, setStandardPeriod] = useState<string>('365')
   const [numInstalments, setNumInstalments] = useState<string>('1')
   const [commissionPct, setCommissionPct] = useState<string>('0')
+  const [copiedField, setCopiedField] = useState<'premium' | 'commission' | null>(null)
+
+  const copyToClipboard = (value: number, field: 'premium' | 'commission') => {
+    navigator.clipboard.writeText(numberToText(value)).then(() => {
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 2000)
+    })
+  }
 
   const calculation = useMemo((): CalcDetails | null => {
     const { days, calendarDays, addedDay } = countDays(startDate, endDate)
@@ -174,7 +209,7 @@ export default function PremiumCalculator() {
               type="datetime-local"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
               aria-label="Policy start date and time"
             />
           </div>
@@ -186,7 +221,7 @@ export default function PremiumCalculator() {
               type="datetime-local"
               value={endDate}
               onChange={e => setEndDate(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
               aria-label="Policy end date and time"
             />
           </div>
@@ -201,7 +236,7 @@ export default function PremiumCalculator() {
               placeholder="e.g. 10000"
               min="0"
               step="0.01"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
               aria-label="Annual premium amount"
             />
           </div>
@@ -214,7 +249,7 @@ export default function PremiumCalculator() {
               value={standardPeriod}
               onChange={e => setStandardPeriod(e.target.value)}
               min="1"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
               aria-label="Standard policy period in days"
             />
           </div>
@@ -227,7 +262,7 @@ export default function PremiumCalculator() {
               value={numInstalments}
               onChange={e => setNumInstalments(e.target.value)}
               min="1"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
               aria-label="Number of premium instalments"
             />
           </div>
@@ -242,7 +277,7 @@ export default function PremiumCalculator() {
               min="0"
               max="100"
               step="0.01"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
               aria-label="Commission percentage"
             />
           </div>
@@ -262,17 +297,72 @@ export default function PremiumCalculator() {
               </div>
               <div style={{ padding: '16px', background: 'rgba(0, 255, 136, 0.08)', borderRadius: '10px', border: '1px solid rgba(0, 255, 136, 0.2)' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Pro-Rata Premium</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{fmt(calculation.proRataPremium)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{fmt(calculation.proRataPremium)}</div>
+                  <button
+                    onClick={() => copyToClipboard(calculation.proRataPremium, 'premium')}
+                    title={numberToText(calculation.proRataPremium)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === 'premium' ? 'var(--success)' : 'var(--text-secondary)', display: 'flex', padding: '4px', borderRadius: '6px', flexShrink: 0 }}
+                  >
+                    {copiedField === 'premium' ? <Check size={16} /> : <Copy size={16} />}
+                  </button>
+                </div>
               </div>
               <div style={{ padding: '16px', background: 'rgba(255, 165, 0, 0.08)', borderRadius: '10px', border: '1px solid rgba(255, 165, 0, 0.2)' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Commission</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{fmt(calculation.commissionTotal)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{fmt(calculation.commissionTotal)}</div>
+                  <button
+                    onClick={() => copyToClipboard(calculation.commissionTotal, 'commission')}
+                    title={numberToText(calculation.commissionTotal)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === 'commission' ? 'var(--success)' : 'var(--text-secondary)', display: 'flex', padding: '4px', borderRadius: '6px', flexShrink: 0 }}
+                  >
+                    {copiedField === 'commission' ? <Check size={16} /> : <Copy size={16} />}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Calculation Steps */}
+          {/* Instalment Breakdown */}
           <section className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Instalment Breakdown</h3>
+            <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <caption className="sr-only">Premium and commission instalment breakdown</caption>
+                <thead>
+                  <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                    <th scope="col" style={{ padding: '14px 16px', width: '80px' }}>#</th>
+                    <th scope="col" style={{ padding: '14px 16px' }}>Premium Instalment</th>
+                    {parseFloat(commissionPct) > 0 && (
+                      <th scope="col" style={{ padding: '14px 16px' }}>Commission Instalment</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {calculation.rows.map(row => (
+                    <tr key={row.number} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{row.number}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>{fmt(row.premium)}</td>
+                      {parseFloat(commissionPct) > 0 && (
+                        <td style={{ padding: '12px 16px', fontWeight: '500' }}>{fmt(row.commission)}</td>
+                      )}
+                    </tr>
+                  ))}
+                  <tr style={{ background: 'var(--table-header-bg)', fontWeight: '700' }}>
+                    <td style={{ padding: '14px 16px' }}>Total</td>
+                    <td style={{ padding: '14px 16px' }}>{fmt(calculation.proRataPremium)}</td>
+                    {parseFloat(commissionPct) > 0 && (
+                      <td style={{ padding: '14px 16px' }}>{fmt(calculation.commissionTotal)}</td>
+                    )}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Calculation Steps */}
+          <section className="glass-card" style={{ padding: '24px' }}>
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Calculation Steps</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontFamily: 'monospace', fontSize: '0.9rem' }}>
 
@@ -372,43 +462,6 @@ export default function PremiumCalculator() {
                   </div>
                 </>
               )}
-            </div>
-          </section>
-
-          {/* Instalment Breakdown */}
-          <section className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Instalment Breakdown</h3>
-            <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <caption className="sr-only">Premium and commission instalment breakdown</caption>
-                <thead>
-                  <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                    <th scope="col" style={{ padding: '14px 16px', width: '80px' }}>#</th>
-                    <th scope="col" style={{ padding: '14px 16px' }}>Premium Instalment</th>
-                    {parseFloat(commissionPct) > 0 && (
-                      <th scope="col" style={{ padding: '14px 16px' }}>Commission Instalment</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {calculation.rows.map(row => (
-                    <tr key={row.number} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{row.number}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>{fmt(row.premium)}</td>
-                      {parseFloat(commissionPct) > 0 && (
-                        <td style={{ padding: '12px 16px', fontWeight: '500' }}>{fmt(row.commission)}</td>
-                      )}
-                    </tr>
-                  ))}
-                  <tr style={{ background: 'var(--table-header-bg)', fontWeight: '700' }}>
-                    <td style={{ padding: '14px 16px' }}>Total</td>
-                    <td style={{ padding: '14px 16px' }}>{fmt(calculation.proRataPremium)}</td>
-                    {parseFloat(commissionPct) > 0 && (
-                      <td style={{ padding: '14px 16px' }}>{fmt(calculation.commissionTotal)}</td>
-                    )}
-                  </tr>
-                </tbody>
-              </table>
             </div>
           </section>
         </>

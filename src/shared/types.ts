@@ -129,6 +129,8 @@ export interface User {
   windowHeight?: number
   windowX?: number
   windowY?: number
+  sidebarCollapsed?: boolean
+  collapsedGroups?: string // JSON array of collapsed group IDs
   createdAt?: string
 }
 
@@ -211,6 +213,7 @@ export interface ComplianceScheduleSettings {
   threshold: number // Match score threshold (0-100)
   includeVessels: boolean
   skipCleared: boolean // Skip entities already marked as CLEARED
+  autoMarkCleanOnCheck?: boolean // Auto-mark as CLEARED when pill check finds no matches above threshold
   lastRunAt?: string
   nextRunAt?: string
 }
@@ -703,4 +706,11 @@ export interface VesselInsurancePolicy {
   surveyReference?: string
   broker?: string
   fleetName?: string
+}
+
+export interface ReportSettings {
+  companyName: string
+  companySubtitle: string
+  footerText: string
+  primaryColor: [number, number, number]
 }

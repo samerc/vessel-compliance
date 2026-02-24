@@ -170,12 +170,14 @@ textarea:focus {
 }
 
 .sidebar {
-  width: 260px;
-  padding: 24px 16px;
+  /* width is controlled by inline style for collapse animation */
+  padding: 20px 12px;
   border-right: var(--glass-border);
   background: var(--bg-sidebar);
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .main-content {
@@ -189,11 +191,6 @@ textarea:focus {
 @media (max-width: 1024px) {
   .main-content {
     padding: 20px;
-  }
-
-  .sidebar {
-    width: 220px;
-    padding: 16px;
   }
 }
 

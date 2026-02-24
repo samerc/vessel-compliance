@@ -309,7 +309,7 @@ export default function Dashboard({ onViewAlerts }: { onViewAlerts: () => void }
                         </div>
                     </div>
                     {entityStats.missing > 0 && (
-                        <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '6px', background: 'rgba(255, 77, 77, 0.08)', fontSize: '0.8rem', color: '#ff4d4d', textAlign: 'center' }}>
+                        <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '6px', background: 'rgba(255, 77, 77, 0.08)', fontSize: '0.8rem', color: 'var(--danger)', textAlign: 'center' }}>
                             {entityStats.missing} missing document{entityStats.missing !== 1 ? 's' : ''}
                         </div>
                     )}

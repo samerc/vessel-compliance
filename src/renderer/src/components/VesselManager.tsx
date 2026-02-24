@@ -207,12 +207,17 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
         setCheckingVesselId(vessel.id)
         try {
             const result = await OfacService.checkSanctions(vessel.name)
-            await window.api.updateVessel(vessel.id, {
-                ofacCheckedAt: result.timestamp,
-                ofacMatchFound: result.matchFound,
-                ofacStatus: result.status
-            })
-            loadData()
+            const autoMark = result.autoMarkCleanOnCheck ?? true
+            if (result.status !== 'CLEARED' || autoMark) {
+                await window.api.updateVessel(vessel.id, {
+                    ofacCheckedAt: result.timestamp,
+                    ofacMatchFound: result.matchFound,
+                    ofacStatus: result.status
+                })
+                loadData()
+            } else {
+                showSuccess('Sanctions check complete: no matches found above threshold')
+            }
 
             if (result.matchFound && result.matches.length > 0) {
                 setSanctionsModal({
@@ -777,7 +782,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                     background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
                 }}>
-                    <div className="glass-card" style={{ padding: '24px', maxWidth: '360px', width: '90%' }}>
+                    <div style={{ padding: '24px', maxWidth: '360px', width: '90%', background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
                         <h3 style={{ marginBottom: '16px' }}>Customer Type</h3>
                         <p style={{ marginBottom: '20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                             How is this customer related?

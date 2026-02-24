@@ -499,7 +499,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <select
                                         value={editVesselType}
                                         onChange={e => setEditVesselType(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)', width: '160px' }}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', width: '160px' }}
                                         aria-label="Vessel type"
                                     >
                                         <option value="">No type</option>
@@ -513,7 +513,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <select
                                         value={editClassification}
                                         onChange={e => setEditClassification(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)', width: '160px' }}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', width: '160px' }}
                                         aria-label="Classification society"
                                     >
                                         <option value="">No class</option>
@@ -531,7 +531,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <select
                                         value={selectedFlagStateId}
                                         onChange={e => setSelectedFlagStateId(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}
+                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                                         aria-label="Flag state"
                                     >
                                         <option value="">No flag</option>
@@ -1396,6 +1396,8 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     const [formStatus, setFormStatus] = useState<'active' | 'expired' | 'cancelled'>('active')
     const [formCurrency, setFormCurrency] = useState('USD')
     const [formBrokerId, setFormBrokerId] = useState('')
+    const [brokerSearch, setBrokerSearch] = useState('')
+    const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false)
     const [formNotes, setFormNotes] = useState('')
     const [formValues, setFormValues] = useState<Record<string, any>>({})
     const modalRef = useRef<HTMLDivElement>(null)
@@ -1759,7 +1761,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                             {!editingPolicyId && (
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Policy Type</label>
-                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
+                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                         {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
                                     </select>
                                 </div>
@@ -1780,7 +1782,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status</label>
-                                    <select value={formStatus} onChange={e => setFormStatus(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
+                                    <select value={formStatus} onChange={e => setFormStatus(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                         <option value="active">Active</option>
                                         <option value="expired">Expired</option>
                                         <option value="cancelled">Cancelled</option>
@@ -1788,7 +1790,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Currency</label>
-                                    <select value={formCurrency} onChange={e => setFormCurrency(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
+                                    <select value={formCurrency} onChange={e => setFormCurrency(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                         <option value="USD">USD ($)</option>
                                         <option value="EUR">EUR (\u20AC)</option>
                                         <option value="GBP">GBP (\u00A3)</option>
@@ -1797,7 +1799,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 {typeCondsForForm.length > 0 && (
                                     <div>
                                         <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Condition</label>
-                                        <select value={formConditionId} onChange={e => setFormConditionId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
+                                        <select value={formConditionId} onChange={e => setFormConditionId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                             <option value="">None</option>
                                             {typeCondsForForm.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
@@ -1805,10 +1807,39 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 )}
                                 <div>
                                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Broker</label>
-                                    <select value={formBrokerId} onChange={e => setFormBrokerId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
-                                        <option value="">Direct (No broker)</option>
-                                        {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                                    </select>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Search broker..."
+                                            value={brokerDropdownOpen ? brokerSearch : (entities.find(e => e.id === formBrokerId)?.name || '')}
+                                            onFocus={() => { setBrokerDropdownOpen(true); setBrokerSearch('') }}
+                                            onChange={e => setBrokerSearch(e.target.value)}
+                                            onBlur={() => setTimeout(() => setBrokerDropdownOpen(false), 150)}
+                                            style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
+                                        />
+                                        {brokerDropdownOpen && (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '4px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                                <div
+                                                    onMouseDown={() => { setFormBrokerId(''); setBrokerDropdownOpen(false); setBrokerSearch('') }}
+                                                    style={{ padding: '8px 12px', cursor: 'pointer', color: formBrokerId === '' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.9rem' }}
+                                                >
+                                                    Direct (No broker)
+                                                </div>
+                                                {entities.filter(e => e.name.toLowerCase().includes(brokerSearch.toLowerCase())).map(e => (
+                                                    <div
+                                                        key={e.id}
+                                                        onMouseDown={() => { setFormBrokerId(e.id); setBrokerDropdownOpen(false); setBrokerSearch('') }}
+                                                        style={{ padding: '8px 12px', cursor: 'pointer', color: e.id === formBrokerId ? 'var(--accent-primary)' : 'var(--text-primary)', background: e.id === formBrokerId ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)') : 'transparent', fontSize: '0.9rem' }}
+                                                    >
+                                                        {e.name}
+                                                    </div>
+                                                ))}
+                                                {entities.filter(e => e.name.toLowerCase().includes(brokerSearch.toLowerCase())).length === 0 && (
+                                                    <div style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No matches</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -1827,7 +1858,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     }} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
                                                 )}
                                                 {c.fieldType === 'date' && (
-                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }} />
+                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }} />
                                                 )}
                                                 {c.fieldType === 'amount' && (
                                                     <input type="number" step="0.01" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
@@ -1838,7 +1869,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     </label>
                                                 )}
                                                 {c.fieldType === 'select' && c.selectOptions && (
-                                                    <select value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)' }}>
+                                                    <select value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                                         <option value="">Select...</option>
                                                         {c.selectOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                     </select>

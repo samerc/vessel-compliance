@@ -633,7 +633,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
         const allSelected = defectsWithNotes.every(d => pdfNoteIds.has(d.id))
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{ background: 'var(--bg-sidebar)', borderRadius: '16px', padding: '28px', width: '500px', maxWidth: '95vw', border: 'var(--glass-border)', boxShadow: 'var(--shadow-lg)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '500px', maxWidth: '95vw', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
                   <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Export PDF</h3>

@@ -374,7 +374,7 @@ function InsuredTab({ quotation, vessels, showSuccess, showError, updateField }:
                     <div style={{ display: 'flex', gap: '2px' }}>
                         <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                         <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                        <button onClick={() => handleDeleteAssured(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: '#ff4d4d' }}><Trash2 size={14} /></button>
+                        <button onClick={() => handleDeleteAssured(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                     </div>
                 </div>
             ))}
@@ -528,7 +528,7 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation
             {subLimits.map(sl => (
                 <div key={sl.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ flex: 1, fontSize: '0.85rem' }}>{sl.currency} {sl.amount.toLocaleString()} - {sl.text}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationSubLimit(sl.id); loadSubLimits() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ff4d4d', padding: '2px' }}><Trash2 size={14} /></button>
+                    <button onClick={async () => { await window.api.deleteQuotationSubLimit(sl.id); loadSubLimits() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                 </div>
             ))}
         </div>
@@ -652,7 +652,7 @@ function ConditionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
             {additionalClauses.map(ac => (
                 <div key={ac.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{ flex: 1, fontSize: '0.83rem', whiteSpace: 'pre-wrap' }}>{ac.customText || allAdditional.find(a => a.id === ac.piAdditionalClauseId)?.text || ''}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ff4d4d', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
+                    <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
                 </div>
             ))}
         </div>
@@ -822,7 +822,7 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
-                    <h4 style={{ fontSize: '0.9rem', marginBottom: '8px', color: '#ff4d4d' }}>Excluded Countries ({excluded.length})</h4>
+                    <h4 style={{ fontSize: '0.9rem', marginBottom: '8px', color: 'var(--danger)' }}>Excluded Countries ({excluded.length})</h4>
                     {excluded.map(c => (
                         <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--table-border)', marginBottom: '4px' }}>
                             <span style={{ flex: 1, fontSize: '0.83rem' }}>{c.name}</span>
@@ -949,7 +949,7 @@ function WarrantiesTab({ quotation, showSuccess }: { quotation: Quotation; showS
 
 // ==================== Deductibles Tab ====================
 
-function DeductiblesTab({ quotation, showSuccess, isLight, updateField, setQ }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void }) {
+function DeductiblesTab({ quotation, showSuccess, updateField, setQ }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void }) {
     const [deductibles, setDeductibles] = useState<QuotationDeductible[]>([])
     const [masterDeductibles, setMasterDeductibles] = useState<PIDeductible[]>([])
     const [textDeds, setTextDeds] = useState<QuotationTextDeductible[]>([])
@@ -1021,7 +1021,7 @@ function DeductiblesTab({ quotation, showSuccess, isLight, updateField, setQ }: 
                         <span style={{ flex: 1, fontSize: '0.85rem' }}>{d.description}</span>
                         <input type="text" defaultValue={d.currency} onBlur={e => handleUpdateCurrency(d.id, e.target.value)} style={{ width: '60px', padding: '4px 6px', fontSize: '0.82rem' }} />
                         <input type="number" defaultValue={d.amount} onBlur={e => handleUpdateAmount(d.id, parseFloat(e.target.value) || 0)} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem' }} />
-                        <button onClick={async () => { await window.api.deleteQuotationDeductible(d.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: isLight ? '#c00' : '#ff4d4d', padding: '2px' }}><Trash2 size={14} /></button>
+                        <button onClick={async () => { await window.api.deleteQuotationDeductible(d.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                     </div>
                     {d.secondaryDescription && (
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px', paddingLeft: '12px' }}>
@@ -1040,7 +1040,7 @@ function DeductiblesTab({ quotation, showSuccess, isLight, updateField, setQ }: 
             {textDeds.map(td => (
                 <div key={td.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{ flex: 1, fontSize: '0.83rem', whiteSpace: 'pre-wrap' }}>{td.text}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationTextDeductible(td.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: isLight ? '#c00' : '#ff4d4d', padding: '2px' }}><Trash2 size={14} /></button>
+                    <button onClick={async () => { await window.api.deleteQuotationTextDeductible(td.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                 </div>
             ))}
 
@@ -1172,7 +1172,7 @@ function SanctionsTab({ quotation, updateField, setQ, sanctionsVersions }: { quo
 
 // ==================== Subjectivities Tab ====================
 
-function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+function SubjectivitiesTab({ quotation, showSuccess }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
     const [items, setItems] = useState<any[]>([])
     const [newText, setNewText] = useState('')
 
@@ -1197,7 +1197,7 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
             {items.map(item => (
                 <div key={item.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ flex: 1, fontSize: '0.85rem' }}>{item.text}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationSubjectivity(item.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: isLight ? '#c00' : '#ff4d4d', padding: '2px' }}><Trash2 size={14} /></button>
+                    <button onClick={async () => { await window.api.deleteQuotationSubjectivity(item.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                 </div>
             ))}
         </div>
@@ -1375,7 +1375,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText, updateSect
 
 // ==================== Information Tab ====================
 
-function InformationTab({ quotation, updateField, setQ, showSuccess, isLight }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+function InformationTab({ quotation, updateField, setQ, showSuccess }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
     const [items, setItems] = useState<any[]>([])
     const [newText, setNewText] = useState('')
 
@@ -1405,7 +1405,7 @@ function InformationTab({ quotation, updateField, setQ, showSuccess, isLight }: 
             {items.map(item => (
                 <div key={item.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ flex: 1, fontSize: '0.85rem' }}>{item.text}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationInformation(item.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: isLight ? '#c00' : '#ff4d4d', padding: '2px' }}><Trash2 size={14} /></button>
+                    <button onClick={async () => { await window.api.deleteQuotationInformation(item.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                 </div>
             ))}
         </div>
@@ -1414,7 +1414,7 @@ function InformationTab({ quotation, updateField, setQ, showSuccess, isLight }: 
 
 // ==================== Notes Tab ====================
 
-function NotesTab({ quotation, showSuccess, isLight }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+function NotesTab({ quotation, showSuccess }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
     const [notes, setNotes] = useState<QuotationNote[]>([])
     const [newTitle, setNewTitle] = useState('')
     const [newContent, setNewContent] = useState('')
@@ -1446,7 +1446,7 @@ function NotesTab({ quotation, showSuccess, isLight }: { quotation: Quotation; s
                 <div key={note.id} style={{ padding: '14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                         <input type="text" defaultValue={note.title} onBlur={e => handleUpdate(note.id, { title: e.target.value })} style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }} />
-                        <button onClick={async () => { await window.api.deleteQuotationNote(note.id); showSuccess('Note deleted'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: isLight ? '#c00' : '#ff4d4d', padding: '2px' }}><Trash2 size={14} /></button>
+                        <button onClick={async () => { await window.api.deleteQuotationNote(note.id); showSuccess('Note deleted'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                     </div>
                     <textarea defaultValue={note.content} onBlur={e => handleUpdate(note.id, { content: e.target.value })} style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontSize: '0.85rem' }} />
                 </div>

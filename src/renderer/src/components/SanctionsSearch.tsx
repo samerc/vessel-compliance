@@ -200,7 +200,7 @@ export default function SanctionsSearch() {
                     background: 'rgba(255, 77, 77, 0.1)',
                     border: '1px solid rgba(255, 77, 77, 0.3)',
                     borderRadius: '12px',
-                    color: '#ff4d4d',
+                    color: 'var(--danger)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',

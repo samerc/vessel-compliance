@@ -452,9 +452,9 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                                 borderRadius: '12px',
                                                 border: r.renewalStatusColor ? `2px solid ${r.renewalStatusColor}` : '1px solid var(--glass-border)',
                                                 background: r.renewalStatusColor ? `${r.renewalStatusColor}22` : 'var(--input-bg)',
-                                                color: r.renewalStatusColor || 'var(--text-secondary)',
+                                                color: r.renewalStatusId ? (isLight ? '#111111' : '#ffffff') : 'var(--text-secondary)',
                                                 fontSize: '0.8rem',
-                                                fontWeight: r.renewalStatusId ? '600' : '400',
+                                                fontWeight: r.renewalStatusId ? '700' : '400',
                                                 cursor: 'pointer',
                                                 minWidth: '100px',
                                                 maxWidth: '100%'
@@ -534,7 +534,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                 onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddNote() }}
                                 rows={3}
                                 placeholder="Add a note about this renewal... (Ctrl+Enter to submit)"
-                                style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'none', fontFamily: 'inherit', fontSize: '0.9rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: 'var(--glass-border)', boxSizing: 'border-box' }}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'none', fontFamily: 'inherit', fontSize: '0.9rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
                             />
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                                 <button onClick={handleAddNote} disabled={notesSaving || !newNoteText.trim()} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
