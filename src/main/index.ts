@@ -185,24 +185,27 @@ function createWindow(): void {
   mainWindow.on('move', saveState)
 
   mainWindow.on('ready-to-show', async () => {
-    // Check DB Connection
-    const configPath = getConfigPath()
-    if (configPath) {
-      db.setConfigPath(configPath)
-    }
-    const connected = await db.connect()
+    try {
+      // Check DB Connection
+      const configPath = getConfigPath()
+      if (configPath) {
+        db.setConfigPath(configPath)
+      }
+      const connected = await db.connect()
 
-    // If not connected, we should probably inform the renderer
-    // We can use a query param or execute JS
-    if (!connected) {
+      if (!connected) {
+        mainWindow.webContents.send('app:db-status', { connected: false })
+      } else {
+        await db.initSchema()
+        await auth.createInitialAdmin()
+        mainWindow.webContents.send('app:db-status', { connected: true })
+      }
+    } catch (error) {
+      console.error('Startup error:', error)
       mainWindow.webContents.send('app:db-status', { connected: false })
-    } else {
-      await db.initSchema()
-      await auth.createInitialAdmin()
-      mainWindow.webContents.send('app:db-status', { connected: true })
+    } finally {
+      mainWindow.show()
     }
-
-    mainWindow.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

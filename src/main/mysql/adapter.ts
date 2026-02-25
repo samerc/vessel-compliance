@@ -47,7 +47,8 @@ export class MySQLAdapter {
                 waitForConnections: true,
                 connectionLimit: 10,
                 queueLimit: 0,
-                dateStrings: true
+                dateStrings: true,
+                connectTimeout: 10000
             })
 
             const conn = await this.pool.getConnection()
