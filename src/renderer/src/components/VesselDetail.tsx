@@ -292,6 +292,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [isEditing, setIsEditing] = useState(false)
     const [editName, setEditName] = useState(vessel.name)
     const [editImo, setEditImo] = useState(vessel.imoNumber)
+    const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
     const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history'>(initialSection || 'documents')
     useEffect(() => { if (initialSection) setDetailView(initialSection) }, [initialSection])
     const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
@@ -965,8 +966,14 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     <Calendar size={14} color="var(--text-secondary)" />
                                                     <input
                                                         type="date"
-                                                        value={rowDoc?.expiryDate || ''}
-                                                        onChange={e => handleUpdateExpiry(rowType.id, e.target.value)}
+                                                        value={editingExpiry[rowType.id] !== undefined ? editingExpiry[rowType.id] : (rowDoc?.expiryDate || '')}
+                                                        onFocus={() => setEditingExpiry(prev => ({ ...prev, [rowType.id]: rowDoc?.expiryDate || '' }))}
+                                                        onChange={e => setEditingExpiry(prev => ({ ...prev, [rowType.id]: e.target.value }))}
+                                                        onBlur={async e => {
+                                                            const val = e.target.value
+                                                            setEditingExpiry(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
+                                                            if (val) await handleUpdateExpiry(rowType.id, val)
+                                                        }}
                                                         min="1900-01-01"
                                                         max="2100-12-31"
                                                         style={{
@@ -1132,8 +1139,14 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 <Calendar size={14} color="var(--text-secondary)" />
                                                 <input
                                                     type="date"
-                                                    value={doc?.expiryDate || ''}
-                                                    onChange={e => handleUpdateExpiry(customType.id, e.target.value)}
+                                                    value={editingExpiry[customType.id] !== undefined ? editingExpiry[customType.id] : (doc?.expiryDate || '')}
+                                                    onFocus={() => setEditingExpiry(prev => ({ ...prev, [customType.id]: doc?.expiryDate || '' }))}
+                                                    onChange={e => setEditingExpiry(prev => ({ ...prev, [customType.id]: e.target.value }))}
+                                                    onBlur={async e => {
+                                                        const val = e.target.value
+                                                        setEditingExpiry(prev => { const n = { ...prev }; delete n[customType.id]; return n })
+                                                        if (val) await handleUpdateExpiry(customType.id, val)
+                                                    }}
                                                     min="1900-01-01"
                                                     max="2100-12-31"
                                                     style={{
