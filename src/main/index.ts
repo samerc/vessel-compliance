@@ -196,8 +196,13 @@ function createWindow(): void {
       if (!connected) {
         mainWindow.webContents.send('app:db-status', { connected: false })
       } else {
-        await db.initSchema()
-        await auth.createInitialAdmin()
+        // Schema init is non-fatal: if it fails the app still opens as connected
+        try {
+          await db.initSchema()
+          await auth.createInitialAdmin()
+        } catch (schemaError) {
+          console.error('Schema init error (non-fatal):', schemaError)
+        }
         mainWindow.webContents.send('app:db-status', { connected: true })
       }
     } catch (error) {
