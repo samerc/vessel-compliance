@@ -654,7 +654,7 @@ export interface VesselDynamicPolicy {
   policyNumber?: string
   conditionId?: string
   conditionName?: string
-  status: 'active' | 'expired' | 'cancelled'
+  status: 'active' | 'expired' | 'cancelled' | 'inactive'
   currency: string
   brokerEntityId?: string
   brokerName?: string
