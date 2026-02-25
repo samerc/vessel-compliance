@@ -972,7 +972,11 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         style={{
                                                             padding: '4px 8px',
                                                             borderRadius: '4px',
-                                                            fontSize: '0.85rem'
+                                                            fontSize: '0.85rem',
+                                                            background: 'var(--input-bg)',
+                                                            color: 'var(--text-primary)',
+                                                            border: '1px solid var(--input-border)',
+                                                            colorScheme: isLight ? 'light' : 'dark'
                                                         }}
                                                         aria-label={`Expiry date for ${rowType.name}`}
                                                     />
@@ -1135,7 +1139,11 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     style={{
                                                         padding: '4px 8px',
                                                         borderRadius: '4px',
-                                                        fontSize: '0.85rem'
+                                                        fontSize: '0.85rem',
+                                                        background: 'var(--input-bg)',
+                                                        color: 'var(--text-primary)',
+                                                        border: '1px solid var(--input-border)',
+                                                        colorScheme: isLight ? 'light' : 'dark'
                                                     }}
                                                     aria-label={`Expiry date for ${customType.name}`}
                                                 />
