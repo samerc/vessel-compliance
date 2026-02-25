@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Search, RefreshCw, Eye } from 'lucide-react'
+import { Search, RefreshCw, Eye, ChevronUp, ChevronDown } from 'lucide-react'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
@@ -12,12 +12,16 @@ interface SurveyWithCounts extends ConditionSurvey {
   totalDefects: number
 }
 
+type SortKey = 'vessel' | 'date' | 'type' | 'surveyor' | 'location' | 'defects'
+
 export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const [surveys, setSurveys] = useState<SurveyWithCounts[]>([])
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const { showError } = useToast()
 
   const vesselMap = useMemo(() => {
@@ -80,12 +84,64 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
     })
   }, [surveys, searchTerm, vesselMap])
 
-  // Sort by survey date descending (most recent first)
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
   const sorted = useMemo(() => {
-    return [...filtered].sort(
-      (a, b) => new Date(b.surveyDate).getTime() - new Date(a.surveyDate).getTime()
+    return [...filtered].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1
+      switch (sortKey) {
+        case 'vessel': {
+          const aName = vesselMap.get(a.vesselId)?.name || ''
+          const bName = vesselMap.get(b.vesselId)?.name || ''
+          return aName.localeCompare(bName) * dir
+        }
+        case 'date':
+          return (new Date(a.surveyDate).getTime() - new Date(b.surveyDate).getTime()) * dir
+        case 'type':
+          return (a.surveyType || '').localeCompare(b.surveyType || '') * dir
+        case 'surveyor': {
+          const aSurveyor = surveyorMap.get(a.surveyorId)?.companyName || ''
+          const bSurveyor = surveyorMap.get(b.surveyorId)?.companyName || ''
+          return aSurveyor.localeCompare(bSurveyor) * dir
+        }
+        case 'location':
+          return (a.location || '').localeCompare(b.location || '') * dir
+        case 'defects':
+          return (a.openDefects - b.openDefects) * dir
+        default:
+          return 0
+      }
+    })
+  }, [filtered, sortKey, sortDir, vesselMap, surveyorMap])
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ChevronUp size={12} style={{ opacity: 0.25 }} />
+    return sortDir === 'asc' ? (
+      <ChevronUp size={12} style={{ color: 'var(--accent-primary)' }} />
+    ) : (
+      <ChevronDown size={12} style={{ color: 'var(--accent-primary)' }} />
     )
-  }, [filtered])
+  }
+
+  const thStyle = {
+    padding: '12px 16px',
+    textAlign: 'left' as const,
+    fontSize: '0.8rem',
+    fontWeight: '600' as const,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    userSelect: 'none' as const,
+    whiteSpace: 'nowrap' as const,
+  }
 
   return (
     <div className="fade-in" style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -168,83 +224,35 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                   borderBottom: '1px solid var(--table-border)'
                 }}
               >
-                <th
-                  style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Vessel
+                <th style={thStyle} onClick={() => handleSort('vessel')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Vessel <SortIcon col="vessel" />
+                  </span>
                 </th>
-                <th
-                  style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Survey Date
+                <th style={thStyle} onClick={() => handleSort('date')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Survey Date <SortIcon col="date" />
+                  </span>
                 </th>
-                <th
-                  style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Type
+                <th style={thStyle} onClick={() => handleSort('type')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Type <SortIcon col="type" />
+                  </span>
                 </th>
-                <th
-                  style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Surveyor
+                <th style={thStyle} onClick={() => handleSort('surveyor')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Surveyor <SortIcon col="surveyor" />
+                  </span>
                 </th>
-                <th
-                  style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Location
+                <th style={thStyle} onClick={() => handleSort('location')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Location <SortIcon col="location" />
+                  </span>
                 </th>
-                <th
-                  style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Defects
+                <th style={thStyle} onClick={() => handleSort('defects')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Defects <SortIcon col="defects" />
+                  </span>
                 </th>
                 <th
                   style={{
@@ -357,7 +365,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <button
                           onClick={() => onNavigateToVessel(survey.vesselId)}
-                          title="View vessel"
+                          title="View vessel surveys"
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',

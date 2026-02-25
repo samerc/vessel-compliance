@@ -304,6 +304,12 @@ export interface Api {
   // Policy Renewal Notes
   getPolicyRenewalNotes: (policyId: string, policyNumber: string) => Promise<any[]>
   addPolicyRenewalNote: (policyId: string, policyNumber: string, note: string) => Promise<any>
+  deletePolicyRenewalNote: (noteId: string) => Promise<void>
+
+  // Vessel Notes
+  getVesselNotes: (vesselId: string) => Promise<any[]>
+  addVesselNote: (vesselId: string, note: string) => Promise<any>
+  deleteVesselNote: (noteId: string) => Promise<void>
 
   // Quotations
   getQuotations: () => Promise<Quotation[]>

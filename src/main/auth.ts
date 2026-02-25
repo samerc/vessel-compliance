@@ -162,6 +162,9 @@ export class AuthService {
         // Security: Clear failed attempts on successful login
         this.loginAttempts.delete(username)
 
+        // Record last login timestamp (fire and forget)
+        db.updateUserLastLogin(user.id).catch(() => {})
+
         // Return user without hash and create session
         const { passwordHash, ...safeUser } = user
         const sessionId = this.createSession(safeUser)

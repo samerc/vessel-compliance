@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Ship, ChevronRight, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X } from 'lucide-react'
+import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X } from 'lucide-react'
 import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
@@ -20,7 +20,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'surveys' | 'policies'; onClearInitialVessel?: () => void } = {}) {
+export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
@@ -31,7 +31,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
 
     // Pagination State
     const [page, setPage] = useState(1)
-    const [limit, setLimit] = useState(10)
+    const [limit, setLimit] = useState(25)
     const [total, setTotal] = useState(0)
     const [totalPages, setTotalPages] = useState(0)
     const [isLoading, setIsLoading] = useState(false)
@@ -58,6 +58,10 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [tableCustomerSearch, setTableCustomerSearch] = useState('')
 
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
+
+    // Section and back-navigation tracking for external navigation
+    const [appliedSection, setAppliedSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
+    const [navigatedExternally, setNavigatedExternally] = useState(false)
 
     // Sanctions checking state
     const [checkingVesselId, setCheckingVesselId] = useState<string | null>(null)
@@ -88,10 +92,16 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     // Open vessel by ID from external navigation
     useEffect(() => {
         if (initialVesselId) {
-            (async () => {
+            // Capture section NOW (synchronously) before the async gap clears it
+            const sectionToApply = initialVesselSection
+            ;(async () => {
                 const allVessels = await window.api.getVessels()
                 const vessel = allVessels.find((v: Vessel) => v.id === initialVesselId)
-                if (vessel) setSelectedVessel(vessel)
+                if (vessel) {
+                    setAppliedSection(sectionToApply)
+                    setNavigatedExternally(true)
+                    setSelectedVessel(vessel)
+                }
                 if (onClearInitialVessel) onClearInitialVessel()
             })()
         }
@@ -383,7 +393,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     }
 
     if (selectedVessel) {
-        return <VesselDetail vessel={selectedVessel} backLabel="Back to Vessels" onBack={() => { setSelectedVessel(null); loadData() }} initialSection={initialVesselSection} />
+        const handleBack = navigatedExternally && onNavigateBack
+            ? () => { onNavigateBack(); setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false) }
+            : () => { setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); loadData() }
+        const backLabel = navigatedExternally && navigateBackLabel ? navigateBackLabel : 'Back to Vessels'
+        return <VesselDetail vessel={selectedVessel} backLabel={backLabel} onBack={handleBack} initialSection={appliedSection} />
     }
 
     return (
@@ -507,7 +521,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     <select
                         value={fleetFilter}
                         onChange={e => setFleetFilter(e.target.value)}
-                        style={{ padding: '10px', borderRadius: '12px', color: 'var(--text-primary)' }}
+                        style={{ padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
                         aria-label="Filter by fleet"
                     >
                         <option value="all">All Fleets</option>
@@ -522,7 +536,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     <select
                         value={statusFilter}
                         onChange={e => setStatusFilter(e.target.value as any)}
-                        style={{ padding: '10px', borderRadius: '12px', color: 'var(--text-primary)' }}
+                        style={{ padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
                         aria-label="Filter by status"
                     >
                         <option value="active">Active Only</option>
@@ -541,8 +555,14 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                 )}
 
                 {!isLoading && vessels.length === 0 && (
-                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        No vessels found matching your criteria.
+                    <div style={{ padding: '64px 40px', textAlign: 'center' }}>
+                        <Ship size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.3 }} />
+                        <div style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                            No vessels found
+                        </div>
+                        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                            {searchTerm ? 'No vessels match your search criteria.' : 'No vessels registered yet. Click "Add Vessel" to get started.'}
+                        </p>
                     </div>
                 )}
 
@@ -551,16 +571,20 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                         <caption className="sr-only">Vessel registry</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th scope="col" style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
-                                    Vessel Name <ArrowUpDown size={14} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        Vessel Name <ArrowUpDown size={13} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
+                                    </span>
                                 </th>
-                                <th scope="col" style={{ padding: '16px', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
-                                    IMO Number <ArrowUpDown size={14} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        IMO Number <ArrowUpDown size={13} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
+                                    </span>
                                 </th>
-                                <th scope="col" style={{ padding: '16px', width: '100px' }}>Sanctions</th>
-                                <th scope="col" style={{ padding: '16px' }}>Customer</th>
-                                <th scope="col" style={{ padding: '16px' }}>Current Fleet</th>
-                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', width: '120px' }}>Sanctions</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Customer</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Fleet</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -596,11 +620,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                     {!v.isActive && (
                                                         <span style={{
                                                             fontSize: '0.65rem',
-                                                            background: 'rgba(0,0,0,0.1)',
+                                                            background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
                                                             padding: '1px 6px',
                                                             borderRadius: '3px',
                                                             color: 'var(--text-secondary)',
-                                                            border: '1px solid rgba(0,0,0,0.1)'
+                                                            border: isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.12)'
                                                         }}>
                                                             INACTIVE
                                                         </span>
@@ -625,7 +649,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                             autoFocus
                                                             onBlur={() => setTimeout(() => setEditingCustomerVesselId(null), 200)}
                                                             placeholder="Search customer..."
-                                                            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', width: '160px' }}
+                                                            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', width: '200px', boxSizing: 'border-box' }}
                                                             aria-label="Search customer"
                                                         />
                                                         <div style={{
@@ -663,13 +687,16 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <span
+                                                    <div
                                                         onClick={() => { setEditingCustomerVesselId(v.id); setTableCustomerSearch(''); }}
-                                                        style={{ cursor: 'pointer', fontSize: '0.85rem', color: v.customerId ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: v.customerId ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', width: '200px', boxSizing: 'border-box' }}
                                                     >
-                                                        {v.customerId ? `${entities.find(e => e.id === v.customerId)?.name || 'Unknown'}` : 'None'}
-                                                        {v.customerType ? ` (${v.customerType})` : ''}
-                                                    </span>
+                                                        <span style={{ flex: 1 }}>
+                                                            {v.customerId ? `${entities.find(e => e.id === v.customerId)?.name || 'Unknown'}` : 'None'}
+                                                            {v.customerType ? ` (${v.customerType})` : ''}
+                                                        </span>
+                                                        <ChevronDown size={12} style={{ opacity: 0.5, flexShrink: 0 }} />
+                                                    </div>
                                                 )}
                                             </div>
                                         </td>
@@ -677,7 +704,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                             <select
                                                 value={v.fleetId || ''}
                                                 onChange={e => handleUpdateFleet(v.id, e.target.value)}
-                                                style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}
+                                                style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit', width: '200px' }}
                                                 aria-label="Assign fleet"
                                             >
                                                 <option value="">Standalone</option>
@@ -687,8 +714,8 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                             </select>
                                         </td>
                                         <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <button onClick={() => setSelectedVessel(v)} className="btn-secondary" style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                Details <ChevronRight size={16} />
+                                            <button onClick={() => setSelectedVessel(v)} className="btn-secondary" style={{ padding: '6px 8px', display: 'inline-flex', alignItems: 'center' }} aria-label="View details">
+                                                <ChevronRight size={16} />
                                             </button>
                                         </td>
                                     </tr>
@@ -754,7 +781,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                             <select
                                 value={limit}
                                 onChange={(e) => setLimit(Number(e.target.value))}
-                                style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }}
+                                style={{ marginLeft: '16px', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
                                 aria-label="Vessels per page"
                             >
                                 <option value="10">10 / page</option>
@@ -779,15 +806,15 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
 
             {customerTypePrompt && (
                 <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                    position: 'fixed', inset: 0,
+                    background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
                 }}>
-                    <div style={{ padding: '24px', maxWidth: '360px', width: '90%', background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
-                        <h3 style={{ marginBottom: '16px' }}>Customer Type</h3>
-                        <p style={{ marginBottom: '20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                            How is this customer related?
+                    <div style={{ padding: '28px', maxWidth: '360px', width: '90%', background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+                        <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', color: 'var(--text-primary)' }}>Customer Type</h3>
+                        <p style={{ margin: '0 0 20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                            How is this customer related to the vessel?
                         </p>
-                        <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
                             <button
                                 onClick={() => {
                                     if (customerTypePrompt.vesselId) {
@@ -798,7 +825,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                     }
                                     setCustomerTypePrompt(null)
                                 }}
-                                className="btn-primary" style={{ flex: 1, padding: '12px' }}>
+                                className="btn-primary" style={{ flex: 1, padding: '10px' }}>
                                 Broker
                             </button>
                             <button
@@ -811,11 +838,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                     }
                                     setCustomerTypePrompt(null)
                                 }}
-                                className="btn-primary" style={{ flex: 1, padding: '12px' }}>
-                                Direct
+                                className="btn-secondary" style={{ flex: 1, padding: '10px' }}>
+                                Direct Client
                             </button>
                         </div>
-                        <button onClick={() => setCustomerTypePrompt(null)} className="btn-secondary" style={{ width: '100%', marginTop: '12px' }}>
+                        <button onClick={() => setCustomerTypePrompt(null)} className="btn-secondary" style={{ width: '100%' }}>
                             Cancel
                         </button>
                     </div>

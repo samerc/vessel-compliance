@@ -132,6 +132,7 @@ export interface User {
   sidebarCollapsed?: boolean
   collapsedGroups?: string // JSON array of collapsed group IDs
   createdAt?: string
+  lastLoginAt?: string
 }
 
 export interface SanctionsMatch {

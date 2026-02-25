@@ -200,7 +200,12 @@ export default function Dashboard({ onViewAlerts }: { onViewAlerts: () => void }
     }, [fleets, vessels, docTypes, allAlerts])
 
     const fullyCompliantCount = useMemo(() => {
-        const vesselsWithAlerts = new Set(allAlerts.filter(a => a.type === 'missing' || a.type === 'expired').map(a => a.vesselId))
+        const activeVesselIds = new Set(activeVessels.map(v => v.id))
+        const vesselsWithAlerts = new Set(
+            allAlerts
+                .filter(a => (a.type === 'missing' || a.type === 'expired') && activeVesselIds.has(a.vesselId))
+                .map(a => a.vesselId)
+        )
         return activeVessels.length - vesselsWithAlerts.size
     }, [activeVessels, allAlerts])
 

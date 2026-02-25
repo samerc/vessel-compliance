@@ -1744,6 +1744,21 @@ app.whenReady().then(() => {
     const user = requireSession(event)
     return db.addPolicyRenewalNote(policyId, policyNumber, note, user.id, user.username)
   })
+  safeHandle('renewalNotes:delete', (event, noteId: string) => {
+    const user = requireSession(event)
+    return db.deletePolicyRenewalNote(noteId, user.id)
+  })
+
+  // Vessel Notes
+  safeHandle('vesselNotes:get', (event, vesselId: string) => { requireSession(event); return db.getVesselNotes(vesselId) })
+  safeHandle('vesselNotes:add', (event, vesselId: string, note: string) => {
+    const user = requireSession(event)
+    return db.addVesselNote(vesselId, note, user.id, user.username)
+  })
+  safeHandle('vesselNotes:delete', (event, noteId: string) => {
+    const user = requireSession(event)
+    return db.deleteVesselNote(noteId, user.id)
+  })
 
   // Quotations
   safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, StickyNote, Plus, X, Shield, RefreshCcw } from 'lucide-react'
-//import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, StickyNote, Plus, X, Shield, RefreshCcw } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,7 +16,7 @@ interface VesselDetailProps {
     vessel: Vessel
     onBack: () => void
     backLabel?: string
-    initialSection?: 'documents' | 'surveys' | 'policies'
+    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history'
 }
 
 export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels', initialSection }: VesselDetailProps) {
@@ -293,13 +292,17 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [isEditing, setIsEditing] = useState(false)
     const [editName, setEditName] = useState(vessel.name)
     const [editImo, setEditImo] = useState(vessel.imoNumber)
-    const [detailView, setDetailView] = useState<'documents' | 'surveys' | 'policies' | 'history'>(initialSection || 'documents')
+    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history'>(initialSection || 'documents')
+    useEffect(() => { if (initialSection) setDetailView(initialSection) }, [initialSection])
     const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
     const [auditLog, setAuditLog] = useState<VesselAuditEntry[]>([])
     const [showExportMenu, setShowExportMenu] = useState(false)
     const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
     const [showNotesModal, setShowNotesModal] = useState(false)
-    const [vesselNotes, setVesselNotes] = useState(vessel.notes || '')
+    const [vesselNotesList, setVesselNotesList] = useState<any[]>([])
+    const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
+    const [newVesselNoteText, setNewVesselNoteText] = useState('')
+    const [vesselNotesSaving, setVesselNotesSaving] = useState(false)
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
     const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
     const [showAddFlagModal, setShowAddFlagModal] = useState(false)
@@ -433,6 +436,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         setVesselActive(newStatus)
         vessel.isActive = newStatus
         showSuccess(`Vessel is now ${newStatus ? 'ACTIVE' : 'INACTIVE'}`)
+        // Refresh policies so cascade changes (active ↔ inactive) are reflected immediately
+        loadDynamicPolicies()
     }
 
     const handleDeleteVessel = async (e: React.MouseEvent) => {
@@ -456,6 +461,36 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 setConfirmation(prev => ({ ...prev, show: false }))
             }
         })
+    }
+
+    const handleOpenVesselNotes = async () => {
+        setShowNotesModal(true)
+        setVesselNotesList([])
+        setNewVesselNoteText('')
+        setVesselNotesLoading(true)
+        try {
+            const data = await window.api.getVesselNotes(vessel.id)
+            setVesselNotesList(data || [])
+        } finally {
+            setVesselNotesLoading(false)
+        }
+    }
+
+    const handleAddVesselNote = async () => {
+        if (!newVesselNoteText.trim()) return
+        setVesselNotesSaving(true)
+        try {
+            const note = await window.api.addVesselNote(vessel.id, newVesselNoteText.trim())
+            setVesselNotesList(prev => [...prev, note])
+            setNewVesselNoteText('')
+        } finally {
+            setVesselNotesSaving(false)
+        }
+    }
+
+    const handleDeleteVesselNote = async (noteId: string) => {
+        await window.api.deleteVesselNote(noteId)
+        setVesselNotesList(prev => prev.filter(n => n.id !== noteId))
     }
 
     return (
@@ -616,7 +651,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 {vesselActive ? 'Active' : 'Inactive'}
                             </button>
                             <button
-                                onClick={() => setShowNotesModal(true)}
+                                onClick={handleOpenVesselNotes}
                                 className="btn-secondary"
                                 style={{
                                     display: 'flex',
@@ -624,22 +659,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     gap: '6px',
                                     padding: '6px 12px',
                                     fontSize: '0.82rem',
-                                    position: 'relative',
-                                    color: vesselNotes ? 'var(--accent-primary)' : undefined
+                                    position: 'relative'
                                 }}
                             >
-                                <StickyNote size={16} /> Notes
-                                {vesselNotes && (
-                                    <span style={{
-                                        position: 'absolute',
-                                        top: '-2px',
-                                        right: '-2px',
-                                        width: '8px',
-                                        height: '8px',
-                                        borderRadius: '50%',
-                                        background: 'var(--accent-primary)'
-                                    }} />
-                                )}
+                                <MessageSquare size={16} /> Notes
                             </button>
                             <div style={{ position: 'relative' }}>
                                 <button
@@ -735,7 +758,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 borderBottom: '2px solid var(--table-border)',
                 marginBottom: '16px'
             }}>
-                {(['documents', 'surveys', 'policies', 'history'] as const).map(view => (
+                {(['documents', 'assureds', 'surveys', 'policies', 'history'] as const).map(view => (
                     <button
                         key={view}
                         onClick={() => {
@@ -760,10 +783,11 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         }}
                     >
                         {view === 'documents' && <FileText size={18} />}
+                        {view === 'assureds' && <Users size={18} />}
                         {view === 'surveys' && <ClipboardList size={18} />}
                         {view === 'policies' && <Shield size={18} />}
                         {view === 'history' && <Calendar size={18} />}
-                        {view.charAt(0).toUpperCase() + view.slice(1)}
+                        {view === 'assureds' ? 'Assured' : view.charAt(0).toUpperCase() + view.slice(1)}
                     </button>
                 ))}
             </div>
@@ -1176,7 +1200,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 </table>
             </div>}
 
-            {detailView === 'documents' && <AssuredManager vessel={vessel} />}
+            {detailView === 'assureds' && <AssuredManager vessel={vessel} />}
 
             {detailView === 'surveys' && <ConditionSurveyManager vessel={vessel} />}
 
@@ -1310,52 +1334,75 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             )}
 
             {showNotesModal && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', zIndex: 1000
-                }} onClick={() => setShowNotesModal(false)}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
                     <div style={{
-                        background: isLight ? '#ffffff' : '#1e222a',
-                        borderRadius: '16px', padding: '24px', width: '500px', maxWidth: '90vw',
-                        border: '1px solid var(--glass-border)',
+                        background: isLight ? '#ffffff' : '#1a1d28',
+                        borderRadius: '16px', padding: '28px', width: '520px', maxWidth: '95vw', maxHeight: '80vh',
+                        display: 'flex', flexDirection: 'column',
+                        border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
-                    }} onClick={e => e.stopPropagation()}>
-                        <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <StickyNote size={20} color="var(--accent-primary)" /> Vessel Notes
-                        </h3>
-                        <textarea
-                            value={vesselNotes}
-                            onChange={e => setVesselNotes(e.target.value)}
-                            placeholder="Add notes about this vessel..."
-                            rows={8}
-                            style={{
-                                width: '100%', resize: 'vertical',
-                                marginBottom: '16px', fontSize: '0.9rem'
-                            }}
-                            aria-label="Vessel notes"
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                            <button
-                                onClick={() => {
-                                    setVesselNotes(vessel.notes || '')
-                                    setShowNotesModal(false)
-                                }}
-                                className="btn-secondary"
-                            >
-                                Cancel
+                    }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexShrink: 0 }}>
+                            <div>
+                                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <MessageSquare size={16} color="var(--accent-primary)" /> Vessel Notes
+                                </h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                    {vessel.name}
+                                </p>
+                            </div>
+                            <button onClick={() => setShowNotesModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
+                                <X size={18} />
                             </button>
-                            <button
-                                onClick={async () => {
-                                    await window.api.updateVessel(vessel.id, { notes: vesselNotes })
-                                    vessel.notes = vesselNotes
-                                    showSuccess('Notes saved')
-                                    setShowNotesModal(false)
-                                }}
-                                className="btn-primary"
-                            >
-                                Save Notes
-                            </button>
+                        </div>
+
+                        {/* New note input */}
+                        <div style={{ flexShrink: 0, marginBottom: '16px' }}>
+                            <textarea
+                                value={newVesselNoteText}
+                                onChange={e => setNewVesselNoteText(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote() }}
+                                rows={3}
+                                placeholder="Add a note about this vessel... (Ctrl+Enter to submit)"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'none', fontFamily: 'inherit', fontSize: '0.9rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                                <button onClick={handleAddVesselNote} disabled={vesselNotesSaving || !newVesselNoteText.trim()} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
+                                    {vesselNotesSaving ? 'Saving...' : 'Add Note'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Notes thread */}
+                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {vesselNotesLoading ? (
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px' }}>Loading...</p>
+                            ) : vesselNotesList.length === 0 ? (
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px', fontStyle: 'italic' }}>No notes yet for this vessel.</p>
+                            ) : vesselNotesList.map(n => (
+                                <div key={n.id} style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px', borderLeft: '3px solid var(--accent-primary)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                        <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
+                                            {(n.createdByUsername || '?').charAt(0).toUpperCase()}
+                                        </div>
+                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-primary)' }}>{n.createdByUsername || 'Unknown'}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
+                                            {new Date(n.createdAt).toLocaleString()}
+                                        </span>
+                                        {n.createdByUserId === user?.id && (
+                                            <button
+                                                onClick={() => handleDeleteVesselNote(n.id)}
+                                                title="Delete note"
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: '2px', borderRadius: '4px', flexShrink: 0 }}
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{n.note}</p>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -1393,7 +1440,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     const [formTypeId, setFormTypeId] = useState('')
     const [formNumber, setFormNumber] = useState('')
     const [formConditionId, setFormConditionId] = useState('')
-    const [formStatus, setFormStatus] = useState<'active' | 'expired' | 'cancelled'>('active')
+    const [formStatus, setFormStatus] = useState<'active' | 'expired' | 'cancelled' | 'inactive'>('active')
     const [formCurrency, setFormCurrency] = useState('USD')
     const [formBrokerId, setFormBrokerId] = useState('')
     const [brokerSearch, setBrokerSearch] = useState('')
@@ -1663,7 +1710,8 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     const statusColors: Record<string, { bg: string; color: string }> = {
         active: { bg: 'rgba(0, 200, 100, 0.1)', color: isLight ? '#008c46' : '#00ff88' },
         expired: { bg: 'rgba(128, 128, 128, 0.1)', color: 'var(--text-secondary)' },
-        cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: isLight ? '#c00000' : '#ff4d4d' }
+        cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: isLight ? '#c00000' : '#ff4d4d' },
+        inactive: { bg: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }
     }
 
     return (
@@ -1731,7 +1779,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                             <button onClick={() => handleRenewPolicy(p)} className="btn-primary" style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <RefreshCcw size={14} /> Renew
                                             </button>
-                                            <button onClick={() => handleDeletePolicy(p.id)} style={{ background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: '4px', fontSize: '0.8rem', padding: '4px 12px', cursor: 'pointer' }}>Delete</button>
+                                            <button onClick={() => handleDeletePolicy(p.id)} style={{ background: 'rgba(255,77,77,0.12)', border: '1px solid rgba(255,77,77,0.35)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.8rem', padding: '4px 12px', cursor: 'pointer' }}>Delete</button>
                                         </div>
                                     </div>
                                 )}
@@ -1740,57 +1788,60 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                     })}
                 </div>
             ) : (
-                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '32px' }}>
-                    {dynamicPolicies.length > 0 ? 'No policies match the current filter.' : 'No policies added yet.'}
-                </p>
+                <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-secondary)' }}>
+                    <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                    <div style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '6px' }}>
+                        {dynamicPolicies.length > 0 ? 'No matching policies' : 'No policies yet'}
+                    </div>
+                    <div style={{ fontSize: '0.85rem' }}>
+                        {dynamicPolicies.length > 0 ? 'Try switching to a different type tab.' : 'Add a policy to start tracking insurance coverage.'}
+                    </div>
+                </div>
             )}
 
             {/* Add/Edit Modal */}
             {/* Add/Edit Modal */}
             {showAddModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setShowAddModal(false)}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setShowAddModal(false)}>
                     <div
                         ref={modalRef}
                         role="dialog"
                         aria-modal="true"
                         onClick={e => e.stopPropagation()}
-                        style={{ background: isLight ? '#ffffff' : '#1a1e26', borderRadius: '12px', padding: '24px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--glass-border)' }}
+                        style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)' }}
                     >
                         <h3 style={{ marginBottom: '16px' }}>{editingPolicyId ? 'Edit Policy' : 'Add Policy'}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {!editingPolicyId && (
                                 <div>
-                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Policy Type</label>
-                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Policy Type</label>
+                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                         {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
                                     </select>
                                 </div>
                             )}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div>
-                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Policy Number</label>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Policy Number</label>
                                     <input
                                         type="text"
                                         value={formNumber}
-                                        onChange={e => {
-                                            console.log('Policy Number Change:', e.target.value)
-                                            setFormNumber(e.target.value)
-                                        }}
-                                        onFocus={() => console.log('Policy Number Focused')}
-                                        style={{ width: '100%', padding: '8px', borderRadius: '4px' }}
+                                        onChange={e => setFormNumber(e.target.value)}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status</label>
-                                    <select value={formStatus} onChange={e => setFormStatus(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Status</label>
+                                    <select value={formStatus} onChange={e => setFormStatus(e.target.value as any)} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                         <option value="active">Active</option>
                                         <option value="expired">Expired</option>
                                         <option value="cancelled">Cancelled</option>
+                                        <option value="inactive">Inactive</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Currency</label>
-                                    <select value={formCurrency} onChange={e => setFormCurrency(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Currency</label>
+                                    <select value={formCurrency} onChange={e => setFormCurrency(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                         <option value="USD">USD ($)</option>
                                         <option value="EUR">EUR (\u20AC)</option>
                                         <option value="GBP">GBP (\u00A3)</option>
@@ -1798,15 +1849,15 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 </div>
                                 {typeCondsForForm.length > 0 && (
                                     <div>
-                                        <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Condition</label>
-                                        <select value={formConditionId} onChange={e => setFormConditionId(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
+                                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Condition</label>
+                                        <select value={formConditionId} onChange={e => setFormConditionId(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                             <option value="">None</option>
                                             {typeCondsForForm.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </div>
                                 )}
                                 <div>
-                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Broker</label>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Broker</label>
                                     <div style={{ position: 'relative' }}>
                                         <input
                                             type="text"
@@ -1815,10 +1866,10 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                             onFocus={() => { setBrokerDropdownOpen(true); setBrokerSearch('') }}
                                             onChange={e => setBrokerSearch(e.target.value)}
                                             onBlur={() => setTimeout(() => setBrokerDropdownOpen(false), 150)}
-                                            style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
+                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
                                         />
                                         {brokerDropdownOpen && (
-                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '4px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                                                 <div
                                                     onMouseDown={() => { setFormBrokerId(''); setBrokerDropdownOpen(false); setBrokerSearch('') }}
                                                     style={{ padding: '8px 12px', cursor: 'pointer', color: formBrokerId === '' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.9rem' }}
@@ -1850,18 +1901,15 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                         {typeCharsForForm.map(c => (
                                             <div key={c.id}>
-                                                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{c.name} {c.isRequired && '*'}</label>
+                                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>{c.name} {c.isRequired && '*'}</label>
                                                 {c.fieldType === 'text' && (
-                                                    <input type="text" name={`policy_${c.id}`} value={formValues[c.id] || ''} onChange={e => {
-                                                        console.log('Changing text input:', c.id, e.target.value)
-                                                        setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))
-                                                    }} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
+                                                    <input type="text" name={`policy_${c.id}`} value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }} />
                                                 )}
                                                 {c.fieldType === 'date' && (
-                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }} />
+                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }} />
                                                 )}
                                                 {c.fieldType === 'amount' && (
-                                                    <input type="number" step="0.01" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px' }} />
+                                                    <input type="number" step="0.01" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }} />
                                                 )}
                                                 {c.fieldType === 'boolean' && (
                                                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
@@ -1869,7 +1917,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     </label>
                                                 )}
                                                 {c.fieldType === 'select' && c.selectOptions && (
-                                                    <select value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
+                                                    <select value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
                                                         <option value="">Select...</option>
                                                         {c.selectOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                     </select>
@@ -1881,11 +1929,11 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                             )}
 
                             <div>
-                                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Notes</label>
-                                <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} style={{ width: '100%', padding: '8px', borderRadius: '4px', resize: 'vertical' }} />
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Notes</label>
+                                <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', resize: 'vertical', boxSizing: 'border-box' }} />
                             </div>
 
-                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--table-border)' }}>
                                 <button onClick={() => setShowAddModal(false)} className="btn-secondary">Cancel</button>
                                 <button onClick={handleSavePolicy} className="btn-primary">{editingPolicyId ? 'Update' : 'Add'} Policy</button>
                             </div>

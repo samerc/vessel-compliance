@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import * as XLSX from 'xlsx'
 
 interface PolicyRenewalsProps {
@@ -31,6 +32,7 @@ function formatPremium(value: number | null, currency: string | null): string {
 
 export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsProps) {
     const { theme } = useTheme()
+    const { user } = useAuth()
     const isLight = theme === 'light'
     const now = new Date()
     const [selectedYear, setSelectedYear] = useState(now.getFullYear())
@@ -134,6 +136,13 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         } finally {
             setNotesSaving(false)
         }
+    }
+
+    const handleDeleteNote = async (noteId: string) => {
+        if (!notesModal) return
+        await window.api.deletePolicyRenewalNote(noteId)
+        setRenewalNotes(prev => prev.filter(n => n.id !== noteId))
+        setRenewals(prev => prev.map(r => r.id === notesModal.id ? { ...r, noteCount: Math.max(0, (r.noteCount || 1) - 1) } : r))
     }
 
     const handleSetStatus = async (policyId: string, statusId: string | null) => {
@@ -559,6 +568,15 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
                                             {new Date(n.createdAt).toLocaleString()}
                                         </span>
+                                        {n.createdByUserId === user?.id && (
+                                            <button
+                                                onClick={() => handleDeleteNote(n.id)}
+                                                title="Delete note"
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: '2px', borderRadius: '4px', flexShrink: 0 }}
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        )}
                                     </div>
                                     <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{n.note}</p>
                                 </div>

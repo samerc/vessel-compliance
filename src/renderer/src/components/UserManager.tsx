@@ -200,7 +200,7 @@ export default function UserManager() {
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                 <th scope="col" style={{ padding: '16px' }}>Username</th>
                                 <th scope="col" style={{ padding: '16px' }}>Role</th>
-                                <th scope="col" style={{ padding: '16px' }}>Created At</th>
+                                <th scope="col" style={{ padding: '16px' }}>Last Login</th>
                                 <th scope="col" style={{ padding: '16px' }}>App Version</th>
                                 <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                             </tr>
@@ -230,7 +230,7 @@ export default function UserManager() {
                                         </span>
                                     </td>
                                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
+                                        {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
                                     </td>
                                     <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                                         {user.lastAppVersion || '-'}

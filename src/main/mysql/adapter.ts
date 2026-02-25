@@ -794,6 +794,26 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE users ADD COLUMN collapsed_groups TEXT DEFAULT NULL")
             }
 
+            // Migration: Add last_login_at to users
+            const [userLoginCols] = await this.pool.query("SHOW COLUMNS FROM users LIKE 'last_login_at'")
+            if ((userLoginCols as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE users ADD COLUMN last_login_at DATETIME DEFAULT NULL')
+            }
+
+            // Migration: Add vessel_notes table
+            const [vnTable] = await this.pool.query("SHOW TABLES LIKE 'vessel_notes'")
+            if ((vnTable as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE vessel_notes (
+                    id VARCHAR(36) PRIMARY KEY,
+                    vessel_id VARCHAR(36) NOT NULL,
+                    note TEXT NOT NULL,
+                    created_by_user_id VARCHAR(36),
+                    created_by_username VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_vn_vessel (vessel_id)
+                )`)
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -1060,6 +1080,14 @@ export class MySQLAdapter {
         if (updates.isActive === false && current && current.is_active) {
             await this.pool.execute(
                 "UPDATE vessel_dynamic_policies SET status = 'inactive' WHERE vessel_id = ? AND status = 'active'",
+                [id]
+            )
+        }
+
+        // When vessel is reactivated, restore cascade-deactivated policies (status = 'inactive') to active
+        if (updates.isActive === true && current && !current.is_active) {
+            await this.pool.execute(
+                "UPDATE vessel_dynamic_policies SET status = 'active' WHERE vessel_id = ? AND status = 'inactive'",
                 [id]
             )
         }
@@ -1728,7 +1756,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt FROM users WHERE username = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -1751,10 +1779,15 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt FROM users ORDER BY username ASC'
+            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt, last_login_at as lastLoginAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
+    }
+
+    async updateUserLastLogin(userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE users SET last_login_at = NOW() WHERE id = ?', [userId])
     }
 
     async deleteUser(id: string): Promise<void> {
@@ -4254,6 +4287,37 @@ export class MySQLAdapter {
             [id, policyId, policyNumber ?? '', note.trim(), userId, username, now]
         )
         return { id, policyId, policyNumber: policyNumber ?? '', note: note.trim(), createdByUserId: userId, createdByUsername: username, createdAt: now.toISOString() }
+    }
+
+    async deletePolicyRenewalNote(noteId: string, userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM policy_renewal_notes WHERE id = ? AND created_by_user_id = ?', [noteId, userId])
+    }
+
+    // --- Vessel Notes ---
+    async getVesselNotes(vesselId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, vessel_id as vesselId, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt FROM vessel_notes WHERE vessel_id = ? ORDER BY created_at ASC',
+            [vesselId]
+        )
+        return rows as any[]
+    }
+
+    async addVesselNote(vesselId: string, note: string, userId: string, username: string): Promise<any> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        const now = new Date()
+        await this.pool.execute(
+            'INSERT INTO vessel_notes (id, vessel_id, note, created_by_user_id, created_by_username, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, vesselId, note.trim(), userId, username, now]
+        )
+        return { id, vesselId, note: note.trim(), createdByUserId: userId, createdByUsername: username, createdAt: now.toISOString() }
+    }
+
+    async deleteVesselNote(noteId: string, userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM vessel_notes WHERE id = ? AND created_by_user_id = ?', [noteId, userId])
     }
 
     // --- Renewal Status Types ---

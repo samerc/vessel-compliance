@@ -34,7 +34,8 @@ function App(): React.JSX.Element {
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
-  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'surveys' | 'policies' | undefined>(undefined)
+  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
+  const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -257,19 +258,33 @@ function App(): React.JSX.Element {
 
         <main id="main-content" className="main-content">
           {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
-          {activeTab === 'vessels' && <VesselManager initialVesselId={navigateToVesselId} initialVesselSection={navigateToVesselSection} onClearInitialVessel={() => { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }} />}
-          {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
+          {activeTab === 'vessels' && <VesselManager
+            initialVesselId={navigateToVesselId}
+            initialVesselSection={navigateToVesselSection}
+            onClearInitialVessel={() => { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }}
+            onNavigateBack={navigateBackTab ? () => { setActiveTab(navigateBackTab as any); setNavigateBackTab(undefined) } : undefined}
+            navigateBackLabel={navigateBackTab ? ({
+              'surveys': 'Back to Surveys',
+              'compliance': 'Back to Compliance',
+              'directory': 'Back to Directory',
+              'vessel-filter': 'Back to Vessel Filter',
+              'renewals': 'Back to Renewals',
+              'admin': 'Back to System Setup',
+              'reminders': 'Back to Reminders',
+            } as Record<string, string>)[navigateBackTab] || 'Back' : undefined}
+          />}
+          {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
           {activeTab === 'fleets' && <FleetManager />}
-          {activeTab === 'admin' && isAdmin && <AdminPanel onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
+          {activeTab === 'admin' && isAdmin && <AdminPanel onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
           {activeTab === 'users' && isAdmin && <UserManager />}
-          {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setActiveTab('vessels') }} />}
-          {activeTab === 'compliance' && <ComplianceCenter onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setActiveTab('vessels') }} />}
+          {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} />}
+          {activeTab === 'compliance' && <ComplianceCenter onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} />}
           {activeTab === 'sanctions-search' && <SanctionsSearch />}
           {activeTab === 'reminders' && <ReminderCenter />}
-          {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setActiveTab('vessels') }} />}
+          {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} />}
           {activeTab === 'calculators' && <Calculators />}
           {activeTab === 'quotations' && <QuotationManager />}
-          {activeTab === 'renewals' && <PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setActiveTab('vessels') }} />}
+          {activeTab === 'renewals' && <PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} />}
           {activeTab === 'reports' && <Reports />}
         </main>
         <UpdateNotification />

@@ -322,6 +322,12 @@ const api = {
   // Policy Renewal Notes
   getPolicyRenewalNotes: (policyId: string, policyNumber: string) => ipcRenderer.invoke('renewalNotes:get', policyId, policyNumber),
   addPolicyRenewalNote: (policyId: string, policyNumber: string, note: string) => ipcRenderer.invoke('renewalNotes:add', policyId, policyNumber, note),
+  deletePolicyRenewalNote: (noteId: string) => ipcRenderer.invoke('renewalNotes:delete', noteId),
+
+  // Vessel Notes
+  getVesselNotes: (vesselId: string) => ipcRenderer.invoke('vesselNotes:get', vesselId),
+  addVesselNote: (vesselId: string, note: string) => ipcRenderer.invoke('vesselNotes:add', vesselId, note),
+  deleteVesselNote: (noteId: string) => ipcRenderer.invoke('vesselNotes:delete', noteId),
 
   // Quotations
   getQuotations: () => ipcRenderer.invoke('db:getQuotations'),
