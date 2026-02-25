@@ -1130,6 +1130,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     type="date"
                                                     value={doc?.expiryDate || ''}
                                                     onChange={e => handleUpdateExpiry(customType.id, e.target.value)}
+                                                    min="1900-01-01"
+                                                    max="2100-12-31"
                                                     style={{
                                                         padding: '4px 8px',
                                                         borderRadius: '4px',

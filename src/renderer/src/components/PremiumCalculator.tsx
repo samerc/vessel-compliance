@@ -11,7 +11,7 @@ function intToWords(n: number): string {
   function helper(num: number): string {
     if (num === 0) return ''
     if (num < 20) return ONES[num]
-    if (num < 100) return TENS[Math.floor(num / 10)] + (num % 10 ? ' ' + ONES[num % 10] : '')
+    if (num < 100) return TENS[Math.floor(num / 10)] + (num % 10 ? '-' + ONES[num % 10] : '')
     if (num < 1000) return ONES[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + helper(num % 100) : '')
     if (num < 1_000_000) return helper(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + helper(num % 1000) : '')
     if (num < 1_000_000_000) return helper(Math.floor(num / 1_000_000)) + ' Million' + (num % 1_000_000 ? ' ' + helper(num % 1_000_000) : '')

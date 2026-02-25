@@ -800,6 +800,21 @@ export class MySQLAdapter {
                 await this.pool.query('ALTER TABLE users ADD COLUMN last_login_at DATETIME DEFAULT NULL')
             }
 
+            // Migration: Drop FK on document_type_id in vessel_documents (allows custom doc type IDs)
+            const [docFkRows]: any[] = await this.pool.query(`
+                SELECT kcu.CONSTRAINT_NAME
+                FROM information_schema.KEY_COLUMN_USAGE kcu
+                JOIN information_schema.TABLE_CONSTRAINTS tc
+                    ON kcu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME AND kcu.TABLE_SCHEMA = tc.TABLE_SCHEMA
+                WHERE kcu.TABLE_SCHEMA = DATABASE()
+                  AND kcu.TABLE_NAME = 'vessel_documents'
+                  AND kcu.COLUMN_NAME = 'document_type_id'
+                  AND tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+            `)
+            if ((docFkRows as any[]).length > 0) {
+                await this.pool.query(`ALTER TABLE vessel_documents DROP FOREIGN KEY ${docFkRows[0].CONSTRAINT_NAME}`)
+            }
+
             // Migration: Add vessel_notes table
             const [vnTable] = await this.pool.query("SHOW TABLES LIKE 'vessel_notes'")
             if ((vnTable as any[]).length === 0) {
