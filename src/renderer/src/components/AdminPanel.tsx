@@ -782,64 +782,80 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{isAdmin ? 'Administrator' : 'User'}</div>
                 </div>
                 <nav style={{ flex: 1, padding: '8px 0' }}>
-                    {/* Regular sections */}
-                    {sidebarSections.filter(s => !s.adminOnly).map(sec => (
-                        <button
-                            key={sec.id}
-                            onClick={() => setActiveSection(sec.id)}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '10px',
-                                padding: '9px 16px', width: '100%', textAlign: 'left',
-                                background: effectiveSection === sec.id ? 'rgba(var(--accent-primary-rgb, 0,210,255),0.1)' : 'transparent',
-                                border: 'none', borderLeft: effectiveSection === sec.id ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                                color: effectiveSection === sec.id ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                fontWeight: effectiveSection === sec.id ? '600' : '400',
-                                fontSize: '0.82rem', cursor: 'pointer',
-                            }}
-                        >
-                            {sec.icon}
-                            {sec.label}
-                        </button>
-                    ))}
+                    {(() => {
+                        const grantable = sidebarSections.filter(s => !s.adminOnly)
+                        const adminSystemSections = sidebarSections.filter(s => s.adminOnly)
 
-                    {/* Administration group */}
-                    {isAdmin && sidebarSections.some(s => s.adminOnly) && (
-                        <>
-                            <div style={{ height: '1px', background: 'var(--glass-border)', margin: '8px 16px', opacity: 0.5 }} />
-                            <div style={{ padding: '6px 16px 2px', fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.9px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-                                Administration
+                        const renderBtn = (sec: typeof sidebarSections[0], isDanger = false) => {
+                            const isActive = effectiveSection === sec.id
+                            return (
+                                <button
+                                    key={sec.id}
+                                    onClick={() => setActiveSection(sec.id)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '10px',
+                                        padding: '9px 16px', width: '100%', textAlign: 'left',
+                                        background: isActive
+                                            ? isDanger ? 'rgba(255,77,77,0.1)' : 'rgba(var(--accent-primary-rgb,0,210,255),0.1)'
+                                            : 'transparent',
+                                        border: 'none',
+                                        borderLeft: isActive
+                                            ? isDanger ? '3px solid var(--danger)' : '3px solid var(--accent-primary)'
+                                            : '3px solid transparent',
+                                        color: isActive
+                                            ? isDanger ? 'var(--danger)' : 'var(--accent-primary)'
+                                            : isDanger ? 'var(--danger)' : 'var(--text-primary)',
+                                        fontWeight: isActive ? '600' : '400',
+                                        fontSize: '0.82rem', cursor: 'pointer',
+                                    }}
+                                >
+                                    {sec.icon}
+                                    {sec.label}
+                                </button>
+                            )
+                        }
+
+                        const groupLabel = (text: string, color = 'var(--text-secondary)') => (
+                            <div style={{ padding: '8px 16px 2px', fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.9px', textTransform: 'uppercase', color }}>
+                                {text}
                             </div>
-                            {sidebarSections.filter(s => s.adminOnly).map(sec => {
-                                const isDanger = sec.id === 'dangerZone'
-                                const isActive = effectiveSection === sec.id
-                                return (
-                                    <button
-                                        key={sec.id}
-                                        onClick={() => setActiveSection(sec.id)}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '10px',
-                                            padding: '9px 16px', width: '100%', textAlign: 'left',
-                                            background: isActive
-                                                ? isDanger ? 'rgba(255,77,77,0.1)' : 'rgba(var(--accent-primary-rgb, 0,210,255),0.1)'
-                                                : 'transparent',
-                                            border: 'none',
-                                            borderLeft: isActive
-                                                ? isDanger ? '3px solid var(--danger)' : '3px solid var(--accent-primary)'
-                                                : '3px solid transparent',
-                                            color: isActive
-                                                ? isDanger ? 'var(--danger)' : 'var(--accent-primary)'
-                                                : isDanger ? 'var(--danger)' : 'var(--text-primary)',
-                                            fontWeight: isActive ? '600' : '400',
-                                            fontSize: '0.82rem', cursor: 'pointer',
-                                        }}
-                                    >
-                                        {sec.icon}
-                                        {sec.label}
-                                    </button>
-                                )
-                            })}
-                        </>
-                    )}
+                        )
+                        const divider = (key: string) => (
+                            <div key={key} style={{ height: '1px', background: 'var(--glass-border)', margin: '8px 16px', opacity: 0.5 }} />
+                        )
+
+                        if (isAdmin) {
+                            const shared = grantable.filter(s => userSectionAccess.includes(s.id))
+                            const adminOnly = grantable.filter(s => !userSectionAccess.includes(s.id))
+                            return (
+                                <>
+                                    {shared.length > 0 && (
+                                        <>
+                                            {groupLabel('Shared with Users', 'var(--accent-primary)')}
+                                            {shared.map(s => renderBtn(s))}
+                                        </>
+                                    )}
+                                    {adminOnly.length > 0 && (
+                                        <>
+                                            {shared.length > 0 && divider('div-grantable')}
+                                            {groupLabel('Admin Only')}
+                                            {adminOnly.map(s => renderBtn(s))}
+                                        </>
+                                    )}
+                                    {adminSystemSections.length > 0 && (
+                                        <>
+                                            {divider('div-admin')}
+                                            {groupLabel('Administration')}
+                                            {adminSystemSections.map(s => renderBtn(s, s.id === 'dangerZone'))}
+                                        </>
+                                    )}
+                                </>
+                            )
+                        }
+
+                        // Regular user — just show their accessible sections flat
+                        return <>{grantable.map(s => renderBtn(s))}</>
+                    })()}
                 </nav>
             </aside>
 
