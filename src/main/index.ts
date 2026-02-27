@@ -203,6 +203,11 @@ function createWindow(): void {
         } catch (schemaError) {
           console.error('Schema init error (non-fatal):', schemaError)
         }
+        // Update last_login for auto-restored sessions (no password re-entry on startup)
+        const restoredSession = auth.getFirstSession()
+        if (restoredSession) {
+          db.updateUserLastLogin(restoredSession.user.id).catch(() => {})
+        }
         mainWindow.webContents.send('app:db-status', { connected: true })
       }
     } catch (error) {
@@ -1738,6 +1743,7 @@ app.whenReady().then(() => {
   // Policy Expiry Alerts
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })
+  safeHandle('policies:setQuotationSentDate', (event, policyId: string, date: string | null) => { requireSession(event); return db.setQuotationSentDate(policyId, date) })
 
   // Renewal Status Types
   safeHandle('renewalStates:getAll', (event) => { requireSession(event); return db.getRenewalStatusTypes() })

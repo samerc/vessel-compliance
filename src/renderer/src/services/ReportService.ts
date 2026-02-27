@@ -54,15 +54,17 @@ export const ReportService = {
       const doc = docs.find(d => d.documentTypeId === type.id)
       const isRequired = doc ? doc.required : type.required
 
-      if (isRequired) {
-        requiredCount++
-        if (doc?.filePath) compliantCount++
+      if (isRequired || !!doc?.filePath) {
+        if (isRequired) {
+          requiredCount++
+          if (doc?.filePath) compliantCount++
+        }
 
         const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || doc?.expiryDate) : doc?.expiryDate
         const expiryToShow = (!!doc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : 'N/A'
 
         complianceData.push({
-          'Document Name': type.name,
+          'Document Name': type.name + (!isRequired ? ' (Optional)' : ''),
           'Description': type.description || '',
           'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry),
           'Date of Receipt': doc?.receivedDate || 'N/A',
@@ -259,15 +261,17 @@ export const ReportService = {
       const vDoc = docs.find(d => d.documentTypeId === type.id)
       const isRequired = vDoc ? vDoc.required : type.required
 
-      if (isRequired) {
-        requiredCount++
-        if (vDoc?.filePath) compliantCount++
+      if (isRequired || !!vDoc?.filePath) {
+        if (isRequired) {
+          requiredCount++
+          if (vDoc?.filePath) compliantCount++
+        }
 
         const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || vDoc?.expiryDate) : vDoc?.expiryDate
         const pdfExpiryToShow = (!!vDoc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : '-'
 
         tableData.push([
-          type.name,
+          type.name + (!isRequired ? ' (Optional)' : ''),
           type.description || '',
           getDocStatus(!!vDoc?.filePath, resolvedExpiry),
           pdfExpiryToShow

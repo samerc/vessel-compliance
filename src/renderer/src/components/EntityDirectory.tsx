@@ -16,6 +16,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
+import { exportCustomerCompliancePDF } from './CustomerComplianceReport'
 
 export default function EntityDirectory() {
     const [entities, setEntities] = useState<Entity[]>([])
@@ -80,6 +81,7 @@ export default function EntityDirectory() {
     const [mergeKeepName, setMergeKeepName] = useState<'source' | 'target'>('target')
     const [isMerging, setIsMerging] = useState(false)
     const [allEntitiesForMerge, setAllEntitiesForMerge] = useState<Entity[]>([])
+    const [exportingCompliance, setExportingCompliance] = useState(false)
 
     const openMergeModal = async (entity: Entity) => {
         setMergeSource(entity)
@@ -956,20 +958,43 @@ export default function EntityDirectory() {
                             </div>
 
                             {/* Associated Vessels */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '8px', flexWrap: 'wrap' }}>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
                                     <Ship size={20} color="var(--accent-primary)" /> Associated Vessels
                                 </h3>
-                                <span style={{
-                                    fontSize: '0.78rem',
-                                    padding: '3px 10px',
-                                    borderRadius: '12px',
-                                    background: isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(0, 210, 255, 0.08)',
-                                    color: 'var(--accent-primary)',
-                                    fontWeight: 600
-                                }}>
-                                    {associatedVessels.length} vessel{associatedVessels.length !== 1 ? 's' : ''}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {vessels.some(v => v.customerId === selectedEntity?.id) && (
+                                        <button
+                                            onClick={async () => {
+                                                if (!selectedEntity) return
+                                                setExportingCompliance(true)
+                                                try {
+                                                    const customerVessel = vessels.find(v => v.customerId === selectedEntity.id)
+                                                    await exportCustomerCompliancePDF(selectedEntity.id, selectedEntity.name, customerVessel?.customerType || null)
+                                                } finally {
+                                                    setExportingCompliance(false)
+                                                }
+                                            }}
+                                            disabled={exportingCompliance}
+                                            className="btn-secondary"
+                                            style={{ padding: '4px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                            title="Export compliance PDF for this customer's vessels"
+                                        >
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                            {exportingCompliance ? 'Exporting...' : 'Compliance PDF'}
+                                        </button>
+                                    )}
+                                    <span style={{
+                                        fontSize: '0.78rem',
+                                        padding: '3px 10px',
+                                        borderRadius: '12px',
+                                        background: isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(0, 210, 255, 0.08)',
+                                        color: 'var(--accent-primary)',
+                                        fontWeight: 600
+                                    }}>
+                                        {associatedVessels.length} vessel{associatedVessels.length !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
                             </div>
 
                             {associatedVessels.length === 0 ? (

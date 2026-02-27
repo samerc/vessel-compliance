@@ -311,6 +311,7 @@ const api = {
   // Policy Expiry Alerts
   getExpiredActivePolicies: () => ipcRenderer.invoke('policies:getExpiredActive'),
   getPolicyRenewalsByMonth: (year: number, month: number) => ipcRenderer.invoke('policies:getRenewalsByMonth', year, month),
+  setQuotationSentDate: (policyId: string, date: string | null) => ipcRenderer.invoke('policies:setQuotationSentDate', policyId, date),
 
   // Renewal Status Types
   getRenewalStatusTypes: () => ipcRenderer.invoke('renewalStates:getAll'),

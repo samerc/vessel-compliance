@@ -17,12 +17,12 @@ interface RenewalStatusType {
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-type SortField = 'vesselName' | 'imoNumber' | 'customerName' | 'fleetName' | 'policyTypeName' | 'policyNumber' | 'endDate' | 'premium' | 'renewalStatusName'
+type SortField = 'vesselName' | 'imoNumber' | 'customerName' | 'fleetName' | 'policyTypeName' | 'policyNumber' | 'endDate' | 'premium' | 'renewalStatusName' | 'quotationSentDate'
 type SortDir = 'asc' | 'desc'
 
 const DEFAULT_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
-// Default column widths: Vessel, IMO, Customer, Fleet, PolicyType, PolicyNo, EndDate, Premium, Status, Actions
-const DEFAULT_COL_WIDTHS = [160, 100, 140, 120, 150, 130, 110, 110, 150, 120]
+// Default column widths: Vessel, IMO, Customer, Fleet, PolicyType, PolicyNo, EndDate, Premium, Status, QuotSent, Actions
+const DEFAULT_COL_WIDTHS = [160, 100, 140, 120, 150, 130, 110, 110, 150, 120, 120]
 
 function formatPremium(value: number | null, currency: string | null): string {
     if (value == null) return '-'
@@ -61,6 +61,28 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     // Column resizing
     const [colWidths, setColWidths] = useState<number[]>(DEFAULT_COL_WIDTHS)
     const resizeRef = useRef<{ colIdx: number; startX: number; startWidth: number } | null>(null)
+    const colWidthsRef = useRef(colWidths)
+
+    // Quotation sent date editing
+    const [editingQuotDate, setEditingQuotDate] = useState<Record<string, string>>({})
+
+    // Load saved column widths from localStorage on mount
+    useEffect(() => {
+        if (user?.id) {
+            const saved = localStorage.getItem(`renewal_col_widths_${user.id}`)
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved)
+                    if (Array.isArray(parsed) && parsed.length === DEFAULT_COL_WIDTHS.length) {
+                        setColWidths(parsed)
+                    }
+                } catch { /* ignore */ }
+            }
+        }
+    }, [user?.id])
+
+    // Keep ref in sync with state (used to read latest value in event handlers)
+    useEffect(() => { colWidthsRef.current = colWidths }, [colWidths])
 
     useEffect(() => {
         loadRenewals()
@@ -145,6 +167,12 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         setRenewals(prev => prev.map(r => r.id === notesModal.id ? { ...r, noteCount: Math.max(0, (r.noteCount || 1) - 1) } : r))
     }
 
+    const handleSetQuotationDate = async (policyId: string, date: string) => {
+        const val = date || null
+        await window.api.setQuotationSentDate(policyId, val)
+        setRenewals(prev => prev.map(r => r.id === policyId ? { ...r, quotationSentDate: val } : r))
+    }
+
     const handleSetStatus = async (policyId: string, statusId: string | null) => {
         await window.api.setRenewalStatusForPolicy(policyId, statusId)
         setRenewals(prev => prev.map(r => {
@@ -174,6 +202,9 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             resizeRef.current = null
             document.removeEventListener('mousemove', onMouseMove)
             document.removeEventListener('mouseup', onMouseUp)
+            if (user?.id) {
+                localStorage.setItem(`renewal_col_widths_${user.id}`, JSON.stringify(colWidthsRef.current))
+            }
         }
 
         document.addEventListener('mousemove', onMouseMove)
@@ -233,7 +264,8 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             'Policy Number': r.policyNumber || '',
             'End Date': r.endDate || '',
             'Premium': r.premium != null ? Number(r.premium) : '',
-            'Renewal Status': r.renewalStatusName || ''
+            'Renewal Status': r.renewalStatusName || '',
+            'Quotation Sent': r.quotationSentDate || ''
         }))
         const ws = XLSX.utils.json_to_sheet(rows)
         const wb = XLSX.utils.book_new()
@@ -435,9 +467,13 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Status <SortIcon field="renewalStatusName" /></span>
                                     <ResizeHandle colIdx={8} />
                                 </th>
-                                <th scope="col" style={{ ...thBase, width: colWidths[9], cursor: 'default', textAlign: 'center' }}>
-                                    Actions
+                                <th scope="col" style={{ ...thBase, width: colWidths[9], cursor: 'pointer' }} onClick={() => handleSort('quotationSentDate')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Quot. Sent <SortIcon field="quotationSentDate" /></span>
                                     <ResizeHandle colIdx={9} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[10], cursor: 'default', textAlign: 'center' }}>
+                                    Actions
+                                    <ResizeHandle colIdx={10} />
                                 </th>
                             </tr>
                         </thead>
@@ -474,6 +510,25 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                                 <option key={st.id} value={st.id}>{st.name}</option>
                                             ))}
                                         </select>
+                                    </td>
+                                    <td style={{ padding: '8px 16px' }}>
+                                        <input
+                                            type="date"
+                                            value={editingQuotDate[r.id] !== undefined ? editingQuotDate[r.id] : (r.quotationSentDate || '')}
+                                            onFocus={() => setEditingQuotDate(prev => ({ ...prev, [r.id]: r.quotationSentDate || '' }))}
+                                            onChange={e => setEditingQuotDate(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                            onBlur={async e => {
+                                                const val = e.target.value
+                                                setEditingQuotDate(prev => { const n = { ...prev }; delete n[r.id]; return n })
+                                                await handleSetQuotationDate(r.id, val)
+                                            }}
+                                            style={{
+                                                padding: '4px 6px', borderRadius: '6px', fontSize: '0.8rem', width: '100%',
+                                                background: 'var(--input-bg)', color: 'var(--text-primary)',
+                                                border: '1px solid var(--input-border)',
+                                                colorScheme: isLight ? 'light' : 'dark'
+                                            }}
+                                        />
                                     </td>
                                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>

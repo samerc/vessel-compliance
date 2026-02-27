@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,6 +8,7 @@ import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 
 import { ReportService } from '../services/ReportService'
+import VesselDocumentsView from './VesselDocumentsView'
 import AssuredManager from './AssuredManager'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import ConfirmationModal from './ConfirmationModal'
@@ -87,6 +88,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         try {
             const cs = await window.api.getClassificationSocieties()
             setClassSocieties([...(cs || [])].sort((a, b) => a.name.localeCompare(b.name)))
+            const vcs = await window.api.getVesselClassifications(vessel.id)
+            setVesselClassificationIds(new Set((vcs || []).map((vc: any) => vc.classificationSocietyId)))
         } catch { /* ignore */ }
         try {
             const vt = await window.api.getVesselTypes()
@@ -315,10 +318,12 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
     const [editVesselType, setEditVesselType] = useState(vessel.vesselType || '')
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
+    const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
     const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
     const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
     const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
     const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
+    const [useCardDocs, setUseCardDocs] = useState(() => localStorage.getItem('vessel_doc_card_view') === '1')
     const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
     const [newCustomDocName, setNewCustomDocName] = useState('')
     const [showPoliciesModal, setShowPoliciesModal] = useState(false)
@@ -424,6 +429,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         vessel.classificationSociety = editClassification || undefined
         vessel.callSign = editCallSign || undefined
         vessel.flagStateId = selectedFlagStateId || undefined
+        await window.api.setVesselClassifications(vessel.id, [...vesselClassificationIds])
         setIsEditing(false)
         showSuccess('Vessel details updated')
         // Reload to refresh name history
@@ -544,19 +550,28 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         ))}
                                     </select>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Class:</span>
-                                    <select
-                                        value={editClassification}
-                                        onChange={e => setEditClassification(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', width: '160px' }}
-                                        aria-label="Classification society"
-                                    >
-                                        <option value="">No class</option>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', paddingTop: '4px', flexShrink: 0 }}>Class:</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '120px', overflowY: 'auto', paddingRight: '4px' }}>
                                         {classSocieties.map(cs => (
-                                            <option key={cs.id} value={cs.abbreviation || cs.name}>{cs.name}{cs.abbreviation ? ` (${cs.abbreviation})` : ''}</option>
+                                            <label key={cs.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={vesselClassificationIds.has(cs.id)}
+                                                    onChange={e => {
+                                                        setVesselClassificationIds(prev => {
+                                                            const next = new Set(prev)
+                                                            if (e.target.checked) next.add(cs.id)
+                                                            else next.delete(cs.id)
+                                                            return next
+                                                        })
+                                                    }}
+                                                    style={{ accentColor: 'var(--accent-primary)' }}
+                                                />
+                                                {cs.name}{cs.abbreviation ? ` (${cs.abbreviation})` : ''}
+                                            </label>
                                         ))}
-                                    </select>
+                                    </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Call Sign:</span>
@@ -596,13 +611,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 })()}
                             </h1>
                             <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
-                            {(vessel.builtYear || vessel.grossTonnage || vessel.vesselType || vessel.classificationSociety || vessel.callSign) && (
+                            {(vessel.builtYear || vessel.grossTonnage || vessel.vesselType || vesselClassificationIds.size > 0 || vessel.classificationSociety || vessel.callSign) && (
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
                                     {[
                                         vessel.builtYear && `Built ${vessel.builtYear}`,
                                         vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
                                         vessel.vesselType,
-                                        vessel.classificationSociety && `Class: ${vessel.classificationSociety}`,
+                                        vesselClassificationIds.size > 0
+                                            ? `Class: ${classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(' / ')}`
+                                            : (vessel.classificationSociety && `Class: ${vessel.classificationSociety}`),
                                         vessel.callSign && `Call Sign: ${vessel.callSign}`
                                     ].filter(Boolean).join(' · ')}
                                 </p>
@@ -627,7 +644,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             <button onClick={handleSaveVessel} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <CheckCircle size={18} /> Save Changes
                             </button>
-                            <button onClick={() => { setIsEditing(false); setEditName(vessel.name); setEditImo(vessel.imoNumber); setEditBuiltYear(vessel.builtYear?.toString() || ''); setEditGrossTonnage(vessel.grossTonnage?.toString() || ''); setEditVesselType(vessel.vesselType || ''); setEditClassification(vessel.classificationSociety || ''); setEditCallSign(vessel.callSign || ''); }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button onClick={async () => { setIsEditing(false); setEditName(vessel.name); setEditImo(vessel.imoNumber); setEditBuiltYear(vessel.builtYear?.toString() || ''); setEditGrossTonnage(vessel.grossTonnage?.toString() || ''); setEditVesselType(vessel.vesselType || ''); setEditClassification(vessel.classificationSociety || ''); setEditCallSign(vessel.callSign || ''); const vcs = await window.api.getVesselClassifications(vessel.id); setVesselClassificationIds(new Set((vcs || []).map((vc: any) => vc.classificationSocietyId))); }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 Cancel
                             </button>
                         </>
@@ -757,7 +774,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 display: 'flex',
                 gap: '0',
                 borderBottom: '2px solid var(--table-border)',
-                marginBottom: '16px'
+                marginBottom: '16px',
+                alignItems: 'center'
             }}>
                 {(['documents', 'assureds', 'surveys', 'policies', 'history'] as const).map(view => (
                     <button
@@ -791,9 +809,40 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         {view === 'assureds' ? 'Assured' : view.charAt(0).toUpperCase() + view.slice(1)}
                     </button>
                 ))}
+                {detailView === 'documents' && (
+                    <button
+                        onClick={() => {
+                            const next = !useCardDocs
+                            setUseCardDocs(next)
+                            localStorage.setItem('vessel_doc_card_view', next ? '1' : '0')
+                        }}
+                        title={useCardDocs ? 'Switch to table view' : 'Switch to card view'}
+                        style={{
+                            marginLeft: 'auto',
+                            marginBottom: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--glass-border)',
+                            borderRadius: '8px',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        {useCardDocs ? <List size={15} /> : <LayoutGrid size={15} />}
+                        {useCardDocs ? 'Table View' : 'Card View'}
+                    </button>
+                )}
             </div>
 
-            {detailView === 'documents' && <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+            {detailView === 'documents' && useCardDocs && (
+                <VesselDocumentsView vessel={vessel} onReload={loadData} />
+            )}
+
+            {detailView === 'documents' && !useCardDocs && <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
                     <caption className="sr-only">Document compliance</caption>
                     <thead>
@@ -1766,7 +1815,13 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 <div onClick={() => toggleCollapse(p.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', background: isCollapsed ? 'transparent' : 'rgba(0,210,255,0.03)' }}>
                                     <ChevronDown size={16} style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.2s', color: 'var(--text-secondary)' }} />
                                     <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.policyTypeName}</span>
-                                    {p.policyNumber && <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>#{p.policyNumber.replace(' (RENEWED - PLEASE VERIFY)', '')}</span>}
+                                    {(() => {
+                                        const headerNum = p.policyNumber ||
+                                            p.values?.find(v => /policy\s*(no\.?|num(ber)?)/i.test(v.characteristicName || '') && v.valueText)?.valueText
+                                        return headerNum
+                                            ? <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>#{headerNum.replace(' (RENEWED - PLEASE VERIFY)', '')}</span>
+                                            : null
+                                    })()}
                                     {p.conditionName && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{p.conditionName}</span>}
                                     <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: sc.bg, color: sc.color, fontWeight: '600', textTransform: 'uppercase' }}>{p.status}</span>
                                     {p.policyNumber && p.policyNumber.includes('RENEWED') && (

@@ -10,6 +10,7 @@ import type { ReportSettings } from '../../../shared/types'
 // ── Data model ────────────────────────────────────────────────────────────────
 
 interface LossPayment {
+  paymentType: string
   paidDate: string
   paidAmount: number
   reserves: number
@@ -20,7 +21,7 @@ interface LossClaim {
   claimId: string
   dateOfLoss: string
   policyId: string
-  damageType: string
+  damageType: string  // col H — same for all payments in this claim
   payments: LossPayment[]
   totalPaid: number
   totalReserves: number
@@ -86,10 +87,10 @@ function parseExcel(buffer: ArrayBuffer): LossUWY[] {
     const uwy = Number(row[6]) || 0
 
     const damageType = String(row[7] || '').trim()
-    const details = String(row[8] || '').trim()
-    const description = details && details !== damageType ? `${damageType} – ${details}` : damageType
+    const paymentType = String(row[8] || '').trim()
 
-    const paidDate = String(row[10] || '').trim()
+    const rawPaidDate = row[10]
+    const paidDate = typeof rawPaidDate === 'number' ? excelSerialToDate(rawPaidDate) : String(rawPaidDate || '').trim()
     const paidAmount = Number(row[11]) || 0
     const reserves = Number(row[12]) || 0
     const totalIncurred = Number(row[13]) || 0
@@ -102,13 +103,13 @@ function parseExcel(buffer: ArrayBuffer): LossUWY[] {
 
     if (!vesselData.claims.has(claimId)) {
       vesselData.claims.set(claimId, {
-        claimId, dateOfLoss, policyId, damageType: description,
+        claimId, dateOfLoss, policyId, damageType,
         payments: [], totalPaid: 0, totalReserves: 0, totalIncurred: 0
       })
     }
 
     const claim = vesselData.claims.get(claimId)!
-    claim.payments.push({ paidDate, paidAmount, reserves, totalIncurred })
+    claim.payments.push({ paymentType, paidDate, paidAmount, reserves, totalIncurred })
     claim.totalPaid += paidAmount
     claim.totalReserves += reserves
     claim.totalIncurred += totalIncurred
@@ -186,21 +187,21 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
   doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, titleY + 9)
 
   // ── Column layout ────────────────────────────────────────────────────────
-  // With reserves (default): Claim# | Date | Description | Paid | Reserves | Total = 182mm
-  //   16 | 20 | 56 | 30 | 30 | 30 = 182
-  // Without reserves:        Claim# | Date | Description | Paid | Total    = 182mm
-  //   16 | 20 | 72 | 34 | 40 = 182
+  // With reserves: Claim# | Date | Damage Type | Payment Type | Paid | Reserves | Total = 182mm
+  //   12 | 22 | 40 | 34 | 26 | 26 | 22 = 182
+  // Without reserves: Claim# | Date | Damage Type | Payment Type | Paid | Total = 182mm
+  //   12 | 22 | 48 | 40 | 30 | 30 = 182
 
   const showRes = opts.showReserves
-  const colCount = showRes ? 6 : 5
+  const colCount = showRes ? 7 : 6
 
   const colWidths = showRes
-    ? { claimId: 16, date: 20, desc: 56, paid: 30, res: 30, total: 30 }
-    : { claimId: 16, date: 20, desc: 72, paid: 34, total: 40 }
+    ? { claimId: 12, date: 22, dmg: 40, payType: 34, paid: 26, res: 26, total: 22 }
+    : { claimId: 12, date: 22, dmg: 48, payType: 40, paid: 30, total: 30 }
 
   const headRow = showRes
-    ? ['Claim #', 'Date of Loss', 'Description', `Paid (${cur})`, `Reserves (${cur})`, `Total Incurred (${cur})`]
-    : ['Claim #', 'Date of Loss', 'Description', `Paid (${cur})`, `Total Incurred (${cur})`]
+    ? ['Claim #', 'Date of Loss', 'Damage Type', 'Payment Type', `Paid (${cur})`, `Reserves (${cur})`, `Total Incurred (${cur})`]
+    : ['Claim #', 'Date of Loss', 'Damage Type', 'Payment Type', `Paid (${cur})`, `Total Incurred (${cur})`]
 
   const R: any = { halign: 'right' }
 
@@ -228,56 +229,60 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
 
       for (const claim of vessel.claims) {
         const multi = claim.payments.length > 1
-        const p0 = claim.payments[0]
 
         if (showRes) {
-          bodyRows.push([claim.claimId, claim.dateOfLoss, claim.damageType,
-            { content: fmtCur(p0.paidAmount), styles: R },
-            { content: fmtCur(p0.reserves), styles: R },
-            { content: fmtCur(p0.totalIncurred), styles: R }])
-          for (let i = 1; i < claim.payments.length; i++) {
+          // First payment row: show claimId, date, damageType, then per-payment cols
+          for (let i = 0; i < claim.payments.length; i++) {
             const p = claim.payments[i]
-            bodyRows.push(['', '',  '',
+            bodyRows.push([
+              i === 0 ? claim.claimId : '',
+              i === 0 ? claim.dateOfLoss : '',
+              i === 0 ? claim.damageType : '',
+              p.paymentType,
               { content: fmtCur(p.paidAmount), styles: R },
               { content: fmtCur(p.reserves), styles: R },
-              { content: fmtCur(p.totalIncurred), styles: R }])
+              { content: fmtCur(p.totalIncurred), styles: R },
+            ])
           }
           if (multi && opts.showClaimSubtotals) {
-            bodyRows.push(['', { content: `Claim ${claim.claimId} Total`, colSpan: 2, styles: { ...S.claimTotal, halign: 'right' as const } },
+            bodyRows.push(['', '', { content: `Claim ${claim.claimId} Total`, colSpan: 2, styles: { ...S.claimTotal, halign: 'right' as const } },
               { content: fmtCur(claim.totalPaid), styles: { ...S.claimTotal, ...R } },
               { content: fmtCur(claim.totalReserves), styles: { ...S.claimTotal, ...R } },
               { content: fmtCur(claim.totalIncurred), styles: { ...S.claimTotal, ...R } }])
           }
         } else {
-          bodyRows.push([claim.claimId, claim.dateOfLoss, claim.damageType,
-            { content: fmtCur(p0.paidAmount), styles: R },
-            { content: fmtCur(p0.totalIncurred), styles: R }])
-          for (let i = 1; i < claim.payments.length; i++) {
+          for (let i = 0; i < claim.payments.length; i++) {
             const p = claim.payments[i]
-            bodyRows.push(['', '', '',
+            bodyRows.push([
+              i === 0 ? claim.claimId : '',
+              i === 0 ? claim.dateOfLoss : '',
+              i === 0 ? claim.damageType : '',
+              p.paymentType,
               { content: fmtCur(p.paidAmount), styles: R },
-              { content: fmtCur(p.totalIncurred), styles: R }])
+              { content: fmtCur(p.totalIncurred), styles: R },
+            ])
           }
           if (multi && opts.showClaimSubtotals) {
-            bodyRows.push(['', { content: `Claim ${claim.claimId} Total`, colSpan: 2, styles: { ...S.claimTotal, halign: 'right' as const } },
+            bodyRows.push(['', '', { content: `Claim ${claim.claimId} Total`, colSpan: 2, styles: { ...S.claimTotal, halign: 'right' as const } },
               { content: fmtCur(claim.totalPaid), styles: { ...S.claimTotal, ...R } },
               { content: fmtCur(claim.totalIncurred), styles: { ...S.claimTotal, ...R } }])
           }
         }
       }
 
-      const vTotalCols = showRes ? colCount - 3 : colCount - 2
+      // colCount = 7 (with res) or 6 (without). Totals: span all except last 2 or 3
+      // With res: span 4 cols, then paid, res, total
+      // Without res: span 4 cols, then paid, total
       bodyRows.push([
-        { content: `${vessel.vesselName} Total`, colSpan: vTotalCols, styles: { ...S.vesselTotal, halign: 'right' as const } },
+        { content: `${vessel.vesselName} Total`, colSpan: colCount - (showRes ? 3 : 2), styles: { ...S.vesselTotal, halign: 'right' as const } },
         { content: fmtCur(vessel.totalPaid), styles: { ...S.vesselTotal, ...R } },
         ...(showRes ? [{ content: fmtCur(vessel.totalReserves), styles: { ...S.vesselTotal, ...R } }] : []),
         { content: fmtCur(vessel.totalIncurred), styles: { ...S.vesselTotal, ...R } },
       ])
     }
 
-    const uTotalCols = showRes ? colCount - 3 : colCount - 2
     bodyRows.push([
-      { content: `Underwriting Year ${uwy.year} Total`, colSpan: uTotalCols, styles: { ...S.uwyTotal, halign: 'right' as const } },
+      { content: `Underwriting Year ${uwy.year} Total`, colSpan: colCount - (showRes ? 3 : 2), styles: { ...S.uwyTotal, halign: 'right' as const } },
       { content: fmtCur(uwy.totalPaid), styles: { ...S.uwyTotal, ...R } },
       ...(showRes ? [{ content: fmtCur(uwy.totalReserves), styles: { ...S.uwyTotal, ...R } }] : []),
       { content: fmtCur(uwy.totalIncurred), styles: { ...S.uwyTotal, ...R } },
@@ -288,9 +293,8 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
     grandIncurred += uwy.totalIncurred
   }
 
-  const gTotalCols = showRes ? colCount - 3 : colCount - 2
   bodyRows.push([
-    { content: 'Grand Total', colSpan: gTotalCols, styles: { ...S.grandTotal, halign: 'right' as const } },
+    { content: 'Grand Total', colSpan: colCount - (showRes ? 3 : 2), styles: { ...S.grandTotal, halign: 'right' as const } },
     { content: fmtCur(grandPaid), styles: { ...S.grandTotal, ...R } },
     ...(showRes ? [{ content: fmtCur(grandReserves), styles: { ...S.grandTotal, ...R } }] : []),
     { content: fmtCur(grandIncurred), styles: { ...S.grandTotal, ...R } },
@@ -300,21 +304,24 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
   const startY = s.companySubtitle ? 64 : 60
 
   const numCol = { halign: 'right' as const, overflow: 'ellipsize' as const }
+  const w = colWidths as any
   const columnStyles: Record<number, any> = showRes
     ? {
-        0: { cellWidth: colWidths.claimId, halign: 'center' },
-        1: { cellWidth: colWidths.date, overflow: 'ellipsize' },
-        2: { cellWidth: (colWidths as any).desc },
-        3: { cellWidth: colWidths.paid, ...numCol },
-        4: { cellWidth: (colWidths as any).res, ...numCol },
-        5: { cellWidth: colWidths.total, ...numCol },
+        0: { cellWidth: w.claimId, halign: 'center' },
+        1: { cellWidth: w.date, overflow: 'ellipsize' },
+        2: { cellWidth: w.dmg },
+        3: { cellWidth: w.payType },
+        4: { cellWidth: w.paid, ...numCol },
+        5: { cellWidth: w.res, ...numCol },
+        6: { cellWidth: w.total, ...numCol },
       }
     : {
-        0: { cellWidth: colWidths.claimId, halign: 'center' },
-        1: { cellWidth: colWidths.date, overflow: 'ellipsize' },
-        2: { cellWidth: (colWidths as any).desc },
-        3: { cellWidth: colWidths.paid, ...numCol },
-        4: { cellWidth: colWidths.total, ...numCol },
+        0: { cellWidth: w.claimId, halign: 'center' },
+        1: { cellWidth: w.date, overflow: 'ellipsize' },
+        2: { cellWidth: w.dmg },
+        3: { cellWidth: w.payType },
+        4: { cellWidth: w.paid, ...numCol },
+        5: { cellWidth: w.total, ...numCol },
       }
 
   autoTable(doc, {

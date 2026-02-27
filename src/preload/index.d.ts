@@ -293,6 +293,7 @@ export interface Api {
   // Policy Expiry Alerts
   getExpiredActivePolicies: () => Promise<any[]>
   getPolicyRenewalsByMonth: (year: number, month: number) => Promise<any[]>
+  setQuotationSentDate: (policyId: string, date: string | null) => Promise<void>
 
   // Renewal Status Types
   getRenewalStatusTypes: () => Promise<any[]>

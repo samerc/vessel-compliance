@@ -827,6 +827,12 @@ export class MySQLAdapter {
                 )`)
             }
 
+            // Migration: Add quotation_sent_date to vessel_dynamic_policies
+            const [qsdCols] = await this.pool.query("SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'quotation_sent_date'")
+            if ((qsdCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN quotation_sent_date DATE NULL")
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -4195,6 +4201,14 @@ export class MySQLAdapter {
         await this.pool.execute(`UPDATE vessel_dynamic_policies SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
+    async setQuotationSentDate(policyId: string, date: string | null): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE vessel_dynamic_policies SET quotation_sent_date = ? WHERE id = ?',
+            [date || null, policyId]
+        )
+    }
+
     async deleteVesselDynamicPolicy(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM vessel_dynamic_policies WHERE id = ?', [id])
@@ -4249,6 +4263,7 @@ export class MySQLAdapter {
                     vdp.currency as currency,
                     vdp.renewal_status_id as renewalStatusId,
                     rst.name as renewalStatusName, rst.color as renewalStatusColor,
+                    vdp.quotation_sent_date as quotationSentDate,
                     COALESCE(rn.cnt, 0) as noteCount,
                     (SELECT vpv2.value_amount FROM vessel_policy_values vpv2
                      JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id

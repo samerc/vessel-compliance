@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { FileBarChart2 } from 'lucide-react'
 import LossRecordReport from './LossRecordReport'
+import CustomerComplianceReport from './CustomerComplianceReport'
 
-type ReportTab = 'loss-record'
+type ReportTab = 'loss-record' | 'customer-compliance'
 
-const TABS: { id: ReportTab; label: string; description: string }[] = [
-  { id: 'loss-record', label: 'Loss Record', description: 'Import an Excel loss record and export a formatted PDF report' }
+const TABS: { id: ReportTab; label: string }[] = [
+  { id: 'loss-record', label: 'Loss Record' },
+  { id: 'customer-compliance', label: 'Customer Compliance' },
 ]
 
 export default function Reports() {
@@ -46,6 +48,7 @@ export default function Reports() {
       </div>
 
       {activeTab === 'loss-record' && <LossRecordReport />}
+      {activeTab === 'customer-compliance' && <CustomerComplianceReport />}
     </div>
   )
 }
