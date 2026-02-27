@@ -8,6 +8,7 @@ import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 
 import { ReportService } from '../services/ReportService'
+import { ReportServiceV2 } from '../services/ReportServiceV2'
 import VesselDocumentsView from './VesselDocumentsView'
 import AssuredManager from './AssuredManager'
 import ConditionSurveyManager from './ConditionSurveyManager'
@@ -834,6 +835,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 gap: '8px',
                                                 background: 'transparent',
                                                 border: 'none',
+                                                borderBottom: '1px solid var(--glass-border)',
                                                 color: 'var(--text-primary)',
                                                 cursor: 'pointer',
                                                 fontSize: '0.85rem'
@@ -841,6 +843,25 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             className="hover-effect"
                                         >
                                             <FileText size={16} /> PDF Report
+                                        </button>
+                                        <button
+                                            onClick={() => { ReportServiceV2.exportVesselToPDF(vessel, docTypes, vesselDocs); setShowExportMenu(false); }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px 16px',
+                                                textAlign: 'left',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: 'var(--accent-primary)',
+                                                cursor: 'pointer',
+                                                fontSize: '0.85rem'
+                                            }}
+                                            className="hover-effect"
+                                        >
+                                            <FileText size={16} /> PDF Report (Pro)
                                         </button>
                                     </div>
                                 )}

@@ -76,7 +76,12 @@ export default function Dashboard({ onViewAlerts }: { onViewAlerts: () => void }
                     if (expiry < today) {
                         alerts.push({ vessel: v.name, vesselId: v.id, fleetId: v.fleetId, document: t.name, msg: 'Expired', type: 'expired', expiryDate: effectiveExpiry })
                     } else if (expiry < thirtyDaysFromNow) {
-                        alerts.push({ vessel: v.name, vesselId: v.id, fleetId: v.fleetId, document: t.name, msg: 'Expiring Soon', type: 'soon', expiryDate: effectiveExpiry })
+                        // Annual doc placed recently with short validity span → compliant, skip alert
+                        const isShortCycle = t.annualRenewal && doc?.receivedDate &&
+                            (new Date(effectiveExpiry).getTime() - new Date(doc.receivedDate).getTime()) / (1000 * 60 * 60 * 24) < 60
+                        if (!isShortCycle) {
+                            alerts.push({ vessel: v.name, vesselId: v.id, fleetId: v.fleetId, document: t.name, msg: 'Expiring Soon', type: 'soon', expiryDate: effectiveExpiry })
+                        }
                     } else if (expiry < ninetyDaysFromNow) {
                         alerts.push({ vessel: v.name, vesselId: v.id, fleetId: v.fleetId, document: t.name, msg: 'Expiring in 90 days', type: 'upcoming', expiryDate: effectiveExpiry })
                     }

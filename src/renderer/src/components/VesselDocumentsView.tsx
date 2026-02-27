@@ -22,12 +22,29 @@ const isExpiringSoon = (d: string | null | undefined) => {
   return exp >= today && exp <= threshold
 }
 
+// If the gap between receipt and expiry is < 60 days the document was placed knowing the
+// policy renews soon — treat it as compliant rather than "expiring soon".
+const annualShortCycle = (expiryDate: string | null | undefined, receivedDate: string | null | undefined) => {
+  if (!expiryDate || !receivedDate) return false
+  const span = (new Date(expiryDate).getTime() - new Date(receivedDate).getTime()) / (1000 * 60 * 60 * 24)
+  return span < 60
+}
+
 type DocStatus = 'compliant' | 'expiring' | 'expired' | 'missing' | 'optional'
 
-function getDocStatus(hasFile: boolean, expiryDate: string | null | undefined, required: boolean): DocStatus {
+function getDocStatus(
+  hasFile: boolean,
+  expiryDate: string | null | undefined,
+  required: boolean,
+  annualRenewal = false,
+  receivedDate?: string,
+): DocStatus {
   if (!hasFile) return required ? 'missing' : 'optional'
   if (isExpired(expiryDate)) return 'expired'
-  if (isExpiringSoon(expiryDate)) return 'expiring'
+  if (isExpiringSoon(expiryDate)) {
+    if (annualRenewal && annualShortCycle(expiryDate, receivedDate)) return 'compliant'
+    return 'expiring'
+  }
   return 'compliant'
 }
 
@@ -221,10 +238,14 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
     doc: VesselDocument | undefined,
     chips: React.ReactNode,
     isCustom = false,
+    annualRenewal = false,
+    description?: string,
   ) => {
     const hasFile = !!doc?.filePath
     const fileExists = fileStatus[id] !== false
-    const status: DocStatus = getDocStatus(hasFile && fileExists, doc?.expiryDate, required)
+    // Annual docs inherit the P&I policy expiry; fall back to the stored expiry date
+    const effectiveExpiry = annualRenewal ? (vessel.policyExpiryDate || doc?.expiryDate) : doc?.expiryDate
+    const status: DocStatus = getDocStatus(hasFile && fileExists, effectiveExpiry, required, annualRenewal, doc?.receivedDate)
     const meta = statusMeta[status]
     const isDragOver = dragOverId === id
 
@@ -251,13 +272,28 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               {name}
+              {annualRenewal && (
+                <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: isLight ? 'rgba(124,58,237,0.1)' : 'rgba(167,139,250,0.18)', color: isLight ? '#7c3aed' : '#a78bfa', fontWeight: '600' }}>
+                  Annual
+                </span>
+              )}
               {chips}
             </div>
-            {doc?.receivedDate && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
-                Received: {new Date(doc.receivedDate).toLocaleDateString()}
-              </div>
+            {description && (
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{description}</div>
             )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px', flexWrap: 'wrap' }}>
+              {doc?.receivedDate && (
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                  Received: {new Date(doc.receivedDate).toLocaleDateString()}
+                </span>
+              )}
+              {doc?.sent && (
+                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.12)', color: isLight ? '#0077a3' : 'var(--accent-primary)', fontWeight: '600' }}>
+                  Sent
+                </span>
+              )}
+            </div>
           </div>
           {/* Status badge */}
           <div style={{
@@ -268,14 +304,42 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
             color: meta.border,
           }}>
             {status === 'compliant' && <CheckCircle size={11} />}
-            {(status === 'missing' || status === 'expired') && <AlertCircle size={11} />}
-            {status === 'expiring' && <AlertCircle size={11} />}
+            {(status === 'missing' || status === 'expired' || status === 'expiring') && <AlertCircle size={11} />}
             {meta.label}
           </div>
         </div>
 
-        {/* Expiry row */}
-        {hasFile && !doc?.expiryDate && (
+        {/* Expiry row — annual docs show P&I policy date as informational; non-annual show editable input */}
+        {hasFile && annualRenewal && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Calendar size={12} color="var(--text-secondary)" />
+            {vessel.policyExpiryDate ? (
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                Expires with P&I ·{' '}
+                <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+                  {new Date(vessel.policyExpiryDate).toLocaleDateString()}
+                </span>
+              </span>
+            ) : doc?.expiryDate ? (
+              <input
+                type="date"
+                value={editingExpiry[id] !== undefined ? editingExpiry[id] : (doc.expiryDate || '')}
+                onFocus={() => setEditingExpiry(prev => ({ ...prev, [id]: doc.expiryDate || '' }))}
+                onChange={e => setEditingExpiry(prev => ({ ...prev, [id]: e.target.value }))}
+                onBlur={async e => {
+                  const val = e.target.value
+                  setEditingExpiry(prev => { const n = { ...prev }; delete n[id]; return n })
+                  if (val) { await window.api.updateVesselDocumentExpiry(vessel.id, id, val); loadData() }
+                }}
+                min="1900-01-01" max="2100-12-31"
+                style={{ fontSize: '0.78rem', padding: '3px 6px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
+              />
+            ) : (
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No P&I policy expiry set</span>
+            )}
+          </div>
+        )}
+        {hasFile && !annualRenewal && !doc?.expiryDate && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Calendar size={12} color="var(--text-secondary)" />
             <input
@@ -294,7 +358,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
             />
           </div>
         )}
-        {hasFile && doc?.expiryDate && (
+        {hasFile && !annualRenewal && doc?.expiryDate && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Calendar size={12} color="var(--text-secondary)" />
             <input
@@ -319,10 +383,16 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
             <button
               onClick={() => handleClickUpload(id)}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '500',
-                background: 'transparent', cursor: 'pointer',
-                border: `1px dashed ${isLight ? 'rgba(0,119,163,0.4)' : 'rgba(0,210,255,0.4)'}`,
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                padding: required ? '5px 14px' : '4px 10px',
+                borderRadius: '6px', fontSize: '0.78rem', fontWeight: required ? '600' : '500',
+                cursor: 'pointer',
+                background: required
+                  ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)')
+                  : 'transparent',
+                border: required
+                  ? `1px solid ${isLight ? 'rgba(0,119,163,0.5)' : 'rgba(0,210,255,0.4)'}`
+                  : `1px dashed ${isLight ? 'rgba(0,119,163,0.3)' : 'rgba(0,210,255,0.3)'}`,
                 color: isLight ? '#0077a3' : 'var(--accent-primary)',
               }}
             >
@@ -412,7 +482,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '10px' }}>
             {requiredDocTypes.map(t => {
               const doc = vesselDocs.find(d => d.documentTypeId === t.id)
-              return renderCard(t.id, t.name, true, doc, null)
+              return renderCard(t.id, t.name, true, doc, null, false, t.annualRenewal, t.description)
             })}
           </div>
         </div>
@@ -425,7 +495,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '10px' }}>
             {optionalDocTypes.map(t => {
               const doc = vesselDocs.find(d => d.documentTypeId === t.id)
-              return renderCard(t.id, t.name, false, doc, null)
+              return renderCard(t.id, t.name, false, doc, null, false, t.annualRenewal, t.description)
             })}
           </div>
         </div>

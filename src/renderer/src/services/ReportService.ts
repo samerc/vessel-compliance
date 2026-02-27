@@ -22,17 +22,29 @@ const isExpiringSoon = (expiryDate: string | null | undefined, days = 60): boole
   return expiry >= today && expiry <= threshold
 }
 
-const getDocStatus = (hasFile: boolean, expiryDate: string | null | undefined): string => {
+const annualShortCycle = (expiryDate: string | null | undefined, receivedDate: string | null | undefined): boolean => {
+  if (!expiryDate || !receivedDate) return false
+  const span = (new Date(expiryDate).getTime() - new Date(receivedDate).getTime()) / (1000 * 60 * 60 * 24)
+  return span < 60
+}
+
+const getDocStatus = (hasFile: boolean, expiryDate: string | null | undefined, annualRenewal = false, receivedDate?: string): string => {
   if (!hasFile) return 'Missing'
   if (isExpired(expiryDate)) return 'Expired'
-  if (isExpiringSoon(expiryDate)) return 'Expiring Soon'
+  if (isExpiringSoon(expiryDate)) {
+    if (annualRenewal && annualShortCycle(expiryDate, receivedDate)) return 'Compliant'
+    return 'Expiring Soon'
+  }
   return 'Compliant'
 }
 
-const getExcelDocStatus = (hasFile: boolean, expiryDate: string | null | undefined): string => {
+const getExcelDocStatus = (hasFile: boolean, expiryDate: string | null | undefined, annualRenewal = false, receivedDate?: string): string => {
   if (!hasFile) return 'MISSING'
   if (isExpired(expiryDate)) return 'EXPIRED'
-  if (isExpiringSoon(expiryDate)) return 'EXPIRING SOON'
+  if (isExpiringSoon(expiryDate)) {
+    if (annualRenewal && annualShortCycle(expiryDate, receivedDate)) return 'COMPLIANT'
+    return 'EXPIRING SOON'
+  }
   return 'COMPLIANT'
 }
 
@@ -66,7 +78,7 @@ export const ReportService = {
         complianceData.push({
           'Document Name': type.name + (!isRequired ? ' (Optional)' : ''),
           'Description': type.description || '',
-          'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry),
+          'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry, type.annualRenewal, doc?.receivedDate),
           'Date of Receipt': doc?.receivedDate || 'N/A',
           'Expiry Date': expiryToShow,
           'Uploaded Date': doc?.uploadedDate ? new Date(doc.uploadedDate).toLocaleDateString() : 'N/A'
@@ -273,7 +285,7 @@ export const ReportService = {
         tableData.push([
           type.name + (!isRequired ? ' (Optional)' : ''),
           type.description || '',
-          getDocStatus(!!vDoc?.filePath, resolvedExpiry),
+          getDocStatus(!!vDoc?.filePath, resolvedExpiry, type.annualRenewal, vDoc?.receivedDate),
           pdfExpiryToShow
         ])
       }
@@ -598,7 +610,7 @@ export const ReportService = {
             'IMO': v.imoNumber,
             'Document Name': type.name,
             'Description': type.description || '',
-            'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry),
+            'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry, type.annualRenewal, doc?.receivedDate),
             'Date of Receipt': doc?.receivedDate || 'N/A',
             'Expiry Date': expiryToShow
           })
@@ -843,7 +855,7 @@ export const ReportService = {
           tableData.push([
             v.name,
             type.name,
-            getDocStatus(!!vDoc?.filePath, resolvedExpiry),
+            getDocStatus(!!vDoc?.filePath, resolvedExpiry, type.annualRenewal, vDoc?.receivedDate),
             fleetPdfExpiry
           ])
         }
