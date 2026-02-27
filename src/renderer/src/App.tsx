@@ -357,22 +357,19 @@ function NavItem({
   onClick: () => void
   sidebarCollapsed: boolean
 }) {
-  const base: React.CSSProperties = {
-    display: 'flex', alignItems: 'center',
-    borderRadius: '8px', cursor: 'pointer',
-    background: active ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-    transition: 'var(--transition)', border: 'none',
-    fontFamily: 'inherit',
-  }
-
   if (sidebarCollapsed) {
     return (
       <button
         onClick={onClick}
         aria-current={active ? 'page' : undefined}
         title={label}
-        style={{ ...base, justifyContent: 'center', width: '100%', padding: '8px' }}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '100%', padding: '8px', border: 'none', borderRadius: '8px',
+          background: active ? 'rgba(var(--accent-primary-rgb, 0,210,255), 0.15)' : 'transparent',
+          color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+          cursor: 'pointer', transition: 'var(--transition)', fontFamily: 'inherit',
+        }}
         className={!active ? 'hover-effect' : ''}
       >
         {icon}
@@ -384,11 +381,21 @@ function NavItem({
     <button
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      style={{ ...base, gap: '10px', padding: '7px 10px', width: '100%', textAlign: 'left', fontSize: '0.85rem' }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        padding: '7px 10px', width: '100%', textAlign: 'left', fontSize: '0.85rem',
+        border: 'none',
+        borderLeft: active ? '3px solid var(--accent-primary)' : '3px solid transparent',
+        borderRadius: active ? '0 8px 8px 0' : '8px',
+        background: active ? 'rgba(var(--accent-primary-rgb, 0,210,255), 0.1)' : 'transparent',
+        color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+        fontWeight: active ? '600' : '400',
+        cursor: 'pointer', transition: 'var(--transition)', fontFamily: 'inherit',
+      }}
       className={!active ? 'hover-effect' : ''}
     >
       {icon}
-      <span style={{ fontWeight: active ? '600' : '400' }}>{label}</span>
+      <span>{label}</span>
     </button>
   )
 }
