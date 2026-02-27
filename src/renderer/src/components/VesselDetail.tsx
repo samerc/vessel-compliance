@@ -18,9 +18,10 @@ interface VesselDetailProps {
     onBack: () => void
     backLabel?: string
     initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history'
+    initialEditing?: boolean
 }
 
-export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels', initialSection }: VesselDetailProps) {
+export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels', initialSection, initialEditing = false }: VesselDetailProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
     const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -292,7 +293,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         if (path) window.api.fsOpen(path)
     }
 
-    const [isEditing, setIsEditing] = useState(false)
+    const [isEditing, setIsEditing] = useState(initialEditing)
     const [editName, setEditName] = useState(vessel.name)
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
@@ -320,6 +321,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
     const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
     const [classDropdownOpen, setClassDropdownOpen] = useState(false)
+    const [classSearch, setClassSearch] = useState('')
+    const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
+    const [flagSearch, setFlagSearch] = useState('')
     const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
     const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
     const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
@@ -559,8 +563,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         {/* Trigger button */}
                                         <button
                                             type="button"
-                                            onClick={() => setClassDropdownOpen(o => !o)}
-                                            onBlur={e => { if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) setTimeout(() => setClassDropdownOpen(false), 150) }}
+                                            onClick={() => { if (classDropdownOpen) setClassSearch(''); setClassDropdownOpen(o => !o) }}
+                                            onBlur={e => { if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) setTimeout(() => { setClassDropdownOpen(false); setClassSearch('') }, 150) }}
                                             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', cursor: 'pointer', minWidth: '220px', justifyContent: 'space-between' }}
                                         >
                                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
@@ -572,37 +576,54 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         </button>
                                         {/* Dropdown list */}
                                         {classDropdownOpen && (
-                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', maxHeight: '220px', overflowY: 'auto' }}>
-                                                {classSocieties.map(cs => {
-                                                    const checked = vesselClassificationIds.has(cs.id)
-                                                    return (
-                                                        <div
-                                                            key={cs.id}
-                                                            onMouseDown={e => {
-                                                                e.preventDefault()
-                                                                setVesselClassificationIds(prev => {
-                                                                    const next = new Set(prev)
-                                                                    if (checked) next.delete(cs.id); else next.add(cs.id)
-                                                                    return next
-                                                                })
-                                                            }}
-                                                            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                readOnly
-                                                                checked={checked}
-                                                                style={{ accentColor: 'var(--accent-primary)', pointerEvents: 'none', flexShrink: 0 }}
-                                                            />
-                                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                                                                {cs.abbreviation ? <><strong>{cs.abbreviation}</strong> – {cs.name}</> : cs.name}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                })}
-                                                {classSocieties.length === 0 && (
-                                                    <div style={{ padding: '10px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No classification societies defined</div>
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', maxHeight: '264px', display: 'flex', flexDirection: 'column' }}>
+                                                {classSocieties.length > 6 && (
+                                                    <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--table-border)', flexShrink: 0 }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search…"
+                                                            value={classSearch}
+                                                            onChange={e => setClassSearch(e.target.value)}
+                                                            onMouseDown={e => e.stopPropagation()}
+                                                            autoFocus
+                                                            style={{ width: '100%', padding: '4px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)', fontSize: '0.8rem', boxSizing: 'border-box', outline: 'none' }}
+                                                        />
+                                                    </div>
                                                 )}
+                                                <div style={{ overflowY: 'auto', flex: 1 }}>
+                                                    {(() => {
+                                                        const filtered = classSearch.trim()
+                                                            ? classSocieties.filter(cs => cs.name.toLowerCase().includes(classSearch.toLowerCase()) || cs.abbreviation?.toLowerCase().includes(classSearch.toLowerCase()))
+                                                            : classSocieties
+                                                        if (filtered.length === 0) return (
+                                                            <div style={{ padding: '10px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                                                {classSearch ? 'No matches' : 'No classification societies defined'}
+                                                            </div>
+                                                        )
+                                                        return filtered.map(cs => {
+                                                            const checked = vesselClassificationIds.has(cs.id)
+                                                            return (
+                                                                <div
+                                                                    key={cs.id}
+                                                                    onMouseDown={e => {
+                                                                        e.preventDefault()
+                                                                        setVesselClassificationIds(prev => {
+                                                                            const next = new Set(prev)
+                                                                            if (checked) next.delete(cs.id); else next.add(cs.id)
+                                                                            return next
+                                                                        })
+                                                                    }}
+                                                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
+                                                                >
+                                                                    <input type="checkbox" readOnly checked={checked} style={{ accentColor: 'var(--accent-primary)', pointerEvents: 'none', flexShrink: 0 }} />
+                                                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                                                        {cs.abbreviation ? <><strong>{cs.abbreviation}</strong> – {cs.name}</> : cs.name}
+                                                                    </span>
+                                                                </div>
+                                                            )
+                                                        })
+                                                    })()}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -613,17 +634,61 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Flag:</span>
-                                    <select
-                                        value={selectedFlagStateId}
-                                        onChange={e => setSelectedFlagStateId(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                                        aria-label="Flag state"
+                                    <div
+                                        style={{ position: 'relative' }}
+                                        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setFlagDropdownOpen(false); setFlagSearch('') } }}
                                     >
-                                        <option value="">No flag</option>
-                                        {flagStates.map(fs => (
-                                            <option key={fs.id} value={fs.id}>{fs.name} ({fs.iso3Code})</option>
-                                        ))}
-                                    </select>
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (flagDropdownOpen) setFlagSearch(''); setFlagDropdownOpen(o => !o) }}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', color: selectedFlagStateId ? 'var(--text-primary)' : 'var(--text-secondary)', border: '1px solid var(--input-border)', cursor: 'pointer', minWidth: '180px', justifyContent: 'space-between' }}
+                                        >
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
+                                                {selectedFlagStateId ? (flagStates.find(f => f.id === selectedFlagStateId)?.name || 'Unknown') : 'No flag'}
+                                            </span>
+                                            <ChevronDown size={13} style={{ flexShrink: 0, transform: flagDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                                        </button>
+                                        {flagDropdownOpen && (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', maxHeight: '264px', display: 'flex', flexDirection: 'column' }}>
+                                                <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--table-border)', flexShrink: 0 }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search flags…"
+                                                        value={flagSearch}
+                                                        onChange={e => setFlagSearch(e.target.value)}
+                                                        onMouseDown={e => e.stopPropagation()}
+                                                        autoFocus
+                                                        style={{ width: '100%', padding: '4px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)', fontSize: '0.8rem', boxSizing: 'border-box', outline: 'none' }}
+                                                    />
+                                                </div>
+                                                <div style={{ overflowY: 'auto', flex: 1 }}>
+                                                    <div
+                                                        onMouseDown={e => { e.preventDefault(); setSelectedFlagStateId(''); setFlagDropdownOpen(false); setFlagSearch('') }}
+                                                        style={{ display: 'flex', alignItems: 'center', padding: '7px 12px', cursor: 'pointer', background: !selectedFlagStateId ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
+                                                    >
+                                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No flag</span>
+                                                    </div>
+                                                    {flagStates
+                                                        .filter(fs => !flagSearch.trim() || fs.name.toLowerCase().includes(flagSearch.toLowerCase()) || fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase()))
+                                                        .map(fs => (
+                                                            <div
+                                                                key={fs.id}
+                                                                onMouseDown={e => { e.preventDefault(); setSelectedFlagStateId(fs.id); setFlagDropdownOpen(false); setFlagSearch('') }}
+                                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 12px', cursor: 'pointer', background: selectedFlagStateId === fs.id ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
+                                                            >
+                                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                                                    {fs.name} <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>({fs.iso3Code})</span>
+                                                                </span>
+                                                            </div>
+                                                        ))
+                                                    }
+                                                    {flagSearch.trim() && flagStates.filter(fs => fs.name.toLowerCase().includes(flagSearch.toLowerCase()) || fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase())).length === 0 && (
+                                                        <div style={{ padding: '10px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No matches</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                     <button
                                         onClick={() => setShowAddFlagModal(true)}
                                         title="Add new flag state"

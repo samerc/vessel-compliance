@@ -25,6 +25,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
+    const [openInEditMode, setOpenInEditMode] = useState(false)
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
@@ -173,6 +174,8 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
             setNewVessel({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' })
             showSuccess(`Vessel "${vessel.name}" registered successfully`)
             loadData()
+            setOpenInEditMode(true)
+            setSelectedVessel(vessel)
 
             // Show modal if potential matches found
             if (scanResult.matchFound && scanResult.matches.length > 0) {
@@ -394,10 +397,10 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
 
     if (selectedVessel) {
         const handleBack = navigatedExternally && onNavigateBack
-            ? () => { onNavigateBack(); setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false) }
-            : () => { setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); loadData() }
+            ? () => { onNavigateBack(); setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); setOpenInEditMode(false) }
+            : () => { setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); setOpenInEditMode(false); loadData() }
         const backLabel = navigatedExternally && navigateBackLabel ? navigateBackLabel : 'Back to Vessels'
-        return <VesselDetail vessel={selectedVessel} backLabel={backLabel} onBack={handleBack} initialSection={appliedSection} />
+        return <VesselDetail vessel={selectedVessel} backLabel={backLabel} onBack={handleBack} initialSection={appliedSection} initialEditing={openInEditMode} />
     }
 
     return (
