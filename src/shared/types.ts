@@ -593,6 +593,7 @@ export interface InstalmentDefaults {
 export interface VesselType {
   id: string
   name: string
+  description?: string
   order: number
 }
 

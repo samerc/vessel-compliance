@@ -547,7 +547,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     >
                                         <option value="">No type</option>
                                         {vesselTypes.map(vt => (
-                                            <option key={vt.id} value={vt.name}>{vt.name}</option>
+                                            <option key={vt.id} value={vt.name}>
+                                                {vt.description ? `${vt.name} – ${vt.description}` : vt.name}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
@@ -570,7 +572,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         </button>
                                         {/* Dropdown list */}
                                         {classDropdownOpen && (
-                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', overflow: 'hidden' }}>
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', maxHeight: '220px', overflowY: 'auto' }}>
                                                 {classSocieties.map(cs => {
                                                     const checked = vesselClassificationIds.has(cs.id)
                                                     return (
@@ -648,7 +650,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     {[
                                         vessel.builtYear && `Built ${vessel.builtYear}`,
                                         vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
-                                        vessel.vesselType,
+                                        vessel.vesselType && (() => { const vt = vesselTypes.find(t => t.name === vessel.vesselType); return vt?.description ? `${vt.name} (${vt.description})` : vt?.name || vessel.vesselType })(),
                                         vesselClassificationIds.size > 0
                                             ? `Class: ${classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(' / ')}`
                                             : (vessel.classificationSociety && `Class: ${vessel.classificationSociety}`),

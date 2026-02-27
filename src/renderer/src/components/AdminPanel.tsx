@@ -4,7 +4,20 @@ import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 
-export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?: (vesselId: string) => void }) {
+// ── Section definitions ────────────────────────────────────────────────────────
+const GRANTABLE_SECTIONS = [
+    { id: 'docTypes',      label: 'Document Types' },
+    { id: 'roles',         label: 'Assured Roles' },
+    { id: 'surveyTypes',   label: 'Survey Types' },
+    { id: 'vesselTypes',   label: 'Vessel Types' },
+    { id: 'classSocieties',label: 'Classification Societies' },
+    { id: 'policyTypes',   label: 'Policy Types' },
+    { id: 'compliance',    label: 'Compliance Schedule' },
+    { id: 'reminders',     label: 'Vessel Reminders' },
+    { id: 'reportSettings',label: 'Report Settings' },
+]
+
+export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: boolean; onNavigateToVessel?: (vesselId: string) => void }) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newName, setNewName] = useState('')
     const [newDescription, setNewDescription] = useState('')
@@ -34,7 +47,10 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [savingCompliance, setSavingCompliance] = useState(false)
     const [runningManualCheck, setRunningManualCheck] = useState(false)
 
-    // Collapsible sections
+    // Sidebar navigation
+    const [activeSection, setActiveSection] = useState<string>('docTypes')
+    const [userSectionAccess, setUserSectionAccess] = useState<string[]>([])
+
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
     const [newPolicyType, setNewPolicyType] = useState('')
     const [editingPolicyTypeId, setEditingPolicyTypeId] = useState<string | null>(null)
@@ -53,8 +69,10 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     // Vessel Types
     const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
     const [newVesselTypeName, setNewVesselTypeName] = useState('')
+    const [newVesselTypeDescription, setNewVesselTypeDescription] = useState('')
     const [editingVesselTypeId, setEditingVesselTypeId] = useState<string | null>(null)
     const [editVesselTypeName, setEditVesselTypeName] = useState('')
+    const [editVesselTypeDescription, setEditVesselTypeDescription] = useState('')
 
     // Policy type characteristics and conditions
     const [expandedPolicyTypeId, setExpandedPolicyTypeId] = useState<string | null>(null)
@@ -68,16 +86,6 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const [reportSettings, setReportSettings] = useState<ReportSettings>(REPORT_SETTINGS_DEFAULTS)
     const [savingReportSettings, setSavingReportSettings] = useState(false)
 
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['docTypes', 'roles', 'surveyTypes', 'vesselTypes', 'classSocieties', 'policyTypes', 'compliance', 'reminders', 'reportSettings', 'fileTypes', 'dbConfig', 'dangerZone']))
-    const toggleSection = (id: string) => {
-        setCollapsedSections(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) next.delete(id)
-            else next.add(id)
-            return next
-        })
-    }
-
     // Reminder settings state
     const DEFAULT_TEMPLATE = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
     const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ periodDays: 7, reminderTemplate: DEFAULT_TEMPLATE })
@@ -90,7 +98,17 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         loadComplianceSettings()
         loadReminderSettings()
         loadReportSettings()
+        window.api.getUserSectionAccess().then(setUserSectionAccess).catch(() => {})
     }, [])
+
+    const handleToggleUserSection = async (sectionId: string) => {
+        const next = userSectionAccess.includes(sectionId)
+            ? userSectionAccess.filter(id => id !== sectionId)
+            : [...userSectionAccess, sectionId]
+        setUserSectionAccess(next)
+        await window.api.setUserSectionAccess(next)
+        showSuccess('User access updated')
+    }
 
     const loadConfigPath = async () => {
         const path = await window.api.setupGetConfigPath()
@@ -273,8 +291,9 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
     const handleAddVesselType = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newVesselTypeName.trim()) return
-        await window.api.addVesselType({ name: newVesselTypeName.trim(), order: vesselTypes.length })
+        await window.api.addVesselType({ name: newVesselTypeName.trim(), description: newVesselTypeDescription.trim() || undefined, order: vesselTypes.length })
         setNewVesselTypeName('')
+        setNewVesselTypeDescription('')
         loadVesselTypes()
         showSuccess('Vessel type added')
     }
@@ -297,7 +316,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
 
     const saveVesselTypeEdit = async (id: string) => {
         if (!editVesselTypeName.trim()) return
-        await window.api.updateVesselType(id, { name: editVesselTypeName.trim() })
+        await window.api.updateVesselType(id, { name: editVesselTypeName.trim(), description: editVesselTypeDescription.trim() || undefined })
         setEditingVesselTypeId(null)
         loadVesselTypes()
         showSuccess('Vessel type updated')
@@ -731,24 +750,97 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
         )
     }
 
-    return (
-        <div className="fade-in">
-            <header style={{ marginBottom: '32px' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Admin Panel</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Configure global document types, their display order, and assured roles.</p>
-            </header>
+    // Sections visible in sidebar
+    const sidebarSections: { id: string; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
+        ...(isAdmin ? [{ id: 'userAccess', label: 'User Access', icon: <UserCheck size={16} />, adminOnly: true }] : []),
+        ...(isAdmin || userSectionAccess.includes('docTypes') ? [{ id: 'docTypes', label: 'Document Types', icon: <FileText size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('roles') ? [{ id: 'roles', label: 'Assured Roles', icon: <UserCheck size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('surveyTypes') ? [{ id: 'surveyTypes', label: 'Survey Types', icon: <ClipboardCheck size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('vesselTypes') ? [{ id: 'vesselTypes', label: 'Vessel Types', icon: <Ship size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('classSocieties') ? [{ id: 'classSocieties', label: 'Classification Societies', icon: <Tag size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('policyTypes') ? [{ id: 'policyTypes', label: 'Policy Types', icon: <Shield size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('compliance') ? [{ id: 'compliance', label: 'Compliance Schedule', icon: <Clock size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('reminders') ? [{ id: 'reminders', label: 'Vessel Reminders', icon: <Bell size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('reportSettings') ? [{ id: 'reportSettings', label: 'Report Settings', icon: <FileText size={16} /> }] : []),
+        ...(isAdmin ? [
+            { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
+            { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
+            { id: 'dangerZone', label: 'Danger Zone', icon: <Trash2 size={16} />, adminOnly: true },
+        ] : []),
+    ]
 
+    // Auto-select first visible section if activeSection not visible
+    const visibleIds = sidebarSections.map(s => s.id)
+    const effectiveSection = visibleIds.includes(activeSection) ? activeSection : (visibleIds[0] || '')
+
+    return (
+        <div className="fade-in" style={{ display: 'flex', height: 'calc(100vh - 60px)', margin: '-24px', overflow: 'hidden' }}>
+            {/* ── Left sidebar ── */}
+            <aside style={{ width: '220px', flexShrink: 0, background: 'var(--bg-sidebar)', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--glass-border)' }}>
+                    <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>Settings</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{isAdmin ? 'Administrator' : 'User'}</div>
+                </div>
+                <nav style={{ flex: 1, padding: '8px 0' }}>
+                    {sidebarSections.map(sec => (
+                        <button
+                            key={sec.id}
+                            onClick={() => setActiveSection(sec.id)}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                                padding: '9px 16px', width: '100%', textAlign: 'left',
+                                background: effectiveSection === sec.id ? 'rgba(var(--accent-primary-rgb, 0,210,255),0.1)' : 'transparent',
+                                border: 'none', borderLeft: effectiveSection === sec.id ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                                color: effectiveSection === sec.id ? 'var(--accent-primary)' : sec.adminOnly ? 'var(--text-secondary)' : 'var(--text-primary)',
+                                fontWeight: effectiveSection === sec.id ? '600' : '400',
+                                fontSize: '0.82rem', cursor: 'pointer',
+                                opacity: sec.adminOnly && sec.id !== 'userAccess' ? 0.7 : 1,
+                            }}
+                        >
+                            {sec.icon}
+                            {sec.label}
+                        </button>
+                    ))}
+                </nav>
+            </aside>
+
+            {/* ── Content area ── */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+
+            {/* User Access - admin only */}
+            {effectiveSection === 'userAccess' && isAdmin && (
+                <section className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+                    <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <UserCheck size={20} color="var(--accent-primary)" /> User Access Control
+                    </h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                        Choose which settings sections are visible to regular users. Admins always see all sections.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '480px' }}>
+                        {GRANTABLE_SECTIONS.map(sec => (
+                            <label key={sec.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--table-border)', cursor: 'pointer', background: userSectionAccess.includes(sec.id) ? 'rgba(var(--accent-primary-rgb,0,210,255),0.06)' : 'transparent' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={userSectionAccess.includes(sec.id)}
+                                    onChange={() => handleToggleUserSection(sec.id)}
+                                    style={{ accentColor: 'var(--accent-primary)', width: '16px', height: '16px', flexShrink: 0 }}
+                                />
+                                <div>
+                                    <div style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-primary)' }}>{sec.label}</div>
+                                </div>
+                            </label>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* 1. Document Types */}
+            {effectiveSection === 'docTypes' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('docTypes')}
-                    style={{ marginBottom: collapsedSections.has('docTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('docTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileText size={20} color="var(--accent-primary)" /> Document Types
                 </h3>
-                {!collapsedSections.has('docTypes') && <><form onSubmit={handleAddDocType} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                <form onSubmit={handleAddDocType} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
                     <div style={{ flex: '1 1 300px' }}>
                         <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name</label>
                         <input
@@ -895,19 +987,16 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             </tbody>
                         </table>
                     </div>
-                </>}
             </section>
+            )}
 
             {/* 2. Assured Roles */}
+            {effectiveSection === 'roles' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('roles')}
-                    style={{ marginBottom: collapsedSections.has('roles') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('roles') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <UserCheck size={20} color="var(--accent-primary)" /> Assured Roles
                 </h3>
-                {!collapsedSections.has('roles') && <><form onSubmit={handleAddRole} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                <form onSubmit={handleAddRole} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
                     <input
                         type="text"
                         value={newRole}
@@ -996,19 +1085,16 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             </tbody>
                         </table>
                     </div>
-                </>}
             </section>
+            )}
 
             {/* 3. Condition Survey Types */}
+            {effectiveSection === 'surveyTypes' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('surveyTypes')}
-                    style={{ marginBottom: collapsedSections.has('surveyTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('surveyTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <ClipboardCheck size={20} color="var(--accent-primary)" /> Condition Survey Types
                 </h3>
-                {!collapsedSections.has('surveyTypes') && <><form onSubmit={handleAddSurveyType} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                <form onSubmit={handleAddSurveyType} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
                     <input
                         type="text"
                         value={newSurveyType}
@@ -1043,19 +1129,16 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             </tbody>
                         </table>
                     </div>
-                </>}
             </section>
+            )}
 
             {/* 4. Sanctions Check Scheduler */}
+            {effectiveSection === 'compliance' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('compliance')}
-                    style={{ marginBottom: collapsedSections.has('compliance') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('compliance') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={20} color="var(--accent-primary)" /> Scheduled Compliance Check
                 </h3>
-                {!collapsedSections.has('compliance') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     Automatically check all entities and vessels against sanctions lists on a weekly schedule.
                 </p>
 
@@ -1205,19 +1288,16 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                         Matches above {complianceSettings.threshold}% confidence will be flagged as "Potential Match" for review.
                         Results can be viewed in the Compliance Center.
                     </div>
-                </>}
             </section>
+            )}
 
             {/* 4. Vessel Reminder Settings */}
+            {effectiveSection === 'reminders' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('reminders')}
-                    style={{ marginBottom: collapsedSections.has('reminders') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('reminders') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Bell size={20} color="var(--accent-primary)" /> Vessel Reminder Settings
                 </h3>
-                {!collapsedSections.has('reminders') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     Configure the snooze period and copy-to-clipboard template for document reminders.
                 </p>
 
@@ -1262,19 +1342,15 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             Save Settings
                         </button>
                     </div>
-                </>}
             </section>
+            )}
 
             {/* Report Settings */}
+            {effectiveSection === 'reportSettings' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('reportSettings')}
-                    style={{ marginBottom: collapsedSections.has('reportSettings') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('reportSettings') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileText size={20} color="var(--accent-primary)" /> Report Settings
                 </h3>
-                {!collapsedSections.has('reportSettings') && <>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                         Configure branding settings applied to all generated PDF reports.
                     </p>
@@ -1336,19 +1412,16 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             Save Settings
                         </button>
                     </div>
-                </>}
             </section>
+            )}
 
             {/* 5. File Types */}
+            {effectiveSection === 'fileTypes' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('fileTypes')}
-                    style={{ marginBottom: collapsedSections.has('fileTypes') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('fileTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Shield size={20} color="var(--accent-primary)" /> File Upload Security
                 </h3>
-                {!collapsedSections.has('fileTypes') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     Control which file types users can upload for vessel documents and passport/ID files.
                 </p>
 
@@ -1494,19 +1567,16 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             </div>
                         </div>
                     </div>
-                </>}
             </section>
+            )}
 
             {/* 6. Database Configuration */}
+            {effectiveSection === 'dbConfig' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('dbConfig')}
-                    style={{ marginBottom: collapsedSections.has('dbConfig') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('dbConfig') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Database size={20} color="var(--accent-primary)" /> Database Configuration
                 </h3>
-                {!collapsedSections.has('dbConfig') && <><p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     View and manage the MySQL database connection settings.
                 </p>
 
@@ -1539,24 +1609,21 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                     <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                         Changing database configuration will reload the application. Make sure all work is saved.
                     </div>
-                </>}
             </section>
+            )}
 
             {/* 7. Vessel Types */}
+            {effectiveSection === 'vesselTypes' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('vesselTypes')}
-                    style={{ marginBottom: collapsedSections.has('vesselTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('vesselTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Ship size={20} color="var(--accent-primary)" /> Vessel Types
                 </h3>
-                {!collapsedSections.has('vesselTypes') && <>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
                         Manage vessel types (e.g. Bulk Carrier, Container Ship, Tanker).
                     </p>
-                    <form onSubmit={handleAddVesselType} style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-                        <input type="text" value={newVesselTypeName} onChange={e => setNewVesselTypeName(e.target.value)} placeholder="Vessel type name" style={{ flex: 1 }} aria-label="Vessel type name" />
+                    <form onSubmit={handleAddVesselType} style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                        <input type="text" value={newVesselTypeName} onChange={e => setNewVesselTypeName(e.target.value)} placeholder="Short name (e.g. BC)" style={{ width: '140px' }} aria-label="Vessel type name" />
+                        <input type="text" value={newVesselTypeDescription} onChange={e => setNewVesselTypeDescription(e.target.value)} placeholder="Full name (e.g. Bulk Carrier)" style={{ flex: 1, minWidth: '200px' }} aria-label="Vessel type description" />
                         <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Plus size={18} /> Add
                         </button>
@@ -1568,7 +1635,8 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                 <thead>
                                     <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                         <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
-                                        <th scope="col" style={{ padding: '16px' }}>Name</th>
+                                        <th scope="col" style={{ padding: '16px', width: '120px' }}>Name</th>
+                                        <th scope="col" style={{ padding: '16px' }}>Full Name / Description</th>
                                         <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                                     </tr>
                                 </thead>
@@ -1584,10 +1652,15 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                                     <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{index + 1}</span>
                                                 </div>
                                             </td>
-                                            <td style={{ padding: '16px' }}>
+                                            <td style={{ padding: '16px', fontFamily: 'monospace', fontWeight: '600', fontSize: '0.9rem' }}>
                                                 {editingVesselTypeId === vt.id ? (
-                                                    <input type="text" value={editVesselTypeName} onChange={e => setEditVesselTypeName(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveVesselTypeEdit(vt.id)} autoFocus style={{ width: '100%' }} />
+                                                    <input type="text" value={editVesselTypeName} onChange={e => setEditVesselTypeName(e.target.value)} autoFocus style={{ width: '100px' }} />
                                                 ) : vt.name}
+                                            </td>
+                                            <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                                                {editingVesselTypeId === vt.id ? (
+                                                    <input type="text" value={editVesselTypeDescription} onChange={e => setEditVesselTypeDescription(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveVesselTypeEdit(vt.id)} placeholder="Full name" style={{ width: '100%' }} />
+                                                ) : (vt.description || <span style={{ opacity: 0.4, fontStyle: 'italic' }}>—</span>)}
                                             </td>
                                             <td style={{ padding: '16px', textAlign: 'right' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -1598,7 +1671,7 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <button onClick={() => { setEditingVesselTypeId(vt.id); setEditVesselTypeName(vt.name) }} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }} aria-label="Edit"><Edit3 size={18} /></button>
+                                                            <button onClick={() => { setEditingVesselTypeId(vt.id); setEditVesselTypeName(vt.name); setEditVesselTypeDescription(vt.description || '') }} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }} aria-label="Edit"><Edit3 size={18} /></button>
                                                             <button onClick={() => handleDeleteVesselType(vt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }} aria-label="Delete"><Trash2 size={18} /></button>
                                                         </>
                                                     )}
@@ -1610,19 +1683,15 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             </table>
                         </div>
                     )}
-                </>}
             </section>
+            )}
 
             {/* 8. Classification Societies */}
+            {effectiveSection === 'classSocieties' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('classSocieties')}
-                    style={{ marginBottom: collapsedSections.has('classSocieties') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('classSocieties') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Shield size={20} color="var(--accent-primary)" /> Classification Societies
                 </h3>
-                {!collapsedSections.has('classSocieties') && <>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
                         Manage classification societies. Vessels can be assigned to one or more classes.
                     </p>
@@ -1697,19 +1766,15 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             </table>
                         </div>
                     )}
-                </>}
             </section>
+            )}
 
             {/* 8. Policy Types */}
+            {effectiveSection === 'policyTypes' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('policyTypes')}
-                    style={{ marginBottom: collapsedSections.has('policyTypes') ? 0 : '16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('policyTypes') ? <ChevronRight size={20} color="var(--accent-primary)" /> : <ChevronDown size={20} color="var(--accent-primary)" />}
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Tag size={20} color="var(--accent-primary)" /> Policy Types
                 </h3>
-                {!collapsedSections.has('policyTypes') && <>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
                         Define policy types that can be assigned to vessels. Used by the Dynamic Address Book for building distribution lists.
                     </p>
@@ -1822,19 +1887,15 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                             ))}
                         </div>
                     )}
-                </>}
             </section>
+            )}
 
             {/* 8. Danger Zone – Purge Data */}
+            {effectiveSection === 'dangerZone' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3
-                    onClick={() => toggleSection('dangerZone')}
-                    style={{ marginBottom: collapsedSections.has('dangerZone') ? 0 : '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                    {collapsedSections.has('dangerZone') ? <ChevronRight size={20} color="#e74c3c" /> : <ChevronDown size={20} color="#e74c3c" />}
-                    <Trash2 size={20} color="#e74c3c" /> Danger Zone
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Trash2 size={20} color="var(--danger)" /> Danger Zone
                 </h3>
-                {!collapsedSections.has('dangerZone') && <>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                         Permanently delete all vessels, entities, and related data (assureds, documents, surveys, UBOs). This action cannot be undone.
                     </p>
@@ -1894,10 +1955,11 @@ export default function AdminPanel({ onNavigateToVessel }: { onNavigateToVessel?
                         </button>
                     </div>
 
-                </>}
             </section>
+            )}
 
-        </div >
-    )
+        </div>
+    </div>
+)
 }
 

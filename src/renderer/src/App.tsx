@@ -226,13 +226,11 @@ function App(): React.JSX.Element {
               {navItem('reports', <ClipboardList size={18} />, 'Reports')}
             </NavGroup>
 
-            {isAdmin && (
-              <>
-                <div style={{ height: '1px', background: 'var(--glass-border)', margin: '6px 4px', opacity: 0.5 }} />
-                {navItem('users', <UserCog size={18} />, 'User Management')}
-                {navItem('admin', <Settings size={18} />, 'System Setup')}
-              </>
-            )}
+            <>
+              <div style={{ height: '1px', background: 'var(--glass-border)', margin: '6px 4px', opacity: 0.5 }} />
+              {navItem('admin', <Settings size={18} />, 'Settings')}
+              {isAdmin && navItem('users', <UserCog size={18} />, 'User Management')}
+            </>
           </nav>
 
           {/* Footer: version + collapse toggle */}
@@ -275,7 +273,7 @@ function App(): React.JSX.Element {
           />}
           {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
           {activeTab === 'fleets' && <FleetManager />}
-          {activeTab === 'admin' && isAdmin && <AdminPanel onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
+          {activeTab === 'admin' && <AdminPanel isAdmin={isAdmin} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
           {activeTab === 'users' && isAdmin && <UserManager />}
           {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} />}
           {activeTab === 'compliance' && <ComplianceCenter onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} />}

@@ -382,6 +382,9 @@ export interface Api {
   reportSettingsGet: () => Promise<ReportSettings>
   reportSettingsSet: (settings: ReportSettings) => Promise<void>
 
+  getUserSectionAccess: () => Promise<string[]>
+  setUserSectionAccess: (sectionIds: string[]) => Promise<void>
+
   // Auto-Update
   updateCheckForUpdates: () => Promise<void>
   updateQuitAndInstall: () => Promise<void>

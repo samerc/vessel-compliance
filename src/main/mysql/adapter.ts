@@ -833,6 +833,12 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN quotation_sent_date DATE NULL")
             }
 
+            // Migration: Add description to vessel_types
+            const [vtDescCols] = await this.pool.query("SHOW COLUMNS FROM vessel_types LIKE 'description'")
+            if ((vtDescCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE vessel_types ADD COLUMN description TEXT NULL AFTER name")
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -3943,7 +3949,7 @@ export class MySQLAdapter {
     // --- Vessel Types ---
     async getVesselTypes(): Promise<VesselType[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, order_index as `order` FROM vessel_types ORDER BY order_index ASC')
+        const [rows] = await this.pool.query('SELECT id, name, description, order_index as `order` FROM vessel_types ORDER BY order_index ASC')
         return rows as VesselType[]
     }
 
@@ -3951,8 +3957,8 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO vessel_types (id, name, order_index) VALUES (?, ?, ?)',
-            [id, vt.name, vt.order || 0]
+            'INSERT INTO vessel_types (id, name, description, order_index) VALUES (?, ?, ?, ?)',
+            [id, vt.name, vt.description || null, vt.order || 0]
         )
         return { id, ...vt }
     }
@@ -3962,6 +3968,7 @@ export class MySQLAdapter {
         const fields: string[] = []
         const values: any[] = []
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description || null) }
         if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
         if (fields.length === 0) return
         values.push(id)

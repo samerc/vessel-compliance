@@ -399,6 +399,8 @@ const api = {
   // Report Settings
   reportSettingsGet: () => ipcRenderer.invoke('reportSettings:get'),
   reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),
+  getUserSectionAccess: () => ipcRenderer.invoke('settings:getUserSectionAccess'),
+  setUserSectionAccess: (sectionIds: string[]) => ipcRenderer.invoke('settings:setUserSectionAccess', sectionIds),
 }
 
 // Expose curated API to renderer via context bridge

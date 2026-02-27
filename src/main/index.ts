@@ -1861,6 +1861,17 @@ app.whenReady().then(() => {
     await db.setSetting(REPORT_SETTINGS_KEY, JSON.stringify(settings))
   })
 
+  safeHandle('settings:getUserSectionAccess', async (event) => {
+    requireSession(event)
+    const raw = await db.getSetting('userSectionAccess')
+    return raw ? JSON.parse(raw) : []
+  })
+
+  safeHandle('settings:setUserSectionAccess', async (event, sectionIds: string[]) => {
+    requireAdmin(event)
+    await db.setSetting('userSectionAccess', JSON.stringify(sectionIds))
+  })
+
   createWindow()
 
   // Start the compliance scheduler after window is created
