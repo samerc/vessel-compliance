@@ -6,23 +6,22 @@ import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 // ── Palette ───────────────────────────────────────────────────────────────────
 type RGB = [number, number, number]
 const C: Record<string, RGB> = {
-  navy:       [10,  22,  40],
-  navyMid:    [22,  46,  80],
-  accent:     [0,   170, 200],
-  white:      [255, 255, 255],
-  textPri:    [20,  30,  48],
-  textSec:    [100, 115, 135],
-  bgLight:    [246, 248, 251],
-  bgMid:      [220, 227, 238],
-  green:      [0,   148, 74],
-  greenBg:    [230, 247, 238],
-  amber:      [176, 88,  0],
-  amberBg:    [255, 246, 224],
-  orange:     [200, 55,  0],
-  orangeBg:   [255, 237, 229],
-  red:        [186, 0,   0],
-  redBg:      [255, 230, 230],
-  purple:     [110, 50,  220],
+  navy:     [10,  22,  40],
+  navyMid:  [22,  46,  80],
+  accent:   [0,   170, 200],
+  white:    [255, 255, 255],
+  textPri:  [20,  30,  48],
+  textSec:  [100, 115, 135],
+  bgLight:  [246, 248, 251],
+  bgMid:    [220, 227, 238],
+  green:    [0,   148, 74],
+  greenBg:  [230, 247, 238],
+  amber:    [176, 88,  0],
+  amberBg:  [255, 246, 224],
+  orange:   [200, 55,  0],
+  orangeBg: [255, 237, 229],
+  red:      [186, 0,   0],
+  redBg:    [255, 230, 230],
 }
 
 type DocStatus = 'Compliant' | 'Expiring Soon' | 'Expired' | 'Missing'
@@ -33,6 +32,9 @@ const statusColors: Record<DocStatus, { text: RGB; bg: RGB }> = {
   'Expired':       { text: C.orange, bg: C.orangeBg },
   'Missing':       { text: C.red,    bg: C.redBg },
 }
+
+const W = 210
+const MARGIN = 10
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const dateOnly = (s: string | null | undefined) => (s ? s.split('T')[0] : '')
@@ -72,47 +74,62 @@ function getStatus(
   return 'Compliant'
 }
 
-const W = 210
-const MARGIN = 10
+// Returns [onFile, onFile, ...] booleans for each required document of an entity
+function entityDocPresence(entity: any): boolean[] {
+  if (entity.type === 'company') return [
+    !!entity.certificateOfIncorporationPath,
+    !!entity.articlesOfAssociationPath,
+    !!entity.kycFilePath,
+  ]
+  if (entity.type === 'person') return [!!entity.passportFilePath]
+  return []
+}
 
 // ── Page chrome ───────────────────────────────────────────────────────────────
 function drawPageHeader(doc: jsPDF) {
   doc.setFillColor(...C.navy)
-  doc.rect(0, 0, W, 13, 'F')
-
-  // Accent left stripe
+  doc.rect(0, 0, W, 14, 'F')
   doc.setFillColor(...C.accent)
-  doc.rect(0, 0, 3, 13, 'F')
+  doc.rect(0, 0, 3, 14, 'F')
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
+  doc.setFontSize(8.5)
   doc.setTextColor(...C.white)
-  doc.text('Al Bahriah Insurance & Reinsurance SAL', MARGIN + 2, 8.5)
+  doc.text('Al Bahriah Insurance & Reinsurance SAL', MARGIN + 2, 9)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('VESSEL COMPLIANCE REPORT', W / 2, 9, { align: 'center' })
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8.5)
-  doc.text('VESSEL COMPLIANCE REPORT', W / 2, 8.5, { align: 'center' })
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7)
   doc.setTextColor(...C.accent)
-  doc.text('CONFIDENTIAL', W - MARGIN, 8.5, { align: 'right' })
+  doc.text('CONFIDENTIAL', W - MARGIN, 9, { align: 'right' })
 }
 
 function drawPageFooter(doc: jsPDF, pageNum: number, total: number) {
   const H = doc.internal.pageSize.getHeight()
   doc.setDrawColor(...C.bgMid)
   doc.setLineWidth(0.3)
-  doc.line(MARGIN, H - 11, W - MARGIN, H - 11)
+  doc.line(MARGIN, H - 12, W - MARGIN, H - 12)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
+  doc.setFontSize(7.5)
   doc.setTextColor(...C.textSec)
   doc.text(
     `Generated ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`,
-    MARGIN, H - 6.5,
+    MARGIN, H - 7,
   )
-  doc.text('Al Bahriah Insurance & Reinsurance SAL', W / 2, H - 6.5, { align: 'center' })
-  doc.text(`Page ${pageNum} / ${total}`, W - MARGIN, H - 6.5, { align: 'right' })
+  doc.text('Al Bahriah Insurance & Reinsurance SAL', W / 2, H - 7, { align: 'center' })
+  doc.text(`Page ${pageNum} / ${total}`, W - MARGIN, H - 7, { align: 'right' })
+}
+
+function drawSectionLabel(doc: jsPDF, y: number, text: string) {
+  doc.setFillColor(...C.navy)
+  doc.rect(MARGIN, y, W - MARGIN * 2, 8, 'F')
+  doc.setTextColor(...C.white)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.text(text, MARGIN + 4, y + 5.5)
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -142,10 +159,10 @@ export const ReportServiceV2 = {
       (a: any, b: any) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999),
     )
 
-    // ── Build document rows ────────────────────────────────────────────────────
+    // ── Build vessel document rows ─────────────────────────────────────────────
     type DocRow = {
       name: string; desc: string; received: string; expires: string
-      status: DocStatus; annual: boolean; optional: boolean
+      status: DocStatus; optional: boolean
     }
     const docRows: DocRow[] = []
     let compliant = 0, expiringSoon = 0, expired = 0, missing = 0
@@ -164,16 +181,11 @@ export const ReportServiceV2 = {
       else missing++
 
       docRows.push({
-        name: type.name,
+        name: type.name + (type.required === false ? ' *' : ''),
         desc: type.description || '',
         received: vDoc?.receivedDate ? fmt(vDoc.receivedDate) : '—',
-        expires: type.annualRenewal
-          ? (vessel.policyExpiryDate
-              ? `P&I · ${fmt(vessel.policyExpiryDate)}`
-              : resolvedExpiry ? dateOnly(resolvedExpiry) : '—')
-          : (resolvedExpiry ? dateOnly(resolvedExpiry) : '—'),
+        expires: resolvedExpiry ? dateOnly(resolvedExpiry) : '—',
         status,
-        annual: !!type.annualRenewal,
         optional: !isRequired,
       })
     }
@@ -191,9 +203,26 @@ export const ReportServiceV2 = {
         received: vDoc?.receivedDate ? fmt(vDoc.receivedDate) : '—',
         expires: vDoc?.expiryDate ? dateOnly(vDoc.expiryDate) : '—',
         status,
-        annual: false,
         optional: false,
       })
+    }
+
+    // ── Count assured + UBO entity documents in stats ──────────────────────────
+    for (const va of vesselAssureds as any[]) {
+      const entity = (allEntities as any[]).find(e => e.id === va.entityId)
+      if (!entity) continue
+      for (const onFile of entityDocPresence(entity)) {
+        if (onFile) compliant++; else missing++
+      }
+      const ubos = (allEntityUBOs as any[])
+        .filter(u => u.assuredEntityId === entity.id)
+        .map(u => (allEntities as any[]).find(e => e.id === u.uboEntityId))
+        .filter(Boolean)
+      for (const ubo of ubos) {
+        for (const onFile of entityDocPresence(ubo)) {
+          if (onFile) compliant++; else missing++
+        }
+      }
     }
 
     const total = compliant + expiringSoon + expired + missing
@@ -203,52 +232,57 @@ export const ReportServiceV2 = {
     // ── Page 1 header chrome ───────────────────────────────────────────────────
     drawPageHeader(doc)
 
-    let y = 19
+    let y = 20
 
-    // Vessel name + IMO
+    // Vessel name + IMO + report date
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(19)
+    doc.setFontSize(20)
     doc.setTextColor(...C.textPri)
-    doc.text(vessel.name, MARGIN, y + 7)
+    doc.text(vessel.name, MARGIN, y + 8)
 
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9.5)
+    doc.setFontSize(10)
     doc.setTextColor(...C.textSec)
-    doc.text(`IMO  ${vessel.imoNumber}`, MARGIN, y + 14)
+    doc.text(`IMO  ${vessel.imoNumber}`, MARGIN, y + 15)
 
-    doc.setFontSize(8)
+    doc.setFontSize(8.5)
     doc.text(
       `Report date: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`,
-      MARGIN, y + 20,
+      MARGIN, y + 22,
     )
 
     // ── Compliance score card (top-right) ─────────────────────────────────────
-    const scoreX = W - MARGIN - 52, scoreY = y - 1, scoreW = 52, scoreH = 30
+    const scoreW = 52, scoreH = 36
+    const scoreX = W - MARGIN - scoreW, scoreY = y - 1
     doc.setFillColor(...C.bgLight)
     doc.setDrawColor(...C.bgMid)
     doc.setLineWidth(0.4)
     doc.roundedRect(scoreX, scoreY, scoreW, scoreH, 4, 4, 'FD')
 
-    // Rate bar background
-    const barW = scoreW - 14, barH = 3.5
-    const barX = scoreX + 7, barY = scoreY + scoreH - 9
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(26)
+    doc.setTextColor(...rateColor)
+    doc.text(`${rate}%`, scoreX + scoreW / 2, scoreY + 13, { align: 'center' })
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(...C.textSec)
+    doc.text('COMPLIANCE RATE', scoreX + scoreW / 2, scoreY + 19, { align: 'center' })
+
+    // Rate progress bar
+    const barW = scoreW - 12, barH = 3.5
+    const barX = scoreX + 6, barY = scoreY + 23
     doc.setFillColor(...C.bgMid)
     doc.roundedRect(barX, barY, barW, barH, 1.5, 1.5, 'F')
     doc.setFillColor(...rateColor)
     doc.roundedRect(barX, barY, barW * (rate / 100), barH, 1.5, 1.5, 'F')
 
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(24)
-    doc.setTextColor(...rateColor)
-    doc.text(`${rate}%`, scoreX + scoreW / 2, scoreY + 15, { align: 'center' })
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(6.5)
+    doc.setFontSize(7)
     doc.setTextColor(...C.textSec)
-    doc.text('COMPLIANCE RATE', scoreX + scoreW / 2, scoreY + 20, { align: 'center' })
-    doc.text(`${compliant} compliant  ·  ${total} total`, scoreX + scoreW / 2, scoreY + scoreH - 4, { align: 'center' })
+    doc.text(`${compliant} compliant  ·  ${total} total`, scoreX + scoreW / 2, scoreY + 32, { align: 'center' })
 
-    y += 26
+    // Ensure stats strip clears the score card bottom
+    y = Math.max(y + 28, scoreY + scoreH + 4)
 
     // ── Status summary strip ───────────────────────────────────────────────────
     const statsData: { label: string; value: number; key: DocStatus }[] = [
@@ -263,235 +297,245 @@ export const ReportServiceV2 = {
       const col = statusColors[s.key]
       doc.setFillColor(...col.bg)
       doc.setDrawColor(...col.bg)
-      doc.roundedRect(sx, y, statW, 17, 3, 3, 'FD')
+      doc.roundedRect(sx, y, statW, 18, 3, 3, 'FD')
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(20)
+      doc.setFontSize(22)
       doc.setTextColor(...col.text)
-      doc.text(String(s.value), sx + statW / 2, y + 11, { align: 'center' })
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(6)
-      doc.text(s.label, sx + statW / 2, y + 15.5, { align: 'center' })
-    })
-
-    y += 23
-
-    // ── Document section label ─────────────────────────────────────────────────
-    doc.setFillColor(...C.navy)
-    doc.rect(MARGIN, y, W - MARGIN * 2, 7, 'F')
-    doc.setTextColor(...C.white)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.text('VESSEL DOCUMENTS', MARGIN + 3, y + 4.8)
-    const hasOptional = docRows.some(r => r.optional)
-    if (hasOptional) {
+      doc.text(String(s.value), sx + statW / 2, y + 12, { align: 'center' })
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(6.5)
-      doc.setTextColor(...C.accent)
-      doc.text('* Optional', W - MARGIN - 2, y + 4.8, { align: 'right' })
-    }
-    y += 7
+      doc.text(s.label, sx + statW / 2, y + 16.5, { align: 'center' })
+    })
 
-    // ── Document table ─────────────────────────────────────────────────────────
-    const tableBody = docRows.map(r => [
-      r.name + (r.optional ? ' *' : ''),
-      r.desc,
-      r.received,
-      r.expires,
-      r.status,
-    ])
+    y += 24
+
+    // ── Vessel documents section ───────────────────────────────────────────────
+    drawSectionLabel(doc, y, 'VESSEL DOCUMENTS')
+    if (docRows.some(r => r.optional)) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7)
+      doc.setTextColor(...C.accent)
+      doc.text('* Optional', W - MARGIN - 3, y + 5.5, { align: 'right' })
+    }
+    y += 8
 
     autoTable(doc, {
       startY: y,
       margin: { left: MARGIN, right: MARGIN },
       head: [['Document', 'Description', 'Received', 'Expires', 'Status']],
-      body: tableBody,
+      body: docRows.map(r => [r.name, r.desc, r.received, r.expires, r.status]),
       theme: 'plain',
       headStyles: {
         fillColor: C.navyMid,
         textColor: C.white,
-        fontSize: 7.5,
+        fontSize: 8,
         fontStyle: 'bold',
-        cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 },
+        cellPadding: { top: 4, bottom: 4, left: 4, right: 3 },
       },
       columnStyles: {
         0: { cellWidth: 62 },
-        1: { cellWidth: 43, textColor: C.textSec as any, fontSize: 7 },
-        2: { cellWidth: 26, halign: 'center', fontSize: 7.5 },
-        3: { cellWidth: 30, halign: 'center', fontSize: 7.5 },
-        4: { cellWidth: 29, halign: 'center', fontSize: 7.5, fontStyle: 'bold' },
+        1: { cellWidth: 43, textColor: C.textSec as any, fontSize: 7.5 },
+        2: { cellWidth: 26, halign: 'center', fontSize: 8 },
+        3: { cellWidth: 30, halign: 'center', fontSize: 8 },
+        4: { cellWidth: 29, halign: 'center', fontSize: 8, fontStyle: 'bold' },
       },
       styles: {
-        fontSize: 8,
-        cellPadding: { top: 4.5, bottom: 4.5, left: 3, right: 3 },
+        fontSize: 8.5,
+        cellPadding: { top: 5, bottom: 5, left: 4, right: 3 },
         lineColor: C.bgMid as any,
         lineWidth: 0.25,
         overflow: 'linebreak',
       },
       alternateRowStyles: { fillColor: C.bgLight as any },
       didParseCell: (data) => {
-        if (data.section !== 'body') return
-        if (data.column.index === 4) {
-          const s = data.cell.raw as DocStatus
-          const col = statusColors[s]
-          if (col) {
-            data.cell.styles.textColor = col.text as any
-            data.cell.styles.fillColor = col.bg as any
-          }
-        }
-        if (data.column.index === 0) {
-          // Extra height for annual badge
-          if (docRows[data.row.index]?.annual) {
-            data.cell.styles.cellPadding = { top: 4.5, bottom: 8, left: 3, right: 3 }
-          }
+        if (data.section !== 'body' || data.column.index !== 4) return
+        const col = statusColors[data.cell.raw as DocStatus]
+        if (col) {
+          data.cell.styles.textColor = col.text as any
+          data.cell.styles.fillColor = col.bg as any
         }
       },
-      didDrawCell: (data) => {
-        if (data.section !== 'body' || data.column.index !== 0) return
-        const row = docRows[data.row.index]
-        if (!row?.annual) return
-        // Draw purple "Annual" pill inside the cell
-        const px = data.cell.x + 3
-        const py = data.cell.y + data.cell.height - 5.5
-        doc.setFontSize(5.5)
-        const label = 'Annual'
-        const tw = doc.getTextWidth(label) + 4
-        doc.setFillColor(...C.purple)
-        doc.roundedRect(px, py, tw, 3.8, 1, 1, 'F')
-        doc.setTextColor(...C.white)
-        doc.setFont('helvetica', 'bold')
-        doc.text(label, px + 2, py + 2.8)
-      },
-      didDrawPage: () => {
-        drawPageHeader(doc)
-        const pn = (doc.internal as any).getCurrentPageInfo().pageNumber
-        drawPageFooter(doc, pn, 999)
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) drawPageHeader(doc)
       },
     })
 
-    // ── Assured entities section ───────────────────────────────────────────────
+    // ── Assured entities & UBOs section ───────────────────────────────────────
     if ((vesselAssureds as any[]).length > 0) {
-      let ay: number = (doc as any).lastAutoTable.finalY + 10
-
-      if (ay > pageH - 45) {
-        doc.addPage()
-        drawPageHeader(doc)
-        ay = 19
-      }
-
-      // Section label
-      doc.setFillColor(...C.navy)
-      doc.rect(MARGIN, ay, W - MARGIN * 2, 7, 'F')
-      doc.setTextColor(...C.white)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.text('ASSURED ENTITIES & DOCUMENTS', MARGIN + 3, ay + 4.8)
-      ay += 11
-
-      const drawDocLine = (label: string, onFile: boolean) => {
-        if (ay > pageH - 18) {
-          doc.addPage()
-          drawPageHeader(doc)
-          ay = 19
-        }
-        const col: RGB = onFile ? C.green : C.red
-        const badge = onFile ? 'ON FILE' : 'MISSING'
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(7.5)
-        doc.setTextColor(...C.textSec)
-        doc.text(`  ${label}`, MARGIN + 5, ay)
-        // Status badge
-        doc.setFontSize(6.5)
-        const bw = doc.getTextWidth(badge) + 5
-        const bx = W - MARGIN - bw - 2
-        doc.setFillColor(...(onFile ? C.greenBg : C.redBg))
-        doc.roundedRect(bx, ay - 3.2, bw, 4.5, 1, 1, 'F')
-        doc.setTextColor(...col)
-        doc.setFont('helvetica', 'bold')
-        doc.text(badge, bx + 2.5, ay + 0.5)
-        ay += 5.5
-      }
+      // Build entity table rows
+      type EntityRowMeta = 'entityHeader' | 'uboBar' | 'uboEntityHeader' | 'doc'
+      const entityRows: [string, string, string][] = []
+      const entityRowMeta: EntityRowMeta[] = []
 
       for (const va of vesselAssureds as any[]) {
         const entity = (allEntities as any[]).find(e => e.id === va.entityId)
         if (!entity) continue
 
-        if (ay > pageH - 40) {
-          doc.addPage()
-          drawPageHeader(doc)
-          ay = 19
-        }
-
-        // Entity header card
-        doc.setFillColor(...C.bgLight)
-        doc.setDrawColor(...C.bgMid)
-        doc.setLineWidth(0.3)
-        doc.roundedRect(MARGIN, ay, W - MARGIN * 2, 11, 2, 2, 'FD')
-        // Accent left stripe on card
-        doc.setFillColor(...C.accent)
-        doc.roundedRect(MARGIN, ay, 2.5, 11, 1, 1, 'F')
-
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(8.5)
-        doc.setTextColor(...C.textPri)
-        doc.text(entity.name, MARGIN + 6, ay + 7)
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(7)
-        doc.setTextColor(...C.textSec)
-        doc.text(`${va.role}  ·  ${entity.type.toUpperCase()}`, W - MARGIN - 2, ay + 7, { align: 'right' })
-        ay += 14
+        entityRows.push([entity.name, `${va.role}  ·  ${entity.type.toUpperCase()}`, ''])
+        entityRowMeta.push('entityHeader')
 
         if (entity.type === 'company') {
-          drawDocLine('Certificate of Incorporation', !!entity.certificateOfIncorporationPath)
-          drawDocLine('Articles of Association',      !!entity.articlesOfAssociationPath)
-          drawDocLine('KYC',                          !!entity.kycFilePath)
+          entityRows.push(['Certificate of Incorporation', '', entity.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING'])
+          entityRowMeta.push('doc')
+          entityRows.push(['Articles of Association', '', entity.articlesOfAssociationPath ? 'ON FILE' : 'MISSING'])
+          entityRowMeta.push('doc')
+          entityRows.push(['KYC', '', entity.kycFilePath ? 'ON FILE' : 'MISSING'])
+          entityRowMeta.push('doc')
         }
         if (entity.type === 'person') {
-          drawDocLine('ID / Passport', !!entity.passportFilePath)
+          entityRows.push(['ID / Passport', '', entity.passportFilePath ? 'ON FILE' : 'MISSING'])
+          entityRowMeta.push('doc')
         }
 
-        // UBOs
         const ubos = (allEntityUBOs as any[])
           .filter(u => u.assuredEntityId === entity.id)
           .map(u => (allEntities as any[]).find(e => e.id === u.uboEntityId))
           .filter(Boolean)
 
         if (ubos.length > 0) {
-          doc.setFont('helvetica', 'bold')
-          doc.setFontSize(7.5)
-          doc.setTextColor(...C.textSec)
-          doc.text('  Ultimate Beneficial Owners', MARGIN + 5, ay)
-          ay += 5
+          entityRows.push(['ULTIMATE BENEFICIAL OWNERS', '', ''])
+          entityRowMeta.push('uboBar')
 
           for (const ubo of ubos) {
             if (!ubo) continue
-            if (ay > pageH - 30) {
-              doc.addPage()
-              drawPageHeader(doc)
-              ay = 19
-            }
-            doc.setFont('helvetica', 'bold')
-            doc.setFontSize(8)
-            doc.setTextColor(...C.textPri)
-            doc.text(`  ${ubo.name}`, MARGIN + 8, ay)
-            doc.setFont('helvetica', 'normal')
-            doc.setFontSize(7)
-            doc.setTextColor(...C.textSec)
-            doc.text(ubo.type.toUpperCase(), W - MARGIN - 2, ay, { align: 'right' })
-            ay += 5.5
+            entityRows.push([ubo.name, ubo.type.toUpperCase(), ''])
+            entityRowMeta.push('uboEntityHeader')
 
             if (ubo.type === 'company') {
-              drawDocLine('Certificate of Incorporation', !!ubo.certificateOfIncorporationPath)
-              drawDocLine('Articles of Association',      !!ubo.articlesOfAssociationPath)
-              drawDocLine('KYC',                          !!ubo.kycFilePath)
+              entityRows.push(['Certificate of Incorporation', '', ubo.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING'])
+              entityRowMeta.push('doc')
+              entityRows.push(['Articles of Association', '', ubo.articlesOfAssociationPath ? 'ON FILE' : 'MISSING'])
+              entityRowMeta.push('doc')
+              entityRows.push(['KYC', '', ubo.kycFilePath ? 'ON FILE' : 'MISSING'])
+              entityRowMeta.push('doc')
             }
             if (ubo.type === 'person') {
-              drawDocLine('ID / Passport', !!ubo.passportFilePath)
+              entityRows.push(['ID / Passport', '', ubo.passportFilePath ? 'ON FILE' : 'MISSING'])
+              entityRowMeta.push('doc')
             }
           }
         }
-
-        ay += 6
       }
+
+      let ey = (doc as any).lastAutoTable.finalY + 10
+      if (ey > pageH - 45) {
+        doc.addPage()
+        drawPageHeader(doc)
+        ey = 20
+      }
+
+      drawSectionLabel(doc, ey, 'ASSURED ENTITIES & DOCUMENTS')
+      ey += 8
+
+      autoTable(doc, {
+        startY: ey,
+        margin: { left: MARGIN, right: MARGIN },
+        head: [['Entity / Document', 'Role / Type', 'Status']],
+        body: entityRows,
+        theme: 'plain',
+        headStyles: {
+          fillColor: C.navyMid,
+          textColor: C.white,
+          fontSize: 8,
+          fontStyle: 'bold',
+          cellPadding: { top: 4, bottom: 4, left: 4, right: 3 },
+        },
+        columnStyles: {
+          0: { cellWidth: 120 },
+          1: { cellWidth: 39, fontSize: 7.5 },
+          2: { cellWidth: 31, halign: 'center', fontSize: 8, fontStyle: 'bold' },
+        },
+        styles: {
+          fontSize: 8.5,
+          cellPadding: { top: 5, bottom: 5, left: 4, right: 3 },
+          lineColor: C.bgMid as any,
+          lineWidth: 0.25,
+          overflow: 'linebreak',
+        },
+        didParseCell: (data) => {
+          if (data.section !== 'body') return
+          const meta = entityRowMeta[data.row.index]
+
+          // Entity header row — navy, teal right-side meta, left-padded for stripe
+          if (meta === 'entityHeader') {
+            data.cell.styles.fillColor = C.navy as any
+            data.cell.styles.fontStyle = data.column.index === 0 ? 'bold' : 'normal'
+            data.cell.styles.fontSize = data.column.index === 0 ? 9.5 : 8
+            if (data.column.index === 0) {
+              data.cell.styles.textColor = C.white as any
+              data.cell.styles.cellPadding = { top: 5, bottom: 5, left: 7, right: 3 }
+            } else if (data.column.index === 1) {
+              data.cell.styles.textColor = C.accent as any
+            } else {
+              data.cell.styles.textColor = C.navy as any // hide status col
+            }
+          }
+
+          // UBO label bar — navyMid background, text only in col 0
+          if (meta === 'uboBar') {
+            data.cell.styles.fillColor = C.navyMid as any
+            data.cell.styles.fontStyle = 'bold'
+            data.cell.styles.fontSize = 7.5
+            if (data.column.index === 0) {
+              data.cell.styles.textColor = C.white as any
+              data.cell.styles.cellPadding = { top: 4, bottom: 4, left: 12, right: 3 }
+            } else {
+              data.cell.styles.textColor = C.navyMid as any // hide other cols
+            }
+          }
+
+          // UBO entity header — bgMid background, indented, smaller than entity header
+          if (meta === 'uboEntityHeader') {
+            data.cell.styles.fillColor = C.bgMid as any
+            data.cell.styles.fontStyle = data.column.index === 0 ? 'bold' : 'normal'
+            data.cell.styles.fontSize = data.column.index === 0 ? 8.5 : 7.5
+            if (data.column.index === 0) {
+              data.cell.styles.textColor = C.textPri as any
+              data.cell.styles.cellPadding = { top: 4.5, bottom: 4.5, left: 12, right: 3 }
+            } else if (data.column.index === 1) {
+              data.cell.styles.textColor = C.textSec as any
+            } else {
+              data.cell.styles.textColor = C.bgMid as any // hide status col
+            }
+          }
+
+          // Doc rows — alternating fills, indented, color-coded status
+          if (meta === 'doc') {
+            data.cell.styles.fillColor = (data.row.index % 2 === 0 ? C.white : C.bgLight) as any
+            if (data.column.index === 0) {
+              data.cell.styles.textColor = C.textPri as any
+              data.cell.styles.cellPadding = { top: 5, bottom: 5, left: 12, right: 3 }
+            }
+            if (data.column.index === 2) {
+              const s = data.cell.raw as string
+              if (s === 'ON FILE') {
+                data.cell.styles.textColor = C.green as any
+                data.cell.styles.fillColor = C.greenBg as any
+              } else if (s === 'MISSING') {
+                data.cell.styles.textColor = C.red as any
+                data.cell.styles.fillColor = C.redBg as any
+              }
+            }
+          }
+        },
+        didDrawCell: (data) => {
+          if (data.section !== 'body' || data.column.index !== 0) return
+          const meta = entityRowMeta[data.row.index]
+          // Teal left stripe for entity headers
+          if (meta === 'entityHeader') {
+            doc.setFillColor(...C.accent)
+            doc.rect(data.cell.x, data.cell.y, 2.5, data.cell.height, 'F')
+          }
+          // navyMid left stripe for UBO entity headers
+          if (meta === 'uboEntityHeader') {
+            doc.setFillColor(...C.navyMid)
+            doc.rect(data.cell.x, data.cell.y, 2, data.cell.height, 'F')
+          }
+        },
+        didDrawPage: (data) => {
+          if (data.pageNumber > 1) drawPageHeader(doc)
+        },
+      })
     }
 
     // ── Fix page footers with correct total ────────────────────────────────────

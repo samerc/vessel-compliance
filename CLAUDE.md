@@ -137,6 +137,14 @@ Required documents vary by entity type:
 - **Persons**: ID/Passport only (no KYC required)
 - **UBOs**: Same document requirements based on their type (company or person)
 
+### Annual Document Compliance Rule
+
+For `annualRenewal = true` document types, the effective expiry is inherited from the active P&I policy via `resolveEffectivePolicyExpiry()` (`src/renderer/src/utils/policyUtils.ts`) instead of the document's own expiry date.
+
+- **Short-cycle rule**: if `(expiryDate − receivedDate) < 60 days`, the document is treated as **Compliant** even when it would otherwise be flagged "Expiring Soon". Rationale: a document placed today against a P&I policy expiring in 30 days was intentionally uploaded knowing its short remaining life.
+- **Helper**: `annualShortCycle(expiry, received)` — returns `true` if span < 60 days
+- **Applied in**: `VesselDocumentsView.tsx` (`getDocStatus`), `ReportService.ts` (`getDocStatus` / `getExcelDocStatus`), `ReportServiceV2.ts` (`getStatus`), `Dashboard.tsx` (`allAlerts` memo)
+
 ### Window Preferences
 - **Per-User Storage**: Window size and position stored in database per user (`users.window_width`, `window_height`, `window_x`, `window_y`)
 - **Auto-Save**: Window bounds saved on resize/move when user is logged in
@@ -280,6 +288,31 @@ Advanced vessel search page (`src/renderer/src/components/VesselFilter.tsx`):
 
 - **Filters**: Multiple criteria for filtering the vessel list
 - **Navigation**: View button navigates to vessel detail
+- **Searchable MultiSelect**: `MultiSelectDropdown` component auto-shows an inline search input when `options.length > 6` (e.g. flag states list). Auto-focuses on open via `useEffect([open, showSearch])`. Filters by both `label` and `sublabel`. Clears search on close.
+- **Portal dropdowns**: Dropdowns rendered via `createPortal` to avoid clipping inside scrollable containers; positioned with `getBoundingClientRect` + flip-upward logic.
+
+### Reports
+
+Tab-based reports page (`src/renderer/src/components/Reports.tsx`) with sub-navigation:
+
+- **LossRecordReport** (`src/renderer/src/components/LossRecordReport.tsx`): Imports Book1.xlsx (UWY in col 6), outputs a PDF grouped by Underwriting Year → vessel → claim
+
+### Professional PDF Report (ReportServiceV2)
+
+Vessel compliance PDF (`src/renderer/src/services/ReportServiceV2.ts`), exported via "PDF Report (Pro)" button in VesselDetail:
+
+- **Color palette**: navy `[10,22,40]`, navyMid `[22,46,80]`, accent teal `[0,170,200]`, status greens/ambers/reds
+- **Page chrome**: `drawPageHeader()` — navy bar + teal left stripe, company name, title, CONFIDENTIAL; `drawPageFooter()` — thin rule, generated date / company / page N/M; `drawSectionLabel()` — reusable navy 8mm section bar helper
+- **Header rule**: page 1 header drawn manually; `didDrawPage` callback only redraws for `data.pageNumber > 1`; footers written entirely by post-processing loop for correct total
+- **Score card** (top-right): rounded rect, 26pt rate% in rate color, "COMPLIANCE RATE" label, progress bar, compliant·total text. Height 36mm; positioned to clear stats strip via `Math.max(y + 28, scoreY + scoreH + 4)`
+- **Stats strip**: 4 boxes — COMPLIANT / EXPIRING SOON / EXPIRED / MISSING. Counts include **both** vessel documents and all assured entity/UBO documents
+- **Vessel docs table**: `autoTable`, 5 columns (Document, Description, Received, Expires, Status). Status column color-coded via `didParseCell`
+- **Entity/UBO table**: single `autoTable` call, 3 columns (Entity/Document, Role/Type, Status). Row types tracked in parallel `entityRowMeta: EntityRowMeta[]` array, styled in `didParseCell` + `didDrawCell`:
+  - `'entityHeader'`: navy bg, teal left stripe (2.5mm, drawn in `didDrawCell`), white name (9.5pt bold), accent role·type
+  - `'uboBar'`: navyMid bg, "ULTIMATE BENEFICIAL OWNERS" indented at left: 12mm
+  - `'uboEntityHeader'`: bgMid bg, navyMid left stripe (2mm), indented name (8.5pt bold)
+  - `'doc'`: alternating white/bgLight (by `row.index % 2`), left padding 12mm, ON FILE (green) / MISSING (red) status pill
+- **`resolveEffectivePolicyExpiry`**: utility at `src/renderer/src/utils/policyUtils.ts` — extracts P&I end date from dynamic policies for annual doc expiry resolution
 
 ### Quotations
 
@@ -294,10 +327,12 @@ Quotation management system:
 
 ### Vessel Detail Navigation
 
-- **Sections**: Toggle between Documents, Surveys, and Policies views via `detailView` state
-- **External Navigation**: `initialSection` prop allows navigating directly to surveys or policies tab
+- **Sections**: Toggle between Documents, Assured, Surveys, Policies, and History views via `detailView` state
+- **External Navigation**: `initialSection` prop allows navigating directly to any tab
 - **Navigation Chain**: App.tsx → VesselManager (initialVesselSection) → VesselDetail (initialSection)
-- **Section Values**: `'documents'`, `'surveys'`, `'policies'`
+- **Section Values**: `'documents'`, `'assureds'`, `'surveys'`, `'policies'`, `'history'`
+- **Auto-edit on add**: `VesselDetail` accepts `initialEditing?: boolean` prop → `useState(initialEditing)` opens in edit mode immediately. `VesselManager` sets `openInEditMode = true` after successful vessel creation; back handler resets it to `false`.
+- **Searchable edit dropdowns**: Classification society and flag state fields use custom searchable dropdowns (`classSearch`, `flagDropdownOpen`, `flagSearch` states). Classification shows search input when `classSocieties.length > 6`; flag filters by name AND iso3Code. The flag `+` (add new) button is retained alongside the dropdown.
 
 ### Vessel List
 
