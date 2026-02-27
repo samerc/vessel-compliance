@@ -319,6 +319,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editVesselType, setEditVesselType] = useState(vessel.vesselType || '')
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
     const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
+    const [classDropdownOpen, setClassDropdownOpen] = useState(false)
     const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
     const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
     const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
@@ -551,28 +552,57 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     </select>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', paddingTop: '4px', flexShrink: 0 }}>Class:</span>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <select
-                                            multiple
-                                            size={Math.min(classSocieties.length, 5)}
-                                            value={[...vesselClassificationIds]}
-                                            onChange={e => {
-                                                const selected = new Set(
-                                                    [...e.target.selectedOptions].map(o => o.value)
-                                                )
-                                                setVesselClassificationIds(selected)
-                                            }}
-                                            style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', minWidth: '200px' }}
-                                            aria-label="Classification societies"
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', paddingTop: '6px', flexShrink: 0 }}>Class:</span>
+                                    <div style={{ position: 'relative' }}>
+                                        {/* Trigger button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setClassDropdownOpen(o => !o)}
+                                            onBlur={e => { if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) setTimeout(() => setClassDropdownOpen(false), 150) }}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', cursor: 'pointer', minWidth: '220px', justifyContent: 'space-between' }}
                                         >
-                                            {classSocieties.map(cs => (
-                                                <option key={cs.id} value={cs.id}>
-                                                    {cs.abbreviation ? `${cs.abbreviation} – ${cs.name}` : cs.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Hold Ctrl / ⌘ to select multiple</span>
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
+                                                {vesselClassificationIds.size === 0
+                                                    ? 'None'
+                                                    : classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(', ')}
+                                            </span>
+                                            <ChevronDown size={13} style={{ flexShrink: 0, transform: classDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                                        </button>
+                                        {/* Dropdown list */}
+                                        {classDropdownOpen && (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', overflow: 'hidden' }}>
+                                                {classSocieties.map(cs => {
+                                                    const checked = vesselClassificationIds.has(cs.id)
+                                                    return (
+                                                        <div
+                                                            key={cs.id}
+                                                            onMouseDown={e => {
+                                                                e.preventDefault()
+                                                                setVesselClassificationIds(prev => {
+                                                                    const next = new Set(prev)
+                                                                    if (checked) next.delete(cs.id); else next.add(cs.id)
+                                                                    return next
+                                                                })
+                                                            }}
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                readOnly
+                                                                checked={checked}
+                                                                style={{ accentColor: 'var(--accent-primary)', pointerEvents: 'none', flexShrink: 0 }}
+                                                            />
+                                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                                                {cs.abbreviation ? <><strong>{cs.abbreviation}</strong> – {cs.name}</> : cs.name}
+                                                            </span>
+                                                        </div>
+                                                    )
+                                                })}
+                                                {classSocieties.length === 0 && (
+                                                    <div style={{ padding: '10px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No classification societies defined</div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
