@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Calendar } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Calendar, Lock } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
@@ -853,7 +853,15 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             )
                         }
 
-                        // Regular user — just show their accessible sections flat
+                        // Regular user — show their accessible sections, or empty state
+                        if (grantable.length === 0) {
+                            return (
+                                <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                                    <Lock size={28} style={{ opacity: 0.25, marginBottom: '10px' }} />
+                                    <p style={{ margin: 0 }}>No sections available.</p>
+                                </div>
+                            )
+                        }
                         return <>{grantable.map(s => renderBtn(s))}</>
                     })()}
                 </nav>
@@ -861,6 +869,17 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
             {/* ── Content area ── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+
+            {/* Empty state for regular users with no access */}
+            {!isAdmin && sidebarSections.length === 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: '16px', textAlign: 'center' }}>
+                    <Lock size={48} style={{ opacity: 0.15 }} />
+                    <div>
+                        <p style={{ fontWeight: '600', marginBottom: '6px' }}>No settings available</p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>Your administrator has not granted access to any settings sections.</p>
+                    </div>
+                </div>
+            )}
 
             {/* User Access - admin only */}
             {effectiveSection === 'userAccess' && isAdmin && (
