@@ -552,25 +552,27 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', paddingTop: '4px', flexShrink: 0 }}>Class:</span>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '120px', overflowY: 'auto', paddingRight: '4px' }}>
-                                        {classSocieties.map(cs => (
-                                            <label key={cs.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={vesselClassificationIds.has(cs.id)}
-                                                    onChange={e => {
-                                                        setVesselClassificationIds(prev => {
-                                                            const next = new Set(prev)
-                                                            if (e.target.checked) next.add(cs.id)
-                                                            else next.delete(cs.id)
-                                                            return next
-                                                        })
-                                                    }}
-                                                    style={{ accentColor: 'var(--accent-primary)' }}
-                                                />
-                                                {cs.name}{cs.abbreviation ? ` (${cs.abbreviation})` : ''}
-                                            </label>
-                                        ))}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <select
+                                            multiple
+                                            size={Math.min(classSocieties.length, 5)}
+                                            value={[...vesselClassificationIds]}
+                                            onChange={e => {
+                                                const selected = new Set(
+                                                    [...e.target.selectedOptions].map(o => o.value)
+                                                )
+                                                setVesselClassificationIds(selected)
+                                            }}
+                                            style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', minWidth: '200px' }}
+                                            aria-label="Classification societies"
+                                        >
+                                            {classSocieties.map(cs => (
+                                                <option key={cs.id} value={cs.id}>
+                                                    {cs.abbreviation ? `${cs.abbreviation} – ${cs.name}` : cs.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Hold Ctrl / ⌘ to select multiple</span>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
