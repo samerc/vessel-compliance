@@ -791,10 +791,9 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                 padding: '9px 16px', width: '100%', textAlign: 'left',
                                 background: effectiveSection === sec.id ? 'rgba(var(--accent-primary-rgb, 0,210,255),0.1)' : 'transparent',
                                 border: 'none', borderLeft: effectiveSection === sec.id ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                                color: effectiveSection === sec.id ? 'var(--accent-primary)' : sec.adminOnly ? 'var(--text-secondary)' : 'var(--text-primary)',
+                                color: effectiveSection === sec.id ? 'var(--accent-primary)' : 'var(--text-primary)',
                                 fontWeight: effectiveSection === sec.id ? '600' : '400',
                                 fontSize: '0.82rem', cursor: 'pointer',
-                                opacity: sec.adminOnly && sec.id !== 'userAccess' ? 0.7 : 1,
                             }}
                         >
                             {sec.icon}
