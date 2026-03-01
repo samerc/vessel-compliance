@@ -100,6 +100,17 @@ Vessel inspection tracking with defects management:
 - **Survey Status**: Automatically shows "SURVEY CLOSED" when all defects are closed
 - **Closure Tracking**: Defects track who closed them, when, and optional closure notes
 
+### Survey Warranties & Follow-Up
+
+Cross-vessel warranty and endorsement tracking system:
+
+- **WarrantyManager** (`src/renderer/src/components/WarrantyManager.tsx`): Per-survey warranty management embedded in `ConditionSurveyManager`. Tracks warranty items with deadline type (date/voyage/voyage+date), reference number, status (OPEN/CLOSED), notes, and sent reminders.
+- **SurveyFollowUp** (`src/renderer/src/components/SurveyFollowUp.tsx`): Fleet-wide survey follow-up page reachable from the sidebar. Shows all open warranties grouped by vessel, endorsements due, and reminder log.
+- **Tables**: `survey_warranties` (id, survey_id, vessel_id, description, deadline_type, deadline_date, deadline_voyage, reference_number, status, notes), `warranty_reminders` (id, warranty_id, sent_at, next_reminder_date, notes)
+- **Endorsements Due**: Computed from surveys with open defects past their due date; displayed in a dedicated tab
+- **IPC Handlers**: `survey_warranty:getByVessel`, `survey_warranty:getAll`, `survey_warranty:create`, `survey_warranty:update`, `survey_warranty:delete`, `survey_warranty:getReminders`, `survey_warranty:addReminder`, `survey_warranty:getEndorsementsDue`
+- **SQL alias rule**: All `sw.*` / `swr.*` wildcard selects must use explicit `column AS camelCaseName` aliases — MySQL returns raw snake_case, but TypeScript interfaces expect camelCase
+
 ### Customer Assignment
 
 Vessels can be assigned to a customer entity with a customer type:
