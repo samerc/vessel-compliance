@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -16,6 +16,7 @@ import ReminderCenter from './components/ReminderCenter'
 import Calculators from './components/Calculators'
 import QuotationManager from './components/QuotationManager'
 import ConditionSurveyList from './components/ConditionSurveyList'
+import SurveyFollowUp from './components/SurveyFollowUp'
 import VesselFilter from './components/VesselFilter'
 import PolicyRenewals from './components/PolicyRenewals'
 import Reports from './components/Reports'
@@ -25,7 +26,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 import ChangelogModal from './components/ChangelogModal'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -221,6 +222,7 @@ function App(): React.JSX.Element {
             >
               {navItem('directory', <BookOpen size={18} />, 'Directory')}
               {navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
+              {navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
               {navItem('calculators', <Calculator size={18} />, 'Calculators')}
               {navItem('quotations', <FileText size={18} />, 'Quotations')}
               {navItem('reports', <ClipboardList size={18} />, 'Reports')}
@@ -255,7 +257,7 @@ function App(): React.JSX.Element {
         </aside>
 
         <main id="main-content" className="main-content">
-          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} />}
+          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} />}
           {activeTab === 'vessels' && <VesselManager
             initialVesselId={navigateToVesselId}
             initialVesselSection={navigateToVesselSection}
@@ -269,6 +271,7 @@ function App(): React.JSX.Element {
               'renewals': 'Back to Renewals',
               'admin': 'Back to System Setup',
               'reminders': 'Back to Reminders',
+              'survey-followup': 'Back to Survey Follow-Up',
             } as Record<string, string>)[navigateBackTab] || 'Back' : undefined}
           />}
           {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
@@ -280,6 +283,7 @@ function App(): React.JSX.Element {
           {activeTab === 'sanctions-search' && <SanctionsSearch />}
           {activeTab === 'reminders' && <ReminderCenter />}
           {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} />}
+          {activeTab === 'survey-followup' && <SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} />}
           {activeTab === 'calculators' && <Calculators />}
           {activeTab === 'quotations' && <QuotationManager />}
           {activeTab === 'renewals' && <PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} />}

@@ -165,6 +165,23 @@ const api = {
   deleteSurveyAttachment: (id) => ipcRenderer.invoke('db:deleteSurveyAttachment', id),
   getOpenDefectsByVessel: () => ipcRenderer.invoke('db:getOpenDefectsByVessel'),
   getSurveyHistory: (vesselId) => ipcRenderer.invoke('db:getSurveyHistory', vesselId),
+  closeSurvey: (surveyId, userId) => ipcRenderer.invoke('db:closeSurvey', surveyId, userId),
+  updateConditionSurveyEndorsement: (surveyId, issued) => ipcRenderer.invoke('db:updateConditionSurveyEndorsement', surveyId, issued),
+
+  // Dashboard
+  dashboardGetActivity: () => ipcRenderer.invoke('dashboard:getActivity'),
+
+  // Survey Warranties
+  surveyWarrantyGetByVessel: (vesselId) => ipcRenderer.invoke('survey_warranty:getByVessel', vesselId),
+  surveyWarrantyGetAll: () => ipcRenderer.invoke('survey_warranty:getAll'),
+  surveyWarrantyGetDueToday: () => ipcRenderer.invoke('survey_warranty:getDueToday'),
+  surveyWarrantyGetEndorsementsDue: () => ipcRenderer.invoke('survey_warranty:getEndorsementsDue'),
+  surveyWarrantyCreate: (data) => ipcRenderer.invoke('survey_warranty:create', data),
+  surveyWarrantyUpdate: (id, data) => ipcRenderer.invoke('survey_warranty:update', id, data),
+  surveyWarrantyDelete: (id) => ipcRenderer.invoke('survey_warranty:delete', id),
+  surveyWarrantyLogReminder: (data) => ipcRenderer.invoke('survey_warranty:logReminder', data),
+  surveyWarrantyGetReminders: (warrantyId) => ipcRenderer.invoke('survey_warranty:getReminders', warrantyId),
+  surveyWarrantyWaive: (id, reason) => ipcRenderer.invoke('survey_warranty:waive', id, reason),
 
   // Auto-Update
   updateCheckForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),

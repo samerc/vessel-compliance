@@ -168,8 +168,55 @@ export interface ConditionSurvey {
   reference?: string
   location?: string
   notes?: string
+  completedAt?: string
+  completedBy?: string
+  endorsementIssued?: boolean | null
+  endorsementReminderDate?: string | null
   createdAt?: string
   createdBy?: string
+}
+
+export type WarrantyStatus = 'pending' | 'survey_done' | 'completed' | 'waived'
+export type DeadlineType = 'days' | 'event'
+
+export interface SurveyWarranty {
+  id: string
+  vesselId: string
+  policyId?: string | null
+  description: string
+  deadlineType: DeadlineType
+  deadlineDays?: number | null
+  deadlineEvent?: string | null
+  inceptionDate: string
+  notes?: string | null
+  status: WarrantyStatus
+  waiverReason?: string | null
+  completedAt?: string | null
+  completionNotes?: string | null
+  conditionSurveyId?: string | null
+  createdAt?: string
+  // joined fields from queries
+  vesselName?: string
+  imoNumber?: string
+  customerName?: string
+  fleetName?: string
+  policyTypeName?: string
+  lastReminderDate?: string | null
+  nextReminderDate?: string | null
+  reminderCount?: number
+}
+
+export interface SurveyWarrantyReminder {
+  id: string
+  warrantyId: string
+  sentAt: string
+  channel: 'email' | 'phone' | 'other'
+  reference?: string | null
+  notes?: string | null
+  nextReminderDate?: string | null
+  loggedBy?: string | null
+  loggedByName?: string | null
+  createdAt?: string
 }
 
 export interface SurveyDefect {

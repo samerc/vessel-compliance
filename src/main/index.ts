@@ -964,6 +964,23 @@ app.whenReady().then(() => {
   safeHandle('db:deleteSurveyAttachment', (event, id) => { requireAdmin(event); return db.deleteSurveyAttachment(id) })
   safeHandle('db:getOpenDefectsByVessel', (event) => { requireSession(event); return db.getOpenDefectsByVessel() })
   safeHandle('db:getSurveyHistory', (event, vesselId) => { requireSession(event); return db.getSurveyHistory(vesselId) })
+  safeHandle('db:closeSurvey', (event, surveyId, userId) => { requireSession(event); return db.closeSurvey(surveyId, userId) })
+  safeHandle('db:updateConditionSurveyEndorsement', (event, surveyId, issued) => { requireSession(event); return db.updateConditionSurveyEndorsement(surveyId, issued) })
+
+  // Dashboard
+  safeHandle('dashboard:getActivity', (event) => { requireSession(event); return db.getDashboardActivity() })
+
+  // Survey Warranties
+  safeHandle('survey_warranty:getByVessel', (event, vesselId) => { requireSession(event); return db.getSurveyWarrantiesByVessel(vesselId) })
+  safeHandle('survey_warranty:getAll', (event) => { requireSession(event); return db.getAllSurveyWarranties() })
+  safeHandle('survey_warranty:getDueToday', (event) => { requireSession(event); return db.getSurveyWarrantiesDueToday() })
+  safeHandle('survey_warranty:getEndorsementsDue', (event) => { requireSession(event); return db.getEndorsementsDue() })
+  safeHandle('survey_warranty:create', (event, data) => { requireSession(event); return db.createSurveyWarranty(data) })
+  safeHandle('survey_warranty:update', (event, id, data) => { requireSession(event); return db.updateSurveyWarranty(id, data) })
+  safeHandle('survey_warranty:delete', (event, id) => { requireAdmin(event); return db.deleteSurveyWarranty(id) })
+  safeHandle('survey_warranty:logReminder', (event, data) => { requireSession(event); return db.logWarrantyReminder(data) })
+  safeHandle('survey_warranty:getReminders', (event, warrantyId) => { requireSession(event); return db.getWarrantyReminders(warrantyId) })
+  safeHandle('survey_warranty:waive', (event, id, reason) => { requireSession(event); return db.waiverSurveyWarranty(id, reason) })
 
   // File System IPC Handlers (session required, path validation)
   safeHandle('fs:exists', (event, filePath: string) => {

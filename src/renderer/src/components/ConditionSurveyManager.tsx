@@ -24,6 +24,8 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const [dragOverSurveyId, setDragOverSurveyId] = useState<string | null>(null)
   const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null)
   const [showNewSurveyorForm, setShowNewSurveyorForm] = useState(false)
+  const [closingSurveyId, setClosingSurveyId] = useState<string | null>(null)
+  const [endorsementSurveyId, setEndorsementSurveyId] = useState<string | null>(null)
   const { theme } = useTheme()
   const isLight = theme === 'light'
 
@@ -124,7 +126,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       surveyorId = newSurveyor.id
     }
 
-    await window.api.addConditionSurvey({
+    const newSurvey = await window.api.addConditionSurvey({
       vesselId: vessel.id,
       surveyDate: newDate,
       surveyorId,
@@ -135,6 +137,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       createdBy: user?.username || 'Unknown'
     })
 
+    setEndorsementSurveyId(newSurvey.id)
     setNewDate('')
     setNewSurveyorId('')
     setNewType('')
@@ -195,6 +198,19 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
         loadData()
       }
     })
+  }
+
+  const handleCloseSurvey = async (surveyId: string) => {
+    if (!user) return
+    await window.api.closeSurvey(surveyId, user.id)
+    setClosingSurveyId(null)
+    await loadData()
+  }
+
+  const handleEndorsementAnswer = async (surveyId: string, issued: boolean) => {
+    await window.api.updateConditionSurveyEndorsement(surveyId, issued)
+    setEndorsementSurveyId(null)
+    await loadData()
   }
 
   const getSurveyorName = (surveyorId: string): string => {
@@ -602,6 +618,32 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                         </>
                       ) : (
                         <>
+                          {survey.completedAt && (
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              background: 'rgba(0,148,74,0.15)',
+                              color: 'var(--success, #00944a)',
+                              fontSize: 11,
+                              fontWeight: 600,
+                            }}>CLOSED</span>
+                          )}
+                          {!survey.completedAt && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setClosingSurveyId(survey.id) }}
+                              style={{
+                                padding: '5px 10px',
+                                borderRadius: 6,
+                                border: '1px solid var(--input-border)',
+                                background: 'var(--input-bg)',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                              }}
+                            >
+                              Close Survey
+                            </button>
+                          )}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEditSurvey(survey) }}
                             className="btn-secondary"
@@ -743,6 +785,39 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
           onConfirm={confirmation.onConfirm}
           onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
         />
+      )}
+
+      {/* Close Survey confirmation modal */}
+      {closingSurveyId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: 12, padding: 28, maxWidth: 400, width: '90%' }}>
+            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>Close Survey</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 20px' }}>
+              This will close the survey and all remaining open defects. This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setClosingSurveyId(null)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => handleCloseSurvey(closingSurveyId)} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--accent, #00aac8)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Close Survey</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Endorsement question modal */}
+      {endorsementSurveyId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: 12, padding: 28, maxWidth: 420, width: '90%' }}>
+            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>Reservations Endorsement</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 24px' }}>
+              Did you issue a reservations endorsement for this survey?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEndorsementSurveyId(null)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-secondary)', cursor: 'pointer' }}>Skip</button>
+              <button onClick={() => handleEndorsementAnswer(endorsementSurveyId, false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(255,77,77,0.35)', background: 'rgba(255,77,77,0.12)', color: 'var(--danger)', cursor: 'pointer', fontWeight: 600 }}>No — remind me in 2 days</button>
+              <button onClick={() => handleEndorsementAnswer(endorsementSurveyId, true)} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--accent, #00aac8)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Yes</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

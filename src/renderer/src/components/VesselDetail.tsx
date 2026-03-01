@@ -12,6 +12,7 @@ import { ReportServiceV2 } from '../services/ReportServiceV2'
 import VesselDocumentsView from './VesselDocumentsView'
 import AssuredManager from './AssuredManager'
 import ConditionSurveyManager from './ConditionSurveyManager'
+import WarrantyManager from './WarrantyManager'
 import ConfirmationModal from './ConfirmationModal'
 
 interface VesselDetailProps {
@@ -295,6 +296,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     }
 
     const [isEditing, setIsEditing] = useState(initialEditing)
+    useEffect(() => { if (initialEditing) setIsEditing(true) }, [initialEditing])
     const [editName, setEditName] = useState(vessel.name)
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
@@ -1397,14 +1399,21 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             {detailView === 'surveys' && <ConditionSurveyManager vessel={vessel} />}
 
             {detailView === 'policies' && (
-                <DynamicPoliciesView
-                    vesselId={vessel.id}
-                    dynamicPolicies={dynamicPolicies}
-                    isLight={isLight}
-                    onReload={loadDynamicPolicies}
-                    showSuccess={showSuccess}
-                    showError={showError}
-                />
+                <>
+                    <DynamicPoliciesView
+                        vesselId={vessel.id}
+                        dynamicPolicies={dynamicPolicies}
+                        isLight={isLight}
+                        onReload={loadDynamicPolicies}
+                        showSuccess={showSuccess}
+                        showError={showError}
+                    />
+                    <WarrantyManager
+                        vesselId={vessel.id}
+                        dynamicPolicies={dynamicPolicies}
+                        isLight={isLight}
+                    />
+                </>
             )}
 
             {detailView === 'history' && (

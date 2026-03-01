@@ -839,6 +839,64 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE vessel_types ADD COLUMN description TEXT NULL AFTER name")
             }
 
+            // Migration: Add completion + endorsement fields to condition_surveys
+            const [csCompletedCols] = await this.pool.query("SHOW COLUMNS FROM condition_surveys LIKE 'completed_at'")
+            if ((csCompletedCols as any[]).length === 0) {
+                await this.pool.query("ALTER TABLE condition_surveys ADD COLUMN completed_at DATETIME NULL, ADD COLUMN completed_by VARCHAR(36) NULL, ADD COLUMN endorsement_issued TINYINT(1) NULL, ADD COLUMN endorsement_reminder_date DATE NULL")
+            }
+
+            // Migration: Create survey_warranties table
+            const [swTables] = await this.pool.query("SHOW TABLES LIKE 'survey_warranties'")
+            if ((swTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE survey_warranties (
+                    id VARCHAR(36) PRIMARY KEY,
+                    vessel_id VARCHAR(36) NOT NULL,
+                    policy_id VARCHAR(36) NULL,
+                    description VARCHAR(500) NOT NULL,
+                    deadline_type ENUM('days','event') NOT NULL DEFAULT 'days',
+                    deadline_days INT NULL,
+                    deadline_event VARCHAR(500) NULL,
+                    inception_date DATE NOT NULL,
+                    notes TEXT NULL,
+                    status ENUM('pending','survey_done','completed','waived') NOT NULL DEFAULT 'pending',
+                    waiver_reason TEXT NULL,
+                    completed_at DATETIME NULL,
+                    completion_notes TEXT NULL,
+                    condition_survey_id VARCHAR(36) NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_sw_vessel (vessel_id),
+                    INDEX idx_sw_policy (policy_id),
+                    INDEX idx_sw_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } else {
+                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+            }
+
+            // Migration: Create survey_warranty_reminders table
+            const [swrTables] = await this.pool.query("SHOW TABLES LIKE 'survey_warranty_reminders'")
+            if ((swrTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE survey_warranty_reminders (
+                    id VARCHAR(36) PRIMARY KEY,
+                    warranty_id VARCHAR(36) NOT NULL,
+                    sent_at DATE NOT NULL,
+                    channel ENUM('email','phone','other') NOT NULL DEFAULT 'email',
+                    reference VARCHAR(255) NULL,
+                    notes TEXT NULL,
+                    next_reminder_date DATE NULL,
+                    logged_by VARCHAR(36) NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_swr_warranty (warranty_id),
+                    INDEX idx_swr_next (next_reminder_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } else {
+                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                // Migration: add reference column if missing
+                const [swrCols] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_reminders LIKE 'reference'")
+                if ((swrCols as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranty_reminders ADD COLUMN reference VARCHAR(255) NULL AFTER channel`)
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -2276,6 +2334,233 @@ export class MySQLAdapter {
             ORDER BY cs.survey_date DESC
         `, [vesselId])
         return rows as any[]
+    }
+
+    // --- Dashboard Activity ---
+    async getDashboardActivity(): Promise<{ recentVessels: any[]; recentEntities: any[]; recentAuditEntries: any[] }> {
+        if (!this.pool) return { recentVessels: [], recentEntities: [], recentAuditEntries: [] }
+        const [recentVessels] = await this.pool.query(`
+            SELECT v.id, v.name, v.imo_number as imoNumber,
+                v.created_at as createdAt, v.is_active as isActive,
+                f.name as fleetName
+            FROM vessels v
+            LEFT JOIN fleets f ON f.id = v.fleet_id
+            ORDER BY v.created_at DESC
+            LIMIT 6
+        `)
+        const [recentEntities] = await this.pool.query(`
+            SELECT id, name, type, created_at as createdAt
+            FROM entities
+            ORDER BY created_at DESC
+            LIMIT 6
+        `)
+        const [recentAuditEntries] = await this.pool.query(`
+            SELECT al.vessel_id as vesselId, v.name as vesselName,
+                al.field_name as fieldName, al.new_value as newValue,
+                al.changed_at as changedAt
+            FROM vessel_audit_log al
+            JOIN vessels v ON v.id = al.vessel_id
+            ORDER BY al.changed_at DESC
+            LIMIT 8
+        `)
+        return {
+            recentVessels: (recentVessels as any[]).map(r => ({ ...r, isActive: Boolean(r.isActive) })),
+            recentEntities: recentEntities as any[],
+            recentAuditEntries: recentAuditEntries as any[]
+        }
+    }
+
+    // --- Survey Warranties ---
+    async getSurveyWarrantiesByVessel(vesselId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT sw.id, sw.vessel_id as vesselId, sw.policy_id as policyId,
+                sw.description, sw.deadline_type as deadlineType,
+                sw.deadline_days as deadlineDays, sw.deadline_event as deadlineEvent,
+                sw.inception_date as inceptionDate, sw.notes, sw.status,
+                sw.waiver_reason as waiverReason, sw.completed_at as completedAt,
+                sw.completion_notes as completionNotes,
+                sw.condition_survey_id as conditionSurveyId,
+                sw.created_at as createdAt,
+                (SELECT COUNT(*) FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id) as reminderCount,
+                (SELECT swr2.sent_at FROM survey_warranty_reminders swr2 WHERE swr2.warranty_id = sw.id ORDER BY swr2.sent_at DESC LIMIT 1) as lastReminderDate,
+                (SELECT swr3.next_reminder_date FROM survey_warranty_reminders swr3 WHERE swr3.warranty_id = sw.id ORDER BY swr3.created_at DESC LIMIT 1) as nextReminderDate
+            FROM survey_warranties sw
+            WHERE sw.vessel_id = ?
+            ORDER BY sw.created_at DESC
+        `, [vesselId])
+        return rows as any[]
+    }
+
+    async getAllSurveyWarranties(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT sw.id, sw.vessel_id as vesselId, sw.policy_id as policyId,
+                sw.description, sw.deadline_type as deadlineType,
+                sw.deadline_days as deadlineDays, sw.deadline_event as deadlineEvent,
+                sw.inception_date as inceptionDate, sw.notes, sw.status,
+                sw.waiver_reason as waiverReason, sw.completed_at as completedAt,
+                sw.completion_notes as completionNotes,
+                sw.condition_survey_id as conditionSurveyId,
+                sw.created_at as createdAt,
+                v.name as vesselName, v.imo_number as imoNumber,
+                e.name as customerName,
+                f.name as fleetName,
+                pt.name as policyTypeName,
+                (SELECT COUNT(*) FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id) as reminderCount,
+                (SELECT swr2.sent_at FROM survey_warranty_reminders swr2 WHERE swr2.warranty_id = sw.id ORDER BY swr2.sent_at DESC LIMIT 1) as lastReminderDate,
+                (SELECT swr3.next_reminder_date FROM survey_warranty_reminders swr3 WHERE swr3.warranty_id = sw.id ORDER BY swr3.created_at DESC LIMIT 1) as nextReminderDate
+            FROM survey_warranties sw
+            JOIN vessels v ON v.id = sw.vessel_id
+            LEFT JOIN entities e ON e.id = v.customer_id
+            LEFT JOIN fleets f ON f.id = v.fleet_id
+            LEFT JOIN vessel_dynamic_policies vdp ON vdp.id = sw.policy_id
+            LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
+            WHERE sw.status IN ('pending', 'survey_done')
+            ORDER BY sw.inception_date ASC
+        `)
+        return rows as any[]
+    }
+
+    async getSurveyWarrantiesDueToday(): Promise<any[]> {
+        if (!this.pool) return []
+        const today = new Date().toISOString().split('T')[0]
+        const [rows] = await this.pool.query(`
+            SELECT sw.id, sw.description, sw.status,
+                v.name as vesselName, v.imo_number as imoNumber,
+                (SELECT swr.next_reminder_date FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id ORDER BY swr.created_at DESC LIMIT 1) as nextReminderDate
+            FROM survey_warranties sw
+            JOIN vessels v ON v.id = sw.vessel_id
+            WHERE sw.status IN ('pending', 'survey_done')
+            HAVING nextReminderDate IS NOT NULL AND nextReminderDate <= ?
+        `, [today])
+        return rows as any[]
+    }
+
+    async getEndorsementsDue(): Promise<any[]> {
+        if (!this.pool) return []
+        const today = new Date().toISOString().split('T')[0]
+        const [rows] = await this.pool.query(`
+            SELECT cs.id as surveyId, cs.vessel_id as vesselId,
+                cs.survey_date as surveyDate, cs.survey_type as surveyType,
+                cs.endorsement_reminder_date as endorsementReminderDate,
+                v.name as vesselName, v.imo_number as imoNumber
+            FROM condition_surveys cs
+            JOIN vessels v ON v.id = cs.vessel_id
+            WHERE cs.endorsement_issued = 0
+              AND cs.endorsement_reminder_date IS NOT NULL
+              AND cs.endorsement_reminder_date <= ?
+              AND cs.completed_at IS NULL
+        `, [today])
+        return rows as any[]
+    }
+
+    async createSurveyWarranty(data: any): Promise<any> {
+        if (!this.pool) throw new Error('No DB')
+        const id = require('crypto').randomUUID()
+        await this.pool.query(
+            `INSERT INTO survey_warranties (id, vessel_id, policy_id, description, deadline_type, deadline_days, deadline_event, inception_date, notes, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [id, data.vesselId, data.policyId || null, data.description, data.deadlineType, data.deadlineDays || null, data.deadlineEvent || null, data.inceptionDate, data.notes || null]
+        )
+        const [rows] = await this.pool.query('SELECT * FROM survey_warranties WHERE id = ?', [id])
+        return (rows as any[])[0]
+    }
+
+    async updateSurveyWarranty(id: string, data: any): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        const allowed = ['description', 'deadlineType', 'deadlineDays', 'deadlineEvent', 'inceptionDate', 'notes', 'status', 'waiverReason', 'completedAt', 'completionNotes', 'conditionSurveyId', 'policyId']
+        const colMap: Record<string, string> = { deadlineType: 'deadline_type', deadlineDays: 'deadline_days', deadlineEvent: 'deadline_event', inceptionDate: 'inception_date', waiverReason: 'waiver_reason', completedAt: 'completed_at', completionNotes: 'completion_notes', conditionSurveyId: 'condition_survey_id', policyId: 'policy_id' }
+        for (const key of allowed) {
+            if (key in data) {
+                fields.push(`${colMap[key] || key} = ?`)
+                values.push(data[key] ?? null)
+            }
+        }
+        if (!fields.length) return
+        values.push(id)
+        await this.pool.query(`UPDATE survey_warranties SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteSurveyWarranty(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.query('DELETE FROM survey_warranty_reminders WHERE warranty_id = ?', [id])
+        await this.pool.query('DELETE FROM survey_warranties WHERE id = ?', [id])
+    }
+
+    async logWarrantyReminder(data: any): Promise<any> {
+        if (!this.pool) throw new Error('No DB')
+        const id = require('crypto').randomUUID()
+        await this.pool.query(
+            `INSERT INTO survey_warranty_reminders (id, warranty_id, sent_at, channel, reference, notes, next_reminder_date, logged_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.warrantyId, data.sentAt, data.channel || 'email', data.reference || null, data.notes || null, data.nextReminderDate || null, data.loggedBy || null]
+        )
+        const [rows] = await this.pool.query('SELECT * FROM survey_warranty_reminders WHERE id = ?', [id])
+        return (rows as any[])[0]
+    }
+
+    async getWarrantyReminders(warrantyId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT swr.id, swr.warranty_id as warrantyId,
+                swr.sent_at as sentAt, swr.channel, swr.reference,
+                swr.notes, swr.next_reminder_date as nextReminderDate,
+                swr.logged_by as loggedBy, swr.created_at as createdAt,
+                u.username as loggedByName
+            FROM survey_warranty_reminders swr
+            LEFT JOIN users u ON u.id = swr.logged_by
+            WHERE swr.warranty_id = ?
+            ORDER BY swr.sent_at DESC, swr.created_at DESC
+        `, [warrantyId])
+        return rows as any[]
+    }
+
+    async waiverSurveyWarranty(id: string, reason: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.query(
+            `UPDATE survey_warranties SET status = 'waived', waiver_reason = ?, completed_at = NOW() WHERE id = ?`,
+            [reason, id]
+        )
+    }
+
+    async closeSurvey(surveyId: string, userId: string): Promise<void> {
+        if (!this.pool) return
+        // Bulk-close all open defects
+        await this.pool.query(
+            `UPDATE survey_defects SET status = 'CLOSED', closed_at = NOW(), closed_by = ? WHERE survey_id = ? AND status = 'OPEN'`,
+            [userId, surveyId]
+        )
+        // Mark survey complete
+        await this.pool.query(
+            `UPDATE condition_surveys SET completed_at = NOW(), completed_by = ? WHERE id = ?`,
+            [userId, surveyId]
+        )
+        // Auto-complete any linked warranty
+        await this.pool.query(
+            `UPDATE survey_warranties SET status = 'completed', completed_at = NOW() WHERE condition_survey_id = ? AND status IN ('pending','survey_done')`,
+            [surveyId]
+        )
+    }
+
+    async updateConditionSurveyEndorsement(surveyId: string, issued: boolean): Promise<void> {
+        if (!this.pool) return
+        if (issued) {
+            await this.pool.query(
+                `UPDATE condition_surveys SET endorsement_issued = 1, endorsement_reminder_date = NULL WHERE id = ?`,
+                [surveyId]
+            )
+        } else {
+            const reminderDate = new Date()
+            reminderDate.setDate(reminderDate.getDate() + 2)
+            const dateStr = reminderDate.toISOString().split('T')[0]
+            await this.pool.query(
+                `UPDATE condition_surveys SET endorsement_issued = 0, endorsement_reminder_date = ? WHERE id = ?`,
+                [dateStr, surveyId]
+            )
+        }
     }
 
     // --- Compliance Schedule ---

@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -159,6 +159,27 @@ export interface Api {
   deleteSurveyAttachment: (id: string) => Promise<void>
   getOpenDefectsByVessel: () => Promise<any[]>
   getSurveyHistory: (vesselId: string) => Promise<any[]>
+  closeSurvey: (surveyId: string, userId: string) => Promise<void>
+  updateConditionSurveyEndorsement: (surveyId: string, issued: boolean) => Promise<void>
+
+  // Dashboard
+  dashboardGetActivity: () => Promise<{
+    recentVessels: Array<{ id: string; name: string; imoNumber: string; fleetName?: string; createdAt: string; isActive: boolean }>
+    recentEntities: Array<{ id: string; name: string; type: string; createdAt: string }>
+    recentAuditEntries: Array<{ vesselId: string; vesselName: string; fieldName: string; newValue?: string; changedAt: string }>
+  }>
+
+  // Survey Warranties
+  surveyWarrantyGetByVessel: (vesselId: string) => Promise<SurveyWarranty[]>
+  surveyWarrantyGetAll: () => Promise<SurveyWarranty[]>
+  surveyWarrantyGetDueToday: () => Promise<SurveyWarranty[]>
+  surveyWarrantyGetEndorsementsDue: () => Promise<any[]>
+  surveyWarrantyCreate: (data: Omit<SurveyWarranty, 'id' | 'status' | 'createdAt'>) => Promise<SurveyWarranty>
+  surveyWarrantyUpdate: (id: string, data: Partial<SurveyWarranty>) => Promise<void>
+  surveyWarrantyDelete: (id: string) => Promise<void>
+  surveyWarrantyLogReminder: (data: Omit<SurveyWarrantyReminder, 'id' | 'createdAt'>) => Promise<SurveyWarrantyReminder>
+  surveyWarrantyGetReminders: (warrantyId: string) => Promise<SurveyWarrantyReminder[]>
+  surveyWarrantyWaive: (id: string, reason: string) => Promise<void>
 
   // Reminders
   remindersGetSettings: () => Promise<ReminderSettings>
