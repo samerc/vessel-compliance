@@ -91,7 +91,7 @@ Automated weekly sanctions screening for all entities and vessels:
 
 ### Condition Surveys
 Vessel inspection tracking with defects management:
-- **Surveyors**: Directory of surveyor companies (`SurveyorDirectory.tsx`) with company name, country, contact info
+- **Surveyors**: Directory of surveyor companies (`SurveyorDirectory.tsx`) — table + slide-in panel layout (see UI Pattern below). Stats strip: Total Surveyors / Total Surveys / Open Surveys. Slide-in panel shows per-surveyor survey history with OPEN / CLOSED / NO DEFECTS status computed from defects (open=0 → CLOSED, no defects → NO DEFECTS). Add/Edit via modal.
 - **Surveys**: Condition surveys attached to vessels (`ConditionSurveyManager.tsx`) with date, surveyor, type, location
 - **Survey List**: Cross-vessel survey overview (`ConditionSurveyList.tsx`) with search, navigates directly to vessel's survey section
 - **Defects**: Each survey can have multiple defects (`DefectManager.tsx`) with severity (optional), status (OPEN/CLOSED), due dates
@@ -124,23 +124,29 @@ Vessels can be assigned to a customer entity with a customer type:
 
 Dual-view fleet management page (`src/renderer/src/components/FleetManager.tsx`):
 
-- **By Customer** view: Vessels grouped under customer entities, split into Brokers / Direct Clients / Unassigned sections
-- **By Fleet** view: Original fleet CRUD with vessel assignment
-- **Filters**: Customer type filter and text search (under By Customer view only)
-- **Collapsible**: Customer cards and sections expand/collapse with glass-card styling
-- **Flag Column**: Fleet vessel tables show flag icons alongside vessel name, IMO, and fleet
+- **Default view**: By Fleet (tab order: By Fleet → By Customer)
+- **Stats strip**: Total Fleets / Assigned Vessels / Unassigned (amber if > 0)
+- **By Fleet view**: toolbar with search + "Add Fleet" button; "Add Fleet" expands an inline form (not a permanent card). Fleet table with slide-in panel (380px):
+  - **Panel — Vessels in Fleet**: compact list of assigned vessels with immediate remove button (`UserMinus`) per row and external-link to vessel detail
+  - **Panel — Add Vessels**: collapsible section below; shows only vessels NOT in this fleet with checkboxes + search filter. "Add N Vessels" confirm button appears once ≥ 1 is checked; batch API save on confirm
+  - Remove is immediate (single API call); add is multi-select then batch-confirmed
+- **By Customer view**: Vessels grouped under customer entities, split into Brokers / Direct Clients / Unassigned sections; collapsible with glass-card styling; customer type filter and text search
+- **Flag Column**: Fleet and customer vessel tables show flag icons
 
 ### Entity Directory
 
-Entity management page (`src/renderer/src/components/EntityDirectory.tsx`) with master-detail layout:
+Entity management page (`src/renderer/src/components/EntityDirectory.tsx`) — table + slide-in panel layout (see UI Pattern below):
 
-- **Stats Row**: Total entities, companies, persons counts with gradient icons
-- **Left Panel**: Paginated entity list (default 25 per page) with type-colored avatars, OFAC badges on separate line, search/filter
-- **Right Panel**: Entity detail with contact info (multiple comma-separated emails supported), document status badges, associated vessels grid
+- **Stats Row**: Total entities, companies, persons counts (derived from `allEntities` — full unfiltered list)
+- **Table columns**: Name | Type | Sanctions (OfacBadge) | Documents (compliance score) | Vessels (count)
+- **Slide-in panel (400px)**: profile header (shows "UBO of: [Company]" with Link2 icon for persons), document status section, associated vessels as compact list rows
+- **`allEntities` state**: full unfiltered entity list loaded alongside paginated data; used for all lookups (`getAssociatedVessels`, `getParentCompanies`, counts). Using paginated `entities` for lookups caused "undefined (role)" in vessel cards when parent was on a different page.
+- **`getParentCompanies(entityId)`**: finds parent companies for UBO persons via `entityUBOs.filter(eu => eu.uboEntityId === entityId).map(eu => allEntities.find(...))`
+- **`getDocScore(entity)`**: returns `{ have, total }` for document compliance indicator column
 - **Edit Modal**: Modify entity name, type, identifier, email(s), phone
 - **Create Entity**: Modal with auto-sanctions check after creation (shows spinner)
 - **Delete**: With confirmation warning about linked vessels; clears customer references
-- **Vessel Navigation**: Clicking vessel names navigates to VesselDetail with "Back to Entity" return
+- **Vessel Navigation**: Clicking vessel names navigates to VesselDetail
 
 ### Entity Documents
 Required documents vary by entity type:
@@ -345,10 +351,36 @@ Quotation management system:
 - **Auto-edit on add**: `VesselDetail` accepts `initialEditing?: boolean` prop → `useState(initialEditing)` opens in edit mode immediately. `VesselManager` sets `openInEditMode = true` after successful vessel creation; back handler resets it to `false`.
 - **Searchable edit dropdowns**: Classification society and flag state fields use custom searchable dropdowns (`classSearch`, `flagDropdownOpen`, `flagSearch` states). Classification shows search input when `classSocieties.length > 6`; flag filters by name AND iso3Code. The flag `+` (add new) button is retained alongside the dropdown.
 
+### Vessel History Tab (`VesselHistoryView`)
+
+Redesigned history view inside `VesselDetail.tsx` (rendered when `detailView === 'history'`):
+
+- **Stats strip**: 3 KPI cards — Total Changes / Contributors / Since (earliest entry date)
+- **Search + field filter**: text search across field names and values; dropdown to filter by specific field
+- **Date-grouped timeline**: entries grouped into Today / Yesterday / specific date labels; each group has a bold header + entry count badge
+- **`getFieldMeta(fieldName)`**: returns `{ icon, color, bg }` by keyword category (name=blue, flag=purple, status=amber, imo=cyan, class=green, type=pink)
+- **Entry row**: colored 3px left border + icon in rounded square, field name, old value (strikethrough) → new value (bold), Clock icon + time, "by username"
+
+### Vessel Document Expiry Fixes (`VesselDocumentsView`)
+
+- **Expiry clear button**: explicit `×` (`X` icon, 18px circle) button renders next to the expiry date input when a date is set; calls `updateVesselDocumentExpiry(..., null)` directly. Chromium date input native clear is unreliable for controlled React inputs.
+- **No expiry inheritance**: `uploadDoc` sets `expiryDate: undefined` (not `existing?.expiryDate || undefined`) so a newly uploaded file never inherits the previous file's expiry date.
+
 ### Vessel List
 
 - **Sanctions Column**: OfacBadge displayed in separate column (not inline with vessel name)
 - **Flag Icons**: Flag state shown as icon next to vessel name using `flag-icons` CSS package
+
+### Table + Slide-in Panel UI Pattern
+
+Used across EntityDirectory, SurveyorDirectory, FleetManager (fleet view), and VesselHistoryView. Canonical pattern for list-detail pages:
+
+- **Full-width table** on the left (`flex: 1`), selected row highlighted with `rgba(0,210,255,0.06)` background
+- **Slide-in panel** on the right (fixed width, e.g. 380–400px): `background: isLight ? '#f4f6fb' : '#14172a'`, `border: '1px solid var(--glass-border)'`, `borderRadius: 12px`, `maxHeight: 'calc(100vh - 280px)'`, `overflowY: auto`
+- Panel header: gradient icon circle (40–44px, borderRadius 10), bold title, secondary subtitle, close X button
+- Clicking a table row opens the panel; clicking another row switches the panel content
+- Panel content is always derived from already-loaded data (no extra API calls on row click)
+- Stats strip above the table: 3–5 glass-card KPI cards with colored gradient icon circles
 
 ### Code Style
 - Prettier: Single quotes, no semicolons, 100 char width, no trailing commas
