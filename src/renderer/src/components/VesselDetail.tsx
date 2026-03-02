@@ -301,7 +301,13 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
     const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history'>(initialSection || 'documents')
-    useEffect(() => { if (initialSection) setDetailView(initialSection) }, [initialSection])
+    useEffect(() => {
+        if (initialSection) {
+            setDetailView(initialSection)
+            if (initialSection === 'policies' || initialSection === 'surveys') loadDynamicPolicies()
+            if (initialSection === 'history') loadAuditLog()
+        }
+    }, [initialSection])
     const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
     const [auditLog, setAuditLog] = useState<VesselAuditEntry[]>([])
     const [showExportMenu, setShowExportMenu] = useState(false)
@@ -904,7 +910,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         key={view}
                         onClick={() => {
                             setDetailView(view)
-                            if (view === 'policies') loadDynamicPolicies()
+                            if (view === 'policies' || view === 'surveys') loadDynamicPolicies()
                             if (view === 'history') loadAuditLog()
                         }}
                         style={{

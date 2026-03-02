@@ -111,6 +111,21 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     }
   }
 
+  // ── Helpers ──────────────────────────────────────────────────────
+  const getPolicyInceptionDate = (policyId: string): string => {
+    const policy = dynamicPolicies.find(p => p.id === policyId)
+    const val = policy?.values?.find(v =>
+      v.characteristicName?.toLowerCase().includes('inception date') ||
+      v.characteristicName?.toLowerCase().includes('start date')
+    )
+    return val?.valueDate || new Date().toISOString().split('T')[0]
+  }
+
+  const handlePolicyChange = (policyId: string) => {
+    setFormPolicyId(policyId)
+    if (policyId) setFormInceptionDate(getPolicyInceptionDate(policyId))
+  }
+
   // ── Add / Edit ──────────────────────────────────────────────────
   const openAddModal = () => {
     setEditingWarranty(null)
@@ -118,8 +133,9 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     setFormDeadlineType('days')
     setFormDeadlineDays('')
     setFormDeadlineEvent('')
-    setFormInceptionDate(new Date().toISOString().split('T')[0])
-    setFormPolicyId(dynamicPolicies[0]?.id || '')
+    const firstPolicyId = dynamicPolicies[0]?.id || ''
+    setFormPolicyId(firstPolicyId)
+    setFormInceptionDate(firstPolicyId ? getPolicyInceptionDate(firstPolicyId) : new Date().toISOString().split('T')[0])
     setFormNotes('')
     setFormStatus('pending')
     setShowAddModal(true)
@@ -226,9 +242,10 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
   const handleLogReminder = async () => {
     if (!reminderWarrantyId || !reminderSentAt) { showError('Sent date is required'); return }
+    const wid = reminderWarrantyId
     try {
-      await window.api.surveyWarrantyLogReminder({
-        warrantyId: reminderWarrantyId,
+      const result = await window.api.surveyWarrantyLogReminder({
+        warrantyId: wid,
         sentAt: reminderSentAt,
         channel: reminderChannel,
         reference: reminderReference.trim() || null,
@@ -236,9 +253,12 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         nextReminderDate: reminderNextDate || null,
         loggedBy: user?.id || null
       })
+      if (result && typeof result === 'object' && (result as any).error) {
+        showError((result as any).message || 'Failed to log reminder'); return
+      }
       showSuccess('Reminder logged')
       setReminderWarrantyId(null)
-      await loadReminders(reminderWarrantyId)
+      await loadReminders(wid)
       loadWarranties()
     } catch (err: any) {
       showError(err.message || 'Failed to log reminder')
@@ -567,7 +587,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
               </div>
               <div>
                 <label style={labelStyle}>Linked Policy</label>
-                <select value={formPolicyId} onChange={e => setFormPolicyId(e.target.value)} style={inputStyle}>
+                <select value={formPolicyId} onChange={e => handlePolicyChange(e.target.value)} style={inputStyle}>
                   <option value="">— None —</option>
                   {dynamicPolicies.map(p => (
                     <option key={p.id} value={p.id}>

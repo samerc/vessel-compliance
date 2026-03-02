@@ -1294,7 +1294,7 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM vessel_documents WHERE id = ?', [docId])
     }
 
-    async updateVesselDocumentExpiry(vesselId: string, docTypeId: string, expiryDate: string): Promise<void> {
+    async updateVesselDocumentExpiry(vesselId: string, docTypeId: string, expiryDate: string | null): Promise<void> {
         if (!this.pool) return
 
         const [existing]: any[] = await this.pool.query(
@@ -2508,10 +2508,8 @@ export class MySQLAdapter {
             SELECT swr.id, swr.warranty_id as warrantyId,
                 swr.sent_at as sentAt, swr.channel, swr.reference,
                 swr.notes, swr.next_reminder_date as nextReminderDate,
-                swr.logged_by as loggedBy, swr.created_at as createdAt,
-                u.username as loggedByName
+                swr.logged_by as loggedBy, swr.created_at as createdAt
             FROM survey_warranty_reminders swr
-            LEFT JOIN users u ON u.id = swr.logged_by
             WHERE swr.warranty_id = ?
             ORDER BY swr.sent_at DESC, swr.created_at DESC
         `, [warrantyId])

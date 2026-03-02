@@ -104,12 +104,15 @@ export default function Dashboard({
   useEffect(() => { loadData() }, [loadData])
 
   const activeVessels = useMemo(() => vessels.filter(v => v.isActive), [vessels])
+  const activeVesselIds = useMemo(() => new Set(activeVessels.map(v => v.id)), [activeVessels])
 
   const docMap = useMemo(() => {
     const map = new Map<string, VesselDocument>()
-    for (const d of docs) map.set(`${d.vesselId}:${d.documentTypeId}`, d)
+    for (const d of docs) {
+      if (activeVesselIds.has(d.vesselId)) map.set(`${d.vesselId}:${d.documentTypeId}`, d)
+    }
     return map
-  }, [docs])
+  }, [docs, activeVesselIds])
 
   const allAlerts = useMemo(() => {
     const today = new Date()

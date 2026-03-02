@@ -42,7 +42,7 @@ export interface Api {
 
   getVesselDocuments: (vesselId?: string) => Promise<VesselDocument[]>
   upsertVesselDocument: (doc: VesselDocument) => Promise<void>
-  updateVesselDocumentExpiry: (vesselId: string, docTypeId: string, expiryDate: string) => Promise<void>
+  updateVesselDocumentExpiry: (vesselId: string, docTypeId: string, expiryDate: string | null) => Promise<void>
   updateVesselDocumentReceivedDate: (vesselId: string, docTypeId: string, receivedDate: string) => Promise<void>
   duplicateVesselDocument: (docId: string, uploadedBy: string) => Promise<void>
   deleteVesselDocumentById: (docId: string) => Promise<void>

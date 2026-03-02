@@ -329,7 +329,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
                 onBlur={async e => {
                   const val = e.target.value
                   setEditingExpiry(prev => { const n = { ...prev }; delete n[id]; return n })
-                  if (val) { await window.api.updateVesselDocumentExpiry(vessel.id, id, val); loadData() }
+                  await window.api.updateVesselDocumentExpiry(vessel.id, id, val || null); loadData()
                 }}
                 min="1900-01-01" max="2100-12-31"
                 style={{ fontSize: '0.78rem', padding: '3px 6px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
@@ -352,6 +352,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
                 const val = e.target.value
                 setEditingExpiry(prev => { const n = { ...prev }; delete n[id]; return n })
                 if (val) { await window.api.updateVesselDocumentExpiry(vessel.id, id, val); loadData() }
+                // no-op if still empty (user focused without entering anything)
               }}
               min="1900-01-01" max="2100-12-31"
               style={{ fontSize: '0.78rem', padding: '3px 6px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
@@ -369,7 +370,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
               onBlur={async e => {
                 const val = e.target.value
                 setEditingExpiry(prev => { const n = { ...prev }; delete n[id]; return n })
-                if (val) { await window.api.updateVesselDocumentExpiry(vessel.id, id, val); loadData() }
+                await window.api.updateVesselDocumentExpiry(vessel.id, id, val || null); loadData()
               }}
               min="1900-01-01" max="2100-12-31"
               style={{ fontSize: '0.78rem', padding: '3px 6px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
