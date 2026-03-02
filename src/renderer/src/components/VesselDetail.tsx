@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, Tag } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -2172,9 +2172,8 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
 // ==================== Vessel History View ====================
 
 function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: VesselAuditEntry[]; isLight: boolean; flagStates: FlagState[] }) {
-    if (auditLog.length === 0) {
-        return <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '32px' }}>No changes recorded yet.</p>
-    }
+    const [search, setSearch] = useState('')
+    const [filterField, setFilterField] = useState('all')
 
     const resolveFlagValue = (val: string | null) => {
         if (!val) return val
@@ -2182,43 +2181,191 @@ function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: Vessel
         return match ? `${match.name} (${match.iso3Code})` : val
     }
 
-    return (
-        <div style={{ position: 'relative', paddingLeft: '24px' }}>
-            {/* Vertical timeline line */}
-            <div style={{ position: 'absolute', left: '8px', top: '4px', bottom: '4px', width: '2px', background: 'var(--glass-border)' }} />
+    const getFieldMeta = (fieldName: string): { icon: React.ReactNode; color: string; bg: string } => {
+        const fn = fieldName.toLowerCase()
+        if (fn.includes('name'))
+            return { icon: <FileText size={12} />, color: isLight ? '#2563eb' : '#60a5fa', bg: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(96,165,250,0.12)' }
+        if (fn.includes('flag'))
+            return { icon: <Shield size={12} />, color: isLight ? '#7c3aed' : '#a78bfa', bg: isLight ? 'rgba(124,58,237,0.1)' : 'rgba(167,139,250,0.12)' }
+        if (fn.includes('status') || fn.includes('active'))
+            return { icon: <ToggleLeft size={12} />, color: isLight ? '#b45309' : '#f59e0b', bg: isLight ? 'rgba(180,83,9,0.1)' : 'rgba(245,158,11,0.12)' }
+        if (fn.includes('imo'))
+            return { icon: <Hash size={12} />, color: isLight ? '#0e7490' : '#22d3ee', bg: isLight ? 'rgba(14,116,144,0.1)' : 'rgba(34,211,238,0.12)' }
+        if (fn.includes('class') || fn.includes('society'))
+            return { icon: <ClipboardList size={12} />, color: isLight ? '#059669' : '#34d399', bg: isLight ? 'rgba(5,150,105,0.1)' : 'rgba(52,211,153,0.12)' }
+        if (fn.includes('type') || fn.includes('vessel type'))
+            return { icon: <Tag size={12} />, color: isLight ? '#db2777' : '#f472b6', bg: isLight ? 'rgba(219,39,119,0.1)' : 'rgba(244,114,182,0.12)' }
+        return { icon: <Calendar size={12} />, color: isLight ? '#1a73e8' : 'var(--accent-primary)', bg: isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)' }
+    }
 
-            {auditLog.map((entry, i) => {
-                const date = new Date(entry.changedAt)
-                const isFlagField = entry.fieldName === 'Flag State'
-                const displayOld = isFlagField ? resolveFlagValue(entry.oldValue) : entry.oldValue
-                const displayNew = isFlagField ? resolveFlagValue(entry.newValue) : entry.newValue
-                return (
-                    <div key={entry.id} style={{ position: 'relative', marginBottom: '16px', paddingLeft: '16px' }}>
-                        {/* Dot */}
-                        <div style={{
-                            position: 'absolute', left: '-20px', top: '6px', width: '12px', height: '12px',
-                            borderRadius: '50%', background: i === 0 ? 'var(--accent-primary)' : 'var(--glass-border)',
-                            border: '2px solid ' + (isLight ? '#fff' : '#1a1e26')
-                        }} />
-                        <div className="glass-card" style={{ padding: '12px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>{entry.fieldName}</span>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                    {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>by {entry.changedBy}</span>
-                            </div>
-                            <div style={{ fontSize: '0.85rem' }}>
-                                {displayOld && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{displayOld}</span>}
-                                {displayOld && displayNew && <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>&rarr;</span>}
-                                {displayNew && <span style={{ fontWeight: '500' }}>{displayNew}</span>}
-                                {!displayOld && displayNew && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}> (set)</span>}
-                                {displayOld && !displayNew && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}> (cleared)</span>}
-                            </div>
+    const uniqueFields = [...new Set(auditLog.map(e => e.fieldName))].sort()
+    const uniqueUsers = new Set(auditLog.map(e => e.changedBy)).size
+    const firstChange = auditLog.length > 0 ? new Date(auditLog[auditLog.length - 1].changedAt) : null
+
+    const filtered = auditLog.filter(e => {
+        const q = search.toLowerCase()
+        const matchSearch = !q ||
+            e.fieldName.toLowerCase().includes(q) ||
+            e.changedBy.toLowerCase().includes(q) ||
+            (e.newValue || '').toLowerCase().includes(q) ||
+            (e.oldValue || '').toLowerCase().includes(q)
+        const matchField = filterField === 'all' || e.fieldName === filterField
+        return matchSearch && matchField
+    })
+
+    // Group by date
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+    const groups: { label: string; entries: VesselAuditEntry[] }[] = []
+    const seenLabels = new Map<string, VesselAuditEntry[]>()
+    for (const entry of filtered) {
+        const d = new Date(entry.changedAt); d.setHours(0, 0, 0, 0)
+        let label: string
+        if (d.getTime() === today.getTime()) label = 'Today'
+        else if (d.getTime() === yesterday.getTime()) label = 'Yesterday'
+        else label = new Date(entry.changedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        if (!seenLabels.has(label)) { seenLabels.set(label, []); groups.push({ label, entries: seenLabels.get(label)! }) }
+        seenLabels.get(label)!.push(entry)
+    }
+
+    if (auditLog.length === 0) {
+        return (
+            <div style={{ textAlign: 'center', padding: '56px 32px', color: 'var(--text-secondary)' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                    <Clock size={28} style={{ opacity: 0.25 }} />
+                </div>
+                <div style={{ fontWeight: 600, marginBottom: '6px' }}>No changes recorded yet</div>
+                <div style={{ fontSize: '0.85rem' }}>Edit history will appear here after the first update.</div>
+            </div>
+        )
+    }
+
+    return (
+        <div>
+            {/* Stats strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                {[
+                    { label: 'Total Changes', value: auditLog.length, icon: <Clock size={16} />, accent: true },
+                    { label: 'Contributors', value: uniqueUsers, icon: <Users size={16} />, accent: false },
+                    { label: 'Since', value: firstChange ? firstChange.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—', icon: <Calendar size={16} />, accent: false },
+                ].map(stat => (
+                    <div key={stat.label} className="glass-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: stat.accent ? 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))' : (isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: stat.accent ? 'white' : 'var(--accent-primary)' }}>
+                            {stat.icon}
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 700, lineHeight: 1.1 }}>{stat.value}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{stat.label}</div>
                         </div>
                     </div>
-                )
-            })}
+                ))}
+            </div>
+
+            {/* Controls */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                    <input
+                        type="text"
+                        placeholder="Search field, user, or value..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        style={{ width: '100%', paddingLeft: '32px', fontSize: '0.85rem' }}
+                    />
+                </div>
+                <select value={filterField} onChange={e => setFilterField(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', minWidth: '160px' }}>
+                    <option value="all">All Fields</option>
+                    {uniqueFields.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+                {(search || filterField !== 'all') && (
+                    <button onClick={() => { setSearch(''); setFilterField('all') }} className="btn-secondary" style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                        <X size={13} /> Clear
+                    </button>
+                )}
+            </div>
+
+            {/* Empty filtered state */}
+            {filtered.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    No entries match your search.
+                </div>
+            )}
+
+            {/* Grouped timeline */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {groups.map(group => (
+                    <div key={group.label}>
+                        {/* Date group header */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                {group.label}
+                            </div>
+                            <div style={{ flex: 1, height: '1px', background: 'var(--table-border)' }} />
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+                                {group.entries.length} change{group.entries.length !== 1 ? 's' : ''}
+                            </div>
+                        </div>
+
+                        {/* Entries */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {group.entries.map(entry => {
+                                const isFlagField = entry.fieldName === 'Flag State'
+                                const displayOld = isFlagField ? resolveFlagValue(entry.oldValue) : entry.oldValue
+                                const displayNew = isFlagField ? resolveFlagValue(entry.newValue) : entry.newValue
+                                const meta = getFieldMeta(entry.fieldName)
+                                const entryTime = new Date(entry.changedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+                                return (
+                                    <div key={entry.id} style={{
+                                        display: 'flex', gap: '12px', alignItems: 'flex-start',
+                                        padding: '12px 14px', borderRadius: '10px',
+                                        border: '1px solid var(--table-border)',
+                                        borderLeft: `3px solid ${meta.color}`,
+                                        background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.02)',
+                                        transition: 'background 0.12s',
+                                    }}>
+                                        {/* Icon */}
+                                        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: meta.color, marginTop: '1px' }}>
+                                            {meta.icon}
+                                        </div>
+
+                                        {/* Content */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                                                <span style={{ fontWeight: 600, fontSize: '0.85rem', color: meta.color }}>{entry.fieldName}</span>
+                                                <div style={{ flex: 1 }} />
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                    <Clock size={10} />{entryTime}
+                                                </span>
+                                            </div>
+
+                                            {/* Value change */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.83rem' }}>
+                                                {displayOld ? (
+                                                    <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{displayOld}</span>
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.78rem' }}>empty</span>
+                                                )}
+                                                <ArrowRight size={12} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+                                                {displayNew ? (
+                                                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{displayNew}</span>
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.78rem' }}>cleared</span>
+                                                )}
+                                            </div>
+
+                                            {/* By */}
+                                            <div style={{ marginTop: '5px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                                by <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{entry.changedBy}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     )
 }

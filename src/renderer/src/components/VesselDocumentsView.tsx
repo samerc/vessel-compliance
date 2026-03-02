@@ -102,7 +102,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
       filePath,
       sent: existing?.sent || false,
       required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
-      expiryDate: existing?.expiryDate || undefined,
+      expiryDate: undefined,
       uploadedDate: new Date().toISOString(),
       uploadedBy: user?.username || 'Unknown',
       receivedDate: new Date().toISOString().split('T')[0],
@@ -375,6 +375,16 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
               min="1900-01-01" max="2100-12-31"
               style={{ fontSize: '0.78rem', padding: '3px 6px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
             />
+            <button
+              title="Clear expiry date"
+              onClick={async () => {
+                await window.api.updateVesselDocumentExpiry(vessel.id, id, null)
+                loadData()
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', padding: 0, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <X size={12} />
+            </button>
           </div>
         )}
 
