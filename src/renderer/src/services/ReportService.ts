@@ -260,7 +260,7 @@ export const ReportService = {
     XLSX.writeFile(wb, `${vessel.name}_Compliance_Report.xlsx`)
   },
 
-  exportVesselToPDF: async (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[]) => {
+  exportVesselToPDF: async (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[], options?: { returnBytes?: boolean }): Promise<Uint8Array | void> => {
     const doc = new jsPDF()
     const tableData: any[] = []
     let compliantCount = 0
@@ -572,6 +572,7 @@ export const ReportService = {
       })
     }
 
+    if (options?.returnBytes) return new Uint8Array(doc.output('arraybuffer') as ArrayBuffer)
     doc.save(`${vessel.name}_Compliance_Report.pdf`)
   },
 

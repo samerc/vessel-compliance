@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Ship, FileSpreadsheet, FileText, ExternalLink, Hash, Plus, Search, X, UserMinus, Loader2 } from 'lucide-react'
 import { Fleet, Vessel, VesselDocument, DocumentType } from '../../../shared/types'
+import JSZip from 'jszip'
 import { ReportService } from '../services/ReportService'
-import { ReportServiceV2 } from '../services/ReportServiceV2'
 import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 
@@ -85,15 +85,15 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
         if (activeVessels.length === 0) return
         setExportingIndividual(true)
         setExportProgress({ current: 0, total: activeVessels.length })
+        const zip = new JSZip()
         let failed = 0
         for (let i = 0; i < activeVessels.length; i++) {
             const v = activeVessels[i]
             setExportProgress({ current: i + 1, total: activeVessels.length })
             try {
                 const vesselDocs = allDocs.filter(d => d.vesselId === v.id)
-                await ReportServiceV2.exportVesselToPDF(v, docTypes, vesselDocs)
-                // small delay so the browser can process each save
-                await new Promise(res => setTimeout(res, 400))
+                const bytes = await ReportService.exportVesselToPDF(v, docTypes, vesselDocs, { returnBytes: true })
+                zip.file(`${v.name}_Compliance_Report.pdf`, bytes as Uint8Array)
             } catch {
                 failed++
             }
@@ -101,9 +101,16 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
         setExportingIndividual(false)
         setExportProgress(null)
         if (failed > 0) {
-            showError(`${failed} vessel PDF${failed > 1 ? 's' : ''} failed to export`)
+            showError(`${failed} vessel PDF${failed > 1 ? 's' : ''} failed to generate`)
         } else {
-            showSuccess(`${activeVessels.length} individual PDF${activeVessels.length > 1 ? 's' : ''} exported`)
+            const blob = await zip.generateAsync({ type: 'blob' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${fleet.name}_Individual_Reports.zip`
+            a.click()
+            URL.revokeObjectURL(url)
+            showSuccess(`${activeVessels.length} PDFs zipped and downloaded`)
         }
     }
 
