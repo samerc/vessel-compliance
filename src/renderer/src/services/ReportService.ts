@@ -4,6 +4,9 @@ import autoTable from 'jspdf-autotable'
 import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy, ConditionSurvey, SurveyDefect, Surveyor } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 
+// Guard against IPC error objects (safeHandle returns { error:true } on failure)
+const safeArray = (v: unknown): any[] => Array.isArray(v) ? v : []
+
 const isExpired = (expiryDate: string | null | undefined): boolean => {
   if (!expiryDate) return false
   const expiry = new Date(expiryDate)
@@ -106,7 +109,7 @@ export const ReportService = {
     const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
-    const assuredRoles = await window.api.getAssuredRoles()
+    const assuredRoles = safeArray(await window.api.getAssuredRoles())
     const roleOrderMap = new Map(assuredRoles.map((r, i) => [r.name, i]))
     vesselAssureds.sort((a, b) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999))
 
@@ -309,7 +312,7 @@ export const ReportService = {
     const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
-    const pdfAssuredRoles = await window.api.getAssuredRoles()
+    const pdfAssuredRoles = safeArray(await window.api.getAssuredRoles())
     const pdfRoleOrderMap = new Map(pdfAssuredRoles.map((r, i) => [r.name, i]))
     vesselAssureds.sort((a, b) => (pdfRoleOrderMap.get(a.role) ?? 999) - (pdfRoleOrderMap.get(b.role) ?? 999))
 
@@ -622,7 +625,7 @@ export const ReportService = {
     // Section 2: Fleet Assureds (Deduplicated)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
-    const excelAssuredRoles = await window.api.getAssuredRoles()
+    const excelAssuredRoles = safeArray(await window.api.getAssuredRoles())
     const excelRoleOrderMap = new Map(excelAssuredRoles.map((r, i) => [r.name, i]))
 
     // Collect all unique assureds across the fleet with their vessel associations
@@ -866,7 +869,7 @@ export const ReportService = {
     // Section 2: Fleet Assureds (Deduplicated)
     const allEntities = await window.api.getEntities()
     const allEntityUBOs = await window.api.getEntityUBOs()
-    const fleetAssuredRoles = await window.api.getAssuredRoles()
+    const fleetAssuredRoles = safeArray(await window.api.getAssuredRoles())
     const fleetRoleOrderMap = new Map(fleetAssuredRoles.map((r, i) => [r.name, i]))
 
     // Collect all unique assureds across the fleet with their vessel associations

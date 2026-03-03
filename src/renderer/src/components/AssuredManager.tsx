@@ -82,10 +82,10 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                 window.api.getVesselAssureds(vessel.id),
                 window.api.getEntityUBOs()
             ])
-            setEntities(e || [])
-            setRoles(r || [])
-            setVesselAssureds(va || [])
-            setEntityUBOs(eu || [])
+            setEntities(Array.isArray(e) ? e : [])
+            setRoles(Array.isArray(r) ? r : [])
+            setVesselAssureds(Array.isArray(va) ? va : [])
+            setEntityUBOs(Array.isArray(eu) ? eu : [])
         } catch (error) {
             console.error('Failed to load assured data:', error)
         }
