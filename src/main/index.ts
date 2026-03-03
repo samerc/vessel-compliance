@@ -223,6 +223,8 @@ function createWindow(): void {
         } catch (schemaError) {
           console.error('Schema init error (non-fatal):', schemaError)
         }
+        // Validate restored sessions against live DB (clears sessions for deleted users)
+        await auth.validateRestoredSessions().catch(() => {})
         // Update last_login for auto-restored sessions (no password re-entry on startup)
         const restoredSession = auth.getFirstSession()
         if (restoredSession) {

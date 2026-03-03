@@ -63,6 +63,18 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const [colWidths, setColWidths] = useState<number[]>(DEFAULT_COL_WIDTHS)
     const resizeRef = useRef<{ colIdx: number; startX: number; startWidth: number } | null>(null)
     const colWidthsRef = useRef(colWidths)
+    const dragListenersRef = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null)
+
+    // Clean up any dangling drag listeners on unmount
+    useEffect(() => {
+        return () => {
+            if (dragListenersRef.current) {
+                document.removeEventListener('mousemove', dragListenersRef.current.move)
+                document.removeEventListener('mouseup', dragListenersRef.current.up)
+                dragListenersRef.current = null
+            }
+        }
+    }, [])
 
     // Quotation sent date editing
     const [editingQuotDate, setEditingQuotDate] = useState<Record<string, string>>({})
@@ -201,6 +213,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
 
         const onMouseUp = () => {
             resizeRef.current = null
+            dragListenersRef.current = null
             document.removeEventListener('mousemove', onMouseMove)
             document.removeEventListener('mouseup', onMouseUp)
             if (user?.id) {
@@ -210,6 +223,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
 
         document.addEventListener('mousemove', onMouseMove)
         document.addEventListener('mouseup', onMouseUp)
+        dragListenersRef.current = { move: onMouseMove, up: onMouseUp }
     }
 
     const goToPreviousMonth = () => {
@@ -582,7 +596,14 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                             </tr>
                         </thead>
                         <tbody>
-                            {groupedRenewals ? (
+                            {sortedRenewals.length === 0 ? (
+                                <tr>
+                                    <td colSpan={11} style={{ padding: '52px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        <Calendar size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }} />
+                                        No policies expiring in {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+                                    </td>
+                                </tr>
+                            ) : groupedRenewals ? (
                                 groupedRenewals.map(([fleetName, rows]) => (
                                     <>
                                         <tr key={`fleet-${fleetName}`}>

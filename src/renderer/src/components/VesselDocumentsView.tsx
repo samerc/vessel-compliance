@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { CheckCircle, AlertCircle, Upload, Eye, Copy, Trash2, Calendar, Plus, X } from 'lucide-react'
+import { CheckCircle, AlertCircle, Upload, Eye, Copy, Trash2, Calendar, Plus, X, Pencil, Loader2 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -63,6 +63,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
   const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
   const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [showAddCustom, setShowAddCustom] = useState(false)
   const [newCustomName, setNewCustomName] = useState('')
 
@@ -93,24 +94,29 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
   useEffect(() => { loadData() }, [vessel.id])
 
   const uploadDoc = async (docTypeId: string, filePath: string) => {
-    const validation = await window.api.fileTypesValidateFile(filePath)
-    if (!validation.valid) { showError(`File rejected: ${validation.reason}`); return }
-    const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
-    const isCustom = customDocTypes.some(c => c.id === docTypeId)
-    await window.api.upsertVesselDocument({
-      vesselId: vessel.id,
-      documentTypeId: docTypeId,
-      filePath,
-      sent: existing?.sent || false,
-      required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
-      expiryDate: undefined,
-      uploadedDate: new Date().toISOString(),
-      uploadedBy: user?.username || 'Unknown',
-      receivedDate: new Date().toISOString().split('T')[0],
-    })
-    showSuccess('Document linked successfully')
-    loadData()
-    onReload?.()
+    setUploadingId(docTypeId)
+    try {
+      const validation = await window.api.fileTypesValidateFile(filePath)
+      if (!validation.valid) { showError(`File rejected: ${validation.reason}`); return }
+      const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
+      const isCustom = customDocTypes.some(c => c.id === docTypeId)
+      await window.api.upsertVesselDocument({
+        vesselId: vessel.id,
+        documentTypeId: docTypeId,
+        filePath,
+        sent: existing?.sent || false,
+        required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
+        expiryDate: undefined,
+        uploadedDate: new Date().toISOString(),
+        uploadedBy: user?.username || 'Unknown',
+        receivedDate: new Date().toISOString().split('T')[0],
+      })
+      showSuccess('Document linked successfully')
+      loadData()
+      onReload?.()
+    } finally {
+      setUploadingId(null)
+    }
   }
 
   const handleDrop = async (e: React.DragEvent, docTypeId: string) => {
@@ -278,6 +284,11 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
                   Annual
                 </span>
               )}
+              {hasFile && !annualRenewal && !doc?.expiryDate && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', fontWeight: 600, color: isLight ? '#008c46' : '#10b981', background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(16,185,129,0.1)', border: `1px solid ${isLight ? 'rgba(0,140,70,0.2)' : 'rgba(16,185,129,0.2)'}`, borderRadius: '4px', padding: '2px 6px' }}>
+                  <CheckCircle size={9} /> No expiry
+                </span>
+              )}
               {chips}
             </div>
             {description && (
@@ -286,10 +297,11 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px', flexWrap: 'wrap' }}>
               {hasFile && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Pencil size={10} color="var(--text-secondary)" />
                   <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>Received:</span>
                   <input
                     type="date"
-                    title="Edit received date"
+                    title="Click to change received date (backdating allowed)"
                     value={editingReceived[id] !== undefined ? editingReceived[id] : (doc?.receivedDate?.split('T')[0] || '')}
                     onFocus={() => setEditingReceived(prev => ({ ...prev, [id]: doc?.receivedDate?.split('T')[0] || '' }))}
                     onChange={e => setEditingReceived(prev => ({ ...prev, [id]: e.target.value }))}
@@ -298,7 +310,6 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
                       setEditingReceived(prev => { const n = { ...prev }; delete n[id]; return n })
                       if (val) { await window.api.updateVesselDocumentReceivedDate(vessel.id, id, val); loadData() }
                     }}
-                    max={new Date().toISOString().split('T')[0]}
                     style={{ fontSize: '0.74rem', padding: '2px 5px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
                   />
                 </div>
@@ -411,11 +422,13 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
           {!hasFile ? (
             <button
               onClick={() => handleClickUpload(id)}
+              disabled={uploadingId === id}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 padding: required ? '5px 14px' : '4px 10px',
                 borderRadius: '6px', fontSize: '0.78rem', fontWeight: required ? '600' : '500',
-                cursor: 'pointer',
+                cursor: uploadingId === id ? 'not-allowed' : 'pointer',
+                opacity: uploadingId === id ? 0.65 : 1,
                 background: required
                   ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)')
                   : 'transparent',
@@ -425,7 +438,8 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
                 color: isLight ? '#0077a3' : 'var(--accent-primary)',
               }}
             >
-              <Upload size={12} /> Upload File
+              {uploadingId === id ? <Loader2 size={12} className="spinner" /> : <Upload size={12} />}
+              {uploadingId === id ? 'Uploading...' : 'Upload File'}
             </button>
           ) : (
             <>

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, Entity, SurveyWarranty } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
+import { useToast } from '../contexts/ToastContext'
 
 interface DashboardActivity {
   recentVessels: Array<{ id: string; name: string; imoNumber: string; fleetName?: string; createdAt: string; isActive: boolean }>
@@ -63,6 +64,7 @@ export default function Dashboard({
 }) {
   const { theme } = useTheme()
   const isLight = theme === 'light'
+  const { showError } = useToast()
 
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [docs, setDocs] = useState<VesselDocument[]>([])
@@ -89,18 +91,22 @@ export default function Dashboard({
       setDocs(dData)
       setDocTypes(tData)
       setEntities(eData)
-    } catch { /* ignore */ }
+    } catch {
+      showError('Failed to load core dashboard data')
+    }
 
-    await Promise.allSettled([
-      window.api.getOpenDefectsByVessel().then(d => setOpenDefects(d || [])).catch(() => {}),
-      window.api.complianceGetPendingResults().then(d => setPendingSanctions(d || [])).catch(() => {}),
-      window.api.surveyWarrantyGetAll().then(d => setActiveWarranties(Array.isArray(d) ? d : [])).catch(() => {}),
-      window.api.surveyWarrantyGetEndorsementsDue().then(d => setEndorsementsDue(Array.isArray(d) ? d.length : 0)).catch(() => {}),
-      window.api.dashboardGetActivity().then(d => setActivity(d || { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] })).catch(() => {})
+    const secondaryResults = await Promise.allSettled([
+      window.api.getOpenDefectsByVessel().then(d => setOpenDefects(d || [])),
+      window.api.complianceGetPendingResults().then(d => setPendingSanctions(d || [])),
+      window.api.surveyWarrantyGetAll().then(d => setActiveWarranties(Array.isArray(d) ? d : [])),
+      window.api.surveyWarrantyGetEndorsementsDue().then(d => setEndorsementsDue(Array.isArray(d) ? d.length : 0)),
+      window.api.dashboardGetActivity().then(d => setActivity(d || { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }))
     ])
+    const failCount = secondaryResults.filter(r => r.status === 'rejected').length
+    if (failCount > 0) showError(`${failCount} dashboard section${failCount > 1 ? 's' : ''} failed to load`)
     setLastRefreshed(new Date())
     setIsLoading(false)
-  }, [])
+  }, [showError])
 
   useEffect(() => { loadData() }, [loadData])
 

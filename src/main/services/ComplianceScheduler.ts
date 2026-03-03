@@ -3,6 +3,7 @@ import { db } from '../mysql/adapter'
 
 class ComplianceScheduler {
     private checkTimer: NodeJS.Timeout | null = null
+    private stopped = false
 
     calculateNextRunTime(dayOfWeek: number, timeOfDay: string): string {
         const now = new Date()
@@ -217,6 +218,7 @@ class ComplianceScheduler {
     }
 
     async start(): Promise<void> {
+        this.stopped = false
         // Clear existing timer
         if (this.checkTimer) {
             clearTimeout(this.checkTimer)
@@ -246,8 +248,8 @@ class ComplianceScheduler {
 
             this.checkTimer = setTimeout(async () => {
                 await this.runComplianceCheck()
-                // Reschedule by restarting
-                this.start()
+                // Reschedule only if not stopped mid-check
+                if (!this.stopped) this.start()
             }, delay)
         } catch (error) {
             console.error('Failed to start compliance scheduler:', error)
@@ -255,6 +257,7 @@ class ComplianceScheduler {
     }
 
     stop() {
+        this.stopped = true
         if (this.checkTimer) {
             clearTimeout(this.checkTimer)
             this.checkTimer = null

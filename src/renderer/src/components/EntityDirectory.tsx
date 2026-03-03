@@ -277,14 +277,50 @@ export default function EntityDirectory() {
     }
   }, [page])
 
+  // ── Pre-built index Maps (rebuilt only when source data changes) ─────────────
+
+  // assuredsByEntity[entityId] = all VesselAssured rows for that entity
+  const assuredsByEntity = useMemo(() => {
+    const m = new Map<string, VesselAssured[]>()
+    for (const va of vesselAssureds) {
+      if (!m.has(va.entityId)) m.set(va.entityId, [])
+      m.get(va.entityId)!.push(va)
+    }
+    return m
+  }, [vesselAssureds])
+
+  // uboParentIds[uboEntityId] = list of assured entity IDs that claim this UBO
+  const uboParentIds = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const eu of entityUBOs) {
+      if (!m.has(eu.uboEntityId)) m.set(eu.uboEntityId, [])
+      m.get(eu.uboEntityId)!.push(eu.assuredEntityId)
+    }
+    return m
+  }, [entityUBOs])
+
+  // vesselCountByEntity[entityId] = count of unique vessel IDs (direct + via UBO)
+  const vesselCountByEntity = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const [entityId, directLinks] of assuredsByEntity) {
+      const directIds = new Set(directLinks.map(l => l.vesselId))
+      const parentIds = uboParentIds.get(entityId) || []
+      for (const parentId of parentIds) {
+        for (const va of assuredsByEntity.get(parentId) || []) {
+          directIds.add(va.vesselId)
+        }
+      }
+      m.set(entityId, directIds.size)
+    }
+    return m
+  }, [assuredsByEntity, uboParentIds])
+
   // ── Data helpers ────────────────────────────────────────────────────────────
 
   const getAssociatedVessels = (entityId: string) => {
-    const directLinks = vesselAssureds.filter(va => va.entityId === entityId)
-    const parentAssuredIds = entityUBOs
-      .filter(eu => eu.uboEntityId === entityId)
-      .map(eu => eu.assuredEntityId)
-    const indirectLinks = vesselAssureds.filter(va => parentAssuredIds.includes(va.entityId))
+    const directLinks = assuredsByEntity.get(entityId) || []
+    const parentIds = uboParentIds.get(entityId) || []
+    const indirectLinks = parentIds.flatMap(pid => assuredsByEntity.get(pid) || [])
     const vesselIds = new Set([...directLinks.map(l => l.vesselId), ...indirectLinks.map(l => l.vesselId)])
     return vessels.filter(v => vesselIds.has(v.id)).map(v => {
       const roles = [...new Set(directLinks.filter(l => l.vesselId === v.id).map(l => l.role))]
@@ -296,17 +332,11 @@ export default function EntityDirectory() {
     })
   }
 
-  const getVesselCount = (entityId: string) => {
-    const directIds = new Set(vesselAssureds.filter(va => va.entityId === entityId).map(va => va.vesselId))
-    const parentAssuredIds = entityUBOs.filter(eu => eu.uboEntityId === entityId).map(eu => eu.assuredEntityId)
-    const indirectIds = vesselAssureds.filter(va => parentAssuredIds.includes(va.entityId)).map(va => va.vesselId)
-    return new Set([...directIds, ...indirectIds]).size
-  }
+  const getVesselCount = (entityId: string) => vesselCountByEntity.get(entityId) ?? 0
 
   const getParentCompanies = (entityId: string): Entity[] => {
-    return entityUBOs
-      .filter(eu => eu.uboEntityId === entityId)
-      .map(eu => allEntities.find(e => e.id === eu.assuredEntityId))
+    return (uboParentIds.get(entityId) || [])
+      .map(pid => allEntities.find(e => e.id === pid))
       .filter((e): e is Entity => !!e)
   }
 

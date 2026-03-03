@@ -270,6 +270,22 @@ export class AuthService {
         const [sessionId, session] = firstEntry.value
         return { sessionId, user: session.user }
     }
+
+    // Validate that restored sessions still have a live DB user — call after DB connects
+    async validateRestoredSessions(): Promise<void> {
+        for (const [sessionId, session] of this.sessions) {
+            try {
+                const user = await db.getUserById(session.user.id)
+                if (!user) {
+                    console.warn(`[AuthService] Clearing stale session for deleted user: ${session.user.username}`)
+                    this.sessions.delete(sessionId)
+                    this.clearSessionFromDisk()
+                }
+            } catch {
+                // DB not ready yet — leave session intact, it will be validated on next use
+            }
+        }
+    }
 }
 
 export const auth = new AuthService()
