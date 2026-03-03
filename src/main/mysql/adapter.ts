@@ -867,9 +867,9 @@ export class MySQLAdapter {
                     INDEX idx_sw_vessel (vessel_id),
                     INDEX idx_sw_policy (policy_id),
                     INDEX idx_sw_status (status)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4`)
                 // Add columns that may be missing from older table versions
                 const [swColCsi] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'condition_survey_id'")
                 if ((swColCsi as any[]).length === 0) {
@@ -914,9 +914,9 @@ export class MySQLAdapter {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_swr_warranty (warranty_id),
                     INDEX idx_swr_next (next_reminder_date)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4`)
                 // Migration: add reference column if missing
                 const [swrCols] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_reminders LIKE 'reference'")
                 if ((swrCols as any[]).length === 0) {
