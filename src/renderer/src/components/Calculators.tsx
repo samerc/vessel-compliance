@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { Calculator } from 'lucide-react'
 import PremiumCalculator from './PremiumCalculator'
 import TLORateCalculator from './TLORateCalculator'
+import WarBreachCalculator from './WarBreachCalculator'
 
-type CalculatorType = 'premium' | 'tlo'
+type CalculatorType = 'premium' | 'tlo' | 'warbreach'
 
 const calculators: { id: CalculatorType; label: string; description: string }[] = [
   { id: 'premium', label: 'Pro-Rata Premium', description: 'Calculate pro-rata premiums with instalment and commission breakdowns' },
-  { id: 'tlo', label: 'TLO Rate', description: 'Calculate Total Loss Only premium based on vessel value changes' }
+  { id: 'tlo', label: 'TLO Rate', description: 'Calculate Total Loss Only premium based on vessel value changes' },
+  { id: 'warbreach', label: 'War Breach', description: 'Compute war/breach premiums with Lebanese government taxes' }
 ]
 
 export default function Calculators() {
@@ -50,6 +52,7 @@ export default function Calculators() {
 
       {activeCalc === 'premium' && <PremiumCalculator />}
       {activeCalc === 'tlo' && <TLORateCalculator />}
+      {activeCalc === 'warbreach' && <WarBreachCalculator />}
     </div>
   )
 }
