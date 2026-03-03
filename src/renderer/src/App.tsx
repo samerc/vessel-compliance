@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2 } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -20,13 +20,14 @@ import SurveyFollowUp from './components/SurveyFollowUp'
 import VesselFilter from './components/VesselFilter'
 import PolicyRenewals from './components/PolicyRenewals'
 import Reports from './components/Reports'
+import FleetAnalytics from './components/FleetAnalytics'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
 import ChangelogModal from './components/ChangelogModal'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -206,6 +207,7 @@ function App(): React.JSX.Element {
               {navItem('vessels', <Ship size={18} />, 'Vessels')}
               {navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
               {navItem('fleets', <LayoutDashboard size={18} />, 'Fleets')}
+              {navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
             </NavGroup>
 
             <NavGroup id="compliance" label="Compliance" icon={<ShieldAlert size={14} />}
@@ -288,6 +290,7 @@ function App(): React.JSX.Element {
           {activeTab === 'quotations' && <QuotationManager />}
           {activeTab === 'renewals' && <PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} />}
           {activeTab === 'reports' && <Reports />}
+          {activeTab === 'analytics' && <FleetAnalytics />}
         </main>
         <UpdateNotification />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
