@@ -296,11 +296,12 @@ app.whenReady().then(() => {
         }
         // Only restore position if it falls within a currently connected display.
         // If the saved position is off-screen (e.g. secondary monitor disconnected),
-        // omit x/y so Electron centers the window on the primary display instead.
+        // resize to the saved dimensions and center on the primary display.
+        let positionValid = false
         if (user.windowX !== null && user.windowX !== undefined &&
             user.windowY !== null && user.windowY !== undefined) {
           const displays = screen.getAllDisplays()
-          const isOnScreen = displays.some(d => {
+          positionValid = displays.some(d => {
             const { x, y, width, height } = d.bounds
             return (
               user.windowX! >= x &&
@@ -309,12 +310,15 @@ app.whenReady().then(() => {
               user.windowY! < y + height
             )
           })
-          if (isOnScreen) {
+          if (positionValid) {
             bounds.x = user.windowX
             bounds.y = user.windowY
           }
         }
         window.setBounds(bounds)
+        if (!positionValid) {
+          window.center()
+        }
       }
     }
     return result
