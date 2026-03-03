@@ -155,7 +155,28 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder = 'Any' 
     )
 }
 
-// ── Module-level cache — persists filter state across navigation ─────────────────
+// ── Module-level cache — persists filter state only when returning from vessel detail ──
+const _resetCache = () => {
+    _cache.hasSearched = false
+    _cache.panelCollapsed = false
+    _cache.nameSearch = ''
+    _cache.logic = 'AND'
+    _cache.selectedPolicyTypes = []
+    _cache.policyStatus = 'all'
+    _cache.selectedFlagStates = []
+    _cache.flagUnassigned = false
+    _cache.selectedClassifications = []
+    _cache.selectedVesselTypes = []
+    _cache.selectedCustomerId = ''
+    _cache.customerType = 'both'
+    _cache.vesselStatus = 'active'
+    _cache.yearFrom = ''
+    _cache.yearTo = ''
+    _cache.gtFrom = ''
+    _cache.gtTo = ''
+    _cache.vesselPolicies = new Map()
+    _cache.vesselClassifications = new Map()
+}
 const _cache = {
     hasSearched: false,
     panelCollapsed: false,
@@ -176,6 +197,7 @@ const _cache = {
     gtTo: '',
     vesselPolicies: new Map<string, VesselDynamicPolicy[]>(),
     vesselClassifications: new Map<string, string[]>(),
+    preserveOnReturn: false,
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -236,6 +258,17 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
         selectedFlagStates, flagUnassigned, selectedClassifications, selectedVesselTypes,
         selectedCustomerId, customerType, vesselStatus, yearFrom, yearTo, gtFrom, gtTo,
         vesselPolicies, vesselClassifications])
+
+    // On unmount: reset cache unless we're navigating into a vessel detail
+    useEffect(() => {
+        return () => {
+            if (_cache.preserveOnReturn) {
+                _cache.preserveOnReturn = false
+            } else {
+                _resetCache()
+            }
+        }
+    }, [])
 
     useEffect(() => { loadData() }, [])
 
@@ -651,7 +684,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                             </td>
                                         </tr>
                                     ) : displayedVessels.map(v => (
-                                        <tr key={v.id} onClick={() => onNavigateToVessel?.(v.id)} className="hover-effect" style={{ borderBottom: '1px solid var(--table-border)', cursor: onNavigateToVessel ? 'pointer' : 'default' }}>
+                                        <tr key={v.id} onClick={() => { if (onNavigateToVessel) { _cache.preserveOnReturn = true; onNavigateToVessel(v.id) } }} className="hover-effect" style={{ borderBottom: '1px solid var(--table-border)', cursor: onNavigateToVessel ? 'pointer' : 'default' }}>
                                             <td style={{ padding: '12px 16px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
                                                     <Ship size={14} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
