@@ -41,6 +41,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const [loading, setLoading] = useState(false)
     const [sortField, setSortField] = useState<SortField>('endDate')
     const [sortDir, setSortDir] = useState<SortDir>('asc')
+    const [groupByFleet, setGroupByFleet] = useState(false)
 
     // Renewal status management
     const [statusTypes, setStatusTypes] = useState<RenewalStatusType[]>([])
@@ -245,6 +246,21 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         return sorted
     }, [renewals, sortField, sortDir])
 
+    const groupedRenewals = useMemo(() => {
+        if (!groupByFleet) return null
+        const groups = new Map<string, any[]>()
+        for (const r of sortedRenewals) {
+            const key = r.fleetName || '— Unassigned —'
+            if (!groups.has(key)) groups.set(key, [])
+            groups.get(key)!.push(r)
+        }
+        return Array.from(groups.entries()).sort((a, b) => {
+            if (a[0] === '— Unassigned —') return 1
+            if (b[0] === '— Unassigned —') return -1
+            return a[0].localeCompare(b[0])
+        })
+    }, [sortedRenewals, groupByFleet])
+
     const vesselSummary = useMemo(() => {
         const map = new Map<string, { vesselName: string; imoNumber: string; vesselId: string; policies: any[] }>()
         for (const r of renewals) {
@@ -311,6 +327,85 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         />
     )
 
+    const renderRenewalRow = (r: any, idx: number) => (
+        <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
+            <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.imoNumber}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customerName || '-'}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.fleetName || '-'}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyTypeName}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.endDate || '-'}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPremium(r.premium, r.currency)}</td>
+            <td style={{ padding: '12px 16px' }}>
+                <select
+                    value={r.renewalStatusId || ''}
+                    onChange={e => handleSetStatus(r.id, e.target.value || null)}
+                    style={{
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        border: r.renewalStatusColor ? `2px solid ${r.renewalStatusColor}` : '1px solid var(--glass-border)',
+                        background: r.renewalStatusColor ? `${r.renewalStatusColor}22` : 'var(--input-bg)',
+                        color: r.renewalStatusId ? (isLight ? '#111111' : '#ffffff') : 'var(--text-secondary)',
+                        fontSize: '0.8rem',
+                        fontWeight: r.renewalStatusId ? '700' : '400',
+                        cursor: 'pointer',
+                        minWidth: '100px',
+                        maxWidth: '100%'
+                    }}
+                >
+                    <option value="">— No status —</option>
+                    {statusTypes.map(st => (
+                        <option key={st.id} value={st.id}>{st.name}</option>
+                    ))}
+                </select>
+            </td>
+            <td style={{ padding: '8px 16px' }}>
+                <input
+                    type="date"
+                    value={editingQuotDate[r.id] !== undefined ? editingQuotDate[r.id] : (r.quotationSentDate || '')}
+                    onFocus={() => setEditingQuotDate(prev => ({ ...prev, [r.id]: r.quotationSentDate || '' }))}
+                    onChange={e => setEditingQuotDate(prev => ({ ...prev, [r.id]: e.target.value }))}
+                    onBlur={async e => {
+                        const val = e.target.value
+                        setEditingQuotDate(prev => { const n = { ...prev }; delete n[r.id]; return n })
+                        await handleSetQuotationDate(r.id, val)
+                    }}
+                    style={{
+                        padding: '4px 6px', borderRadius: '6px', fontSize: '0.8rem', width: '100%',
+                        background: 'var(--input-bg)', color: 'var(--text-primary)',
+                        border: '1px solid var(--input-border)',
+                        colorScheme: isLight ? 'light' : 'dark'
+                    }}
+                />
+            </td>
+            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                    <button
+                        onClick={() => handleOpenNotes(r)}
+                        className="btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', position: 'relative' }}
+                        title={r.noteCount > 0 ? `${r.noteCount} note${r.noteCount > 1 ? 's' : ''}` : 'Add notes'}
+                    >
+                        <MessageSquare size={14} />
+                        {r.noteCount > 0 && (
+                            <span style={{ position: 'absolute', top: '-5px', right: '-6px', minWidth: '16px', height: '16px', borderRadius: '8px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.65rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                                {r.noteCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => onNavigateToVessel?.(r.vesselId)}
+                        className="btn-secondary"
+                        style={{ padding: '4px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <Eye size={14} /> View
+                    </button>
+                </div>
+            </td>
+        </tr>
+    )
+
     const totalWidth = colWidths.reduce((a, b) => a + b, 0)
 
     return (
@@ -340,6 +435,15 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 </div>
 
                 <button onClick={goToCurrentMonth} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Today</button>
+
+                <button
+                    onClick={() => setGroupByFleet(v => !v)}
+                    className={groupByFleet ? 'btn-primary' : 'btn-secondary'}
+                    style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    title={groupByFleet ? 'Switch to flat list' : 'Group rows by fleet'}
+                >
+                    Group by Fleet
+                </button>
 
                 <button
                     onClick={() => setShowStatusManager(v => !v)}
@@ -478,84 +582,33 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                             </tr>
                         </thead>
                         <tbody>
-                            {sortedRenewals.map((r: any, idx: number) => (
-                                <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                    <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.imoNumber}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customerName || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.fleetName || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyTypeName}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.endDate || '-'}</td>
-                                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPremium(r.premium, r.currency)}</td>
-                                    <td style={{ padding: '12px 16px' }}>
-                                        <select
-                                            value={r.renewalStatusId || ''}
-                                            onChange={e => handleSetStatus(r.id, e.target.value || null)}
-                                            style={{
-                                                padding: '4px 8px',
-                                                borderRadius: '12px',
-                                                border: r.renewalStatusColor ? `2px solid ${r.renewalStatusColor}` : '1px solid var(--glass-border)',
-                                                background: r.renewalStatusColor ? `${r.renewalStatusColor}22` : 'var(--input-bg)',
-                                                color: r.renewalStatusId ? (isLight ? '#111111' : '#ffffff') : 'var(--text-secondary)',
+                            {groupedRenewals ? (
+                                groupedRenewals.map(([fleetName, rows]) => (
+                                    <>
+                                        <tr key={`fleet-${fleetName}`}>
+                                            <td colSpan={11} style={{
+                                                padding: '8px 16px',
+                                                borderBottom: '1px solid var(--table-border)',
+                                                borderTop: '2px solid var(--table-border)',
+                                                fontWeight: '700',
                                                 fontSize: '0.8rem',
-                                                fontWeight: r.renewalStatusId ? '700' : '400',
-                                                cursor: 'pointer',
-                                                minWidth: '100px',
-                                                maxWidth: '100%'
-                                            }}
-                                        >
-                                            <option value="">— No status —</option>
-                                            {statusTypes.map(st => (
-                                                <option key={st.id} value={st.id}>{st.name}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td style={{ padding: '8px 16px' }}>
-                                        <input
-                                            type="date"
-                                            value={editingQuotDate[r.id] !== undefined ? editingQuotDate[r.id] : (r.quotationSentDate || '')}
-                                            onFocus={() => setEditingQuotDate(prev => ({ ...prev, [r.id]: r.quotationSentDate || '' }))}
-                                            onChange={e => setEditingQuotDate(prev => ({ ...prev, [r.id]: e.target.value }))}
-                                            onBlur={async e => {
-                                                const val = e.target.value
-                                                setEditingQuotDate(prev => { const n = { ...prev }; delete n[r.id]; return n })
-                                                await handleSetQuotationDate(r.id, val)
-                                            }}
-                                            style={{
-                                                padding: '4px 6px', borderRadius: '6px', fontSize: '0.8rem', width: '100%',
-                                                background: 'var(--input-bg)', color: 'var(--text-primary)',
-                                                border: '1px solid var(--input-border)',
-                                                colorScheme: isLight ? 'light' : 'dark'
-                                            }}
-                                        />
-                                    </td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                            <button
-                                                onClick={() => handleOpenNotes(r)}
-                                                className="btn-secondary"
-                                                style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', position: 'relative' }}
-                                                title={r.noteCount > 0 ? `${r.noteCount} note${r.noteCount > 1 ? 's' : ''}` : 'Add notes'}
-                                            >
-                                                <MessageSquare size={14} />
-                                                {r.noteCount > 0 && (
-                                                    <span style={{ position: 'absolute', top: '-5px', right: '-6px', minWidth: '16px', height: '16px', borderRadius: '8px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.65rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
-                                                        {r.noteCount}
-                                                    </span>
-                                                )}
-                                            </button>
-                                            <button
-                                                onClick={() => onNavigateToVessel?.(r.vesselId)}
-                                                className="btn-secondary"
-                                                style={{ padding: '4px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                            >
-                                                <Eye size={14} /> View
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                                color: 'var(--accent-primary)',
+                                                textTransform: 'uppercase' as const,
+                                                letterSpacing: '0.5px',
+                                                position: 'sticky' as const,
+                                                top: '49px',
+                                                zIndex: 1,
+                                                background: isLight ? '#eef0f3' : '#181b24'
+                                            }}>
+                                                {fleetName} <span style={{ fontWeight: 400, color: 'var(--text-secondary)', textTransform: 'none', letterSpacing: 0 }}>({rows.length} {rows.length === 1 ? 'policy' : 'policies'})</span>
+                                            </td>
+                                        </tr>
+                                        {rows.map((r: any, idx: number) => renderRenewalRow(r, idx))}
+                                    </>
+                                ))
+                            ) : (
+                                sortedRenewals.map((r: any, idx: number) => renderRenewalRow(r, idx))
+                            )}
                         </tbody>
                     </table>
                 </div>
