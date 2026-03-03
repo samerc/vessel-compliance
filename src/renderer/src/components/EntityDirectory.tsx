@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X,
@@ -267,6 +267,22 @@ export default function EntityDirectory() {
 
   useEffect(() => { loadData() }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode])
   useEffect(() => { setPage(1) }, [debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
+
+  // Escape key — close topmost open modal first (priority order: sanctions > merge > create > edit)
+  const handleGlobalEscape = useCallback(() => {
+    if (sanctionsModal.show) { setSanctionsModal(prev => ({ ...prev, show: false })); return }
+    if (showMergeModal) { setShowMergeModal(false); return }
+    if (showCreateModal) { setShowCreateModal(false); return }
+    if (editingEntity) { setEditingEntity(null); return }
+  }, [sanctionsModal.show, showMergeModal, showCreateModal, editingEntity])
+
+  useEffect(() => {
+    const anyOpen = sanctionsModal.show || showMergeModal || showCreateModal || !!editingEntity
+    if (!anyOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleGlobalEscape() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [sanctionsModal.show, showMergeModal, showCreateModal, editingEntity, handleGlobalEscape])
 
   const [hasInitialized, setHasInitialized] = useState(false)
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -605,8 +605,8 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                 </tr>
                             ) : groupedRenewals ? (
                                 groupedRenewals.map(([fleetName, rows]) => (
-                                    <>
-                                        <tr key={`fleet-${fleetName}`}>
+                                    <React.Fragment key={fleetName}>
+                                        <tr>
                                             <td colSpan={11} style={{
                                                 padding: '8px 16px',
                                                 borderBottom: '1px solid var(--table-border)',
@@ -625,7 +625,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                             </td>
                                         </tr>
                                         {rows.map((r: any, idx: number) => renderRenewalRow(r, idx))}
-                                    </>
+                                    </React.Fragment>
                                 ))
                             ) : (
                                 sortedRenewals.map((r: any, idx: number) => renderRenewalRow(r, idx))

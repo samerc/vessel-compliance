@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { X, Key, User as UserIcon, Shield, Loader2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 interface UserProfileModalProps {
     onClose: () => void
@@ -15,6 +16,8 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [changingPassword, setChangingPassword] = useState(false)
+
+    useEscapeKey(onClose)
 
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault()

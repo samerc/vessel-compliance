@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, ExternalLink, Calendar, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react'
 import { changelogService, ChangelogEntry } from '../services/ChangelogService'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 interface ChangelogModalProps {
     onClose: () => void
@@ -11,6 +12,8 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [expandedVersion, setExpandedVersion] = useState<string | null>(null)
+
+    useEscapeKey(onClose)
 
     useEffect(() => {
         const fetchChangelogs = async () => {
