@@ -284,7 +284,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
                   Annual
                 </span>
               )}
-              {hasFile && !annualRenewal && !doc?.expiryDate && (
+              {hasFile && !annualRenewal && (!doc?.expiryDate || doc.expiryDate === '0000-00-00') && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', fontWeight: 600, color: isLight ? '#008c46' : '#10b981', background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(16,185,129,0.1)', border: `1px solid ${isLight ? 'rgba(0,140,70,0.2)' : 'rgba(16,185,129,0.2)'}`, borderRadius: '4px', padding: '2px 6px' }}>
                   <CheckCircle size={9} /> No expiry
                 </span>
@@ -365,7 +365,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
             )}
           </div>
         )}
-        {hasFile && !annualRenewal && !doc?.expiryDate && (
+        {hasFile && !annualRenewal && (!doc?.expiryDate || doc.expiryDate === '0000-00-00') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' as const }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 600, color: isLight ? '#008c46' : '#10b981', background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(16,185,129,0.1)', border: `1px solid ${isLight ? 'rgba(0,140,70,0.2)' : 'rgba(16,185,129,0.2)'}`, borderRadius: '4px', padding: '1px 6px' }}>
               <CheckCircle size={10} /> No expiry

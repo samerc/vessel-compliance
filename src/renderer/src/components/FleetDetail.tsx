@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Ship, FileSpreadsheet, FileText, ExternalLink, Hash, Plus, Search, X, UserMinus } from 'lucide-react'
+import { ArrowLeft, Ship, FileSpreadsheet, FileText, ExternalLink, Hash, Plus, Search, X, UserMinus, Loader2 } from 'lucide-react'
 import { Fleet, Vessel, VesselDocument, DocumentType } from '../../../shared/types'
 import { ReportService } from '../services/ReportService'
+import { ReportServiceV2 } from '../services/ReportServiceV2'
 import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 
@@ -17,7 +18,11 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const [allDocs, setAllDocs] = useState<VesselDocument[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
-    const { showSuccess } = useToast()
+    const { showSuccess, showError } = useToast()
+
+    // Individual PDF export state
+    const [exportingIndividual, setExportingIndividual] = useState(false)
+    const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null)
 
     // Quick-add state
     const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -75,6 +80,32 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                 v.imoNumber.toLowerCase().includes(quickAddSearch.toLowerCase()))
         ).slice(0, 8)
         : []
+
+    const handleExportIndividualPDFs = async () => {
+        if (activeVessels.length === 0) return
+        setExportingIndividual(true)
+        setExportProgress({ current: 0, total: activeVessels.length })
+        let failed = 0
+        for (let i = 0; i < activeVessels.length; i++) {
+            const v = activeVessels[i]
+            setExportProgress({ current: i + 1, total: activeVessels.length })
+            try {
+                const vesselDocs = allDocs.filter(d => d.vesselId === v.id)
+                await ReportServiceV2.exportVesselToPDF(v, docTypes, vesselDocs)
+                // small delay so the browser can process each save
+                await new Promise(res => setTimeout(res, 400))
+            } catch {
+                failed++
+            }
+        }
+        setExportingIndividual(false)
+        setExportProgress(null)
+        if (failed > 0) {
+            showError(`${failed} vessel PDF${failed > 1 ? 's' : ''} failed to export`)
+        } else {
+            showSuccess(`${activeVessels.length} individual PDF${activeVessels.length > 1 ? 's' : ''} exported`)
+        }
+    }
 
     const renderVesselTable = (vesselList: Vessel[], title: string, showRemove: boolean) => {
         if (vesselList.length === 0) return null
@@ -192,7 +223,19 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         disabled={loading}
                     >
-                        <FileText size={18} /> PDF
+                        <FileText size={18} /> Fleet PDF
+                    </button>
+                    <button
+                        onClick={handleExportIndividualPDFs}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        disabled={loading || exportingIndividual || activeVessels.length === 0}
+                        title={activeVessels.length === 0 ? 'No active vessels' : `Export one PDF per vessel (${activeVessels.length})`}
+                    >
+                        {exportingIndividual
+                            ? <><Loader2 size={18} className="spinner" /> {exportProgress ? `${exportProgress.current}/${exportProgress.total}` : 'Exporting...'}</>
+                            : <><FileText size={18} /> Individual PDFs</>
+                        }
                     </button>
                 </div>
             </header>
