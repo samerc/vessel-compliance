@@ -56,7 +56,14 @@ function calcTaxesUSD(grossPremUSD: number, s: TaxSettings): number {
 
 // ── Per-vessel calculation ────────────────────────────────────────────────────
 
+function getTotalDays(from: string, to: string): number {
+  if (!from || !to) return 0
+  const diff = new Date(to).getTime() - new Date(from).getTime()
+  return Math.round(diff / (1000 * 60 * 60 * 24))
+}
+
 interface VesselCalc {
+  totalDays: number
   grossPrem: number
   taxesGov: number
   net: number
@@ -65,20 +72,22 @@ interface VesselCalc {
   netDue: number
 }
 
-function calcVessel(row: VesselRow, settings: TaxSettings): VesselCalc | null {
+function calcVessel(row: VesselRow, settings: TaxSettings, baseDays: number): VesselCalc | null {
   const sumIns = parseFloat(row.sumInsured) || 0
   const rate = parseFloat(row.rate) || 0
   const ncb = parseFloat(row.ncbDiscount) || 0
-  if (sumIns <= 0 || rate <= 0) return null
+  const totalDays = getTotalDays(row.periodFrom, row.periodTo)
+  if (sumIns <= 0 || rate <= 0 || baseDays <= 0 || totalDays <= 0) return null
 
-  const grossPrem = sumIns * (rate / 100) * (1 - ncb / 100)
+  // (Sum Insured × Rate%) / Base Days × (1 − NCB%) × Total Days
+  const grossPrem = (sumIns * (rate / 100)) / baseDays * (1 - ncb / 100) * totalDays
   const taxesGov = calcTaxesUSD(grossPrem, settings)
   const net = grossPrem - taxesGov
   const commission = net * (settings.commissionPct / 100)
   const nrTax = net * (settings.nrTaxPct / 100)
   const netDue = net - commission - nrTax
 
-  return { grossPrem, taxesGov, net, commission, nrTax, netDue }
+  return { totalDays, grossPrem, taxesGov, net, commission, nrTax, netDue }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -99,6 +108,7 @@ export default function WarBreachCalculator() {
 
   const [coverNoteNo, setCoverNoteNo] = useState('')
   const [currency, setCurrency] = useState('US DOLLARS')
+  const [baseDays, setBaseDays] = useState(365)
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState<TaxSettings>(DEFAULT_SETTINGS)
   const [copied, setCopied] = useState(false)
@@ -110,8 +120,8 @@ export default function WarBreachCalculator() {
   // ── Computed ─────────────────────────────────────────────────────────────
 
   const calculations = useMemo(
-    () => vessels.map(v => ({ id: v.id, calc: calcVessel(v, settings) })),
-    [vessels, settings]
+    () => vessels.map(v => ({ id: v.id, calc: calcVessel(v, settings, baseDays) })),
+    [vessels, settings, baseDays]
   )
 
   const totalNetDue = useMemo(
@@ -147,10 +157,10 @@ export default function WarBreachCalculator() {
   const buildEmailText = useCallback((): string => {
     const padL = (s: string | number, n: number) => String(s).padEnd(n)
     const padR = (s: string | number, n: number) => String(s).padStart(n)
-    const SEP = '-'.repeat(166)
+    const SEP = '-'.repeat(178)
 
     const lines: string[] = []
-    lines.push(`COVER NOTE: ${coverNoteNo || '___________'}${''.padEnd(20)}CURRENCY: ${currency}`)
+    lines.push(`COVER NOTE: ${coverNoteNo || '___________'}${''.padEnd(20)}CURRENCY: ${currency}${''.padEnd(20)}BASE DAYS: ${baseDays}`)
     lines.push('')
     lines.push(
       padL('POL. N°', 16) +
@@ -159,6 +169,7 @@ export default function WarBreachCalculator() {
       padR('SUM INS.', 15) +
       padR('RATE %', 9) +
       padR('NCB', 8) +
+      padR('DAYS', 7) +
       padR('GROSS PREM.', 14) +
       padR('TAXES GOV.', 13) +
       padR('NET', 13) +
@@ -182,6 +193,7 @@ export default function WarBreachCalculator() {
         padR(fmt(parseFloat(v.sumInsured) || 0), 15) +
         padR((parseFloat(v.rate) || 0).toFixed(3) + '%', 9) +
         padR(ncbLabel, 8) +
+        padR(String(c.totalDays), 7) +
         padR(fmt(c.grossPrem), 14) +
         padR(fmt(c.taxesGov), 13) +
         padR(fmt(c.net), 13) +
@@ -193,9 +205,9 @@ export default function WarBreachCalculator() {
 
     lines.push(SEP)
     lines.push('')
-    lines.push(''.padEnd(135) + 'NET DUE TO R/I:  ' + fmt(totalNetDue))
+    lines.push(''.padEnd(148) + 'NET DUE TO R/I:  ' + fmt(totalNetDue))
     return lines.join('\n')
-  }, [vessels, calculations, coverNoteNo, currency, totalNetDue])
+  }, [vessels, calculations, coverNoteNo, currency, baseDays, totalNetDue])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(buildEmailText()).then(() => {
@@ -252,7 +264,7 @@ export default function WarBreachCalculator() {
       </div>
 
       {/* ── Cover Note header ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', marginBottom: '20px' }}>
         <div>
           <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             Cover Note No.
@@ -275,6 +287,19 @@ export default function WarBreachCalculator() {
             onChange={e => setCurrency(e.target.value)}
             placeholder="e.g. US DOLLARS"
             style={{ width: '100%' }}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            Base Days
+          </label>
+          <input
+            type="number"
+            value={baseDays}
+            onChange={e => setBaseDays(parseInt(e.target.value) || 365)}
+            min="1"
+            step="1"
+            style={{ width: '90px' }}
           />
         </div>
       </div>
@@ -348,6 +373,7 @@ export default function WarBreachCalculator() {
               <th style={{ padding: '10px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' }}>SUM INS. (USD)</th>
               <th style={{ padding: '10px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' }}>RATE %</th>
               <th style={{ padding: '10px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' }}>NCB DISC. %</th>
+              <th style={{ padding: '10px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' }}>DAYS</th>
               {/* Computed */}
               <th style={{ padding: '10px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right', background: accentBg, whiteSpace: 'nowrap' }}>GROSS PREM.</th>
               <th style={{ padding: '10px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right', background: accentBg, whiteSpace: 'nowrap' }}>TAXES GOV.</th>
@@ -384,6 +410,9 @@ export default function WarBreachCalculator() {
                   <td style={{ padding: '5px 8px' }}>
                     <input style={{ ...cellInput, textAlign: 'right' }} type="number" placeholder="0" value={v.ncbDiscount} onChange={e => updateVessel(v.id, 'ncbDiscount', e.target.value)} min="0" max="99" step="5" />
                   </td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.85rem', color: c ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: c ? 600 : 400 }}>
+                    {getTotalDays(v.periodFrom, v.periodTo) || '—'}
+                  </td>
 
                   {/* Computed columns */}
                   {c ? (
@@ -397,7 +426,7 @@ export default function WarBreachCalculator() {
                     </>
                   ) : (
                     <td colSpan={6} style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.78rem', background: accentBg, fontStyle: 'italic' }}>
-                      — enter sum insured + rate —
+                      — enter sum insured, rate and period —
                     </td>
                   )}
 
