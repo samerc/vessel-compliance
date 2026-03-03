@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join, dirname, resolve, normalize, extname } from 'path'
 import { Worker } from 'worker_threads'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -294,11 +294,25 @@ app.whenReady().then(() => {
           width: user.windowWidth,
           height: user.windowHeight
         }
-        if (user.windowX !== null && user.windowX !== undefined) {
-          bounds.x = user.windowX
-        }
-        if (user.windowY !== null && user.windowY !== undefined) {
-          bounds.y = user.windowY
+        // Only restore position if it falls within a currently connected display.
+        // If the saved position is off-screen (e.g. secondary monitor disconnected),
+        // omit x/y so Electron centers the window on the primary display instead.
+        if (user.windowX !== null && user.windowX !== undefined &&
+            user.windowY !== null && user.windowY !== undefined) {
+          const displays = screen.getAllDisplays()
+          const isOnScreen = displays.some(d => {
+            const { x, y, width, height } = d.bounds
+            return (
+              user.windowX! >= x &&
+              user.windowY! >= y &&
+              user.windowX! < x + width &&
+              user.windowY! < y + height
+            )
+          })
+          if (isOnScreen) {
+            bounds.x = user.windowX
+            bounds.y = user.windowY
+          }
         }
         window.setBounds(bounds)
       }
