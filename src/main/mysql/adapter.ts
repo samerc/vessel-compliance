@@ -94,6 +94,25 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Normalize all tables to utf8mb4_unicode_ci to prevent
+            // "Illegal mix of collations" errors when JOINing tables created with
+            // different MySQL default collations (e.g. utf8mb4_0900_ai_ci vs unicode_ci)
+            try {
+                const [mismatchedTables] = await this.pool.query(`
+                    SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
+                    AND TABLE_TYPE = 'BASE TABLE'
+                `) as any[]
+                for (const row of (mismatchedTables as any[])) {
+                    await this.pool.query(
+                        `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                    )
+                }
+            } catch (e) {
+                console.error('Migration error (collation normalization):', e)
+            }
+
             // Migration: Add description to document_types if it doesn't exist
             const [cols] = await this.pool.query('SHOW COLUMNS FROM document_types LIKE "description"')
             if ((cols as any[]).length === 0) {
