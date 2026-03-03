@@ -888,7 +888,7 @@ export class MySQLAdapter {
                     INDEX idx_sw_status (status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Add columns that may be missing from older table versions
                 const [swColCsi] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'condition_survey_id'")
                 if ((swColCsi as any[]).length === 0) {
@@ -935,7 +935,7 @@ export class MySQLAdapter {
                     INDEX idx_swr_next (next_reminder_date)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Migration: add reference column if missing
                 const [swrCols] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_reminders LIKE 'reference'")
                 if ((swrCols as any[]).length === 0) {
@@ -946,6 +946,24 @@ export class MySQLAdapter {
                 if ((swrColCa as any[]).length === 0) {
                     await this.pool.query(`ALTER TABLE survey_warranty_reminders ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`)
                 }
+            }
+
+            // Final collation normalization pass — catches any tables created or altered
+            // during migration blocks above (must run after all CREATE/ALTER TABLE statements)
+            try {
+                const [mismatchedFinal] = await this.pool.query(`
+                    SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
+                    AND TABLE_TYPE = 'BASE TABLE'
+                `) as any[]
+                for (const row of (mismatchedFinal as any[])) {
+                    await this.pool.query(
+                        `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                    )
+                }
+            } catch (e) {
+                console.error('Migration error (final collation normalization):', e)
             }
 
         } catch (error) {
