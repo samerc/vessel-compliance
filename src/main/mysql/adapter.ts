@@ -922,6 +922,11 @@ export class MySQLAdapter {
                 if ((swrCols as any[]).length === 0) {
                     await this.pool.query(`ALTER TABLE survey_warranty_reminders ADD COLUMN reference VARCHAR(255) NULL AFTER channel`)
                 }
+                // Migration: add created_at column if missing
+                const [swrColCa] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_reminders LIKE 'created_at'")
+                if ((swrColCa as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranty_reminders ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`)
+                }
             }
 
         } catch (error) {
@@ -2443,7 +2448,6 @@ export class MySQLAdapter {
             LEFT JOIN fleets f ON f.id = v.fleet_id
             LEFT JOIN vessel_dynamic_policies vdp ON vdp.id = sw.policy_id
             LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
-            WHERE sw.status IN ('pending', 'survey_done')
             ORDER BY sw.inception_date ASC
         `)
         return rows as any[]

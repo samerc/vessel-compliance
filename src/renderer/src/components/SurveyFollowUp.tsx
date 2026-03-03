@@ -94,7 +94,12 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
         window.api.surveyWarrantyGetAll(),
         window.api.surveyWarrantyGetEndorsementsDue()
       ])
-      setWarranties(Array.isArray(ws) ? ws : [])
+      if (ws && (ws as any).error) {
+        showError('Failed to load warranties: ' + (ws as any).message)
+        setWarranties([])
+      } else {
+        setWarranties(Array.isArray(ws) ? ws : [])
+      }
       setEndorsementsDue(Array.isArray(eds) ? eds : [])
     } catch (err: any) {
       showError('Failed to load data: ' + (err.message || err))
