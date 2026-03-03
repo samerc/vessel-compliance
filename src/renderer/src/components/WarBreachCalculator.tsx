@@ -157,13 +157,23 @@ export default function WarBreachCalculator() {
   // ── Filename builder ──────────────────────────────────────────────────────
 
   function buildFilename(ext: string): string {
+    const toTitleCase = (s: string) =>
+      s.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+
     const vesselNames = vessels
       .filter((_, i) => calculations[i]?.calc !== null)
-      .map(v => v.vessel.trim())
+      .map(v => toTitleCase(v.vessel.trim()))
       .filter(Boolean)
       .join(' - ')
-    const now = new Date()
-    const monthYear = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+    // Use the latest expiry (TO) date across vessels with results; fall back to today
+    const expiryDates = vessels
+      .filter((v, i) => calculations[i]?.calc !== null && v.periodTo)
+      .map(v => v.periodTo)
+      .sort()
+    const dateForName = expiryDates.length > 0 ? new Date(expiryDates.at(-1)!) : new Date()
+    const monthYear = dateForName.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
     const parts = [vesselNames || 'Vessels', breachDetails.trim() || 'Breach', monthYear]
     return `${parts.join(' - ')}.${ext}`
   }
@@ -256,9 +266,9 @@ export default function WarBreachCalculator() {
   // ── Email output builders ─────────────────────────────────────────────────
 
   function buildEmailHTML(): string {
-    // Use <font> tag inside each header cell — the only technique that survives Outlook/Word paste reliably
+    // Light bg + dark text — Outlook's paste engine strips text color reliably; this is always readable
     const th = (t: string, align = 'right') =>
-      `<td style="border:1px solid #8aaac8;padding:6px 10px;background:#1a4f7a;text-align:${align};white-space:nowrap;font-size:11px;font-family:Arial,sans-serif;font-weight:bold;"><font color="#ffffff">${t}</font></td>`
+      `<td align="${align}" style="border:1px solid #8aaac8;padding:6px 10px;background:#cce0f5;color:#0a2040;text-align:${align};white-space:nowrap;font-size:11px;font-family:Arial,sans-serif;font-weight:bold;">${t}</td>`
     const td = (t: string, extra = '') =>
       `<td style="border:1px solid #ddd;padding:5px 10px;text-align:right;font-size:11px;font-family:Arial,sans-serif;${extra}">${t}</td>`
     const tdL = (t: string) =>
@@ -285,8 +295,8 @@ export default function WarBreachCalculator() {
     }).filter(Boolean).join('')
 
     const totalsRow = `<tr style="background:#e8f4fb;">
-      <td colspan="12" style="border:1px solid #ddd;padding:7px 10px;text-align:right;font-weight:bold;font-size:11px;font-family:Arial,sans-serif;">NET DUE TO R/I:</td>
-      <td style="border:1px solid #ddd;padding:7px 10px;text-align:right;font-weight:bold;font-size:11px;font-family:Arial,sans-serif;color:#006b8f;">${fmt(totalNetDue)}</td>
+      <td colspan="12" align="right" style="border:1px solid #ddd;padding:7px 10px;text-align:right;font-weight:bold;font-size:11px;font-family:Arial,sans-serif;">NET DUE TO R/I:</td>
+      <td align="right" style="border:1px solid #ddd;padding:7px 10px;text-align:right;font-weight:bold;font-size:11px;font-family:Arial,sans-serif;color:#006b8f;">${fmt(totalNetDue)}</td>
     </tr>`
 
     // No <thead> — single <tbody> is more Outlook-compatible
@@ -671,15 +681,15 @@ export default function WarBreachCalculator() {
             {/* Preview table */}
             <table style={{ borderCollapse: 'collapse', fontSize: '0.78rem' }}>
               <thead>
-                <tr style={{ background: '#1a4f7a' }}>
+                <tr style={{ background: '#cce0f5' }}>
                   {(['POL. N°', 'VESSEL', 'FROM', 'TO', 'SUM INS.', 'RATE %', 'NCB', 'GROSS PREM.', 'TAXES GOV.', 'NET', `Your Comm. ${settings.commissionPct}%`, 'Tax Non-Resident', 'NET DUE']).map((h, i) => (
                     <th key={h} style={{
                       padding: '7px 10px',
-                      border: '1px solid #2a5a8a',
-                      color: i === 12 ? 'var(--accent-primary)' : '#ffffff',
+                      border: '1px solid #8aaac8',
+                      color: '#0a2040',
                       textAlign: i < 4 ? 'left' : 'right',
                       whiteSpace: 'nowrap',
-                      fontWeight: 600,
+                      fontWeight: 700,
                       ...(i === 7 ? { borderLeft: '2px solid #4a9fd4' } : {}),
                     }}>
                       {h}
