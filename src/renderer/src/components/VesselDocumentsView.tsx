@@ -61,6 +61,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
   const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
   const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
   const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
+  const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [showAddCustom, setShowAddCustom] = useState(false)
   const [newCustomName, setNewCustomName] = useState('')
@@ -283,10 +284,24 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
               <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{description}</div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px', flexWrap: 'wrap' }}>
-              {doc?.receivedDate && (
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                  Received: {new Date(doc.receivedDate).toLocaleDateString()}
-                </span>
+              {hasFile && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>Received:</span>
+                  <input
+                    type="date"
+                    title="Edit received date"
+                    value={editingReceived[id] !== undefined ? editingReceived[id] : (doc?.receivedDate?.split('T')[0] || '')}
+                    onFocus={() => setEditingReceived(prev => ({ ...prev, [id]: doc?.receivedDate?.split('T')[0] || '' }))}
+                    onChange={e => setEditingReceived(prev => ({ ...prev, [id]: e.target.value }))}
+                    onBlur={async e => {
+                      const val = e.target.value
+                      setEditingReceived(prev => { const n = { ...prev }; delete n[id]; return n })
+                      if (val) { await window.api.updateVesselDocumentReceivedDate(vessel.id, id, val); loadData() }
+                    }}
+                    max={new Date().toISOString().split('T')[0]}
+                    style={{ fontSize: '0.74rem', padding: '2px 5px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
+                  />
+                </div>
               )}
               {doc?.sent && (
                 <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.12)', color: isLight ? '#0077a3' : 'var(--accent-primary)', fontWeight: '600' }}>
