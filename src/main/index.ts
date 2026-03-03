@@ -143,12 +143,28 @@ function createWindow(): void {
     y: undefined
   }) as { width: number, height: number, x?: number, y?: number }
 
+  // Validate stored position against connected displays to avoid off-screen window
+  let validX: number | undefined
+  let validY: number | undefined
+  if (windowState.x !== undefined && windowState.y !== undefined) {
+    const displays = screen.getAllDisplays()
+    const isOnScreen = displays.some(d => {
+      const { x, y, width, height } = d.bounds
+      return windowState.x! >= x && windowState.y! >= y &&
+        windowState.x! < x + width && windowState.y! < y + height
+    })
+    if (isOnScreen) {
+      validX = windowState.x
+      validY = windowState.y
+    }
+  }
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: windowState.width,
     height: windowState.height,
-    x: windowState.x,
-    y: windowState.y,
+    x: validX,
+    y: validY,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -185,6 +201,10 @@ function createWindow(): void {
   mainWindow.on('move', saveState)
 
   mainWindow.on('ready-to-show', async () => {
+    // If stored position was off-screen, center the window
+    if (validX === undefined) {
+      mainWindow.center()
+    }
     try {
       // Check DB Connection
       const configPath = getConfigPath()

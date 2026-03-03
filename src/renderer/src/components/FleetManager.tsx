@@ -608,7 +608,7 @@ export default function FleetManager() {
               <button
                 onClick={() => setShowAddForm(v => !v)}
                 className="btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap', marginLeft: 'auto' }}
               >
                 <Plus size={15} /> Add Fleet
               </button>

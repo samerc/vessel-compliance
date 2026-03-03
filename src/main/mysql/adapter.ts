@@ -870,6 +870,33 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
                 await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                // Add columns that may be missing from older table versions
+                const [swColCsi] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'condition_survey_id'")
+                if ((swColCsi as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN condition_survey_id VARCHAR(36) NULL`)
+                }
+                const [swColCn] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'completion_notes'")
+                if ((swColCn as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN completion_notes TEXT NULL`)
+                }
+                const [swColWr] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'waiver_reason'")
+                if ((swColWr as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN waiver_reason TEXT NULL`)
+                }
+                const [swColCa] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'completed_at'")
+                if ((swColCa as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN completed_at DATETIME NULL`)
+                }
+                const [swColCr] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'created_at'")
+                if ((swColCr as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`)
+                }
+                // Ensure status ENUM includes all values
+                const [swStatusInfo] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'status'")
+                const swStatusCol = (swStatusInfo as any[])[0]
+                if (swStatusCol && !String(swStatusCol.Type).includes('completed')) {
+                    await this.pool.query(`ALTER TABLE survey_warranties MODIFY COLUMN status ENUM('pending','survey_done','completed','waived') NOT NULL DEFAULT 'pending'`)
+                }
             }
 
             // Migration: Create survey_warranty_reminders table

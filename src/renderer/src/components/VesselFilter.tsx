@@ -155,6 +155,29 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder = 'Any' 
     )
 }
 
+// ── Module-level cache — persists filter state across navigation ─────────────────
+const _cache = {
+    hasSearched: false,
+    panelCollapsed: false,
+    nameSearch: '',
+    logic: 'AND' as 'AND' | 'OR',
+    selectedPolicyTypes: [] as string[],
+    policyStatus: 'all' as 'active' | 'expired' | 'all',
+    selectedFlagStates: [] as string[],
+    flagUnassigned: false,
+    selectedClassifications: [] as string[],
+    selectedVesselTypes: [] as string[],
+    selectedCustomerId: '',
+    customerType: 'both' as 'broker' | 'direct' | 'both',
+    vesselStatus: 'active' as 'active' | 'inactive' | 'all',
+    yearFrom: '',
+    yearTo: '',
+    gtFrom: '',
+    gtTo: '',
+    vesselPolicies: new Map<string, VesselDynamicPolicy[]>(),
+    vesselClassifications: new Map<string, string[]>(),
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) {
     const { showError } = useToast()
@@ -165,28 +188,54 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
     const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
-    const [vesselPolicies, setVesselPolicies] = useState<Map<string, VesselDynamicPolicy[]>>(new Map())
-    const [vesselClassifications, setVesselClassifications] = useState<Map<string, string[]>>(new Map())
+    const [vesselPolicies, setVesselPolicies] = useState<Map<string, VesselDynamicPolicy[]>>(_cache.vesselPolicies)
+    const [vesselClassifications, setVesselClassifications] = useState<Map<string, string[]>>(_cache.vesselClassifications)
 
     const [loading, setLoading] = useState(false)
-    const [hasSearched, setHasSearched] = useState(false)
-    const [panelCollapsed, setPanelCollapsed] = useState(false)
-    const [nameSearch, setNameSearch] = useState('')
+    const [hasSearched, setHasSearched] = useState(_cache.hasSearched)
+    const [panelCollapsed, setPanelCollapsed] = useState(_cache.panelCollapsed)
+    const [nameSearch, setNameSearch] = useState(_cache.nameSearch)
 
-    const [logic, setLogic] = useState<'AND' | 'OR'>('AND')
-    const [selectedPolicyTypes, setSelectedPolicyTypes] = useState<string[]>([])
-    const [policyStatus, setPolicyStatus] = useState<'active' | 'expired' | 'all'>('all')
-    const [selectedFlagStates, setSelectedFlagStates] = useState<string[]>([])
-    const [flagUnassigned, setFlagUnassigned] = useState(false)
-    const [selectedClassifications, setSelectedClassifications] = useState<string[]>([])
-    const [selectedVesselTypes, setSelectedVesselTypes] = useState<string[]>([])
-    const [selectedCustomerId, setSelectedCustomerId] = useState('')
-    const [customerType, setCustomerType] = useState<'broker' | 'direct' | 'both'>('both')
-    const [vesselStatus, setVesselStatus] = useState<'active' | 'inactive' | 'all'>('active')
-    const [yearFrom, setYearFrom] = useState('')
-    const [yearTo, setYearTo] = useState('')
-    const [gtFrom, setGtFrom] = useState('')
-    const [gtTo, setGtTo] = useState('')
+    const [logic, setLogic] = useState<'AND' | 'OR'>(_cache.logic)
+    const [selectedPolicyTypes, setSelectedPolicyTypes] = useState<string[]>(_cache.selectedPolicyTypes)
+    const [policyStatus, setPolicyStatus] = useState<'active' | 'expired' | 'all'>(_cache.policyStatus)
+    const [selectedFlagStates, setSelectedFlagStates] = useState<string[]>(_cache.selectedFlagStates)
+    const [flagUnassigned, setFlagUnassigned] = useState(_cache.flagUnassigned)
+    const [selectedClassifications, setSelectedClassifications] = useState<string[]>(_cache.selectedClassifications)
+    const [selectedVesselTypes, setSelectedVesselTypes] = useState<string[]>(_cache.selectedVesselTypes)
+    const [selectedCustomerId, setSelectedCustomerId] = useState(_cache.selectedCustomerId)
+    const [customerType, setCustomerType] = useState<'broker' | 'direct' | 'both'>(_cache.customerType)
+    const [vesselStatus, setVesselStatus] = useState<'active' | 'inactive' | 'all'>(_cache.vesselStatus)
+    const [yearFrom, setYearFrom] = useState(_cache.yearFrom)
+    const [yearTo, setYearTo] = useState(_cache.yearTo)
+    const [gtFrom, setGtFrom] = useState(_cache.gtFrom)
+    const [gtTo, setGtTo] = useState(_cache.gtTo)
+
+    // Save filter state to module cache on every change
+    useEffect(() => {
+        _cache.hasSearched = hasSearched
+        _cache.panelCollapsed = panelCollapsed
+        _cache.nameSearch = nameSearch
+        _cache.logic = logic
+        _cache.selectedPolicyTypes = selectedPolicyTypes
+        _cache.policyStatus = policyStatus
+        _cache.selectedFlagStates = selectedFlagStates
+        _cache.flagUnassigned = flagUnassigned
+        _cache.selectedClassifications = selectedClassifications
+        _cache.selectedVesselTypes = selectedVesselTypes
+        _cache.selectedCustomerId = selectedCustomerId
+        _cache.customerType = customerType
+        _cache.vesselStatus = vesselStatus
+        _cache.yearFrom = yearFrom
+        _cache.yearTo = yearTo
+        _cache.gtFrom = gtFrom
+        _cache.gtTo = gtTo
+        _cache.vesselPolicies = vesselPolicies
+        _cache.vesselClassifications = vesselClassifications
+    }, [hasSearched, panelCollapsed, nameSearch, logic, selectedPolicyTypes, policyStatus,
+        selectedFlagStates, flagUnassigned, selectedClassifications, selectedVesselTypes,
+        selectedCustomerId, customerType, vesselStatus, yearFrom, yearTo, gtFrom, gtTo,
+        vesselPolicies, vesselClassifications])
 
     useEffect(() => { loadData() }, [])
 
@@ -247,6 +296,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
         setVesselStatus('active')
         setYearFrom(''); setYearTo(''); setGtFrom(''); setGtTo('')
         setHasSearched(false); setNameSearch('')
+        setVesselPolicies(new Map()); setVesselClassifications(new Map())
     }
 
     const filteredVessels = useMemo(() => {
