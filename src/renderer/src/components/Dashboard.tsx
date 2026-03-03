@@ -11,6 +11,7 @@ interface DashboardActivity {
   recentVessels: Array<{ id: string; name: string; imoNumber: string; fleetName?: string; createdAt: string; isActive: boolean }>
   recentEntities: Array<{ id: string; name: string; type: string; createdAt: string }>
   recentAuditEntries: Array<{ vesselId: string; vesselName: string; fieldName: string; newValue?: string; changedAt: string }>
+  weekRenewals: Array<{ vesselName: string; imoNumber: string; policyTypeName: string; policyNumber?: string; endDate: string }>
 }
 
 interface ExpirationItem {
@@ -71,7 +72,7 @@ export default function Dashboard({
   const [pendingSanctions, setPendingSanctions] = useState<any[]>([])
   const [activeWarranties, setActiveWarranties] = useState<SurveyWarranty[]>([])
   const [endorsementsDue, setEndorsementsDue] = useState<number>(0)
-  const [activity, setActivity] = useState<DashboardActivity>({ recentVessels: [], recentEntities: [], recentAuditEntries: [] })
+  const [activity, setActivity] = useState<DashboardActivity>({ recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] })
   const [isLoading, setIsLoading] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
 
@@ -95,7 +96,7 @@ export default function Dashboard({
       window.api.complianceGetPendingResults().then(d => setPendingSanctions(d || [])).catch(() => {}),
       window.api.surveyWarrantyGetAll().then(d => setActiveWarranties(Array.isArray(d) ? d : [])).catch(() => {}),
       window.api.surveyWarrantyGetEndorsementsDue().then(d => setEndorsementsDue(Array.isArray(d) ? d.length : 0)).catch(() => {}),
-      window.api.dashboardGetActivity().then(d => setActivity(d || { recentVessels: [], recentEntities: [], recentAuditEntries: [] })).catch(() => {})
+      window.api.dashboardGetActivity().then(d => setActivity(d || { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] })).catch(() => {})
     ])
     setLastRefreshed(new Date())
     setIsLoading(false)
@@ -425,7 +426,7 @@ export default function Dashboard({
       </div>
 
       {/* ── Activity Row ─────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
 
         {/* Recently Added Vessels */}
         <div style={cardStyle}>
@@ -496,6 +497,44 @@ export default function Dashboard({
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       {relativeTime(e.createdAt)}
                     </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Renewals This Week */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Calendar size={13} color="#fff" />
+            </div>
+            Renewals This Week
+          </h3>
+          {activity.weekRenewals.length === 0 ? (
+            <EmptyActivity label="No renewals this week" />
+          ) : (
+            <div>
+              {activity.weekRenewals.map((r, idx) => {
+                const days = daysUntil(r.endDate)
+                return (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.02)')
+                  }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '7px', background: days <= 2 ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Calendar size={13} color={days <= 2 ? '#ef4444' : '#10b981'} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.82rem', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyTypeName}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: '700', color: days <= 2 ? 'var(--danger)' : '#10b981' }}>{days === 0 ? 'Today' : `${days}d`}</div>
+                      <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>{formatDate(r.endDate)}</div>
+                    </div>
                   </div>
                 )
               })}

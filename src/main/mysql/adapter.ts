@@ -2369,8 +2369,8 @@ export class MySQLAdapter {
     }
 
     // --- Dashboard Activity ---
-    async getDashboardActivity(): Promise<{ recentVessels: any[]; recentEntities: any[]; recentAuditEntries: any[] }> {
-        if (!this.pool) return { recentVessels: [], recentEntities: [], recentAuditEntries: [] }
+    async getDashboardActivity(): Promise<{ recentVessels: any[]; recentEntities: any[]; recentAuditEntries: any[]; weekRenewals: any[] }> {
+        if (!this.pool) return { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }
         const [recentVessels] = await this.pool.query(`
             SELECT v.id, v.name, v.imo_number as imoNumber,
                 v.created_at as createdAt, v.is_active as isActive,
@@ -2388,17 +2388,40 @@ export class MySQLAdapter {
         `)
         const [recentAuditEntries] = await this.pool.query(`
             SELECT al.vessel_id as vesselId, v.name as vesselName,
-                al.field_name as fieldName, al.new_value as newValue,
+                al.field_name as fieldName,
+                CASE WHEN al.field_name = 'Flag State'
+                    THEN COALESCE(fs.name, al.new_value)
+                    ELSE al.new_value
+                END as newValue,
                 al.changed_at as changedAt
             FROM vessel_audit_log al
             JOIN vessels v ON v.id = al.vessel_id
+            LEFT JOIN flag_states fs ON al.field_name = 'Flag State' AND fs.id = al.new_value
             ORDER BY al.changed_at DESC
             LIMIT 8
+        `)
+        const [weekRenewals] = await this.pool.query(`
+            SELECT v.name as vesselName, v.imo_number as imoNumber,
+                pt.name as policyTypeName, vdp.policy_number as policyNumber,
+                vpv.value_date as endDate
+            FROM vessel_dynamic_policies vdp
+            JOIN vessels v ON vdp.vessel_id = v.id AND v.is_active = TRUE
+            JOIN policy_types pt ON vdp.policy_type_id = pt.id
+            JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
+            JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
+            WHERE vdp.status = 'active'
+              AND ptc.field_type = 'date'
+              AND LOWER(ptc.name) LIKE '%end%'
+              AND vpv.value_date IS NOT NULL
+              AND vpv.value_date >= CURDATE()
+              AND vpv.value_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+            ORDER BY vpv.value_date ASC
         `)
         return {
             recentVessels: (recentVessels as any[]).map(r => ({ ...r, isActive: Boolean(r.isActive) })),
             recentEntities: recentEntities as any[],
-            recentAuditEntries: recentAuditEntries as any[]
+            recentAuditEntries: recentAuditEntries as any[],
+            weekRenewals: weekRenewals as any[]
         }
     }
 

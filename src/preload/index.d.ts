@@ -167,6 +167,7 @@ export interface Api {
     recentVessels: Array<{ id: string; name: string; imoNumber: string; fleetName?: string; createdAt: string; isActive: boolean }>
     recentEntities: Array<{ id: string; name: string; type: string; createdAt: string }>
     recentAuditEntries: Array<{ vesselId: string; vesselName: string; fieldName: string; newValue?: string; changedAt: string }>
+    weekRenewals: Array<{ vesselName: string; imoNumber: string; policyTypeName: string; policyNumber?: string; endDate: string }>
   }>
 
   // Survey Warranties

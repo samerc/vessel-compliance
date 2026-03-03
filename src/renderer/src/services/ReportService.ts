@@ -869,7 +869,7 @@ export const ReportService = {
     const fleetRoleOrderMap = new Map(fleetAssuredRoles.map((r, i) => [r.name, i]))
 
     // Collect all unique assureds across the fleet with their vessel associations
-    const assuredMap = new Map<string, { entity: any; vessels: string[]; role: string }>()
+    const assuredMap = new Map<string, { entity: any; vessels: string[]; roles: string[] }>()
 
     for (const vessel of activeVessels) {
       const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
@@ -879,17 +879,20 @@ export const ReportService = {
 
         if (assuredMap.has(entity.id)) {
           const existing = assuredMap.get(entity.id)!
-          if (!existing.vessels.includes(vessel.name)) {
-            existing.vessels.push(vessel.name)
-          }
+          if (!existing.vessels.includes(vessel.name)) existing.vessels.push(vessel.name)
+          if (!existing.roles.includes(va.role)) existing.roles.push(va.role)
         } else {
-          assuredMap.set(entity.id, { entity, vessels: [vessel.name], role: va.role })
+          assuredMap.set(entity.id, { entity, vessels: [vessel.name], roles: [va.role] })
         }
       }
     }
 
-    // Sort assureds by role order
-    const sortedAssureds = [...assuredMap.entries()].sort((a, b) => (fleetRoleOrderMap.get(a[1].role) ?? 999) - (fleetRoleOrderMap.get(b[1].role) ?? 999))
+    // Sort assureds by first role order
+    const sortedAssureds = [...assuredMap.entries()].sort((a, b) => {
+      const aMin = Math.min(...a[1].roles.map(r => fleetRoleOrderMap.get(r) ?? 999))
+      const bMin = Math.min(...b[1].roles.map(r => fleetRoleOrderMap.get(r) ?? 999))
+      return aMin - bMin
+    })
 
     // Count entity documents for compliance rate
     for (const [, { entity }] of sortedAssureds) {
@@ -1023,7 +1026,7 @@ export const ReportService = {
       finalY += 10
 
       let assuredIndex = 0
-      for (const [, { entity, vessels: vesselNames, role }] of sortedAssureds) {
+      for (const [, { entity, vessels: vesselNames, roles }] of sortedAssureds) {
         assuredIndex++
 
         // Check if we need a new page
@@ -1041,7 +1044,7 @@ export const ReportService = {
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(9)
         doc.setTextColor(100, 100, 100)
-        doc.text(`Role: ${role} | Type: ${entity.type.toUpperCase()} | Vessels: ${vesselNames.join(', ')}`, 14, finalY)
+        doc.text(`Role: ${roles.join(', ')} | Type: ${entity.type.toUpperCase()} | Vessels: ${vesselNames.join(', ')}`, 14, finalY)
         finalY += 8
 
         // Entity documents

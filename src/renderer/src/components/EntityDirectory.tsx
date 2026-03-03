@@ -287,7 +287,7 @@ export default function EntityDirectory() {
     const indirectLinks = vesselAssureds.filter(va => parentAssuredIds.includes(va.entityId))
     const vesselIds = new Set([...directLinks.map(l => l.vesselId), ...indirectLinks.map(l => l.vesselId)])
     return vessels.filter(v => vesselIds.has(v.id)).map(v => {
-      const roles = directLinks.filter(l => l.vesselId === v.id).map(l => l.role)
+      const roles = [...new Set(directLinks.filter(l => l.vesselId === v.id).map(l => l.role))]
       const viaAssureds = indirectLinks.filter(l => l.vesselId === v.id).map(l => {
         const assured = allEntities.find(e => e.id === l.entityId)
         return `${assured?.name ?? '?'} (${l.role})`
