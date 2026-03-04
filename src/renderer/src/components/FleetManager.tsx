@@ -77,11 +77,11 @@ export default function FleetManager() {
       window.api.getEntities(),
       window.api.getFlagStates(),
     ])
-    setFleets(fData)
-    setVessels(vData)
-    setEntities(eData)
-    setFlagStates(fsData)
-    return vData
+    setFleets(Array.isArray(fData) ? fData : [])
+    setVessels(Array.isArray(vData) ? vData : [])
+    setEntities(Array.isArray(eData) ? eData : [])
+    setFlagStates(Array.isArray(fsData) ? fsData : [])
+    return Array.isArray(vData) ? vData : []
   }
 
   const openPanel = (fleet: Fleet) => {

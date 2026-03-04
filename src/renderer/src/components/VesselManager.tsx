@@ -83,9 +83,9 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                 window.api.getEntities(),
                 window.api.getFlagStates()
             ])
-            setFleets(fData)
-            setEntities(eData)
-            setFlagStates(fsData)
+            setFleets(Array.isArray(fData) ? fData : [])
+            setEntities(Array.isArray(eData) ? eData : [])
+            setFlagStates(Array.isArray(fsData) ? fsData : [])
         }
         loadStaticData()
     }, [])

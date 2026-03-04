@@ -122,6 +122,7 @@ export class MySQLAdapter {
                     WHERE TABLE_SCHEMA = DATABASE()
                     AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
                     AND TABLE_TYPE = 'BASE TABLE'
+                    ORDER BY TABLE_NAME ASC
                 `) as any[]
                 for (const row of (mismatchedTables as any[])) {
                     try {
@@ -1011,6 +1012,7 @@ export class MySQLAdapter {
                     WHERE TABLE_SCHEMA = DATABASE()
                     AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
                     AND TABLE_TYPE = 'BASE TABLE'
+                    ORDER BY TABLE_NAME ASC
                 `) as any[]
                 for (const row of (mismatchedFinal as any[])) {
                     try {
