@@ -85,7 +85,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const loadPolicyAlerts = async () => {
         try {
             const alerts = await window.api.getExpiredActivePolicies()
-            setPolicyAlerts(alerts || [])
+            setPolicyAlerts(Array.isArray(alerts) ? alerts : [])
         } catch {
             setPolicyAlerts([])
         }

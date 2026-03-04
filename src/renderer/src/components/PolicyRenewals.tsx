@@ -106,7 +106,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         setLoading(true)
         try {
             const data = await window.api.getPolicyRenewalsByMonth(selectedYear, selectedMonth)
-            setRenewals(data || [])
+            setRenewals(Array.isArray(data) ? data : [])
         } catch {
             setRenewals([])
         }
@@ -116,7 +116,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const loadStatusTypes = async () => {
         try {
             const data = await window.api.getRenewalStatusTypes()
-            setStatusTypes(data || [])
+            setStatusTypes(Array.isArray(data) ? data : [])
         } catch {
             setStatusTypes([])
         }
@@ -153,7 +153,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         setNotesLoading(true)
         try {
             const data = await window.api.getPolicyRenewalNotes(r.id, r.policyNumber || '')
-            setRenewalNotes(data || [])
+            setRenewalNotes(Array.isArray(data) ? data : [])
         } finally {
             setNotesLoading(false)
         }

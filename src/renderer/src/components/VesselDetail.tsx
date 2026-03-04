@@ -82,46 +82,46 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         // Load supplementary data separately so failures don't break core functionality
         try {
             const history = await window.api.getVesselNameHistory(vessel.id)
-            setNameHistory(history || [])
+            setNameHistory(Array.isArray(history) ? history : [])
         } catch { /* ignore */ }
         try {
             const fs = await window.api.getFlagStates()
-            setFlagStates(fs || [])
+            setFlagStates(Array.isArray(fs) ? fs : [])
         } catch { /* ignore */ }
         try {
             const cs = await window.api.getClassificationSocieties()
-            setClassSocieties([...(cs || [])].sort((a, b) => a.name.localeCompare(b.name)))
+            setClassSocieties(Array.isArray(cs) ? [...cs].sort((a, b) => a.name.localeCompare(b.name)) : [])
         } catch { /* ignore */ }
         try {
             const vcs = await window.api.getVesselClassifications(vessel.id)
-            setVesselClassificationIds(new Set((vcs || []).map((vc: any) => vc.classificationSocietyId)))
+            setVesselClassificationIds(new Set(Array.isArray(vcs) ? vcs.map((vc: any) => vc.classificationSocietyId) : []))
         } catch { /* ignore */ }
         try {
             const vt = await window.api.getVesselTypes()
-            setVesselTypes(vt || [])
+            setVesselTypes(Array.isArray(vt) ? vt : [])
         } catch { /* ignore */ }
         try {
             const [pt, vp] = await Promise.all([
                 window.api.getPolicyTypes(),
                 window.api.getVesselPolicies(vessel.id)
             ])
-            setAllPolicyTypes(pt || [])
-            setVesselPolicies(vp || [])
-            setAssignedPolicyTypeIds(new Set((vp || []).map((p: VesselPolicy) => p.policyTypeId)))
+            setAllPolicyTypes(Array.isArray(pt) ? pt : [])
+            setVesselPolicies(Array.isArray(vp) ? vp : [])
+            setAssignedPolicyTypeIds(new Set(Array.isArray(vp) ? vp.map((p: VesselPolicy) => p.policyTypeId) : []))
         } catch { /* ignore */ }
     }
 
     const loadDynamicPolicies = async () => {
         try {
             const dp = await window.api.getVesselDynamicPolicies(vessel.id)
-            setDynamicPolicies(dp || [])
+            setDynamicPolicies(Array.isArray(dp) ? dp : [])
         } catch { /* ignore */ }
     }
 
     const loadAuditLog = async () => {
         try {
             const log = await window.api.getVesselAuditLog(vessel.id)
-            setAuditLog(log || [])
+            setAuditLog(Array.isArray(log) ? log : [])
         } catch { /* ignore */ }
     }
 
@@ -450,7 +450,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         showSuccess('Vessel details updated')
         // Reload to refresh name history
         const history = await window.api.getVesselNameHistory(vessel.id)
-        setNameHistory(history || [])
+        setNameHistory(Array.isArray(history) ? history : [])
     }
 
     const handleToggleVesselActive = async () => {
@@ -493,7 +493,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         setVesselNotesLoading(true)
         try {
             const data = await window.api.getVesselNotes(vessel.id)
-            setVesselNotesList(data || [])
+            setVesselNotesList(Array.isArray(data) ? data : [])
         } finally {
             setVesselNotesLoading(false)
         }
@@ -1709,10 +1709,10 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                 window.api.getPolicyTypeConditions(),
                 window.api.getEntities()
             ])
-            setPolicyTypes(pt || [])
-            setCharacteristics(allChars || [])
-            setConditions(allConds || [])
-            setEntities(ent || [])
+            setPolicyTypes(Array.isArray(pt) ? pt : [])
+            setCharacteristics(Array.isArray(allChars) ? allChars : [])
+            setConditions(Array.isArray(allConds) ? allConds : [])
+            setEntities(Array.isArray(ent) ? ent : [])
         } catch { /* ignore */ }
     }
 
