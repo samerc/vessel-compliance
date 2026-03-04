@@ -202,7 +202,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     const loadPolicyTypes = async () => {
         const data = await window.api.getPolicyTypes()
-        setPolicyTypes(data)
+        setPolicyTypes(Array.isArray(data) ? data : [])
     }
 
     const handleAddPolicyType = async (e: React.FormEvent) => {
@@ -285,7 +285,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     // --- Vessel Types ---
     const loadVesselTypes = async () => {
         const data = await window.api.getVesselTypes()
-        setVesselTypes(data)
+        setVesselTypes(Array.isArray(data) ? data : [])
     }
 
     const handleAddVesselType = async (e: React.FormEvent) => {
@@ -384,7 +384,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const loadDocTypes = async () => {
-        const data = await window.api.getDocumentTypes()
+        const raw = await window.api.getDocumentTypes()
+        const data = Array.isArray(raw) ? raw : []
 
         // Normalize orders: ensure every doc has a unique sequential order
         // Sort by existing order first, handling undefined/NaN
@@ -417,12 +418,12 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     const loadRoles = async () => {
         const data = await window.api.getAssuredRoles()
-        setRoles(data)
+        setRoles(Array.isArray(data) ? data : [])
     }
 
     const loadSurveyTypes = async () => {
         const data = await window.api.getConditionSurveyTypes()
-        setSurveyTypes(data)
+        setSurveyTypes(Array.isArray(data) ? data : [])
     }
 
     const handleAddDocType = async (e: React.FormEvent) => {

@@ -1790,7 +1790,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(`
             SELECT ar.id, ar.name, ar.order_index as \`order\`, COUNT(DISTINCT va.vessel_id) as vesselCount
             FROM assured_roles ar
-            LEFT JOIN vessel_assureds va ON ar.name = va.role
+            LEFT JOIN vessel_assureds va ON ar.name COLLATE utf8mb4_unicode_ci = va.role COLLATE utf8mb4_unicode_ci
             GROUP BY ar.id, ar.name, ar.order_index
             ORDER BY ar.order_index ASC, ar.name ASC
         `)
