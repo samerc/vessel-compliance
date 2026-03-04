@@ -48,7 +48,8 @@ export class MySQLAdapter {
                 connectionLimit: 10,
                 queueLimit: 0,
                 dateStrings: true,
-                connectTimeout: 10000
+                connectTimeout: 10000,
+                charset: 'UTF8MB4_UNICODE_CI'
             })
 
             const conn = await this.pool.getConnection()
@@ -112,25 +113,30 @@ export class MySQLAdapter {
             }
 
             // Migration: Normalize all existing tables to utf8mb4_unicode_ci.
-            // Each table is converted independently — one failure must not abort
-            // the rest. FK checks are disabled so tables with FK constraints can
-            // be altered without referential errors.
+            // Multi-pass (up to 5 rounds) so that FK-parent tables converted in
+            // an earlier pass no longer block FK-child tables in a later pass.
+            // Each table is converted independently — one failure never aborts
+            // the rest. FK checks are disabled during conversion.
             try {
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                const [mismatchedTables] = await this.pool.query(`
-                    SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_SCHEMA = DATABASE()
-                    AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
-                    AND TABLE_TYPE = 'BASE TABLE'
-                    ORDER BY TABLE_NAME ASC
-                `) as any[]
-                for (const row of (mismatchedTables as any[])) {
-                    try {
-                        await this.pool.query(
-                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-                        )
-                    } catch (tableErr) {
-                        console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
+                for (let pass = 0; pass < 5; pass++) {
+                    const [mismatchedTables] = await this.pool.query(`
+                        SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+                        WHERE TABLE_SCHEMA = DATABASE()
+                        AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
+                        AND TABLE_TYPE = 'BASE TABLE'
+                        ORDER BY TABLE_NAME ASC
+                    `) as any[]
+                    if ((mismatchedTables as any[]).length === 0) break
+                    console.log(`Collation normalization pass ${pass + 1}: ${(mismatchedTables as any[]).length} table(s) remaining`)
+                    for (const row of (mismatchedTables as any[])) {
+                        try {
+                            await this.pool.query(
+                                `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                            )
+                        } catch (tableErr) {
+                            console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
+                        }
                     }
                 }
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
