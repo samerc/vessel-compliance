@@ -86,6 +86,23 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('Not connected')
 
         try {
+            // Set the database-level default collation BEFORE creating any tables.
+            // On MariaDB 10.10+, the server default is utf8mb4_uca1400_ai_ci which
+            // differs from utf8mb4_unicode_ci used by existing tables, causing
+            // "Illegal mix of collations" errors on JOINs. Setting the DB default
+            // here ensures all new tables (from schema.sql and migration blocks)
+            // inherit utf8mb4_unicode_ci without needing per-table COLLATE clauses.
+            try {
+                const [[dbRow]] = await this.pool.query('SELECT DATABASE() as name') as any
+                if (dbRow?.name) {
+                    await this.pool.query(
+                        `ALTER DATABASE \`${dbRow.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                    )
+                }
+            } catch (e) {
+                console.error('Migration warning (alter database collation):', e)
+            }
+
             const statements = schemaSql.split(';').filter((s: string) => s.trim())
 
             for (const statement of statements) {
@@ -94,11 +111,10 @@ export class MySQLAdapter {
                 }
             }
 
-            // Migration: Normalize all tables to utf8mb4_unicode_ci to prevent
-            // "Illegal mix of collations" errors when JOINing tables created with
-            // different MySQL/MariaDB default collations (e.g. utf8mb4_0900_ai_ci,
-            // utf8mb4_uca1400_ai_ci vs unicode_ci). FK checks must be disabled so
-            // that tables with foreign key constraints can be altered.
+            // Migration: Normalize all existing tables to utf8mb4_unicode_ci.
+            // Each table is converted independently — one failure must not abort
+            // the rest. FK checks are disabled so tables with FK constraints can
+            // be altered without referential errors.
             try {
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
                 const [mismatchedTables] = await this.pool.query(`
@@ -108,9 +124,13 @@ export class MySQLAdapter {
                     AND TABLE_TYPE = 'BASE TABLE'
                 `) as any[]
                 for (const row of (mismatchedTables as any[])) {
-                    await this.pool.query(
-                        `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-                    )
+                    try {
+                        await this.pool.query(
+                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                        )
+                    } catch (tableErr) {
+                        console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
+                    }
                 }
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             } catch (e) {
@@ -983,7 +1003,7 @@ export class MySQLAdapter {
 
             // Final collation normalization pass — catches any tables created or altered
             // during migration blocks above (must run after all CREATE/ALTER TABLE statements).
-            // FK checks disabled so tables with foreign key constraints can be converted.
+            // Each table is converted independently so one failure never blocks the rest.
             try {
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
                 const [mismatchedFinal] = await this.pool.query(`
@@ -993,9 +1013,13 @@ export class MySQLAdapter {
                     AND TABLE_TYPE = 'BASE TABLE'
                 `) as any[]
                 for (const row of (mismatchedFinal as any[])) {
-                    await this.pool.query(
-                        `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-                    )
+                    try {
+                        await this.pool.query(
+                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                        )
+                    } catch (tableErr) {
+                        console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
+                    }
                 }
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             } catch (e) {
