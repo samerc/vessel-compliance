@@ -815,7 +815,7 @@ export class MySQLAdapter {
                     color VARCHAR(7) NOT NULL DEFAULT '#6366f1',
                     order_index INT DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
             // Migration: Add renewal_status_id to vessel_dynamic_policies
@@ -836,7 +836,7 @@ export class MySQLAdapter {
                     created_by_username VARCHAR(255),
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_prn_policy (policy_id, policy_number(100))
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
             // Migration: Add sidebar state columns to users
@@ -4732,7 +4732,7 @@ export class MySQLAdapter {
                  SELECT policy_id, policy_number, COUNT(*) as cnt
                  FROM policy_renewal_notes
                  GROUP BY policy_id, policy_number
-             ) rn ON rn.policy_id = vdp.id AND rn.policy_number = COALESCE(vdp.policy_number, '')
+             ) rn ON rn.policy_id COLLATE utf8mb4_unicode_ci = vdp.id COLLATE utf8mb4_unicode_ci AND rn.policy_number COLLATE utf8mb4_unicode_ci = COALESCE(vdp.policy_number, '') COLLATE utf8mb4_unicode_ci
              WHERE vdp.status = 'active'
                AND v.is_active = TRUE
                AND ptc.field_type = 'date'
