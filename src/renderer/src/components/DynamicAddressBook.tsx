@@ -34,8 +34,8 @@ export default function DynamicAddressBook() {
             window.api.getPolicyTypes(),
             window.api.getFlagStates()
         ])
-        setPolicyTypes(pt)
-        setFlagStates(fs)
+        setPolicyTypes(Array.isArray(pt) ? pt : [])
+        setFlagStates(Array.isArray(fs) ? fs : [])
     }
 
     const selectedPolicyTypeIds = useMemo(() => {

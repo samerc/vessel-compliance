@@ -97,7 +97,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
             const sectionToApply = initialVesselSection
             ;(async () => {
                 const allVessels = await window.api.getVessels()
-                const vessel = allVessels.find((v: Vessel) => v.id === initialVesselId)
+                const vessel = Array.isArray(allVessels) ? allVessels.find((v: Vessel) => v.id === initialVesselId) : undefined
                 if (vessel) {
                     setAppliedSection(sectionToApply)
                     setNavigatedExternally(true)
@@ -128,9 +128,9 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
 
             // @ts-ignore - API exposed in preload
             const result = await window.api.getVesselsPaginated(params)
-            setVessels(result.data)
-            setTotal(result.total)
-            setTotalPages(result.totalPages)
+            setVessels(Array.isArray(result?.data) ? result.data : [])
+            setTotal(result?.total ?? 0)
+            setTotalPages(result?.totalPages ?? 1)
         } catch (error: any) {
             console.error('Failed to load vessels:', error)
             showError('Failed to load vessels')
@@ -481,7 +481,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                             onClick={async () => {
                                                 const newEntity = await window.api.addEntity({ name: customerSearch, type: 'company' })
                                                 const eData = await window.api.getEntities()
-                                                setEntities(eData)
+                                                setEntities(Array.isArray(eData) ? eData : [])
                                                 setCustomerTypePrompt({ vesselId: '', customerId: newEntity.id })
                                             }}
                                             style={{ padding: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--accent-primary)' }}
@@ -678,7 +678,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                                     onClick={async () => {
                                                                         const newEntity = await window.api.addEntity({ name: tableCustomerSearch, type: 'company' })
                                                                         const eData = await window.api.getEntities()
-                                                                        setEntities(eData)
+                                                                        setEntities(Array.isArray(eData) ? eData : [])
                                                                         setCustomerTypePrompt({ vesselId: v.id, customerId: newEntity.id })
                                                                         setEditingCustomerVesselId(null)
                                                                     }}

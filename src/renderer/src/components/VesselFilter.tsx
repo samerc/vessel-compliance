@@ -282,8 +282,12 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                 window.api.getVesselTypes(),
                 window.api.getEntities(),
             ])
-            setVessels(v); setPolicyTypes(pt); setFlagStates(fs)
-            setClassSocieties(cs); setVesselTypes(vt); setEntities(ent)
+            setVessels(Array.isArray(v) ? v : [])
+            setPolicyTypes(Array.isArray(pt) ? pt : [])
+            setFlagStates(Array.isArray(fs) ? fs : [])
+            setClassSocieties(Array.isArray(cs) ? cs : [])
+            setVesselTypes(Array.isArray(vt) ? vt : [])
+            setEntities(Array.isArray(ent) ? ent : [])
         } catch { showError('Failed to load filter data') }
     }
 

@@ -137,9 +137,9 @@ export default function FleetAnalytics() {
         window.api.getFlagStates(),
         window.api.getFleets()
       ])
-      setVessels(v || [])
-      setFlagStates(fs || [])
-      setFleets(fl || [])
+      setVessels(Array.isArray(v) ? v : [])
+      setFlagStates(Array.isArray(fs) ? fs : [])
+      setFleets(Array.isArray(fl) ? fl : [])
       setLastRefreshed(new Date())
     } catch { /* ignore */ }
     setLoading(false)

@@ -62,8 +62,8 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
             window.api.piGetSectionTexts(),
             window.api.piGetSanctionsVersions()
         ])
-        setPolicyTypes(pt)
-        setVessels(v)
+        setPolicyTypes(Array.isArray(pt) ? pt : [])
+        setVessels(Array.isArray(v) ? v : [])
         if (gt && Object.keys(gt).length > 0) setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
         setSanctionsVersions(sv)
     }
@@ -258,9 +258,9 @@ function InsuredTab({ quotation, vessels, showSuccess, showError, updateField }:
             window.api.getAssuredRoles(),
             window.api.getEntities()
         ])
-        setAssureds(a)
-        setRoles(r)
-        setEntities(e)
+        setAssureds(Array.isArray(a) ? a : [])
+        setRoles(Array.isArray(r) ? r : [])
+        setEntities(Array.isArray(e) ? e : [])
     }
 
     const handleAddAssured = async () => {

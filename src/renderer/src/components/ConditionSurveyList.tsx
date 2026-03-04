@@ -44,12 +44,12 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
         window.api.getVessels(),
         window.api.getSurveyors()
       ])
-      setVessels(allVessels)
-      setSurveyors(allSurveyors)
+      setVessels(Array.isArray(allVessels) ? allVessels : [])
+      setSurveyors(Array.isArray(allSurveyors) ? allSurveyors : [])
 
       // Load defect counts for each survey
       const surveysWithCounts: SurveyWithCounts[] = await Promise.all(
-        allSurveys.map(async (survey) => {
+        (Array.isArray(allSurveys) ? allSurveys : []).map(async (survey) => {
           try {
             const defects: SurveyDefect[] = await window.api.getSurveyDefects(survey.id)
             const openDefects = defects.filter((d) => d.status === 'OPEN').length

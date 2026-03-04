@@ -40,10 +40,10 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
             const dTypes = await window.api.getDocumentTypes()
             const docs = await window.api.getVesselDocuments()
 
-            setAllVessels(allV)
-            setVessels(fVessels)
-            setDocTypes(dTypes)
-            setAllDocs(docs)
+            setAllVessels(Array.isArray(allV) ? allV : [])
+            setVessels(Array.isArray(fVessels) ? fVessels : [])
+            setDocTypes(Array.isArray(dTypes) ? dTypes : [])
+            setAllDocs(Array.isArray(docs) ? docs : [])
         } finally {
             setLoading(false)
         }

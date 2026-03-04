@@ -87,10 +87,10 @@ export default function Dashboard({
         window.api.getDocumentTypes(),
         window.api.getEntities()
       ])
-      setVessels(vData)
-      setDocs(dData)
-      setDocTypes(tData)
-      setEntities(eData)
+      setVessels(Array.isArray(vData) ? vData : [])
+      setDocs(Array.isArray(dData) ? dData : [])
+      setDocTypes(Array.isArray(tData) ? tData : [])
+      setEntities(Array.isArray(eData) ? eData : [])
     } catch {
       showError('Failed to load core dashboard data')
     }

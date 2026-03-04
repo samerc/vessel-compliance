@@ -66,9 +66,9 @@ export default function SurveyorDirectory() {
         sortOrder: 'asc'
       }
       const result = await window.api.getSurveyorsPaginated(params)
-      setSurveyors(result.data)
-      setTotal(result.total)
-      setTotalPages(result.totalPages)
+      setSurveyors(Array.isArray(result?.data) ? result.data : [])
+      setTotal(result?.total ?? 0)
+      setTotalPages(result?.totalPages ?? 1)
     } catch (error: any) {
       showError(error.message || 'Failed to load surveyors')
     } finally {
@@ -85,12 +85,13 @@ export default function SurveyorDirectory() {
         window.api.getConditionSurveyTypes(),
         window.api.getSurveyors()
       ])
-      setAllSurveys(surveys)
-      setAllDefects(defects)
-      setVessels(vs)
-      setSurveyTypes(types)
-      setAllSurveyorCount(all.length)
-      setAllCountries([...new Set(all.map(s => s.country).filter(Boolean))].sort())
+      setAllSurveys(Array.isArray(surveys) ? surveys : [])
+      setAllDefects(Array.isArray(defects) ? defects : [])
+      setVessels(Array.isArray(vs) ? vs : [])
+      setSurveyTypes(Array.isArray(types) ? types : [])
+      const allSafe = Array.isArray(all) ? all : []
+      setAllSurveyorCount(allSafe.length)
+      setAllCountries([...new Set(allSafe.map(s => s.country).filter(Boolean))].sort())
     } catch {
       // non-critical
     }

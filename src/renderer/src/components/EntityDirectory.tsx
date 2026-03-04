@@ -253,13 +253,13 @@ export default function EntityDirectory() {
         window.api.getEntityUBOs(),
         window.api.getEntities()
       ])
-      setEntities(result.data)
-      setTotal(result.total)
-      setTotalPages(result.totalPages)
-      setVessels(v)
-      setVesselAssureds(va)
-      setEntityUBOs(eu)
-      setAllEntities(allEnts)
+      setEntities(Array.isArray(result?.data) ? result.data : [])
+      setTotal(result?.total ?? 0)
+      setTotalPages(result?.totalPages ?? 1)
+      setVessels(Array.isArray(v) ? v : [])
+      setVesselAssureds(Array.isArray(va) ? va : [])
+      setEntityUBOs(Array.isArray(eu) ? eu : [])
+      setAllEntities(Array.isArray(allEnts) ? allEnts : [])
     } finally {
       setIsLoading(false)
     }

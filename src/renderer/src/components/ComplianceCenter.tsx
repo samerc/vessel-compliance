@@ -46,9 +46,9 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                 window.api.getDocumentTypes()
             ])
             console.log('ComplianceCenter: Data loaded successfully', { vessels: vData.length, docs: dData.length, docTypes: tData.length })
-            setVessels(vData)
-            setDocs(dData)
-            setDocTypes(tData)
+            setVessels(Array.isArray(vData) ? vData : [])
+            setDocs(Array.isArray(dData) ? dData : [])
+            setDocTypes(Array.isArray(tData) ? tData : [])
         } catch (error) {
             console.error('ComplianceCenter: Failed to load data:', error)
             setVessels([])

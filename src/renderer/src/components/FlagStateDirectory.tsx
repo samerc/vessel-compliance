@@ -32,7 +32,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
 
     const loadData = async () => {
         const data = await window.api.getFlagStates()
-        setFlagStates(data)
+        setFlagStates(Array.isArray(data) ? data : [])
     }
 
     const handleNameChange = (value: string, setName: (v: string) => void, setIso3: (v: string) => void) => {
