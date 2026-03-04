@@ -91,6 +91,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         try {
             const cs = await window.api.getClassificationSocieties()
             setClassSocieties([...(cs || [])].sort((a, b) => a.name.localeCompare(b.name)))
+        } catch { /* ignore */ }
+        try {
             const vcs = await window.api.getVesselClassifications(vessel.id)
             setVesselClassificationIds(new Set((vcs || []).map((vc: any) => vc.classificationSocietyId)))
         } catch { /* ignore */ }

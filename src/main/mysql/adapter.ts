@@ -96,8 +96,11 @@ export class MySQLAdapter {
 
             // Migration: Normalize all tables to utf8mb4_unicode_ci to prevent
             // "Illegal mix of collations" errors when JOINing tables created with
-            // different MySQL default collations (e.g. utf8mb4_0900_ai_ci vs unicode_ci)
+            // different MySQL/MariaDB default collations (e.g. utf8mb4_0900_ai_ci,
+            // utf8mb4_uca1400_ai_ci vs unicode_ci). FK checks must be disabled so
+            // that tables with foreign key constraints can be altered.
             try {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
                 const [mismatchedTables] = await this.pool.query(`
                     SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
                     WHERE TABLE_SCHEMA = DATABASE()
@@ -109,8 +112,10 @@ export class MySQLAdapter {
                         `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                     )
                 }
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             } catch (e) {
                 console.error('Migration error (collation normalization):', e)
+                try { await this.pool.query('SET FOREIGN_KEY_CHECKS=1') } catch { /* ignore */ }
             }
 
             // Migration: Add description to document_types if it doesn't exist
@@ -886,7 +891,7 @@ export class MySQLAdapter {
                     INDEX idx_sw_vessel (vessel_id),
                     INDEX idx_sw_policy (policy_id),
                     INDEX idx_sw_status (status)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
                 await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Add columns that may be missing from older table versions
@@ -933,7 +938,7 @@ export class MySQLAdapter {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_swr_warranty (warranty_id),
                     INDEX idx_swr_next (next_reminder_date)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
                 await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Migration: add reference column if missing
@@ -948,9 +953,39 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Create classification_societies table if it doesn't exist
+            const [classSocTables] = await this.pool.query("SHOW TABLES LIKE 'classification_societies'")
+            if ((classSocTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE classification_societies (
+                    id VARCHAR(36) PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    abbreviation VARCHAR(20) NOT NULL DEFAULT '',
+                    is_iacs BOOLEAN DEFAULT 0,
+                    order_index INT DEFAULT 0
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } else {
+                await this.pool.query(`ALTER TABLE classification_societies CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+            }
+
+            // Migration: Create vessel_classifications table if it doesn't exist
+            const [vesselClassTables] = await this.pool.query("SHOW TABLES LIKE 'vessel_classifications'")
+            if ((vesselClassTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE vessel_classifications (
+                    id VARCHAR(36) PRIMARY KEY,
+                    vessel_id VARCHAR(36) NOT NULL,
+                    classification_society_id VARCHAR(36) NOT NULL,
+                    INDEX idx_vc_vessel (vessel_id),
+                    INDEX idx_vc_cs (classification_society_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } else {
+                await this.pool.query(`ALTER TABLE vessel_classifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+            }
+
             // Final collation normalization pass — catches any tables created or altered
-            // during migration blocks above (must run after all CREATE/ALTER TABLE statements)
+            // during migration blocks above (must run after all CREATE/ALTER TABLE statements).
+            // FK checks disabled so tables with foreign key constraints can be converted.
             try {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
                 const [mismatchedFinal] = await this.pool.query(`
                     SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
                     WHERE TABLE_SCHEMA = DATABASE()
@@ -962,8 +997,10 @@ export class MySQLAdapter {
                         `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                     )
                 }
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             } catch (e) {
                 console.error('Migration error (final collation normalization):', e)
+                try { await this.pool.query('SET FOREIGN_KEY_CHECKS=1') } catch { /* ignore */ }
             }
 
         } catch (error) {
