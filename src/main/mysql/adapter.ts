@@ -176,7 +176,7 @@ export class MySQLAdapter {
                     id VARCHAR(36) PRIMARY KEY,
                     name VARCHAR(255) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             `)
             // Migration: Add email and phone to entities if they don't exist
             const [entityCols] = await this.pool.query('SHOW COLUMNS FROM entities')
@@ -235,7 +235,7 @@ export class MySQLAdapter {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_company_name (company_name),
                     INDEX idx_country (country)
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
             // Migration: Add contact_person column to surveyors
@@ -293,7 +293,7 @@ export class MySQLAdapter {
                     FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
                     FOREIGN KEY (surveyor_id) REFERENCES surveyors(id) ON DELETE RESTRICT,
                     INDEX idx_vessel_date (vessel_id, survey_date)
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS survey_defects (
                     id VARCHAR(36) PRIMARY KEY,
@@ -310,7 +310,7 @@ export class MySQLAdapter {
                     FOREIGN KEY (survey_id) REFERENCES condition_surveys(id) ON DELETE CASCADE,
                     INDEX idx_survey_status (survey_id, status),
                     INDEX idx_due_date (due_date)
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS survey_attachments (
                     id VARCHAR(36) PRIMARY KEY,
@@ -321,7 +321,7 @@ export class MySQLAdapter {
                     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     uploaded_by VARCHAR(255),
                     FOREIGN KEY (survey_id) REFERENCES condition_surveys(id) ON DELETE CASCADE
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
                 // Migration: Update existing condition_surveys table to use surveyor_id
                 const [columns] = await this.pool.query(
@@ -375,7 +375,7 @@ export class MySQLAdapter {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
                 INDEX idx_vessel_custom_docs (vessel_id)
-            )`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
             // Create compliance check logs table
             await this.pool.query(`CREATE TABLE IF NOT EXISTS compliance_check_logs (
@@ -387,7 +387,7 @@ export class MySQLAdapter {
                 error TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_run_at (run_at)
-            )`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
             // Create compliance check results table
             await this.pool.query(`CREATE TABLE IF NOT EXISTS compliance_check_results (
@@ -407,7 +407,7 @@ export class MySQLAdapter {
                 INDEX idx_log_id (log_id),
                 INDEX idx_status (status),
                 INDEX idx_entity (entity_type, entity_id)
-            )`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
             // Add decision column if it doesn't exist
             const [resultCols]: any[] = await this.pool.query('SHOW COLUMNS FROM compliance_check_results')
@@ -424,7 +424,7 @@ export class MySQLAdapter {
                 snooze_until DATETIME NOT NULL,
                 PRIMARY KEY (vessel_id),
                 FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE
-            )`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
             // Add performance indexes (idempotent)
             const addIndexIfNotExists = async (table: string, indexName: string, columns: string): Promise<void> => {
@@ -472,7 +472,7 @@ export class MySQLAdapter {
                     FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE,
                     INDEX idx_vnh_vessel (vessel_id),
                     INDEX idx_vnh_name (previous_name)
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
             // Migration: Add order_index to assured_roles
@@ -760,7 +760,7 @@ export class MySQLAdapter {
                 const [dateVals] = await this.pool.query(
                     `SELECT vpv.id, vpv.value_date
                      FROM vessel_policy_values vpv
-                     JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+                     JOIN policy_type_characteristics ptc ON ptc.id COLLATE utf8mb4_unicode_ci = vpv.characteristic_id COLLATE utf8mb4_unicode_ci
                      WHERE ptc.field_type = 'date'
                        AND vpv.value_date IS NOT NULL
                        AND vpv.value_date NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`
@@ -875,7 +875,7 @@ export class MySQLAdapter {
                     created_by_username VARCHAR(255),
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_vn_vessel (vessel_id)
-                )`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
             // Migration: Add quotation_sent_date to vessel_dynamic_policies
