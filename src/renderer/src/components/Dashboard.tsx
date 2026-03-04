@@ -96,11 +96,17 @@ export default function Dashboard({
     }
 
     const secondaryResults = await Promise.allSettled([
-      window.api.getOpenDefectsByVessel().then(d => setOpenDefects(d || [])),
-      window.api.complianceGetPendingResults().then(d => setPendingSanctions(d || [])),
+      window.api.getOpenDefectsByVessel().then(d => setOpenDefects(Array.isArray(d) ? d : [])),
+      window.api.complianceGetPendingResults().then(d => setPendingSanctions(Array.isArray(d) ? d : [])),
       window.api.surveyWarrantyGetAll().then(d => setActiveWarranties(Array.isArray(d) ? d : [])),
       window.api.surveyWarrantyGetEndorsementsDue().then(d => setEndorsementsDue(Array.isArray(d) ? d.length : 0)),
-      window.api.dashboardGetActivity().then(d => setActivity(d || { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }))
+      window.api.dashboardGetActivity().then(d =>
+        setActivity(
+          d && Array.isArray((d as any).recentVessels)
+            ? (d as any)
+            : { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }
+        )
+      )
     ])
     const failCount = secondaryResults.filter(r => r.status === 'rejected').length
     if (failCount > 0) showError(`${failCount} dashboard section${failCount > 1 ? 's' : ''} failed to load`)

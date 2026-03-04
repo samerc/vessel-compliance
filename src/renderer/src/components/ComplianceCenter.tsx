@@ -68,11 +68,10 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                 }),
                 window.api.complianceGetCheckLogs()
             ])
-            console.log('ComplianceCenter: Sanctions data loaded successfully', { pending: result.data.length, total: result.total, logs: logs.length })
-            setPendingResults(result.data)
-            setResultsTotal(result.total)
-            setResultsTotalPages(result.totalPages)
-            setCheckLogs(logs)
+            setPendingResults(Array.isArray(result?.data) ? result.data : [])
+            setResultsTotal(result?.total ?? 0)
+            setResultsTotalPages(result?.totalPages ?? 0)
+            setCheckLogs(Array.isArray(logs) ? logs : [])
         } catch (error) {
             console.error('ComplianceCenter: Failed to load sanctions data:', error)
             // Set empty arrays to prevent blank screen
