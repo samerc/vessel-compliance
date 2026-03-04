@@ -1137,7 +1137,28 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         </td>
                                         <td style={{ padding: '16px' }}>
                                             {rowType.annualRenewal ? (
-                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual</span>
+                                                rowHasFile ? (
+                                                    vessel.policyExpiryDate ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <Calendar size={14} color="var(--text-secondary)" />
+                                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                                Expires with P&I ·{' '}
+                                                                <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+                                                                    {new Date(vessel.policyExpiryDate).toLocaleDateString()}
+                                                                </span>
+                                                            </span>
+                                                        </div>
+                                                    ) : rowDoc?.expiryDate ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <Calendar size={14} color="var(--text-secondary)" />
+                                                            <span style={{ fontSize: '0.85rem' }}>{new Date(rowDoc.expiryDate).toLocaleDateString()}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual — P&I date not set</span>
+                                                    )
+                                                ) : (
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual (P&I)</span>
+                                                )
                                             ) : !rowHasFile ? (
                                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
                                             ) : (
