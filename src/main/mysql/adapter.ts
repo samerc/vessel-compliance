@@ -97,7 +97,7 @@ export class MySQLAdapter {
                 const [[dbRow]] = await this.pool.query('SELECT DATABASE() as name') as any
                 if (dbRow?.name) {
                     await this.pool.query(
-                        `ALTER DATABASE \`${dbRow.name}\` CHARACTER SET utf8mb4`
+                        `ALTER DATABASE \`${dbRow.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                     )
                 }
             } catch (e) {
@@ -132,7 +132,7 @@ export class MySQLAdapter {
                     for (const row of (mismatchedTables as any[])) {
                         try {
                             await this.pool.query(
-                                `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4`
+                                `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                             )
                         } catch (tableErr) {
                             console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
@@ -760,7 +760,7 @@ export class MySQLAdapter {
                 const [dateVals] = await this.pool.query(
                     `SELECT vpv.id, vpv.value_date
                      FROM vessel_policy_values vpv
-                     JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+                     JOIN policy_type_characteristics ptc ON ptc.id COLLATE utf8mb4_unicode_ci = vpv.characteristic_id COLLATE utf8mb4_unicode_ci
                      WHERE ptc.field_type = 'date'
                        AND vpv.value_date IS NOT NULL
                        AND vpv.value_date NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`
@@ -920,7 +920,7 @@ export class MySQLAdapter {
                     INDEX idx_sw_status (status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Add columns that may be missing from older table versions
                 const [swColCsi] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'condition_survey_id'")
                 if ((swColCsi as any[]).length === 0) {
@@ -967,7 +967,7 @@ export class MySQLAdapter {
                     INDEX idx_swr_next (next_reminder_date)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Migration: add reference column if missing
                 const [swrCols] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_reminders LIKE 'reference'")
                 if ((swrCols as any[]).length === 0) {
@@ -991,7 +991,7 @@ export class MySQLAdapter {
                     order_index INT DEFAULT 0
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE classification_societies CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE classification_societies CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
             }
 
             // Migration: Create vessel_classifications table if it doesn't exist
@@ -1005,7 +1005,7 @@ export class MySQLAdapter {
                     INDEX idx_vc_cs (classification_society_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE vessel_classifications CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE vessel_classifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
             }
 
             // Final collation normalization pass — catches any tables created or altered
@@ -1023,7 +1023,7 @@ export class MySQLAdapter {
                 for (const row of (mismatchedFinal as any[])) {
                     try {
                         await this.pool.query(
-                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4`
+                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                         )
                     } catch (tableErr) {
                         console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
@@ -1485,7 +1485,7 @@ export class MySQLAdapter {
             SELECT fs.id, fs.name, fs.iso3_code as iso3Code, fs.address, fs.email,
                    COUNT(v.id) as vesselCount
             FROM flag_states fs
-            LEFT JOIN vessels v ON fs.id = v.flag_state_id
+            LEFT JOIN vessels v ON fs.id COLLATE utf8mb4_unicode_ci = v.flag_state_id COLLATE utf8mb4_unicode_ci
             GROUP BY fs.id, fs.name, fs.iso3_code, fs.address, fs.email
             ORDER BY fs.name ASC
         `)
@@ -1714,7 +1714,7 @@ export class MySQLAdapter {
             // First, find duplicates (same vessel + same role for both entities)
             const [dupeAssureds] = await conn.query(
                 `SELECT va1.id FROM vessel_assureds va1
-                 INNER JOIN vessel_assureds va2 ON va1.vessel_id = va2.vessel_id AND va1.role = va2.role
+                 INNER JOIN vessel_assureds va2 ON va1.vessel_id COLLATE utf8mb4_unicode_ci = va2.vessel_id COLLATE utf8mb4_unicode_ci AND va1.role = va2.role
                  WHERE va1.entity_id = ? AND va2.entity_id = ?`,
                 [sourceId, targetId]
             )
@@ -1733,7 +1733,7 @@ export class MySQLAdapter {
             // As assured parent: move UBOs from source to target (skip duplicates)
             const [dupeUbosParent] = await conn.query(
                 `SELECT eu1.ubo_entity_id FROM entity_ubos eu1
-                 INNER JOIN entity_ubos eu2 ON eu1.ubo_entity_id = eu2.ubo_entity_id
+                 INNER JOIN entity_ubos eu2 ON eu1.ubo_entity_id COLLATE utf8mb4_unicode_ci = eu2.ubo_entity_id COLLATE utf8mb4_unicode_ci
                  WHERE eu1.assured_entity_id = ? AND eu2.assured_entity_id = ?`,
                 [sourceId, targetId]
             )
@@ -1745,7 +1745,7 @@ export class MySQLAdapter {
             // As UBO child: update references where source is someone's UBO
             const [dupeUbosChild] = await conn.query(
                 `SELECT eu1.assured_entity_id FROM entity_ubos eu1
-                 INNER JOIN entity_ubos eu2 ON eu1.assured_entity_id = eu2.assured_entity_id
+                 INNER JOIN entity_ubos eu2 ON eu1.assured_entity_id COLLATE utf8mb4_unicode_ci = eu2.assured_entity_id COLLATE utf8mb4_unicode_ci
                  WHERE eu1.ubo_entity_id = ? AND eu2.ubo_entity_id = ?`,
                 [sourceId, targetId]
             )
@@ -1790,7 +1790,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(`
             SELECT ar.id, ar.name, ar.order_index as \`order\`, COUNT(DISTINCT va.vessel_id) as vesselCount
             FROM assured_roles ar
-            LEFT JOIN vessel_assureds va ON ar.name = va.role
+            LEFT JOIN vessel_assureds va ON ar.name COLLATE utf8mb4_unicode_ci = va.role COLLATE utf8mb4_unicode_ci
             GROUP BY ar.id, ar.name, ar.order_index
             ORDER BY ar.order_index ASC, ar.name ASC
         `)
@@ -1872,7 +1872,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(`
             SELECT DISTINCT v.id, v.name, v.imo_number as imoNumber
             FROM vessels v
-            INNER JOIN vessel_assureds va ON v.id = va.vessel_id
+            INNER JOIN vessel_assureds va ON v.id COLLATE utf8mb4_unicode_ci = va.vessel_id COLLATE utf8mb4_unicode_ci
             WHERE va.role = ?
             ORDER BY v.name ASC
         `, [roleName])
@@ -2264,7 +2264,7 @@ export class MySQLAdapter {
                    cs.surveyor_id as surveyorId, cs.survey_type as surveyType, cs.reference, cs.location, cs.notes,
                    cs.created_at as createdAt, cs.created_by as createdBy
                    FROM condition_surveys cs
-                   JOIN vessels v ON v.id = cs.vessel_id
+                   JOIN vessels v ON v.id COLLATE utf8mb4_unicode_ci = cs.vessel_id COLLATE utf8mb4_unicode_ci
                    WHERE v.is_active = TRUE
                    ORDER BY cs.survey_date DESC`
         }
@@ -2445,9 +2445,9 @@ export class MySQLAdapter {
                 sd.id as defectId, sd.defect_number as defectNumber, sd.description,
                 sd.severity, sd.due_date as dueDate, sd.created_at as createdAt
             FROM vessels v
-            INNER JOIN condition_surveys cs ON cs.vessel_id = v.id
-            LEFT JOIN surveyors s ON s.id = cs.surveyor_id
-            INNER JOIN survey_defects sd ON sd.survey_id = cs.id
+            INNER JOIN condition_surveys cs ON cs.vessel_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN surveyors s ON s.id COLLATE utf8mb4_unicode_ci = cs.surveyor_id COLLATE utf8mb4_unicode_ci
+            INNER JOIN survey_defects sd ON sd.survey_id COLLATE utf8mb4_unicode_ci = cs.id COLLATE utf8mb4_unicode_ci
             WHERE sd.status = 'OPEN' AND v.is_active = TRUE
             ORDER BY v.name ASC, sd.severity DESC, sd.due_date ASC
         `)
@@ -2465,8 +2465,8 @@ export class MySQLAdapter {
                 COUNT(CASE WHEN sd.status = 'CLOSED' THEN 1 END) as closedDefects,
                 COUNT(sd.id) as totalDefects
             FROM condition_surveys cs
-            LEFT JOIN surveyors s ON s.id = cs.surveyor_id
-            LEFT JOIN survey_defects sd ON sd.survey_id = cs.id
+            LEFT JOIN surveyors s ON s.id COLLATE utf8mb4_unicode_ci = cs.surveyor_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN survey_defects sd ON sd.survey_id COLLATE utf8mb4_unicode_ci = cs.id COLLATE utf8mb4_unicode_ci
             WHERE cs.vessel_id = ?
             GROUP BY cs.id
             ORDER BY cs.survey_date DESC
@@ -2482,7 +2482,7 @@ export class MySQLAdapter {
                 v.created_at as createdAt, v.is_active as isActive,
                 f.name as fleetName
             FROM vessels v
-            LEFT JOIN fleets f ON f.id = v.fleet_id
+            LEFT JOIN fleets f ON f.id COLLATE utf8mb4_unicode_ci = v.fleet_id COLLATE utf8mb4_unicode_ci
             ORDER BY v.created_at DESC
             LIMIT 6
         `)
@@ -2501,8 +2501,8 @@ export class MySQLAdapter {
                 END as newValue,
                 al.changed_at as changedAt
             FROM vessel_audit_log al
-            JOIN vessels v ON v.id = al.vessel_id
-            LEFT JOIN flag_states fs ON al.field_name = 'Flag State' AND fs.id = al.new_value
+            JOIN vessels v ON v.id COLLATE utf8mb4_unicode_ci = al.vessel_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN flag_states fs ON al.field_name = 'Flag State' AND fs.id COLLATE utf8mb4_unicode_ci = al.new_value COLLATE utf8mb4_unicode_ci
             ORDER BY al.changed_at DESC
             LIMIT 8
         `)
@@ -2511,10 +2511,10 @@ export class MySQLAdapter {
                 pt.name as policyTypeName, vdp.policy_number as policyNumber,
                 vpv.value_date as endDate
             FROM vessel_dynamic_policies vdp
-            JOIN vessels v ON vdp.vessel_id = v.id AND v.is_active = TRUE
-            JOIN policy_types pt ON vdp.policy_type_id = pt.id
-            JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
-            JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
+            JOIN vessels v ON vdp.vessel_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci AND v.is_active = TRUE
+            JOIN policy_types pt ON vdp.policy_type_id COLLATE utf8mb4_unicode_ci = pt.id COLLATE utf8mb4_unicode_ci
+            JOIN vessel_policy_values vpv ON vpv.policy_id COLLATE utf8mb4_unicode_ci = vdp.id COLLATE utf8mb4_unicode_ci
+            JOIN policy_type_characteristics ptc ON vpv.characteristic_id COLLATE utf8mb4_unicode_ci = ptc.id COLLATE utf8mb4_unicode_ci
             WHERE vdp.status = 'active'
               AND ptc.field_type = 'date'
               AND LOWER(ptc.name) LIKE '%end%'
@@ -2572,11 +2572,11 @@ export class MySQLAdapter {
                 (SELECT swr2.sent_at FROM survey_warranty_reminders swr2 WHERE swr2.warranty_id = sw.id ORDER BY swr2.sent_at DESC LIMIT 1) as lastReminderDate,
                 (SELECT swr3.next_reminder_date FROM survey_warranty_reminders swr3 WHERE swr3.warranty_id = sw.id ORDER BY swr3.created_at DESC LIMIT 1) as nextReminderDate
             FROM survey_warranties sw
-            JOIN vessels v ON v.id = sw.vessel_id
-            LEFT JOIN entities e ON e.id = v.customer_id
-            LEFT JOIN fleets f ON f.id = v.fleet_id
-            LEFT JOIN vessel_dynamic_policies vdp ON vdp.id = sw.policy_id
-            LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
+            JOIN vessels v ON v.id COLLATE utf8mb4_unicode_ci = sw.vessel_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN entities e ON e.id COLLATE utf8mb4_unicode_ci = v.customer_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN fleets f ON f.id COLLATE utf8mb4_unicode_ci = v.fleet_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN vessel_dynamic_policies vdp ON vdp.id COLLATE utf8mb4_unicode_ci = sw.policy_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN policy_types pt ON pt.id COLLATE utf8mb4_unicode_ci = vdp.policy_type_id COLLATE utf8mb4_unicode_ci
             ORDER BY sw.inception_date ASC
         `)
         return rows as any[]
@@ -2590,7 +2590,7 @@ export class MySQLAdapter {
                 v.name as vesselName, v.imo_number as imoNumber,
                 (SELECT swr.next_reminder_date FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id ORDER BY swr.created_at DESC LIMIT 1) as nextReminderDate
             FROM survey_warranties sw
-            JOIN vessels v ON v.id = sw.vessel_id
+            JOIN vessels v ON v.id COLLATE utf8mb4_unicode_ci = sw.vessel_id COLLATE utf8mb4_unicode_ci
             WHERE sw.status IN ('pending', 'survey_done')
             HAVING nextReminderDate IS NOT NULL AND nextReminderDate <= ?
         `, [today])
@@ -2606,7 +2606,7 @@ export class MySQLAdapter {
                 cs.endorsement_reminder_date as endorsementReminderDate,
                 v.name as vesselName, v.imo_number as imoNumber
             FROM condition_surveys cs
-            JOIN vessels v ON v.id = cs.vessel_id
+            JOIN vessels v ON v.id COLLATE utf8mb4_unicode_ci = cs.vessel_id COLLATE utf8mb4_unicode_ci
             WHERE cs.endorsement_issued = 0
               AND cs.endorsement_reminder_date IS NOT NULL
               AND cs.endorsement_reminder_date <= ?
@@ -2820,7 +2820,7 @@ export class MySQLAdapter {
                    r.entity_name as entityName, r.match_score as matchScore, r.match_details as matchDetails,
                    r.status, r.decision, r.reviewed_by as reviewedBy, r.reviewed_at as reviewedAt, r.created_at as createdAt
                    FROM compliance_check_results r
-                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
+                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci`
 
         const conditions: string[] = []
         const params: any[] = []
@@ -2849,9 +2849,9 @@ export class MySQLAdapter {
                    r.entity_name as entityName, r.match_score as matchScore, r.match_details as matchDetails,
                    r.status, r.decision, r.reviewed_by as reviewedBy, r.reviewed_at as reviewedAt, r.created_at as createdAt
                    FROM compliance_check_results r
-                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
+                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci`
         let countQuery = `SELECT COUNT(*) as total FROM compliance_check_results r
-                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
+                   LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci`
         const conditions: string[] = []
         const values: any[] = []
 
@@ -2964,7 +2964,7 @@ export class MySQLAdapter {
         const [vessels]: any[] = await this.pool.query(
             `SELECT v.id, v.name, v.imo_number, v.fleet_id, f.name as fleet_name
              FROM vessels v
-             LEFT JOIN fleets f ON v.fleet_id = f.id
+             LEFT JOIN fleets f ON v.fleet_id COLLATE utf8mb4_unicode_ci = f.id COLLATE utf8mb4_unicode_ci
              WHERE v.is_active = 1
              ORDER BY v.name`
         )
@@ -2986,7 +2986,7 @@ export class MySQLAdapter {
                     e.passport_file_path, e.certificate_of_incorporation_path,
                     e.articles_of_association_path, e.kyc_file_path
              FROM vessel_assureds va
-             JOIN entities e ON va.entity_id = e.id`
+             JOIN entities e ON va.entity_id COLLATE utf8mb4_unicode_ci = e.id COLLATE utf8mb4_unicode_ci`
         )
 
         // Get active snoozes
@@ -3232,8 +3232,8 @@ export class MySQLAdapter {
                 e.phone,
                 GROUP_CONCAT(DISTINCT v.name ORDER BY v.name SEPARATOR ', ') as vesselNames
             FROM entities e
-            INNER JOIN vessel_assureds va ON va.entity_id = e.id
-            INNER JOIN vessels v ON v.id = va.vessel_id
+            INNER JOIN vessel_assureds va ON va.entity_id COLLATE utf8mb4_unicode_ci = e.id COLLATE utf8mb4_unicode_ci
+            INNER JOIN vessels v ON v.id COLLATE utf8mb4_unicode_ci = va.vessel_id COLLATE utf8mb4_unicode_ci
             WHERE ${statusFilter} AND (${whereClause})
             GROUP BY e.id, e.name, e.type, e.email, e.phone
             ORDER BY e.name
@@ -3249,7 +3249,7 @@ export class MySQLAdapter {
                 e.phone,
                 GROUP_CONCAT(DISTINCT v.name ORDER BY v.name SEPARATOR ', ') as vesselNames
             FROM entities e
-            INNER JOIN vessels v ON v.customer_id = e.id
+            INNER JOIN vessels v ON v.customer_id COLLATE utf8mb4_unicode_ci = e.id COLLATE utf8mb4_unicode_ci
             WHERE ${statusFilter} AND (${whereClause})
             GROUP BY e.id, e.name, e.type, e.email, e.phone
             ORDER BY e.name
@@ -3716,8 +3716,8 @@ export class MySQLAdapter {
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
-            LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
-            LEFT JOIN vessels v ON q.vessel_id = v.id
+            LEFT JOIN policy_types pt ON q.policy_type_id COLLATE utf8mb4_unicode_ci = pt.id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN vessels v ON q.vessel_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci
             ORDER BY q.created_at DESC
         `)
         return (rows as any[]).map(r => ({
@@ -4370,7 +4370,7 @@ export class MySQLAdapter {
             `SELECT vc.id, vc.vessel_id as vesselId, vc.classification_society_id as classificationSocietyId,
                     cs.name as classificationSocietyName, cs.abbreviation, cs.is_iacs as isIacs
              FROM vessel_classifications vc
-             JOIN classification_societies cs ON vc.classification_society_id = cs.id
+             JOIN classification_societies cs ON vc.classification_society_id COLLATE utf8mb4_unicode_ci = cs.id COLLATE utf8mb4_unicode_ci
              WHERE vc.vessel_id = ?
              ORDER BY cs.order_index ASC`,
             [vesselId]
@@ -4551,9 +4551,9 @@ export class MySQLAdapter {
                     e.name as brokerName, vdp.notes,
                     vdp.created_at as createdAt, vdp.updated_at as updatedAt
              FROM vessel_dynamic_policies vdp
-             LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
-             LEFT JOIN policy_type_conditions ptc ON vdp.condition_id = ptc.id
-             LEFT JOIN entities e ON vdp.broker_entity_id = e.id
+             LEFT JOIN policy_types pt ON vdp.policy_type_id COLLATE utf8mb4_unicode_ci = pt.id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN policy_type_conditions ptc ON vdp.condition_id COLLATE utf8mb4_unicode_ci = ptc.id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN entities e ON vdp.broker_entity_id COLLATE utf8mb4_unicode_ci = e.id COLLATE utf8mb4_unicode_ci
              WHERE vdp.vessel_id = ?
              ORDER BY pt.order_index ASC, vdp.created_at DESC`,
             [vesselId]
@@ -4568,7 +4568,7 @@ export class MySQLAdapter {
                         vpv.value_text as valueText, vpv.value_amount as valueAmount,
                         vpv.value_date as valueDate, vpv.value_boolean as valueBoolean
                  FROM vessel_policy_values vpv
-                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
+                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id COLLATE utf8mb4_unicode_ci = ptch.id COLLATE utf8mb4_unicode_ci
                  WHERE vpv.policy_id = ?
                  ORDER BY ptch.order_index ASC`,
                 [p.id]
@@ -4589,9 +4589,9 @@ export class MySQLAdapter {
                     e.name as brokerName, vdp.notes,
                     vdp.created_at as createdAt, vdp.updated_at as updatedAt
              FROM vessel_dynamic_policies vdp
-             LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
-             LEFT JOIN policy_type_conditions ptc ON vdp.condition_id = ptc.id
-             LEFT JOIN entities e ON vdp.broker_entity_id = e.id
+             LEFT JOIN policy_types pt ON vdp.policy_type_id COLLATE utf8mb4_unicode_ci = pt.id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN policy_type_conditions ptc ON vdp.condition_id COLLATE utf8mb4_unicode_ci = ptc.id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN entities e ON vdp.broker_entity_id COLLATE utf8mb4_unicode_ci = e.id COLLATE utf8mb4_unicode_ci
              ORDER BY vdp.vessel_id, pt.order_index ASC`
         )
         const policies = rows as VesselDynamicPolicy[]
@@ -4603,7 +4603,7 @@ export class MySQLAdapter {
                     vpv.value_text as valueText, vpv.value_amount as valueAmount,
                     vpv.value_date as valueDate, vpv.value_boolean as valueBoolean
              FROM vessel_policy_values vpv
-             JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
+             JOIN policy_type_characteristics ptch ON vpv.characteristic_id COLLATE utf8mb4_unicode_ci = ptch.id COLLATE utf8mb4_unicode_ci
              ORDER BY vpv.policy_id, ptch.order_index ASC`
         )
         
@@ -4684,10 +4684,10 @@ export class MySQLAdapter {
                     pt.name as policyTypeName, vdp.policy_number as policyNumber, vdp.status,
                     vpv.value_date as endDate
              FROM vessel_dynamic_policies vdp
-             JOIN vessels v ON vdp.vessel_id = v.id
-             JOIN policy_types pt ON vdp.policy_type_id = pt.id
-             JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
-             JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
+             JOIN vessels v ON vdp.vessel_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci
+             JOIN policy_types pt ON vdp.policy_type_id COLLATE utf8mb4_unicode_ci = pt.id COLLATE utf8mb4_unicode_ci
+             JOIN vessel_policy_values vpv ON vpv.policy_id COLLATE utf8mb4_unicode_ci = vdp.id COLLATE utf8mb4_unicode_ci
+             JOIN policy_type_characteristics ptc ON vpv.characteristic_id COLLATE utf8mb4_unicode_ci = ptc.id COLLATE utf8mb4_unicode_ci
              WHERE vdp.status = 'active'
                AND ptc.field_type = 'date'
                AND LOWER(ptc.name) LIKE '%end%'
@@ -4716,23 +4716,23 @@ export class MySQLAdapter {
                     vdp.quotation_sent_date as quotationSentDate,
                     COALESCE(rn.cnt, 0) as noteCount,
                     (SELECT vpv2.value_amount FROM vessel_policy_values vpv2
-                     JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
+                     JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id COLLATE utf8mb4_unicode_ci = ptc2.id COLLATE utf8mb4_unicode_ci
                      WHERE vpv2.policy_id = vdp.id AND ptc2.field_type = 'amount'
                        AND LOWER(ptc2.name) LIKE '%premium%'
                      LIMIT 1) as premium
              FROM vessel_dynamic_policies vdp
-             JOIN vessels v ON vdp.vessel_id = v.id
-             JOIN policy_types pt ON vdp.policy_type_id = pt.id
-             JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
-             JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
-             LEFT JOIN entities e ON v.customer_id = e.id
-             LEFT JOIN fleets f ON v.fleet_id = f.id
-             LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
+             JOIN vessels v ON vdp.vessel_id COLLATE utf8mb4_unicode_ci = v.id COLLATE utf8mb4_unicode_ci
+             JOIN policy_types pt ON vdp.policy_type_id COLLATE utf8mb4_unicode_ci = pt.id COLLATE utf8mb4_unicode_ci
+             JOIN vessel_policy_values vpv ON vpv.policy_id COLLATE utf8mb4_unicode_ci = vdp.id COLLATE utf8mb4_unicode_ci
+             JOIN policy_type_characteristics ptc ON vpv.characteristic_id COLLATE utf8mb4_unicode_ci = ptc.id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN entities e ON v.customer_id COLLATE utf8mb4_unicode_ci = e.id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN fleets f ON v.fleet_id COLLATE utf8mb4_unicode_ci = f.id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id COLLATE utf8mb4_unicode_ci = rst.id COLLATE utf8mb4_unicode_ci
              LEFT JOIN (
                  SELECT policy_id, policy_number, COUNT(*) as cnt
                  FROM policy_renewal_notes
                  GROUP BY policy_id, policy_number
-             ) rn ON rn.policy_id = vdp.id AND rn.policy_number = COALESCE(vdp.policy_number, '')
+             ) rn ON rn.policy_id COLLATE utf8mb4_unicode_ci = vdp.id COLLATE utf8mb4_unicode_ci AND rn.policy_number COLLATE utf8mb4_unicode_ci = COALESCE(vdp.policy_number, '') COLLATE utf8mb4_unicode_ci
              WHERE vdp.status = 'active'
                AND v.is_active = TRUE
                AND ptc.field_type = 'date'
