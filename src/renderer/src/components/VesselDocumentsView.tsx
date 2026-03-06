@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { CheckCircle, AlertCircle, Upload, Eye, Copy, Trash2, Calendar, Plus, X, Pencil, Loader2 } from 'lucide-react'
+import { CheckCircle, AlertCircle, Upload, Eye, Copy, Trash2, Calendar, Plus, X, Pencil, Loader2, Info, FolderOpen } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -66,6 +66,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
   const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [showAddCustom, setShowAddCustom] = useState(false)
   const [newCustomName, setNewCustomName] = useState('')
+  const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set())
 
   const loadData = async () => {
     const [types, docs, customTypes] = await Promise.all([
@@ -292,7 +293,21 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
               {chips}
             </div>
             {description && (
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{description}</div>
+              <button
+                onClick={() => setExpandedDesc(prev => {
+                  const next = new Set(prev)
+                  next.has(id) ? next.delete(id) : next.add(id)
+                  return next
+                })}
+                title={expandedDesc.has(id) ? 'Hide description' : 'Show description'}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '3px', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.68rem', cursor: 'pointer' }}
+              >
+                <Info size={10} />
+                {expandedDesc.has(id) ? 'Hide info' : 'Info'}
+              </button>
+            )}
+            {description && expandedDesc.has(id) && (
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.5 }}>{description}</div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px', flexWrap: 'wrap' }}>
               {hasFile && (
@@ -445,6 +460,9 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
             <>
               <button onClick={() => window.api.fsOpen(doc!.filePath)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Open file">
                 <Eye size={13} /> View
+              </button>
+              <button onClick={() => window.api.shellShowItemInFolder(doc!.filePath)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Open file location">
+                <FolderOpen size={13} />
               </button>
               <button onClick={() => handleDuplicate(doc!)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Duplicate">
                 <Copy size={13} /> Copy

@@ -1075,6 +1075,23 @@ export class MySQLAdapter {
                 await this.pool.query(`ALTER TABLE vessel_classifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
             }
 
+            // Migration: Create war_breach_records table
+            const [wbrTables] = await this.pool.query("SHOW TABLES LIKE 'war_breach_records'")
+            if ((wbrTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE war_breach_records (
+                    id VARCHAR(36) PRIMARY KEY,
+                    cover_note_no VARCHAR(200) NULL,
+                    currency VARCHAR(50) NULL,
+                    breach_details VARCHAR(1000) NULL,
+                    base_days INT NOT NULL DEFAULT 7,
+                    settings_json TEXT NOT NULL,
+                    vessels_json TEXT NOT NULL,
+                    total_net_due DECIMAL(18,4) NOT NULL DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_wbr_created (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            }
+
             // Final collation normalization pass — catches any tables created or altered
             // during migration blocks above (must run after all CREATE/ALTER TABLE statements).
             // Each table is converted independently so one failure never blocks the rest.
@@ -4929,6 +4946,155 @@ export class MySQLAdapter {
         const updatedVessels = (vessResult as any).affectedRows
 
         return { updatedValues, updatedVessels }
+    }
+
+    // --- WAR Policy Migration (temporary) ---
+    async migrateWarPolicyCoverage(): Promise<{ updated: number }> {
+        if (!this.pool) return { updated: 0 }
+        const [warRows] = await this.pool.query(`
+            SELECT
+                vdp.id as policyId,
+                vdp.vessel_id as vesselId,
+                (SELECT vpv.value_text
+                 FROM vessel_policy_values vpv
+                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
+                 WHERE vpv.policy_id = vdp.id AND LOWER(ptch.name) LIKE '%coverage%'
+                 LIMIT 1) as coverageValue,
+                (SELECT ptch.id
+                 FROM policy_type_characteristics ptch
+                 WHERE ptch.policy_type_id = vdp.policy_type_id
+                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
+                 LIMIT 1) as endCharId,
+                (SELECT vpv.id
+                 FROM vessel_policy_values vpv
+                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
+                 WHERE vpv.policy_id = vdp.id
+                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
+                 LIMIT 1) as endValueId,
+                (SELECT vpv.value_date
+                 FROM vessel_policy_values vpv
+                 JOIN vessel_dynamic_policies vdp2 ON vpv.policy_id = vdp2.id
+                 JOIN policy_types pt2 ON vdp2.policy_type_id = pt2.id
+                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
+                 WHERE vdp2.vessel_id = vdp.vessel_id
+                   AND LOWER(pt2.name) LIKE '%hull%'
+                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
+                 ORDER BY vdp2.created_at DESC LIMIT 1) as hullEndDate,
+                (SELECT vpv.value_date
+                 FROM vessel_policy_values vpv
+                 JOIN vessel_dynamic_policies vdp2 ON vpv.policy_id = vdp2.id
+                 JOIN policy_types pt2 ON vdp2.policy_type_id = pt2.id
+                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
+                 WHERE vdp2.vessel_id = vdp.vessel_id
+                   AND (LOWER(pt2.name) LIKE '%p&i%' OR LOWER(pt2.name) LIKE '%p and i%'
+                        OR LOWER(pt2.name) LIKE '%protection%' OR LOWER(pt2.name) LIKE '%indemnity%')
+                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
+                 ORDER BY vdp2.created_at DESC LIMIT 1) as piEndDate
+            FROM vessel_dynamic_policies vdp
+            JOIN policy_types pt ON vdp.policy_type_id = pt.id
+            WHERE LOWER(pt.name) LIKE '%war%'
+        `) as any[]
+
+        let updated = 0
+        for (const row of warRows as any[]) {
+            if (row.coverageValue) {
+                await this.pool.execute(
+                    'UPDATE vessel_dynamic_policies SET policy_number = ? WHERE id = ?',
+                    [row.coverageValue, row.policyId]
+                )
+            }
+            const targetDate = row.hullEndDate || row.piEndDate || null
+            if (targetDate && row.endCharId) {
+                if (row.endValueId) {
+                    await this.pool.execute(
+                        'UPDATE vessel_policy_values SET value_date = ? WHERE id = ?',
+                        [targetDate, row.endValueId]
+                    )
+                } else {
+                    await this.pool.execute(
+                        'INSERT INTO vessel_policy_values (id, policy_id, characteristic_id, value_date) VALUES (?, ?, ?, ?)',
+                        [uuidv4(), row.policyId, row.endCharId, targetDate]
+                    )
+                }
+            }
+            updated++
+        }
+        return { updated }
+    }
+
+    // --- File Path Remap ---
+
+    async getVesselFilePaths(vesselId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [docRows] = await this.pool.query(
+            `SELECT vd.id, 'document' as source, vd.file_path as filePath,
+                    COALESCE(dt.name, vcd.name, 'Custom') as label
+             FROM vessel_documents vd
+             LEFT JOIN document_types dt ON dt.id = vd.document_type_id
+             LEFT JOIN vessel_custom_doc_types vcd ON vcd.id = vd.document_type_id
+             WHERE vd.vessel_id = ? AND vd.file_path IS NOT NULL AND vd.file_path != ''
+             ORDER BY dt.name, vcd.name`,
+            [vesselId]
+        )
+        const [attRows] = await this.pool.query(
+            `SELECT sa.id, 'attachment' as source, sa.file_path as filePath,
+                    CONCAT('Survey ', DATE_FORMAT(cs.survey_date, '%Y-%m-%d'), ' – ', sa.file_name) as label
+             FROM survey_attachments sa
+             JOIN condition_surveys cs ON cs.id = sa.survey_id
+             WHERE cs.vessel_id = ? AND sa.file_path IS NOT NULL AND sa.file_path != ''
+             ORDER BY cs.survey_date DESC, sa.file_name`,
+            [vesselId]
+        )
+        return [...(docRows as any[]), ...(attRows as any[])]
+    }
+
+    async remapVesselFilePaths(remaps: { source: string; id: string; newPath: string }[]): Promise<void> {
+        if (!this.pool || remaps.length === 0) return
+        for (const remap of remaps) {
+            if (remap.source === 'document') {
+                await this.pool.execute('UPDATE vessel_documents SET file_path = ? WHERE id = ?', [remap.newPath, remap.id])
+            } else if (remap.source === 'attachment') {
+                await this.pool.execute('UPDATE survey_attachments SET file_path = ? WHERE id = ?', [remap.newPath, remap.id])
+            }
+        }
+    }
+
+    // --- War Breach Records ---
+
+    async saveWarBreachRecord(record: {
+        coverNoteNo: string
+        currency: string
+        breachDetails: string
+        baseDays: number
+        settingsJson: string
+        vesselsJson: string
+        totalNetDue: number
+    }): Promise<{ id: string }> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO war_breach_records (id, cover_note_no, currency, breach_details, base_days, settings_json, vessels_json, total_net_due)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, record.coverNoteNo || null, record.currency || null, record.breachDetails || null,
+             record.baseDays, record.settingsJson, record.vesselsJson, record.totalNetDue]
+        )
+        return { id }
+    }
+
+    async getWarBreachRecords(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, cover_note_no AS coverNoteNo, currency, breach_details AS breachDetails,
+                    base_days AS baseDays, settings_json AS settingsJson, vessels_json AS vesselsJson,
+                    total_net_due AS totalNetDue, created_at AS createdAt
+             FROM war_breach_records ORDER BY created_at DESC`
+        )
+        return rows as any[]
+    }
+
+    async deleteWarBreachRecord(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM war_breach_records WHERE id = ?', [id])
     }
 }
 

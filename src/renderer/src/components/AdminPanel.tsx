@@ -2030,6 +2030,38 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         </button>
                     </div>
 
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0', paddingTop: '16px' }}>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '4px' }}>
+                            <strong>WAR Policy Migration</strong>
+                        </p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
+                            For all WAR policies: copies the Coverage value to Policy Number, and sets the end date to match the Hull (or P&I) policy end date for the same vessel. Run once then remove.
+                        </p>
+                        <button
+                            onClick={async () => {
+                                const confirmed = confirm('Run WAR policy migration? This will overwrite policy numbers and end dates for all WAR policies.')
+                                if (!confirmed) return
+                                try {
+                                    const result = await window.api.policiesMigrateWar()
+                                    showSuccess(`WAR migration complete — ${result.updated} policies updated.`)
+                                } catch (err: any) {
+                                    showError(err.message || 'WAR migration failed')
+                                }
+                            }}
+                            className="btn-secondary"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: 'rgba(245, 158, 11, 0.12)',
+                                border: '1px solid rgba(245, 158, 11, 0.4)',
+                                color: '#f59e0b'
+                            }}
+                        >
+                            Run WAR Policy Migration
+                        </button>
+                    </div>
+
             </section>
             )}
 

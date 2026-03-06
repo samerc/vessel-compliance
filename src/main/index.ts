@@ -1022,6 +1022,55 @@ app.whenReady().then(() => {
   safeHandle('survey_warranty:getReminders', (event, warrantyId) => { requireSession(event); return db.getWarrantyReminders(warrantyId) })
   safeHandle('survey_warranty:waive', (event, id, reason) => { requireSession(event); return db.waiverSurveyWarranty(id, reason) })
 
+  // WAR policy migration (temporary)
+  safeHandle('policies:migrateWar', (event) => { requireAdmin(event); return db.migrateWarPolicyCoverage() })
+
+  // File Path Remap
+  safeHandle('vessel:getFilePaths', (event, vesselId: string) => {
+    requireSession(event)
+    return db.getVesselFilePaths(vesselId)
+  })
+
+  safeHandle('vessel:remapFilePaths', (event, remaps: { source: string; id: string; newPath: string }[]) => {
+    requireSession(event)
+    if (!Array.isArray(remaps)) throw new Error('Invalid remaps payload')
+    return db.remapVesselFilePaths(remaps)
+  })
+
+  safeHandle('dialog:openFolder', async (event) => {
+    requireSession(event)
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  safeHandle('dialog:locateFile', async (event) => {
+    requireSession(event)
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({ properties: ['openFile'] })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  safeHandle('shell:showItemInFolder', (event, filePath: string) => {
+    requireSession(event)
+    if (typeof filePath !== 'string' || !filePath) return
+    shell.showItemInFolder(normalize(filePath))
+  })
+
+  // War Breach Records
+  safeHandle('warBreach:save', (event, record: any) => {
+    requireSession(event)
+    return db.saveWarBreachRecord(record)
+  })
+  safeHandle('warBreach:getAll', (event) => {
+    requireSession(event)
+    return db.getWarBreachRecords()
+  })
+  safeHandle('warBreach:delete', (event, id: string) => {
+    requireSession(event)
+    return db.deleteWarBreachRecord(id)
+  })
+
   // File System IPC Handlers (session required, path validation)
   safeHandle('fs:exists', (event, filePath: string) => {
     requireSession(event)

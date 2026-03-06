@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import XLSX from 'xlsx-js-style'
 import { useTheme } from '../contexts/ThemeContext'
-import { Plus, X, Copy, ChevronDown, ChevronRight, Settings, CheckCircle, FileSpreadsheet } from 'lucide-react'
+import { Plus, X, Copy, ChevronDown, ChevronRight, Settings, CheckCircle, FileSpreadsheet, Save, History, Trash2, RotateCcw, Eye } from 'lucide-react'
+import { useToast } from '../contexts/ToastContext'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,23 @@ function fmtDate(d: string): string {
 export default function WarBreachCalculator() {
   const { theme } = useTheme()
   const isLight = theme === 'light'
+  const { showSuccess, showError } = useToast()
+
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyRecords, setHistoryRecords] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [viewingRecord, setViewingRecord] = useState<any | null>(null)
+  const [copiedModal, setCopiedModal] = useState(false)
+
+  const loadHistory = useCallback(async () => {
+    const records = await window.api.warBreachGetAll()
+    setHistoryRecords(records)
+  }, [])
+
+  useEffect(() => {
+    if (showHistory) loadHistory()
+  }, [showHistory, loadHistory])
 
   const [coverNoteNo, setCoverNoteNo] = useState('')
   const [currency, setCurrency] = useState('US DOLLARS')
@@ -153,6 +171,51 @@ export default function WarBreachCalculator() {
     setSettings(prev => ({ ...prev, [field]: value }))
 
   const resetSettings = () => setSettings(DEFAULT_SETTINGS)
+
+  const clearAll = () => {
+    setCoverNoteNo('')
+    setCurrency('US DOLLARS')
+    setBreachDetails('')
+    setBaseDays(7)
+    setSettings(DEFAULT_SETTINGS)
+    setVessels([{ id: Date.now().toString(), policyNo: '', vessel: '', periodFrom: '', periodTo: '', sumInsured: '', rate: '', ncbDiscount: '0' }])
+  }
+
+  const handleSaveRecord = async () => {
+    if (!hasAnyResult) return
+    setSaving(true)
+    try {
+      const vesselsWithCalcs = vessels.map((v, i) => ({ ...v, calc: calculations[i]?.calc ?? null }))
+      await window.api.warBreachSave({
+        coverNoteNo,
+        currency,
+        breachDetails,
+        baseDays,
+        settingsJson: JSON.stringify(settings),
+        vesselsJson: JSON.stringify(vesselsWithCalcs),
+        totalNetDue,
+      })
+      showSuccess('Saved — fields cleared for new entry')
+      if (showHistory) loadHistory()
+      clearAll()
+    } catch {
+      showError('Failed to save record')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteRecord = async (id: string) => {
+    try {
+      await window.api.warBreachDelete(id)
+      loadHistory()
+      showSuccess('Record deleted')
+    } catch {
+      showError('Failed to delete record')
+    } finally {
+      setDeleteConfirmId(null)
+    }
+  }
 
   // ── Filename builder ──────────────────────────────────────────────────────
 
@@ -383,7 +446,30 @@ export default function WarBreachCalculator() {
             Compute war/breach premiums with Lebanese government taxes
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setShowHistory(v => !v)}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: showHistory ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)') : undefined }}
+          >
+            <History size={16} /> History
+          </button>
+          <button
+            onClick={clearAll}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            title="Clear all fields"
+          >
+            <RotateCcw size={16} /> Clear
+          </button>
+          <button
+            onClick={handleSaveRecord}
+            disabled={!hasAnyResult || saving}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: hasAnyResult ? 1 : 0.4 }}
+          >
+            <Save size={16} /> {saving ? 'Saving...' : 'Save'}
+          </button>
           <button
             onClick={exportToExcel}
             disabled={!hasAnyResult}
@@ -662,6 +748,291 @@ export default function WarBreachCalculator() {
           </div>
         )}
       </div>
+
+      {/* ── History Panel ── */}
+      {showHistory && (
+        <div style={{
+          marginTop: '28px',
+          border: '1px solid var(--table-border)',
+          borderRadius: '10px',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '12px 16px',
+            background: isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.025)',
+            borderBottom: '1px solid var(--table-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            <History size={15} color="var(--text-secondary)" />
+            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Saved Records</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: 4 }}>
+              ({historyRecords.length})
+            </span>
+          </div>
+          {historyRecords.length === 0 ? (
+            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              No saved records yet. Complete a calculation and click Save.
+            </div>
+          ) : (
+            <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
+              {historyRecords.map((rec, idx) => {
+                const vessels = (() => { try { return JSON.parse(rec.vesselsJson) } catch { return [] } })()
+                const vesselCount = vessels.filter((v: any) => v.calc !== null).length
+                const date = new Date(rec.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                const isConfirming = deleteConfirmId === rec.id
+                return (
+                  <div
+                    key={rec.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      padding: '12px 16px',
+                      borderBottom: idx < historyRecords.length - 1 ? '1px solid var(--table-border)' : 'none',
+                      background: idx % 2 === 1 ? (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)') : 'transparent',
+                    }}
+                  >
+                    {/* Date */}
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: 90, flexShrink: 0 }}>{date}</div>
+                    {/* Cover note */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {rec.coverNoteNo || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No cover note</span>}
+                      </div>
+                      {rec.breachDetails && (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {rec.breachDetails}
+                        </div>
+                      )}
+                    </div>
+                    {/* Vessel count */}
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                      {vesselCount} vessel{vesselCount !== 1 ? 's' : ''}
+                    </div>
+                    {/* Net due */}
+                    <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-primary)', minWidth: 100, textAlign: 'right', flexShrink: 0 }}>
+                      {fmt(parseFloat(rec.totalNetDue))}
+                    </div>
+                    {/* View */}
+                    <button
+                      onClick={() => setViewingRecord(rec)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', opacity: 0.7, padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                      title="View calculations"
+                    >
+                      <Eye size={14} />
+                    </button>
+                    {/* Delete */}
+                    {isConfirming ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>Delete?</span>
+                        <button
+                          onClick={() => handleDeleteRecord(rec.id)}
+                          style={{ background: 'rgba(255,77,77,0.1)', border: '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.75rem' }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(null)}
+                          style={{ background: 'transparent', border: '1px solid var(--table-border)', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-secondary)' }}
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setDeleteConfirmId(rec.id)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', opacity: 0.5, padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                        title="Delete record"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Record View Modal ── */}
+      {viewingRecord && (() => {
+        const recVessels: (VesselRow & { calc: VesselCalc | null })[] = (() => { try { return JSON.parse(viewingRecord.vesselsJson) } catch { return [] } })()
+        const recSettings: TaxSettings = (() => { try { return JSON.parse(viewingRecord.settingsJson) } catch { return DEFAULT_SETTINGS } })()
+        const recTotal = parseFloat(viewingRecord.totalNetDue)
+        const date = new Date(viewingRecord.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+        const cvn = viewingRecord.coverNoteNo || ''
+        const curr = viewingRecord.currency || ''
+        const bdet = viewingRecord.breachDetails || ''
+        const bd = viewingRecord.baseDays
+
+        const modalFilename = (ext: string) => {
+          const toTitleCase = (s: string) => s.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          const vesselNames = recVessels.filter(v => v.calc !== null).map(v => toTitleCase(v.vessel.trim())).filter(Boolean).join(' - ')
+          const expiryDates = recVessels.filter(v => v.calc !== null && v.periodTo).map(v => v.periodTo).sort()
+          const dateForName = expiryDates.length > 0 ? new Date(expiryDates.at(-1)!) : new Date()
+          const monthYear = dateForName.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+          return `${[vesselNames || 'Vessels', bdet || 'Breach', monthYear].join(' - ')}.${ext}`
+        }
+
+        const modalExportToExcel = () => {
+          const wb = XLSX.utils.book_new()
+          const infoRows = [['COVER NOTE', cvn, 'CURRENCY', curr, 'BASE DAYS', bd, 'BREACH DETAILS', bdet], []]
+          const headers = ['POL. N°', 'VESSEL', 'FROM', 'TO', 'SUM INS. (USD)', 'RATE %', 'NCB %', 'GROSS PREM.', 'TAXES GOV.', 'NET', `Your Comm. ${recSettings.commissionPct}%`, 'Tax Non-Resident', 'NET DUE']
+          const dataRows = recVessels.map(v => {
+            const c = v.calc
+            if (!c) return null
+            return [v.policyNo, v.vessel.toUpperCase(), v.periodFrom ? fmtDate(v.periodFrom) : '', v.periodTo ? fmtDate(v.periodTo) : '', parseFloat(v.sumInsured) || 0, parseFloat(v.rate) || 0, parseFloat(v.ncbDiscount) || 0, fmtNum(c.grossPrem), fmtNum(c.taxesGov), fmtNum(c.net), fmtNum(c.commission), fmtNum(c.nrTax), fmtNum(c.netDue)]
+          }).filter((r): r is (string | number)[] => r !== null)
+          const totalRow = ['', '', '', '', '', '', '', '', '', '', '', 'NET DUE TO R/I:', fmtNum(recTotal)]
+          const wsData = [...infoRows, headers, ...dataRows, [], totalRow]
+          const ws = XLSX.utils.aoa_to_sheet(wsData)
+          const borderThin = { style: 'thin', color: { rgb: 'aaaaaa' } }
+          const allBorders = { top: borderThin, bottom: borderThin, left: borderThin, right: borderThin }
+          const colLetters = 'ABCDEFGHIJKLM'.split('')
+          ;[0, 2, 4, 6].forEach(col => { const a = `${colLetters[col]}1`; if (ws[a]) ws[a].s = { border: allBorders, fill: { fgColor: { rgb: 'e8f0f8' } }, font: { bold: true, sz: 10, color: { rgb: '0a2040' } }, alignment: { horizontal: 'right' } } })
+          ;[1, 3, 5, 7].forEach(col => { const a = `${colLetters[col]}1`; if (ws[a]) ws[a].s = { border: allBorders, fill: { fgColor: { rgb: 'ffffff' } }, font: { sz: 10 }, alignment: { horizontal: 'left' } } })
+          headers.forEach((_, col) => { const a = `${colLetters[col]}3`; if (ws[a]) ws[a].s = { border: allBorders, fill: { fgColor: { rgb: '1a4f7a' } }, font: { bold: true, sz: 10, color: { rgb: 'ffffff' } }, alignment: { horizontal: col < 4 ? 'left' : 'right' } } })
+          ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 13 }, { wch: 13 }, { wch: 16 }, { wch: 9 }, { wch: 8 }, { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 11 }, { wch: 13 }]
+          XLSX.utils.book_append_sheet(wb, ws, 'War Breach')
+          XLSX.writeFile(wb, modalFilename('xlsx'))
+        }
+
+        const buildModalEmailHTML = () => {
+          const th = (t: string, align = 'right') => `<td align="${align}" style="border:1px solid #8aaac8;padding:6px 10px;background:#cce0f5;color:#0a2040;text-align:${align};white-space:nowrap;font-size:11px;font-family:Arial,sans-serif;font-weight:bold;">${t}</td>`
+          const td = (t: string, extra = '') => `<td style="border:1px solid #ddd;padding:5px 10px;text-align:right;font-size:11px;font-family:Arial,sans-serif;${extra}">${t}</td>`
+          const tdL = (t: string) => `<td style="border:1px solid #ddd;padding:5px 10px;text-align:left;font-size:11px;font-family:Arial,sans-serif;">${t}</td>`
+          const dataRows = recVessels.map((v, i) => {
+            const c = v.calc
+            if (!c) return ''
+            const ncbLabel = (parseFloat(v.ncbDiscount) || 0) > 0 ? `${v.ncbDiscount}%` : '-'
+            const rowBg = i % 2 === 1 ? 'background:#f9f9f9;' : ''
+            return `<tr>${tdL(v.policyNo)}${tdL(v.vessel.toUpperCase())}${tdL(fmtDate(v.periodFrom))}${tdL(fmtDate(v.periodTo))}${td(fmt(parseFloat(v.sumInsured) || 0), rowBg)}${td(`${(parseFloat(v.rate) || 0).toFixed(3)}%`, rowBg)}${td(ncbLabel, rowBg)}${td(fmt(c.grossPrem), `${rowBg}font-weight:bold;`)}${td(fmt(c.taxesGov), `${rowBg}color:#c00000;`)}${td(fmt(c.net), rowBg)}${td(fmt(c.commission), rowBg)}${td(fmt(c.nrTax), rowBg)}${td(fmt(c.netDue), `${rowBg}font-weight:bold;color:#006b8f;`)}</tr>`
+          }).filter(Boolean).join('')
+          const totalsRow = `<tr style="background:#e8f4fb;"><td colspan="12" align="right" style="border:1px solid #ddd;padding:7px 10px;text-align:right;font-weight:bold;font-size:11px;font-family:Arial,sans-serif;">NET DUE TO R/I:</td><td align="right" style="border:1px solid #ddd;padding:7px 10px;text-align:right;font-weight:bold;font-size:11px;font-family:Arial,sans-serif;color:#006b8f;">${fmt(recTotal)}</td></tr>`
+          return `<table style="border-collapse:collapse;width:100%;"><tbody><tr>${th('POL. N°', 'left')}${th('VESSEL', 'left')}${th('FROM', 'left')}${th('TO', 'left')}${th('SUM INS.')}${th('RATE %')}${th('NCB')}${th('GROSS PREM.')}${th('TAXES GOV.')}${th('NET')}${th(`Your Comm. ${recSettings.commissionPct}%`)}${th('Tax Non-Resident')}${th('NET DUE')}</tr>${dataRows}${totalsRow}</tbody></table>`
+        }
+
+        const buildModalEmailTSV = () => {
+          const cols = ['POL. N°', 'VESSEL', 'FROM', 'TO', 'SUM INS.', 'RATE %', 'NCB', 'GROSS PREM.', 'TAXES GOV.', 'NET', `Your Comm. ${recSettings.commissionPct}%`, 'Tax Non-Resident', 'NET DUE']
+          const lines = [cols.join('\t')]
+          recVessels.forEach(v => {
+            const c = v.calc
+            if (!c) return
+            const ncbLabel = (parseFloat(v.ncbDiscount) || 0) > 0 ? `${v.ncbDiscount}%` : ''
+            lines.push([v.policyNo, v.vessel.toUpperCase(), fmtDate(v.periodFrom), fmtDate(v.periodTo), fmt(parseFloat(v.sumInsured) || 0), `${(parseFloat(v.rate) || 0).toFixed(3)}%`, ncbLabel, fmt(c.grossPrem), fmt(c.taxesGov), fmt(c.net), fmt(c.commission), fmt(c.nrTax), fmt(c.netDue)].join('\t'))
+          })
+          lines.push('', ['', '', '', '', '', '', '', '', '', '', '', 'NET DUE TO R/I:', fmt(recTotal)].join('\t'))
+          return lines.join('\n')
+        }
+
+        const handleModalCopy = async () => {
+          try {
+            const htmlBlob = new Blob([buildModalEmailHTML()], { type: 'text/html' })
+            const textBlob = new Blob([buildModalEmailTSV()], { type: 'text/plain' })
+            await navigator.clipboard.write([new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })])
+          } catch {
+            await navigator.clipboard.writeText(buildModalEmailTSV())
+          }
+          setCopiedModal(true)
+          setTimeout(() => setCopiedModal(false), 2500)
+        }
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+            <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '1100px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
+              {/* Modal header */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '20px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <History size={20} color="white" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: '700' }}>{cvn || 'No Cover Note'}</h2>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Saved {date}</p>
+                </div>
+                <button onClick={() => setViewingRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Meta strip */}
+              <div style={{ display: 'flex', gap: '24px', padding: '12px 16px', borderRadius: '10px', background: 'var(--table-header-bg)', marginBottom: '20px', flexWrap: 'wrap', fontSize: '0.83rem' }}>
+                {[
+                  { label: 'Currency', value: curr },
+                  { label: 'Base Days', value: bd },
+                  { label: 'Breach Details', value: bdet || '—' },
+                  { label: 'Commission', value: `${recSettings.commissionPct}%` },
+                  { label: 'NR Tax', value: `${recSettings.nrTaxPct}%` },
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                    <div style={{ fontWeight: '600' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Calculations table */}
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem', width: '100%' }}>
+                    <thead>
+                      <tr style={{ background: isLight ? '#cce0f5' : '#1a3a5c' }}>
+                        {['POL. N°', 'VESSEL', 'FROM', 'TO', 'SUM INS.', 'RATE %', 'NCB', 'GROSS PREM.', 'TAXES GOV.', 'NET', `Comm. ${recSettings.commissionPct}%`, 'NR Tax', 'NET DUE'].map((h, i) => (
+                          <th key={h} style={{ padding: '8px 10px', border: `1px solid ${isLight ? '#8aaac8' : 'rgba(255,255,255,0.1)'}`, textAlign: i < 4 ? 'left' : 'right', whiteSpace: 'nowrap', fontWeight: 700, color: isLight ? '#0a2040' : 'var(--text-primary)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recVessels.map((v, i) => {
+                        const c = v.calc
+                        if (!c) return null
+                        const ncbLabel = (parseFloat(v.ncbDiscount) || 0) > 0 ? `${v.ncbDiscount}%` : '-'
+                        const rowBg = i % 2 === 1 ? (isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.025)') : 'transparent'
+                        const cell: React.CSSProperties = { padding: '7px 10px', border: '1px solid var(--table-border)', background: rowBg, whiteSpace: 'nowrap' }
+                        const num: React.CSSProperties = { ...cell, textAlign: 'right', fontFamily: 'monospace' }
+                        return (
+                          <tr key={v.id}>
+                            <td style={cell}>{v.policyNo}</td>
+                            <td style={{ ...cell, fontWeight: 600 }}>{v.vessel.toUpperCase()}</td>
+                            <td style={cell}>{fmtDate(v.periodFrom)}</td>
+                            <td style={cell}>{fmtDate(v.periodTo)}</td>
+                            <td style={num}>{fmt(parseFloat(v.sumInsured) || 0)}</td>
+                            <td style={num}>{(parseFloat(v.rate) || 0).toFixed(3)}%</td>
+                            <td style={{ ...num, textAlign: 'center' }}>{ncbLabel}</td>
+                            <td style={{ ...num, fontWeight: 700, borderLeft: `2px solid ${accentBorder}` }}>{fmt(c.grossPrem)}</td>
+                            <td style={{ ...num, color: isLight ? '#c00000' : '#ff7070' }}>{fmt(c.taxesGov)}</td>
+                            <td style={num}>{fmt(c.net)}</td>
+                            <td style={{ ...num, color: 'var(--text-secondary)' }}>{fmt(c.commission)}</td>
+                            <td style={{ ...num, color: 'var(--text-secondary)' }}>{fmt(c.nrTax)}</td>
+                            <td style={{ ...num, fontWeight: 700, color: 'var(--accent-primary)' }}>{fmt(c.netDue)}</td>
+                          </tr>
+                        )
+                      })}
+                      <tr style={{ background: accentBg, borderTop: `2px solid ${accentBorder}` }}>
+                        <td colSpan={12} style={{ padding: '9px 10px', border: '1px solid var(--table-border)', textAlign: 'right', fontWeight: 700, background: accentBg }}>NET DUE TO R/I:</td>
+                        <td style={{ padding: '9px 10px', border: '1px solid var(--table-border)', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, fontSize: '1rem', color: 'var(--accent-primary)', background: accentBg }}>{fmt(recTotal)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '18px' }}>
+                <button onClick={() => setViewingRecord(null)} className="btn-secondary">Close</button>
+                <button onClick={modalExportToExcel} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileSpreadsheet size={16} /> Export Excel
+                </button>
+                <button onClick={handleModalCopy} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {copiedModal ? <CheckCircle size={16} /> : <Copy size={16} />}
+                  {copiedModal ? 'Copied!' : 'Copy for Email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Email Preview (rendered table) ── */}
       {hasAnyResult && (

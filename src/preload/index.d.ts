@@ -412,6 +412,15 @@ export interface Api {
   updateQuitAndInstall: () => Promise<void>
   updateGetCurrentVersion: () => Promise<string>
   updateGetChangelogs: () => Promise<any>
+  policiesMigrateWar: () => Promise<{ updated: number }>
+  vesselGetFilePaths: (vesselId: string) => Promise<{ id: string; source: string; filePath: string; label: string }[]>
+  vesselRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => Promise<void>
+  dialogOpenFolder: () => Promise<string | null>
+  dialogLocateFile: () => Promise<string | null>
+  shellShowItemInFolder: (filePath: string) => Promise<void>
+  warBreachSave: (record: any) => Promise<{ id: string }>
+  warBreachGetAll: () => Promise<any[]>
+  warBreachDelete: (id: string) => Promise<void>
   updateUserAppVersion: (version: string) => Promise<void>
   updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => Promise<void>
   onUpdateChecking: (callback: () => void) => void

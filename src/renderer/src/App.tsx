@@ -25,6 +25,7 @@ import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
 import ChangelogModal from './components/ChangelogModal'
+import WhatsNewModal from './components/WhatsNewModal'
 
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics'>('dashboard')
@@ -32,6 +33,7 @@ function App(): React.JSX.Element {
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
   const [showChangelog, setShowChangelog] = useState(false)
+  const [showWhatsNew, setShowWhatsNew] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -87,6 +89,17 @@ function App(): React.JSX.Element {
       window.api.updateUserAppVersion(appVersion).catch(() => { })
     }
   }, [isAuthenticated, appVersion])
+
+  // Show What's New once per version per user (700ms delay so Dashboard is visible first)
+  useEffect(() => {
+    if (!isAuthenticated || !appVersion || !user) return
+    const key = `whatsNew_seen_v${appVersion}_u${user.id}`
+    if (!localStorage.getItem(key)) {
+      const timer = setTimeout(() => setShowWhatsNew(true), 700)
+      return () => clearTimeout(timer)
+    }
+    return undefined
+  }, [isAuthenticated, appVersion, user?.id])
 
   useEffect(() => {
     const preventDefault = (e: DragEvent) => {
@@ -295,6 +308,15 @@ function App(): React.JSX.Element {
         <UpdateNotification />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
         {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+        {showWhatsNew && (
+          <WhatsNewModal
+            onClose={() => {
+              if (user && appVersion) localStorage.setItem(`whatsNew_seen_v${appVersion}_u${user.id}`, '1')
+              setShowWhatsNew(false)
+            }}
+            onViewChangelog={() => setShowChangelog(true)}
+          />
+        )}
       </div>
     </ErrorBoundary>
   )

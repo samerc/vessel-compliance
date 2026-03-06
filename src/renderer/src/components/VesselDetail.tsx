@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, Tag } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, Tag, FolderSearch, FolderOpen } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -14,6 +14,7 @@ import AssuredManager from './AssuredManager'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
 import ConfirmationModal from './ConfirmationModal'
+import RemapFilePathsModal from './RemapFilePathsModal'
 
 interface VesselDetailProps {
     vessel: Vessel
@@ -29,6 +30,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [dragOverId, setDragOverId] = useState<string | null>(null)
     const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
     const [vesselActive, setVesselActive] = useState(vessel.isActive)
+    const [showRemapModal, setShowRemapModal] = useState(false)
 
     // Confirmation modal state
     const [confirmation, setConfirmation] = useState<{
@@ -183,7 +185,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             filePath: filePath,
             sent: existing?.sent || false,
             required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
-            expiryDate: existing?.expiryDate || undefined,
+            expiryDate: undefined,
             uploadedDate: new Date().toISOString(),
             uploadedBy: user?.username || 'Unknown',
             receivedDate: new Date().toISOString().split('T')[0]
@@ -217,7 +219,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             filePath: filePath,
             sent: existing?.sent || false,
             required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
-            expiryDate: existing?.expiryDate || undefined,
+            expiryDate: undefined,
             uploadedDate: new Date().toISOString(),
             uploadedBy: user?.username || 'Unknown',
             receivedDate: new Date().toISOString().split('T')[0]
@@ -302,6 +304,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editName, setEditName] = useState(vessel.name)
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
+    const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
     const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history'>(initialSection || 'documents')
     useEffect(() => {
         if (initialSection) {
@@ -343,6 +346,18 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
     const [newCustomDocName, setNewCustomDocName] = useState('')
     const [showPoliciesModal, setShowPoliciesModal] = useState(false)
+
+    // Seed classification IDs from legacy text field if junction table is empty
+    useEffect(() => {
+        if (vesselClassificationIds.size === 0 && vessel.classificationSociety && classSocieties.length > 0) {
+            const text = vessel.classificationSociety.trim().toLowerCase()
+            const matched = classSocieties.find(cs =>
+                cs.name.toLowerCase() === text ||
+                (cs.abbreviation && cs.abbreviation.toLowerCase() === text)
+            )
+            if (matched) setVesselClassificationIds(new Set([matched.id]))
+        }
+    }, [classSocieties, vessel.classificationSociety])
     const [allPolicyTypes, setAllPolicyTypes] = useState<PolicyType[]>([])
     const [vesselPolicies, setVesselPolicies] = useState<VesselPolicy[]>([])
     const [assignedPolicyTypeIds, setAssignedPolicyTypeIds] = useState<Set<string>>(new Set())
@@ -940,31 +955,52 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     </button>
                 ))}
                 {detailView === 'documents' && (
-                    <button
-                        onClick={() => {
-                            const next = !useCardDocs
-                            setUseCardDocs(next)
-                            localStorage.setItem('vessel_doc_card_view', next ? '1' : '0')
-                        }}
-                        title={useCardDocs ? 'Switch to table view' : 'Switch to card view'}
-                        style={{
-                            marginLeft: 'auto',
-                            marginBottom: '2px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '6px 12px',
-                            background: 'var(--bg-card)',
-                            border: '1px solid var(--glass-border)',
-                            borderRadius: '8px',
-                            color: 'var(--text-secondary)',
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                        }}
-                    >
-                        {useCardDocs ? <List size={15} /> : <LayoutGrid size={15} />}
-                        {useCardDocs ? 'Table View' : 'Card View'}
-                    </button>
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                            onClick={() => setShowRemapModal(true)}
+                            title="Remap file paths for this vessel"
+                            style={{
+                                marginBottom: '2px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--glass-border)',
+                                borderRadius: '8px',
+                                color: 'var(--text-secondary)',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            <FolderSearch size={15} />
+                            Remap Files
+                        </button>
+                        <button
+                            onClick={() => {
+                                const next = !useCardDocs
+                                setUseCardDocs(next)
+                                localStorage.setItem('vessel_doc_card_view', next ? '1' : '0')
+                            }}
+                            title={useCardDocs ? 'Switch to table view' : 'Switch to card view'}
+                            style={{
+                                marginBottom: '2px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--glass-border)',
+                                borderRadius: '8px',
+                                color: 'var(--text-secondary)',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            {useCardDocs ? <List size={15} /> : <LayoutGrid size={15} />}
+                            {useCardDocs ? 'Table View' : 'Card View'}
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -1131,9 +1167,24 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             )}
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                {rowDoc?.receivedDate ? new Date(rowDoc.receivedDate).toLocaleDateString() : '-'}
-                                            </span>
+                                            {rowHasFile ? (
+                                                <input
+                                                    type="date"
+                                                    title="Click to change received date"
+                                                    value={editingReceived[rowType.id] !== undefined ? editingReceived[rowType.id] : (rowDoc?.receivedDate?.split('T')[0] || '')}
+                                                    onFocus={() => setEditingReceived(prev => ({ ...prev, [rowType.id]: rowDoc?.receivedDate?.split('T')[0] || '' }))}
+                                                    onChange={e => setEditingReceived(prev => ({ ...prev, [rowType.id]: e.target.value }))}
+                                                    onBlur={async e => {
+                                                        const val = e.target.value
+                                                        setEditingReceived(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
+                                                        if (val) { await window.api.updateVesselDocumentReceivedDate(vessel.id, rowType.id, val); loadData() }
+                                                    }}
+                                                    min="1900-01-01" max="2100-12-31"
+                                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
+                                                />
+                                            ) : (
+                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
+                                            )}
                                         </td>
                                         <td style={{ padding: '16px' }}>
                                             {rowType.annualRenewal ? (
@@ -1151,7 +1202,19 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     ) : rowDoc?.expiryDate ? (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                             <Calendar size={14} color="var(--text-secondary)" />
-                                                            <span style={{ fontSize: '0.85rem' }}>{new Date(rowDoc.expiryDate).toLocaleDateString()}</span>
+                                                            <input
+                                                                type="date"
+                                                                value={editingExpiry[rowType.id] !== undefined ? editingExpiry[rowType.id] : (rowDoc.expiryDate || '')}
+                                                                onFocus={() => setEditingExpiry(prev => ({ ...prev, [rowType.id]: rowDoc.expiryDate || '' }))}
+                                                                onChange={e => setEditingExpiry(prev => ({ ...prev, [rowType.id]: e.target.value }))}
+                                                                onBlur={async e => {
+                                                                    const val = e.target.value
+                                                                    setEditingExpiry(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
+                                                                    await window.api.updateVesselDocumentExpiry(vessel.id, rowType.id, val || null); loadData()
+                                                                }}
+                                                                min="1900-01-01" max="2100-12-31"
+                                                                style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
+                                                            />
                                                         </div>
                                                     ) : (
                                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual — P&I date not set</span>
@@ -1161,8 +1224,27 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 )
                                             ) : !rowHasFile ? (
                                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
+                                            ) : !rowDoc?.expiryDate || rowDoc.expiryDate === '0000-00-00' ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Calendar size={14} color="var(--text-secondary)" />
+                                                    <input
+                                                        type="date"
+                                                        placeholder="Set expiry"
+                                                        value={editingExpiry[rowType.id] !== undefined ? editingExpiry[rowType.id] : ''}
+                                                        onFocus={() => setEditingExpiry(prev => ({ ...prev, [rowType.id]: '' }))}
+                                                        onChange={e => setEditingExpiry(prev => ({ ...prev, [rowType.id]: e.target.value }))}
+                                                        onBlur={async e => {
+                                                            const val = e.target.value
+                                                            setEditingExpiry(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
+                                                            if (val) { await handleUpdateExpiry(rowType.id, val) }
+                                                        }}
+                                                        min="1900-01-01" max="2100-12-31"
+                                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
+                                                        aria-label={`Expiry date for ${rowType.name}`}
+                                                    />
+                                                </div>
                                             ) : (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <Calendar size={14} color="var(--text-secondary)" />
                                                     <input
                                                         type="date"
@@ -1172,21 +1254,20 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         onBlur={async e => {
                                                             const val = e.target.value
                                                             setEditingExpiry(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
-                                                            if (val) await handleUpdateExpiry(rowType.id, val)
+                                                            await window.api.updateVesselDocumentExpiry(vessel.id, rowType.id, val || null); loadData()
                                                         }}
                                                         min="1900-01-01"
                                                         max="2100-12-31"
-                                                        style={{
-                                                            padding: '4px 8px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '0.85rem',
-                                                            background: 'var(--input-bg)',
-                                                            color: 'var(--text-primary)',
-                                                            border: '1px solid var(--input-border)',
-                                                            colorScheme: isLight ? 'light' : 'dark'
-                                                        }}
+                                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
                                                         aria-label={`Expiry date for ${rowType.name}`}
                                                     />
+                                                    <button
+                                                        title="Clear expiry date"
+                                                        onClick={async () => { await window.api.updateVesselDocumentExpiry(vessel.id, rowType.id, null); loadData() }}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', padding: 0, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
                                                 </div>
                                             )}
                                         </td>
@@ -1196,6 +1277,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     <>
                                                         <button onClick={() => openFile(rowDoc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="View File" aria-label="View file">
                                                             <Eye size={18} />
+                                                        </button>
+                                                        <button onClick={() => window.api.shellShowItemInFolder(rowDoc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="Open file location" aria-label="Open file location">
+                                                            <FolderOpen size={18} />
                                                         </button>
                                                         <button onClick={() => handleDuplicateDoc(rowDoc!)} className="btn-secondary" style={{ padding: '6px' }} title="Duplicate Document" aria-label="Duplicate document">
                                                             <Copy size={18} />
@@ -1327,15 +1411,30 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         )}
                                     </td>
                                     <td style={{ padding: '16px' }}>
-                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                            {doc?.receivedDate ? new Date(doc.receivedDate).toLocaleDateString() : '-'}
-                                        </span>
+                                        {rowHasFile ? (
+                                            <input
+                                                type="date"
+                                                title="Click to change received date"
+                                                value={editingReceived[customType.id] !== undefined ? editingReceived[customType.id] : (doc?.receivedDate?.split('T')[0] || '')}
+                                                onFocus={() => setEditingReceived(prev => ({ ...prev, [customType.id]: doc?.receivedDate?.split('T')[0] || '' }))}
+                                                onChange={e => setEditingReceived(prev => ({ ...prev, [customType.id]: e.target.value }))}
+                                                onBlur={async e => {
+                                                    const val = e.target.value
+                                                    setEditingReceived(prev => { const n = { ...prev }; delete n[customType.id]; return n })
+                                                    if (val) { await window.api.updateVesselDocumentReceivedDate(vessel.id, customType.id, val); loadData() }
+                                                }}
+                                                min="1900-01-01" max="2100-12-31"
+                                                style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
+                                            />
+                                        ) : (
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
+                                        )}
                                     </td>
                                     <td style={{ padding: '16px' }}>
                                         {!rowHasFile ? (
                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
                                         ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                 <Calendar size={14} color="var(--text-secondary)" />
                                                 <input
                                                     type="date"
@@ -1345,21 +1444,21 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     onBlur={async e => {
                                                         const val = e.target.value
                                                         setEditingExpiry(prev => { const n = { ...prev }; delete n[customType.id]; return n })
-                                                        if (val) await handleUpdateExpiry(customType.id, val)
+                                                        await window.api.updateVesselDocumentExpiry(vessel.id, customType.id, val || null); loadData()
                                                     }}
-                                                    min="1900-01-01"
-                                                    max="2100-12-31"
-                                                    style={{
-                                                        padding: '4px 8px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '0.85rem',
-                                                        background: 'var(--input-bg)',
-                                                        color: 'var(--text-primary)',
-                                                        border: '1px solid var(--input-border)',
-                                                        colorScheme: isLight ? 'light' : 'dark'
-                                                    }}
+                                                    min="1900-01-01" max="2100-12-31"
+                                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
                                                     aria-label={`Expiry date for ${customType.name}`}
                                                 />
+                                                {doc?.expiryDate && doc.expiryDate !== '0000-00-00' && (
+                                                    <button
+                                                        title="Clear expiry date"
+                                                        onClick={async () => { await window.api.updateVesselDocumentExpiry(vessel.id, customType.id, null); loadData() }}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', padding: 0, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </td>
@@ -1369,6 +1468,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 <>
                                                     <button onClick={() => openFile(doc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="View File" aria-label="View file">
                                                         <Eye size={18} />
+                                                    </button>
+                                                    <button onClick={() => window.api.shellShowItemInFolder(doc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="Open file location" aria-label="Open file location">
+                                                        <FolderOpen size={18} />
                                                     </button>
                                                     <button onClick={() => handleDeleteDoc(doc!)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Unlink File" aria-label="Unlink file">
                                                         <Trash2 size={18} />
@@ -1456,6 +1558,13 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     isDangerous={confirmation.isDangerous}
                     onConfirm={confirmation.onConfirm}
                     onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
+                />
+            )}
+            {showRemapModal && (
+                <RemapFilePathsModal
+                    vesselId={vessel.id}
+                    vesselName={vessel.name}
+                    onClose={() => setShowRemapModal(false)}
                 />
             )}
 

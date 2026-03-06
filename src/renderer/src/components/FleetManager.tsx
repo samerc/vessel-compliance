@@ -6,6 +6,7 @@ import {
   Ship,
   Eye,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Search,
   Building2,
@@ -16,6 +17,7 @@ import {
   Check,
   ExternalLink,
   UserMinus,
+  ChevronsUpDown,
 } from 'lucide-react'
 import { Fleet, Vessel, Entity, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
@@ -59,6 +61,8 @@ export default function FleetManager() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newFleetName, setNewFleetName] = useState('')
   const [fleetSearch, setFleetSearch] = useState('')
+  const [fleetSortKey, setFleetSortKey] = useState<'name' | 'vessels'>('name')
+  const [fleetSortDir, setFleetSortDir] = useState<'asc' | 'desc'>('asc')
   const [customerSearch, setCustomerSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'broker' | 'direct'>('all')
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
@@ -159,6 +163,29 @@ export default function FleetManager() {
     const s = fleetSearch.toLowerCase()
     return fleets.filter(f => f.name.toLowerCase().includes(s))
   }, [fleets, fleetSearch])
+
+  // Sorted fleet list
+  const sortedFleets = useMemo(() => {
+    return [...filteredFleets].sort((a, b) => {
+      if (fleetSortKey === 'vessels') {
+        const aCount = vessels.filter(v => v.fleetId === a.id).length
+        const bCount = vessels.filter(v => v.fleetId === b.id).length
+        return fleetSortDir === 'asc' ? aCount - bCount : bCount - aCount
+      }
+      return fleetSortDir === 'asc'
+        ? a.name.localeCompare(b.name)
+        : b.name.localeCompare(a.name)
+    })
+  }, [filteredFleets, fleetSortKey, fleetSortDir, vessels])
+
+  const toggleFleetSort = (key: 'name' | 'vessels') => {
+    if (fleetSortKey === key) {
+      setFleetSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setFleetSortKey(key)
+      setFleetSortDir('asc')
+    }
+  }
 
   // Panel: vessels already in this fleet
   const fleetVessels = useMemo(
@@ -661,137 +688,206 @@ export default function FleetManager() {
                   <tr
                     style={{
                       background: 'var(--table-header-bg)',
-                      borderBottom: '1px solid var(--table-border)',
+                      borderBottom: '2px solid var(--table-border)',
                     }}
                   >
-                    {[
-                      { label: 'FLEET', width: undefined },
-                      { label: 'VESSELS', width: 110 },
-                      { label: 'ACTIONS', width: 130, right: true },
-                    ].map(h => (
-                      <th
-                        key={h.label}
-                        scope="col"
-                        style={{
-                          padding: '12px 16px',
-                          textAlign: h.right ? 'right' : 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: 'var(--text-secondary)',
-                          letterSpacing: '0.05em',
-                          width: h.width,
-                        }}
-                      >
-                        {h.label}
-                      </th>
-                    ))}
+                    {/* Sortable: FLEET */}
+                    <th
+                      scope="col"
+                      onClick={() => toggleFleetSort('name')}
+                      style={{
+                        padding: '11px 16px',
+                        textAlign: 'left',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        color: fleetSortKey === 'name' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        letterSpacing: '0.05em',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        FLEET
+                        {fleetSortKey === 'name' ? (
+                          fleetSortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />
+                        ) : (
+                          <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
+                        )}
+                      </span>
+                    </th>
+                    {/* Sortable: VESSELS */}
+                    <th
+                      scope="col"
+                      onClick={() => toggleFleetSort('vessels')}
+                      style={{
+                        padding: '11px 16px',
+                        textAlign: 'left',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        color: fleetSortKey === 'vessels' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        letterSpacing: '0.05em',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        whiteSpace: 'nowrap',
+                        width: 130,
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        VESSELS
+                        {fleetSortKey === 'vessels' ? (
+                          fleetSortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />
+                        ) : (
+                          <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
+                        )}
+                      </span>
+                    </th>
+                    {/* Non-sortable: ACTIONS */}
+                    <th
+                      scope="col"
+                      style={{
+                        padding: '11px 16px',
+                        textAlign: 'right',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        letterSpacing: '0.05em',
+                        width: 130,
+                      }}
+                    >
+                      ACTIONS
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredFleets.length === 0 ? (
+                  {sortedFleets.length === 0 ? (
                     <tr>
                       <td
                         colSpan={3}
-                        style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                        style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}
                       >
                         <Folder
                           size={40}
-                          style={{ opacity: 0.18, display: 'block', margin: '0 auto 12px' }}
+                          style={{ opacity: 0.15, display: 'block', margin: '0 auto 14px' }}
                         />
-                        {fleetSearch
-                          ? 'No fleets match your search.'
-                          : 'No fleets yet. Click "Add Fleet" to get started.'}
+                        <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                          {fleetSearch
+                            ? 'No fleets match your search.'
+                            : 'No fleets yet. Click "Add Fleet" to get started.'}
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredFleets.map(fleet => {
+                    sortedFleets.map((fleet, idx) => {
                       const count = vessels.filter(v => v.fleetId === fleet.id).length
-                      const inactiveCount = vessels.filter(
-                        v => v.fleetId === fleet.id && !v.isActive
-                      ).length
+                      const activeCount = vessels.filter(v => v.fleetId === fleet.id && v.isActive).length
+                      const inactiveCount = count - activeCount
                       const isSelected = panelFleet?.id === fleet.id
                       return (
                         <tr
                           key={fleet.id}
                           onClick={() => openPanel(fleet)}
                           style={{
-                            borderBottom: '1px solid var(--table-border)',
+                            borderBottom: idx < sortedFleets.length - 1 ? '1px solid var(--table-border)' : 'none',
                             background: isSelected ? 'rgba(0,210,255,0.06)' : 'transparent',
                             cursor: 'pointer',
                             transition: 'background 0.15s',
+                            borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
                           }}
                           className="hover-effect"
                         >
-                          <td style={{ padding: '14px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <td style={{ padding: '13px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div
                                 style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: 8,
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: 9,
                                   background: isSelected
-                                    ? 'rgba(0,210,255,0.22)'
-                                    : 'rgba(0,210,255,0.1)',
+                                    ? 'linear-gradient(135deg, rgba(0,210,255,0.35), rgba(0,210,255,0.15))'
+                                    : 'linear-gradient(135deg, rgba(0,210,255,0.18), rgba(0,210,255,0.06))',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   flexShrink: 0,
+                                  border: isSelected ? '1px solid rgba(0,210,255,0.3)' : '1px solid transparent',
                                 }}
                               >
-                                <Folder size={15} color="var(--accent-primary)" />
+                                <Folder size={16} color="var(--accent-primary)" />
                               </div>
-                              <span style={{ fontWeight: 600, fontSize: '0.93rem' }}>
-                                {fleet.name}
-                              </span>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.92rem', lineHeight: 1.2 }}>
+                                  {fleet.name}
+                                </div>
+                                {inactiveCount > 0 && (
+                                  <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                                    {activeCount} active · {inactiveCount} inactive
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </td>
-                          <td style={{ padding: '14px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <Ship size={13} color="var(--text-secondary)" />
-                              <span style={{ fontWeight: 600 }}>{count}</span>
-                              {inactiveCount > 0 && (
-                                <span
-                                  style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}
-                                >
-                                  ({inactiveCount} inactive)
-                                </span>
-                              )}
-                            </div>
+                          <td style={{ padding: '13px 16px' }}>
+                            {count === 0 ? (
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                Empty
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  background: 'rgba(0,210,255,0.08)',
+                                  border: '1px solid rgba(0,210,255,0.18)',
+                                  borderRadius: '20px',
+                                  padding: '3px 10px 3px 7px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  color: 'var(--accent-primary)',
+                                }}
+                              >
+                                <Ship size={12} />
+                                {count}
+                              </span>
+                            )}
                           </td>
                           <td
-                            style={{ padding: '14px 16px', textAlign: 'right' }}
+                            style={{ padding: '13px 16px', textAlign: 'right' }}
                             onClick={e => e.stopPropagation()}
                           >
                             <div
-                              style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}
+                              style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}
                             >
                               <button
                                 onClick={() => setSelectedFleetDetail(fleet)}
                                 className="btn-secondary"
                                 style={{
-                                  padding: '5px 10px',
-                                  fontSize: '0.8rem',
+                                  padding: '5px 12px',
+                                  fontSize: '0.78rem',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '5px',
                                 }}
                               >
-                                <Eye size={13} /> View
+                                <Eye size={12} /> View
                               </button>
                               <button
                                 onClick={() => handleDeleteFleet(fleet)}
                                 style={{
-                                  background: 'transparent',
+                                  background: 'rgba(255,77,77,0.08)',
                                   color: 'var(--danger)',
-                                  border: 'none',
+                                  border: '1px solid rgba(255,77,77,0.2)',
+                                  borderRadius: '7px',
                                   cursor: 'pointer',
-                                  padding: '5px',
+                                  padding: '5px 8px',
                                   display: 'flex',
                                   alignItems: 'center',
+                                  transition: 'background 0.15s',
                                 }}
                                 title="Delete fleet"
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={13} />
                               </button>
                             </div>
                           </td>
@@ -822,70 +918,139 @@ export default function FleetManager() {
               {/* Panel header */}
               <div
                 style={{
-                  padding: '16px 16px 14px',
+                  padding: '14px 16px',
                   borderBottom: '1px solid var(--glass-border)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
                 }}
               >
-                <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 9,
-                      background:
-                        'linear-gradient(135deg, rgba(0,210,255,0.4), rgba(0,210,255,0.12))',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Folder size={18} color="var(--accent-primary)" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        background: 'linear-gradient(135deg, rgba(0,210,255,0.4), rgba(0,210,255,0.12))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        border: '1px solid rgba(0,210,255,0.25)',
+                      }}
+                    >
+                      <Folder size={19} color="var(--accent-primary)" />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.97rem', lineHeight: 1.2 }}>
+                        {panelFleet.name}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Fleet · {fleetVessels.length} vessel{fleetVessels.length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.97rem', lineHeight: 1.2 }}>
-                      {panelFleet.name}
-                    </div>
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                      {fleetVessels.length} vessel{fleetVessels.length !== 1 ? 's' : ''}
-                    </div>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => handleDeleteFleet(panelFleet)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--danger)',
+                        padding: '5px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        opacity: 0.65,
+                        borderRadius: '6px',
+                      }}
+                      title="Delete fleet"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => setPanelFleet(null)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        padding: '5px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button
-                    onClick={() => handleDeleteFleet(panelFleet)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--danger)',
-                      padding: '5px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      opacity: 0.7,
-                    }}
-                    title="Delete fleet"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                  <button
-                    onClick={() => setPanelFleet(null)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--text-secondary)',
-                      padding: '5px',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+                {/* Mini stats strip */}
+                {fleetVessels.length > 0 && (() => {
+                  const active = fleetVessels.filter(v => v.isActive).length
+                  const inactive = fleetVessels.length - active
+                  return (
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        marginTop: '12px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          flex: 1,
+                          background: 'rgba(16,185,129,0.08)',
+                          border: '1px solid rgba(16,185,129,0.2)',
+                          borderRadius: '8px',
+                          padding: '7px 10px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#10b981', lineHeight: 1 }}>
+                          {active}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', letterSpacing: '0.04em' }}>
+                          ACTIVE
+                        </div>
+                      </div>
+                      {inactive > 0 && (
+                        <div
+                          style={{
+                            flex: 1,
+                            background: 'rgba(245,158,11,0.08)',
+                            border: '1px solid rgba(245,158,11,0.2)',
+                            borderRadius: '8px',
+                            padding: '7px 10px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f59e0b', lineHeight: 1 }}>
+                            {inactive}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', letterSpacing: '0.04em' }}>
+                            INACTIVE
+                          </div>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          flex: 1,
+                          background: 'rgba(0,210,255,0.06)',
+                          border: '1px solid rgba(0,210,255,0.15)',
+                          borderRadius: '8px',
+                          padding: '7px 10px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)', lineHeight: 1 }}>
+                          {fleetVessels.length}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', letterSpacing: '0.04em' }}>
+                          TOTAL
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Current fleet vessels */}

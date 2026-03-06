@@ -413,6 +413,19 @@ const api = {
   updateQuotationNote: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationNote', id, updates),
   deleteQuotationNote: (id: string) => ipcRenderer.invoke('db:deleteQuotationNote', id),
 
+  // WAR policy migration (temporary)
+  policiesMigrateWar: () => ipcRenderer.invoke('policies:migrateWar'),
+
+  // File Path Remap
+  vesselGetFilePaths: (vesselId: string) => ipcRenderer.invoke('vessel:getFilePaths', vesselId),
+  vesselRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => ipcRenderer.invoke('vessel:remapFilePaths', remaps),
+  dialogOpenFolder: () => ipcRenderer.invoke('dialog:openFolder'),
+  dialogLocateFile: () => ipcRenderer.invoke('dialog:locateFile'),
+  shellShowItemInFolder: (filePath: string) => ipcRenderer.invoke('shell:showItemInFolder', filePath),
+  warBreachSave: (record: any) => ipcRenderer.invoke('warBreach:save', record),
+  warBreachGetAll: () => ipcRenderer.invoke('warBreach:getAll'),
+  warBreachDelete: (id: string) => ipcRenderer.invoke('warBreach:delete', id),
+
   // Report Settings
   reportSettingsGet: () => ipcRenderer.invoke('reportSettings:get'),
   reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),

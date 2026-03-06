@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X,
-  Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload, Merge, Link2
+  Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload, Merge, Link2,
+  ScanSearch
 } from 'lucide-react'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
 
@@ -21,6 +22,43 @@ import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
 import { exportCustomerCompliancePDF } from './CustomerComplianceReport'
+
+function jaroWinkler(s1: string, s2: string): number {
+  s1 = s1.toLowerCase().trim()
+  s2 = s2.toLowerCase().trim()
+  if (s1 === s2) return 1
+  const len1 = s1.length, len2 = s2.length
+  if (len1 === 0 || len2 === 0) return 0
+  const matchDist = Math.max(Math.floor(Math.max(len1, len2) / 2) - 1, 0)
+  const s1m = new Array(len1).fill(false)
+  const s2m = new Array(len2).fill(false)
+  let matches = 0
+  for (let i = 0; i < len1; i++) {
+    const lo = Math.max(0, i - matchDist)
+    const hi = Math.min(i + matchDist + 1, len2)
+    for (let j = lo; j < hi; j++) {
+      if (s2m[j] || s1[i] !== s2[j]) continue
+      s1m[i] = s2m[j] = true
+      matches++
+      break
+    }
+  }
+  if (matches === 0) return 0
+  let t = 0, k = 0
+  for (let i = 0; i < len1; i++) {
+    if (!s1m[i]) continue
+    while (!s2m[k]) k++
+    if (s1[i] !== s2[k]) t++
+    k++
+  }
+  const jaro = (matches / len1 + matches / len2 + (matches - t / 2) / matches) / 3
+  let prefix = 0
+  for (let i = 0; i < Math.min(4, Math.min(len1, len2)); i++) {
+    if (s1[i] === s2[i]) prefix++
+    else break
+  }
+  return jaro + prefix * 0.1 * (1 - jaro)
+}
 
 export default function EntityDirectory() {
   const [entities, setEntities] = useState<Entity[]>([])
@@ -80,6 +118,9 @@ export default function EntityDirectory() {
   const [allEntitiesForMerge, setAllEntitiesForMerge] = useState<Entity[]>([])
   const [exportingCompliance, setExportingCompliance] = useState(false)
 
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false)
+  const [dupThreshold, setDupThreshold] = useState(85)
+
   const openMergeModal = async (entity: Entity) => {
     setMergeSource(entity)
     setMergeTarget(null)
@@ -96,6 +137,19 @@ export default function EntityDirectory() {
       .filter(e => e.name.toLowerCase().includes(mergeSearch.toLowerCase()))
       .slice(0, 20)
   }, [mergeSearch, allEntitiesForMerge])
+
+  const duplicatePairs = useMemo(() => {
+    if (!showDuplicatesModal) return []
+    const threshold = dupThreshold / 100
+    const pairs: { a: Entity; b: Entity; score: number }[] = []
+    for (let i = 0; i < allEntities.length; i++) {
+      for (let j = i + 1; j < allEntities.length; j++) {
+        const score = jaroWinkler(allEntities[i].name, allEntities[j].name)
+        if (score >= threshold) pairs.push({ a: allEntities[i], b: allEntities[j], score })
+      }
+    }
+    return pairs.sort((x, y) => y.score - x.score)
+  }, [allEntities, showDuplicatesModal, dupThreshold])
 
   const handleMerge = async () => {
     if (!mergeSource || !mergeTarget) return
@@ -546,9 +600,14 @@ export default function EntityDirectory() {
           <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Entity Directory</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Assureds, UBOs, and beneficial owners across your fleet.</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem', flexShrink: 0 }}>
-          <Plus size={16} /> Create Entity
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          <button className="btn-secondary" onClick={() => setShowDuplicatesModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.9rem' }}>
+            <ScanSearch size={16} /> Find Duplicates
+          </button>
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem' }}>
+            <Plus size={16} /> Create Entity
+          </button>
+        </div>
       </header>
 
       {/* Stats row */}
@@ -1106,6 +1165,110 @@ export default function EntityDirectory() {
                 {isMerging ? <Loader2 size={14} className="spinner" /> : <Merge size={14} />}
                 {isMerging ? 'Merging...' : 'Merge Entities'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Finder Modal */}
+      {showDuplicatesModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '780px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <ScanSearch size={20} color="white" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700' }}>Duplicate Finder</h2>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Entities with similar names based on Jaro-Winkler similarity</p>
+              </div>
+              <button onClick={() => setShowDuplicatesModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Threshold control */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', borderRadius: '10px', background: 'var(--table-header-bg)', marginBottom: '18px' }}>
+              <label style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Similarity threshold:</label>
+              <input
+                type="range"
+                min={70}
+                max={99}
+                value={dupThreshold}
+                onChange={e => setDupThreshold(Number(e.target.value))}
+                style={{ flex: 1, accentColor: 'var(--accent-primary)' }}
+              />
+              <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--accent-primary)', minWidth: '38px', textAlign: 'right' }}>{dupThreshold}%</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>— {duplicatePairs.length} pair{duplicatePairs.length !== 1 ? 's' : ''} found</span>
+            </div>
+
+            {/* Results */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {duplicatePairs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
+                  <CheckCircle2 size={40} style={{ marginBottom: '12px', color: 'var(--success, #00c853)', opacity: 0.7 }} />
+                  <div style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '4px' }}>No duplicates found</div>
+                  <div style={{ fontSize: '0.82rem' }}>No entities share {dupThreshold}%+ name similarity.</div>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--table-header-bg)' }}>
+                      <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--table-border)' }}>Entity A</th>
+                      <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--table-border)' }}>Entity B</th>
+                      <th style={{ padding: '9px 14px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--table-border)', width: '80px' }}>Score</th>
+                      <th style={{ padding: '9px 14px', borderBottom: '1px solid var(--table-border)', width: '80px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {duplicatePairs.map((pair, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--table-border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {pair.a.type === 'company' ? <Building2 size={14} color={companyColor} /> : <User size={14} color={personColor} />}
+                            <div>
+                              <div style={{ fontWeight: '600' }}>{pair.a.name}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{pair.a.type}{pair.a.identifier ? ` · ${pair.a.identifier}` : ''}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {pair.b.type === 'company' ? <Building2 size={14} color={companyColor} /> : <User size={14} color={personColor} />}
+                            <div>
+                              <div style={{ fontWeight: '600' }}>{pair.b.name}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{pair.b.type}{pair.b.identifier ? ` · ${pair.b.identifier}` : ''}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '700',
+                            background: pair.score >= 0.97 ? 'rgba(255,77,77,0.12)' : pair.score >= 0.92 ? 'rgba(255,193,7,0.12)' : 'rgba(0,200,100,0.1)',
+                            color: pair.score >= 0.97 ? 'var(--danger)' : pair.score >= 0.92 ? (isLight ? '#a06000' : '#ffc107') : (isLight ? '#007a3d' : '#00c853')
+                          }}>
+                            {Math.round(pair.score * 100)}%
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <button
+                            className="btn-secondary"
+                            style={{ padding: '5px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => { setShowDuplicatesModal(false); openMergeModal(pair.a) }}
+                            title="Open merge dialog for this pair"
+                          >
+                            <Merge size={13} /> Merge
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
+              <button onClick={() => setShowDuplicatesModal(false)} className="btn-secondary">Close</button>
             </div>
           </div>
         </div>
