@@ -17,9 +17,10 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
-    version: '5.3.28',
+    version: '5.4.0',
     date: 'March 2026',
     items: [
+      { tag: 'Improved', text: 'Fleet Analytics redesigned: professional KPI cards, column histogram charts for age and tonnage, OFAC status pill badges, and percentage annotations on all charts' },
       { tag: 'New', text: 'War Breach Calculator: save records to history with full calculation detail view' },
       { tag: 'New', text: 'Export to Excel and Copy for Email from saved War Breach records' },
       { tag: 'New', text: 'Entity Directory: Find Duplicates button detects near-matching entity names' },

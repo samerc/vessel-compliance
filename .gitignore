@@ -98,5 +98,6 @@ Thumbs.db
 
 # Project Specific
 *.md
+!RELEASE_NOTES.md
 db/db-config.json
 documents

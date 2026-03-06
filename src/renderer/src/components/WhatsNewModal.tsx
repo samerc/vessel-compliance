@@ -82,9 +82,16 @@ export default function WhatsNewModal({ onClose, onViewChangelog }: WhatsNewModa
       .then(data => {
         if (data.length > 0) {
           const latest = data[0]
-          setVersion(latest.version)
-          setDate(new Date(latest.date).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
-          setItems(parseNotes(latest.notes || ''))
+          const parsed = parseNotes(latest.notes || '')
+          if (parsed.length > 0) {
+            // Strip leading 'v' from tag_name (e.g. 'v5.4.0' → '5.4.0')
+            setVersion(latest.version.replace(/^v/, ''))
+            setDate(new Date(latest.date).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
+            setItems(parsed)
+          } else {
+            // GitHub release exists but body is empty — use hardcoded fallback
+            loadFallback()
+          }
         } else {
           loadFallback()
         }
