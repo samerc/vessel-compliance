@@ -116,11 +116,11 @@ export class MySQLAdapter {
             // Multi-pass (up to 5 rounds) so that FK-parent tables converted in
             // an earlier pass no longer block FK-child tables in a later pass.
             // Each table is converted independently — one failure never aborts
-            // the rest. Uses a dedicated connection so SET FOREIGN_KEY_CHECKS=0
-            // applies to the same session as all ALTER TABLE calls (pool.query()
-            // can use different connections for each call). Tables are sorted in
-            // topological FK dependency order (parents before children) so MariaDB
-            // never sees a collation mismatch between an FK column and its reference.
+            // the rest. Strategy: drop all FK constraints touching mismatched tables,
+            // convert every mismatched table, then re-add the constraints.
+            // MariaDB (unlike MySQL) enforces FK collation in BOTH directions even with
+            // FOREIGN_KEY_CHECKS=0, so there is no ordering that avoids the error —
+            // the FKs must be absent during conversion.
             const normConn = await this.pool.getConnection()
             try {
                 await normConn.query('SET FOREIGN_KEY_CHECKS=0')
@@ -137,50 +137,71 @@ export class MySQLAdapter {
                 if (mismatchedSet.size > 0) {
                     console.log(`Collation normalization: ${mismatchedSet.size} table(s) need conversion`)
 
-                    // Fetch all FK relationships so we can sort parents before children
+                    // Fetch full FK definitions for constraints touching any mismatched table
                     const [fkRows] = await normConn.query(`
-                        SELECT TABLE_NAME, REFERENCED_TABLE_NAME
-                        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                        WHERE TABLE_SCHEMA = DATABASE()
-                        AND REFERENCED_TABLE_NAME IS NOT NULL
+                        SELECT
+                            kcu.TABLE_NAME, kcu.CONSTRAINT_NAME,
+                            kcu.COLUMN_NAME, kcu.ORDINAL_POSITION,
+                            kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME,
+                            rc.UPDATE_RULE, rc.DELETE_RULE
+                        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+                        JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+                            ON rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                            AND rc.CONSTRAINT_SCHEMA = kcu.TABLE_SCHEMA
+                        WHERE kcu.TABLE_SCHEMA = DATABASE()
+                        AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+                        ORDER BY kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
                     `) as any[]
 
-                    // Build dependency graph limited to mismatched tables
-                    const deps = new Map<string, Set<string>>()
-                    const revDeps = new Map<string, Set<string>>()
-                    for (const t of mismatchedSet) { deps.set(t, new Set()); revDeps.set(t, new Set()) }
+                    // Group columns by constraint key
+                    type FKDef = { tableName: string; constraintName: string; columns: string[]; refTable: string; refColumns: string[]; updateRule: string; deleteRule: string }
+                    const fkMap = new Map<string, FKDef>()
                     for (const row of (fkRows as any[])) {
-                        const child = row.TABLE_NAME as string
-                        const parent = row.REFERENCED_TABLE_NAME as string
-                        if (mismatchedSet.has(child) && mismatchedSet.has(parent) && child !== parent) {
-                            deps.get(child)!.add(parent)
-                            revDeps.get(parent)!.add(child)
+                        const key = `${row.TABLE_NAME}.${row.CONSTRAINT_NAME}`
+                        if (!fkMap.has(key)) {
+                            fkMap.set(key, { tableName: row.TABLE_NAME, constraintName: row.CONSTRAINT_NAME, columns: [], refTable: row.REFERENCED_TABLE_NAME, refColumns: [], updateRule: row.UPDATE_RULE, deleteRule: row.DELETE_RULE })
                         }
+                        fkMap.get(key)!.columns.push(row.COLUMN_NAME)
+                        fkMap.get(key)!.refColumns.push(row.REFERENCED_COLUMN_NAME)
                     }
 
-                    // Kahn's topological sort: tables with no remaining deps go first
-                    const sorted: string[] = []
-                    const queue = [...mismatchedSet].filter(t => deps.get(t)!.size === 0)
-                    while (queue.length > 0) {
-                        const t = queue.shift()!
-                        sorted.push(t)
-                        for (const child of revDeps.get(t)!) {
-                            deps.get(child)!.delete(t)
-                            if (deps.get(child)!.size === 0) queue.push(child)
-                        }
-                    }
-                    // Append anything left (circular deps, should not happen in practice)
-                    for (const t of mismatchedSet) { if (!sorted.includes(t)) sorted.push(t) }
+                    // Only handle FKs where at least one side is a mismatched table
+                    const relevantFKs = [...fkMap.values()].filter(
+                        fk => mismatchedSet.has(fk.tableName) || mismatchedSet.has(fk.refTable)
+                    )
 
-                    for (const tableName of sorted) {
+                    // Drop all relevant FK constraints
+                    for (const fk of relevantFKs) {
                         try {
-                            await normConn.query(
-                                `ALTER TABLE \`${tableName}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-                            )
-                        } catch (tableErr) {
-                            console.error(`Migration warning: failed to convert table ${tableName}:`, tableErr)
+                            await normConn.query(`ALTER TABLE \`${fk.tableName}\` DROP FOREIGN KEY \`${fk.constraintName}\``)
+                        } catch (e) {
+                            console.error(`Migration warning: failed to drop FK ${fk.constraintName} on ${fk.tableName}:`, e)
                         }
                     }
+
+                    // Convert every mismatched table — no FK constraints blocking now
+                    for (const tableName of mismatchedSet) {
+                        try {
+                            await normConn.query(`ALTER TABLE \`${tableName}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                        } catch (e) {
+                            console.error(`Migration warning: failed to convert table ${tableName}:`, e)
+                        }
+                    }
+
+                    // Re-add all dropped FK constraints
+                    for (const fk of relevantFKs) {
+                        try {
+                            const cols = fk.columns.map(c => `\`${c}\``).join(', ')
+                            const refCols = fk.refColumns.map(c => `\`${c}\``).join(', ')
+                            await normConn.query(
+                                `ALTER TABLE \`${fk.tableName}\` ADD CONSTRAINT \`${fk.constraintName}\` FOREIGN KEY (${cols}) REFERENCES \`${fk.refTable}\` (${refCols}) ON DELETE ${fk.deleteRule} ON UPDATE ${fk.updateRule}`
+                            )
+                        } catch (e) {
+                            console.error(`Migration warning: failed to re-add FK ${fk.constraintName} on ${fk.tableName}:`, e)
+                        }
+                    }
+
+                    console.log('Collation normalization complete')
                 }
 
                 await normConn.query('SET FOREIGN_KEY_CHECKS=1')
