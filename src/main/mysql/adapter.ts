@@ -182,7 +182,7 @@ export class MySQLAdapter {
                     // Convert every mismatched table — no FK constraints blocking now
                     for (const tableName of mismatchedSet) {
                         try {
-                            await normConn.query(`ALTER TABLE \`${tableName}\` CONVERT TO CHARACTER SET utf8mb4`)
+                            await normConn.query(`ALTER TABLE \`${tableName}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                         } catch (e) {
                             console.error(`Migration warning: failed to convert table ${tableName}:`, e)
                         }
@@ -987,7 +987,7 @@ export class MySQLAdapter {
                     INDEX idx_sw_status (status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Add columns that may be missing from older table versions
                 const [swColCsi] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'condition_survey_id'")
                 if ((swColCsi as any[]).length === 0) {
@@ -1034,7 +1034,7 @@ export class MySQLAdapter {
                     INDEX idx_swr_next (next_reminder_date)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
                 // Migration: add reference column if missing
                 const [swrCols] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_reminders LIKE 'reference'")
                 if ((swrCols as any[]).length === 0) {
@@ -1058,7 +1058,7 @@ export class MySQLAdapter {
                     order_index INT DEFAULT 0
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE classification_societies CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE classification_societies CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
             }
 
             // Migration: Create vessel_classifications table if it doesn't exist
@@ -1072,7 +1072,7 @@ export class MySQLAdapter {
                     INDEX idx_vc_cs (classification_society_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE vessel_classifications CONVERT TO CHARACTER SET utf8mb4`)
+                await this.pool.query(`ALTER TABLE vessel_classifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
             }
 
             // Final collation normalization pass — catches any tables created or altered
@@ -1090,7 +1090,7 @@ export class MySQLAdapter {
                 for (const row of (mismatchedFinal as any[])) {
                     try {
                         await this.pool.query(
-                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4`
+                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                         )
                     } catch (tableErr) {
                         console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
