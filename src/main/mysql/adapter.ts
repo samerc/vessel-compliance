@@ -116,33 +116,79 @@ export class MySQLAdapter {
             // Multi-pass (up to 5 rounds) so that FK-parent tables converted in
             // an earlier pass no longer block FK-child tables in a later pass.
             // Each table is converted independently — one failure never aborts
-            // the rest. FK checks are disabled during conversion.
+            // the rest. Uses a dedicated connection so SET FOREIGN_KEY_CHECKS=0
+            // applies to the same session as all ALTER TABLE calls (pool.query()
+            // can use different connections for each call). Tables are sorted in
+            // topological FK dependency order (parents before children) so MariaDB
+            // never sees a collation mismatch between an FK column and its reference.
+            const normConn = await this.pool.getConnection()
             try {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                for (let pass = 0; pass < 5; pass++) {
-                    const [mismatchedTables] = await this.pool.query(`
-                        SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+                await normConn.query('SET FOREIGN_KEY_CHECKS=0')
+
+                // Find all tables still using the wrong collation
+                const [mismatchedRows] = await normConn.query(`
+                    SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
+                    AND TABLE_TYPE = 'BASE TABLE'
+                `) as any[]
+                const mismatchedSet = new Set((mismatchedRows as any[]).map((r: any) => r.TABLE_NAME as string))
+
+                if (mismatchedSet.size > 0) {
+                    console.log(`Collation normalization: ${mismatchedSet.size} table(s) need conversion`)
+
+                    // Fetch all FK relationships so we can sort parents before children
+                    const [fkRows] = await normConn.query(`
+                        SELECT TABLE_NAME, REFERENCED_TABLE_NAME
+                        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
                         WHERE TABLE_SCHEMA = DATABASE()
-                        AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
-                        AND TABLE_TYPE = 'BASE TABLE'
-                        ORDER BY TABLE_NAME ASC
+                        AND REFERENCED_TABLE_NAME IS NOT NULL
                     `) as any[]
-                    if ((mismatchedTables as any[]).length === 0) break
-                    console.log(`Collation normalization pass ${pass + 1}: ${(mismatchedTables as any[]).length} table(s) remaining`)
-                    for (const row of (mismatchedTables as any[])) {
+
+                    // Build dependency graph limited to mismatched tables
+                    const deps = new Map<string, Set<string>>()
+                    const revDeps = new Map<string, Set<string>>()
+                    for (const t of mismatchedSet) { deps.set(t, new Set()); revDeps.set(t, new Set()) }
+                    for (const row of (fkRows as any[])) {
+                        const child = row.TABLE_NAME as string
+                        const parent = row.REFERENCED_TABLE_NAME as string
+                        if (mismatchedSet.has(child) && mismatchedSet.has(parent) && child !== parent) {
+                            deps.get(child)!.add(parent)
+                            revDeps.get(parent)!.add(child)
+                        }
+                    }
+
+                    // Kahn's topological sort: tables with no remaining deps go first
+                    const sorted: string[] = []
+                    const queue = [...mismatchedSet].filter(t => deps.get(t)!.size === 0)
+                    while (queue.length > 0) {
+                        const t = queue.shift()!
+                        sorted.push(t)
+                        for (const child of revDeps.get(t)!) {
+                            deps.get(child)!.delete(t)
+                            if (deps.get(child)!.size === 0) queue.push(child)
+                        }
+                    }
+                    // Append anything left (circular deps, should not happen in practice)
+                    for (const t of mismatchedSet) { if (!sorted.includes(t)) sorted.push(t) }
+
+                    for (const tableName of sorted) {
                         try {
-                            await this.pool.query(
-                                `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                            await normConn.query(
+                                `ALTER TABLE \`${tableName}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                             )
                         } catch (tableErr) {
-                            console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
+                            console.error(`Migration warning: failed to convert table ${tableName}:`, tableErr)
                         }
                     }
                 }
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+
+                await normConn.query('SET FOREIGN_KEY_CHECKS=1')
             } catch (e) {
                 console.error('Migration error (collation normalization):', e)
-                try { await this.pool.query('SET FOREIGN_KEY_CHECKS=1') } catch { /* ignore */ }
+                try { await normConn.query('SET FOREIGN_KEY_CHECKS=1') } catch { /* ignore */ }
+            } finally {
+                normConn.release()
             }
 
             // Migration: Add description to document_types if it doesn't exist
