@@ -2309,11 +2309,35 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
 function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: VesselAuditEntry[]; isLight: boolean; flagStates: FlagState[] }) {
     const [search, setSearch] = useState('')
     const [filterField, setFilterField] = useState('all')
+    const [entityNameMap, setEntityNameMap] = useState<Map<string, string>>(new Map())
+
+    // Resolve any UUID-valued Customer entries to entity names (covers legacy entries written before the fix)
+    useEffect(() => {
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        const ids = new Set<string>()
+        for (const entry of auditLog) {
+            if (entry.fieldName === 'Customer') {
+                if (entry.oldValue && uuidPattern.test(entry.oldValue)) ids.add(entry.oldValue)
+                if (entry.newValue && uuidPattern.test(entry.newValue)) ids.add(entry.newValue)
+            }
+        }
+        if (ids.size === 0) return
+        window.api.getEntities().then(ents => {
+            const map = new Map<string, string>()
+            for (const e of (ents || [])) if (ids.has(e.id)) map.set(e.id, e.name)
+            setEntityNameMap(map)
+        }).catch(() => {})
+    }, [auditLog])
 
     const resolveFlagValue = (val: string | null) => {
         if (!val) return val
         const match = flagStates.find(fs => fs.id === val)
         return match ? `${match.name} (${match.iso3Code})` : val
+    }
+
+    const resolveEntityValue = (val: string | null) => {
+        if (!val) return val
+        return entityNameMap.get(val) ?? val
     }
 
     const getFieldMeta = (fieldName: string): { icon: React.ReactNode; color: string; bg: string } => {
@@ -2445,8 +2469,9 @@ function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: Vessel
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {group.entries.map(entry => {
                                 const isFlagField = entry.fieldName === 'Flag State'
-                                const displayOld = isFlagField ? resolveFlagValue(entry.oldValue) : entry.oldValue
-                                const displayNew = isFlagField ? resolveFlagValue(entry.newValue) : entry.newValue
+                                const isCustomerField = entry.fieldName === 'Customer'
+                                const displayOld = isFlagField ? resolveFlagValue(entry.oldValue) : isCustomerField ? resolveEntityValue(entry.oldValue) : entry.oldValue
+                                const displayNew = isFlagField ? resolveFlagValue(entry.newValue) : isCustomerField ? resolveEntityValue(entry.newValue) : entry.newValue
                                 const meta = getFieldMeta(entry.fieldName)
                                 const entryTime = new Date(entry.changedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 

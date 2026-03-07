@@ -1375,6 +1375,27 @@ export class MySQLAdapter {
                 if (updates[af.updateKey] !== undefined) {
                     const oldVal = current[af.dbCol] != null ? String(current[af.dbCol]) : null
                     const newVal = updates[af.updateKey] != null ? String(updates[af.updateKey]) : null
+
+                    // Resolve entity UUIDs to names for the Customer field
+                    if (af.updateKey === 'customerId') {
+                        const idsToResolve = [oldVal, newVal].filter(Boolean) as string[]
+                        const nameMap = new Map<string, string>()
+                        if (idsToResolve.length > 0) {
+                            const placeholders = idsToResolve.map(() => '?').join(',')
+                            const [nameRows] = await this.pool.query(
+                                `SELECT id, name FROM entities WHERE id IN (${placeholders})`,
+                                idsToResolve
+                            )
+                            for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+                        }
+                        const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
+                        const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
+                        if (oldName !== newName) {
+                            await this.addVesselAuditEntry(id, af.label, oldName, newName, who)
+                        }
+                        continue
+                    }
+
                     // Normalize numeric fields to avoid "4737.00" vs "4737" false positives from MySQL Decimal type
                     const isNumeric = numericAuditKeys.includes(af.updateKey)
                     const oldNorm = isNumeric && oldVal != null ? String(parseFloat(oldVal)) : oldVal
