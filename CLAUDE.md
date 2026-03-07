@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Supplementary References
+
+Two additional reference files live in `.claude/` and should be consulted when working on UI or architecture:
+
+- **`.claude/design-guide.md`** — Canonical UI design standards: CSS variables, button variants, input styles, modals, tables, cards, typography, spacing, status badges, empty states. Consult before writing any new component or UI change.
+- **`.claude/lessons-learned.md`** — Hard-won patterns and anti-patterns: MySQL pitfalls, React component traps, audit log conventions, IPC rules, git gotchas, release workflow. Consult when debugging or adding new features.
+
 ## Build and Development Commands
 
 ```bash
