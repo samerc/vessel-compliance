@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { CheckCircle, AlertCircle, Upload, Eye, Copy, Trash2, Calendar, Plus, X, Pencil, Loader2, Info, FolderOpen } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import type { Vessel, DocumentType, VesselDocument, VesselCustomDocType } from '../../../shared/types'
+import type { Vessel, DocumentType, VesselDocument, VesselCustomDocType, VesselDynamicPolicy } from '../../../shared/types'
+import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 
 interface Props {
   vessel: Vessel
+  dynamicPolicies?: VesselDynamicPolicy[]
   onReload?: () => void
 }
 
@@ -48,11 +50,18 @@ function getDocStatus(
   return 'compliant'
 }
 
-export default function VesselDocumentsView({ vessel, onReload }: Props) {
+export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload }: Props) {
   const { theme } = useTheme()
   const { user } = useAuth()
   const { showSuccess, showError } = useToast()
   const isLight = theme === 'light'
+
+  // Resolve P&I expiry from dynamic policies first, fall back to legacy vessel field
+  const effectivePolicyExpiry = useMemo(
+    () => resolveEffectivePolicyExpiry(dynamicPolicies || []) || vessel.policyExpiryDate || undefined,
+    [dynamicPolicies, vessel.policyExpiryDate]
+  )
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pendingDocTypeId = useRef<string | null>(null)
 
@@ -252,7 +261,7 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
     const hasFile = !!doc?.filePath
     const fileExists = fileStatus[id] !== false
     // Annual docs inherit the P&I policy expiry; fall back to the stored expiry date
-    const effectiveExpiry = annualRenewal ? (vessel.policyExpiryDate || doc?.expiryDate) : doc?.expiryDate
+    const effectiveExpiry = annualRenewal ? (effectivePolicyExpiry || doc?.expiryDate) : doc?.expiryDate
     const status: DocStatus = getDocStatus(hasFile && fileExists, effectiveExpiry, required, annualRenewal, doc?.receivedDate)
     const meta = statusMeta[status]
     const isDragOver = dragOverId === id
@@ -354,11 +363,11 @@ export default function VesselDocumentsView({ vessel, onReload }: Props) {
         {hasFile && annualRenewal && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Calendar size={12} color="var(--text-secondary)" />
-            {vessel.policyExpiryDate ? (
+            {effectivePolicyExpiry ? (
               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                 Expires with P&I ·{' '}
                 <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                  {new Date(vessel.policyExpiryDate).toLocaleDateString()}
+                  {new Date(effectivePolicyExpiry).toLocaleDateString()}
                 </span>
               </span>
             ) : doc?.expiryDate ? (

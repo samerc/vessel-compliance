@@ -347,9 +347,12 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [newCustomDocName, setNewCustomDocName] = useState('')
     const [showPoliciesModal, setShowPoliciesModal] = useState(false)
 
-    // Seed classification IDs from legacy text field if junction table is empty
+    // Seed classification IDs from legacy text field if junction table is empty OR has stale IDs
+    // (stale = IDs exist in junction but don't match any current classSociety record)
     useEffect(() => {
-        if (vesselClassificationIds.size === 0 && vessel.classificationSociety && classSocieties.length > 0) {
+        if (classSocieties.length === 0) return
+        const validIds = classSocieties.filter(cs => vesselClassificationIds.has(cs.id))
+        if (validIds.length === 0 && vessel.classificationSociety) {
             const text = vessel.classificationSociety.trim().toLowerCase()
             const matched = classSocieties.find(cs =>
                 cs.name.toLowerCase() === text ||
@@ -1005,7 +1008,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             </div>
 
             {detailView === 'documents' && useCardDocs && (
-                <VesselDocumentsView vessel={vessel} onReload={loadData} />
+                <VesselDocumentsView vessel={vessel} dynamicPolicies={dynamicPolicies} onReload={loadData} />
             )}
 
             {detailView === 'documents' && !useCardDocs && <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>

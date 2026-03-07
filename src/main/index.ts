@@ -920,9 +920,7 @@ app.whenReady().then(() => {
   })
   safeHandle('db:deleteEntity', (event, id) => { requireSession(event); return db.deleteEntity(id) })
   safeHandle('db:mergeEntities', (event, sourceId, targetId, keepName) => { requireSession(event); return db.mergeEntities(sourceId, targetId, keepName) })
-  safeHandle('db:purgeAllVesselsAndEntities', (event) => { requireAdmin(event); return db.purgeAllVesselsAndEntities() })
   safeHandle('maintenance:syncSettings', (event) => { requireAdmin(event); return db.syncAssuredRoles() })
-  safeHandle('maintenance:addOneDayToAllPolicies', (event) => { requireAdmin(event); return db.addOneDayToAllPolicies() })
 
   safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
   safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })
@@ -1022,8 +1020,7 @@ app.whenReady().then(() => {
   safeHandle('survey_warranty:getReminders', (event, warrantyId) => { requireSession(event); return db.getWarrantyReminders(warrantyId) })
   safeHandle('survey_warranty:waive', (event, id, reason) => { requireSession(event); return db.waiverSurveyWarranty(id, reason) })
 
-  // WAR policy migration (temporary)
-  safeHandle('policies:migrateWar', (event) => { requireAdmin(event); return db.migrateWarPolicyCoverage() })
+
 
   // File Path Remap
   safeHandle('vessel:getFilePaths', (event, vesselId: string) => {

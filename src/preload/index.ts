@@ -35,7 +35,7 @@ const api = {
   updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),
   mergeEntities: (sourceId, targetId, keepName?) => ipcRenderer.invoke('db:mergeEntities', sourceId, targetId, keepName),
-  purgeAllVesselsAndEntities: () => ipcRenderer.invoke('db:purgeAllVesselsAndEntities'),
+
 
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),
   addAssuredRole: (role) => ipcRenderer.invoke('db:addAssuredRole', role),
@@ -53,7 +53,7 @@ const api = {
   addEntityUBO: (ubo) => ipcRenderer.invoke('db:addEntityUBO', ubo),
   deleteEntityUBO: (ubo) => ipcRenderer.invoke('db:deleteEntityUBO', ubo),
   maintenanceSyncSettings: () => ipcRenderer.invoke('maintenance:syncSettings'),
-  maintenanceAddOneDayToAllPolicies: () => ipcRenderer.invoke('maintenance:addOneDayToAllPolicies'),
+
 
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   fsOpen: (filePath) => ipcRenderer.invoke('fs:open', filePath),
@@ -413,8 +413,7 @@ const api = {
   updateQuotationNote: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationNote', id, updates),
   deleteQuotationNote: (id: string) => ipcRenderer.invoke('db:deleteQuotationNote', id),
 
-  // WAR policy migration (temporary)
-  policiesMigrateWar: () => ipcRenderer.invoke('policies:migrateWar'),
+
 
   // File Path Remap
   vesselGetFilePaths: (vesselId: string) => ipcRenderer.invoke('vessel:getFilePaths', vesselId),

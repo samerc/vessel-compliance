@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Calendar, Lock } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
@@ -766,7 +766,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin ? [
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
-            { id: 'dangerZone', label: 'Danger Zone', icon: <Trash2 size={16} />, adminOnly: true },
         ] : []),
     ]
 
@@ -1965,105 +1964,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             </section>
             )}
 
-            {/* 8. Danger Zone – Purge Data */}
-            {effectiveSection === 'dangerZone' && (
-            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Trash2 size={20} color="var(--danger)" /> Danger Zone
-                </h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                        Permanently delete all vessels, entities, and related data (assureds, documents, surveys, UBOs). This action cannot be undone.
-                    </p>
-                    <button
-                        onClick={async () => {
-                            const first = confirm('Are you sure you want to delete ALL vessels and entities? This cannot be undone.')
-                            if (!first) return
-                            const second = confirm('This will permanently remove all vessels, entities, documents, surveys, and related data. Type OK to proceed.')
-                            if (!second) return
-                            try {
-                                const result = await window.api.purgeAllVesselsAndEntities()
-                                showSuccess(`Purged ${result.vesselsDeleted} vessels and ${result.entitiesDeleted} entities.`)
-                            } catch (err: any) {
-                                showError(err.message || 'Failed to purge data')
-                            }
-                        }}
-                        className="btn-secondary"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            background: 'rgba(231, 76, 60, 0.15)',
-                            border: '1px solid rgba(231, 76, 60, 0.4)',
-                            color: '#e74c3c',
-                            marginBottom: '16px'
-                        }}
-                    >
-                        <Trash2 size={18} /> Purge All Vessels & Entities
-                    </button>
-
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0', paddingTop: '16px' }}>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                            Adjust all policy inception and expiry dates by adding exactly one day. Use this to fix date offsets from imports.
-                        </p>
-                        <button
-                            onClick={async () => {
-                                const confirmed = confirm('Are you sure you want to add 1 day to ALL policy inception and expiry dates?')
-                                if (!confirmed) return
-                                try {
-                                    const result = await window.api.maintenanceAddOneDayToAllPolicies()
-                                    showSuccess(`Successfully updated ${result.updatedValues} policy field values and ${result.updatedVessels} vessel summary records.`)
-                                } catch (err: any) {
-                                    showError(err.message || 'Failed to update policy dates')
-                                }
-                            }}
-                            className="btn-secondary"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                background: 'rgba(52, 152, 219, 0.15)',
-                                border: '1px solid rgba(52, 152, 219, 0.4)',
-                                color: '#3498db'
-                            }}
-                        >
-                            <Calendar size={18} /> Add 1 Day to All Policy Dates
-                        </button>
-                    </div>
-
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0', paddingTop: '16px' }}>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '4px' }}>
-                            <strong>WAR Policy Migration</strong>
-                        </p>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
-                            For all WAR policies: copies the Coverage value to Policy Number, and sets the end date to match the Hull (or P&I) policy end date for the same vessel. Run once then remove.
-                        </p>
-                        <button
-                            onClick={async () => {
-                                const confirmed = confirm('Run WAR policy migration? This will overwrite policy numbers and end dates for all WAR policies.')
-                                if (!confirmed) return
-                                try {
-                                    const result = await window.api.policiesMigrateWar()
-                                    showSuccess(`WAR migration complete — ${result.updated} policies updated.`)
-                                } catch (err: any) {
-                                    showError(err.message || 'WAR migration failed')
-                                }
-                            }}
-                            className="btn-secondary"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                background: 'rgba(245, 158, 11, 0.12)',
-                                border: '1px solid rgba(245, 158, 11, 0.4)',
-                                color: '#f59e0b'
-                            }}
-                        >
-                            Run WAR Policy Migration
-                        </button>
-                    </div>
-
-            </section>
-            )}
 
         </div>
     </div>

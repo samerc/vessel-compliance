@@ -53,7 +53,7 @@ export interface Api {
   updateEntity: (id: string, updates: Partial<Entity>) => Promise<void>
   deleteEntity: (id: string) => Promise<void>
   mergeEntities: (sourceId: string, targetId: string, keepName?: string) => Promise<{ mergedAssuredLinks: number; mergedUBOLinks: number; mergedCustomerLinks: number }>
-  purgeAllVesselsAndEntities: () => Promise<{ vesselsDeleted: number; entitiesDeleted: number }>
+
 
   getAssuredRoles: () => Promise<AssuredRole[]>
   addAssuredRole: (role: Omit<AssuredRole, 'id'>) => Promise<AssuredRole>
@@ -71,7 +71,7 @@ export interface Api {
   addEntityUBO: (ubo: EntityUBO) => Promise<void>
   deleteEntityUBO: (ubo: EntityUBO) => Promise<void>
   maintenanceSyncSettings: () => Promise<{ added: number }>
-  maintenanceAddOneDayToAllPolicies: () => Promise<{ updatedValues: number; updatedVessels: number }>
+
 
   fsExists: (filePath: string) => Promise<boolean>
   fsOpen: (filePath: string) => Promise<void>
@@ -412,7 +412,7 @@ export interface Api {
   updateQuitAndInstall: () => Promise<void>
   updateGetCurrentVersion: () => Promise<string>
   updateGetChangelogs: () => Promise<any>
-  policiesMigrateWar: () => Promise<{ updated: number }>
+
   vesselGetFilePaths: (vesselId: string) => Promise<{ id: string; source: string; filePath: string; label: string }[]>
   vesselRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => Promise<void>
   dialogOpenFolder: () => Promise<string | null>

@@ -1370,11 +1370,16 @@ export class MySQLAdapter {
         // Log audit entries for tracked fields
         if (current) {
             const who = changedBy || 'system'
+            const numericAuditKeys: string[] = ['builtYear', 'grossTonnage']
             for (const af of auditFields) {
                 if (updates[af.updateKey] !== undefined) {
                     const oldVal = current[af.dbCol] != null ? String(current[af.dbCol]) : null
                     const newVal = updates[af.updateKey] != null ? String(updates[af.updateKey]) : null
-                    if (oldVal !== newVal) {
+                    // Normalize numeric fields to avoid "4737.00" vs "4737" false positives from MySQL Decimal type
+                    const isNumeric = numericAuditKeys.includes(af.updateKey)
+                    const oldNorm = isNumeric && oldVal != null ? String(parseFloat(oldVal)) : oldVal
+                    const newNorm = isNumeric && newVal != null ? String(parseFloat(newVal)) : newVal
+                    if (oldNorm !== newNorm) {
                         await this.addVesselAuditEntry(id, af.label, oldVal, newVal, who)
                     }
                 }
@@ -1738,26 +1743,6 @@ export class MySQLAdapter {
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE entities SET ${fields.join(', ')} WHERE id = ?`, values)
-    }
-
-    async purgeAllVesselsAndEntities(): Promise<{ vesselsDeleted: number; entitiesDeleted: number }> {
-        if (!this.pool) throw new Error('DB Not connected')
-        const [vRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM vessels')
-        const [eRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM entities')
-        const vesselsDeleted = (vRows as any[])[0].cnt
-        const entitiesDeleted = (eRows as any[])[0].cnt
-        // Delete in dependency order to avoid FK violations
-        await this.pool.execute('DELETE FROM vessel_reminder_snoozes')
-        await this.pool.execute('DELETE FROM survey_attachments WHERE survey_id IN (SELECT id FROM condition_surveys)')
-        await this.pool.execute('DELETE FROM survey_defects WHERE survey_id IN (SELECT id FROM condition_surveys)')
-        await this.pool.execute('DELETE FROM condition_surveys')
-        await this.pool.execute('DELETE FROM entity_ubos')
-        await this.pool.execute('DELETE FROM vessel_assureds')
-        await this.pool.execute('DELETE FROM vessel_documents')
-        await this.pool.execute('DELETE FROM compliance_check_results')
-        await this.pool.execute('DELETE FROM vessels')
-        await this.pool.execute('DELETE FROM entities')
-        return { vesselsDeleted, entitiesDeleted }
     }
 
     async deleteEntity(id: string): Promise<void> {
@@ -4913,113 +4898,6 @@ export class MySQLAdapter {
     async setRenewalStatusForPolicy(policyId: string, statusId: string | null): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('UPDATE vessel_dynamic_policies SET renewal_status_id = ? WHERE id = ?', [statusId || null, policyId])
-    }
-
-    async addOneDayToAllPolicies(): Promise<{ updatedValues: number; updatedVessels: number }> {
-        if (!this.pool) throw new Error('DB Not connected')
-
-        // 1. Update vessel_policy_values for the dynamic policy system
-        // We find all characteristics that are date fields and likely inception/expiry
-        const [dateChars] = await this.pool.query(
-            "SELECT id FROM policy_type_characteristics WHERE field_type = 'date' AND (LOWER(name) LIKE '%inception%' OR LOWER(name) LIKE '%end%' OR LOWER(name) LIKE '%expiry%')"
-        )
-        const charIds = (dateChars as any[]).map(c => c.id)
-
-        let updatedValues = 0
-        if (charIds.length > 0) {
-            // MySQL's DATE_ADD works on ISO date strings
-            const [result] = await this.pool.query(
-                `UPDATE vessel_policy_values 
-                 SET value_date = DATE_FORMAT(DATE_ADD(STR_TO_DATE(value_date, '%Y-%m-%d'), INTERVAL 1 DAY), '%Y-%m-%d')
-                 WHERE characteristic_id IN (?) AND value_date REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`,
-                [charIds]
-            )
-            updatedValues = (result as any).affectedRows
-        }
-
-        // 2. Update vessels.policy_expiry_date (legacy/summary field)
-        const [vessResult] = await this.pool.query(
-            `UPDATE vessels 
-             SET policy_expiry_date = DATE_FORMAT(DATE_ADD(STR_TO_DATE(policy_expiry_date, '%Y-%m-%d'), INTERVAL 1 DAY), '%Y-%m-%d')
-             WHERE policy_expiry_date REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`
-        )
-        const updatedVessels = (vessResult as any).affectedRows
-
-        return { updatedValues, updatedVessels }
-    }
-
-    // --- WAR Policy Migration (temporary) ---
-    async migrateWarPolicyCoverage(): Promise<{ updated: number }> {
-        if (!this.pool) return { updated: 0 }
-        const [warRows] = await this.pool.query(`
-            SELECT
-                vdp.id as policyId,
-                vdp.vessel_id as vesselId,
-                (SELECT vpv.value_text
-                 FROM vessel_policy_values vpv
-                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
-                 WHERE vpv.policy_id = vdp.id AND LOWER(ptch.name) LIKE '%coverage%'
-                 LIMIT 1) as coverageValue,
-                (SELECT ptch.id
-                 FROM policy_type_characteristics ptch
-                 WHERE ptch.policy_type_id = vdp.policy_type_id
-                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
-                 LIMIT 1) as endCharId,
-                (SELECT vpv.id
-                 FROM vessel_policy_values vpv
-                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
-                 WHERE vpv.policy_id = vdp.id
-                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
-                 LIMIT 1) as endValueId,
-                (SELECT vpv.value_date
-                 FROM vessel_policy_values vpv
-                 JOIN vessel_dynamic_policies vdp2 ON vpv.policy_id = vdp2.id
-                 JOIN policy_types pt2 ON vdp2.policy_type_id = pt2.id
-                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
-                 WHERE vdp2.vessel_id = vdp.vessel_id
-                   AND LOWER(pt2.name) LIKE '%hull%'
-                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
-                 ORDER BY vdp2.created_at DESC LIMIT 1) as hullEndDate,
-                (SELECT vpv.value_date
-                 FROM vessel_policy_values vpv
-                 JOIN vessel_dynamic_policies vdp2 ON vpv.policy_id = vdp2.id
-                 JOIN policy_types pt2 ON vdp2.policy_type_id = pt2.id
-                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
-                 WHERE vdp2.vessel_id = vdp.vessel_id
-                   AND (LOWER(pt2.name) LIKE '%p&i%' OR LOWER(pt2.name) LIKE '%p and i%'
-                        OR LOWER(pt2.name) LIKE '%protection%' OR LOWER(pt2.name) LIKE '%indemnity%')
-                   AND LOWER(ptch.name) LIKE '%end%' AND ptch.field_type = 'date'
-                 ORDER BY vdp2.created_at DESC LIMIT 1) as piEndDate
-            FROM vessel_dynamic_policies vdp
-            JOIN policy_types pt ON vdp.policy_type_id = pt.id
-            WHERE LOWER(pt.name) LIKE '%war%'
-        `) as any[]
-
-        let updated = 0
-        for (const row of warRows as any[]) {
-            if (row.coverageValue) {
-                await this.pool.execute(
-                    'UPDATE vessel_dynamic_policies SET policy_number = ? WHERE id = ?',
-                    [row.coverageValue, row.policyId]
-                )
-            }
-            const targetDate = row.hullEndDate || row.piEndDate || null
-            if (targetDate && row.endCharId) {
-                if (row.endValueId) {
-                    await this.pool.execute(
-                        'UPDATE vessel_policy_values SET value_date = ? WHERE id = ?',
-                        [targetDate, row.endValueId]
-                    )
-                } else {
-                    await this.pool.execute(
-                        'INSERT INTO vessel_policy_values (id, policy_id, characteristic_id, value_date) VALUES (?, ?, ?, ?)',
-                        [uuidv4(), row.policyId, row.endCharId, targetDate]
-                    )
-                }
-            }
-            updated++
-        }
-        return { updated }
     }
 
     // --- File Path Remap ---
