@@ -1,9 +1,4 @@
-- Improved: Fleet Analytics redesigned with professional KPI cards, column histogram charts for age and tonnage distributions, OFAC status pill badges, and percentage annotations on all charts
-- New: War Breach Calculator now saves records to a persistent history with date, cover note, breach details, and net due
-- New: Saved War Breach records can be viewed with full calculation breakdown, exported to Excel, or copied for email
-- New: War Breach Calculator — Save clears all fields automatically so you can start a new entry immediately
-- New: War Breach Calculator — Clear button resets all fields without saving
-- New: Entity Directory — Find Duplicates button scans all entities for similar names using Jaro-Winkler similarity with an adjustable threshold slider; pairs can be merged directly from the results
-- New: Open file location button added to all documents (vessel documents, entity files, UBO files, passport, KYC, COI, AOA)
-- New: What's New modal shown automatically after each update, pulling notes from the GitHub release
-- Improved: Fleet view redesigned with sortable columns (name and vessel count), enhanced slide-in panel with active/inactive stats strip, and polished row styling
+- Fixed: Annual documents now correctly read the P&I policy expiry date from active dynamic policies instead of showing "No P&I policy expiry set"
+- Fixed: Editing vessel details no longer creates false audit log entries for Gross Tonnage (e.g. "4737.00 → 4737")
+- Fixed: Classification society combo now correctly pre-selects the saved value when opening a vessel in edit mode
+- Improved: Address book redesigned with a two-panel layout — sticky filter sidebar with collapsible sections and a clean results card with icon-prefixed contact cells

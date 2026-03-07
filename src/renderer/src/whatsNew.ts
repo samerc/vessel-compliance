@@ -17,6 +17,16 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '5.4.1',
+    date: 'March 2026',
+    items: [
+      { tag: 'Fixed', text: 'Annual documents now correctly read the P&I policy expiry from active dynamic policies instead of showing "No P&I policy expiry set"' },
+      { tag: 'Fixed', text: 'Editing vessel details no longer creates false audit log entries for Gross Tonnage (e.g. "4737.00 → 4737")' },
+      { tag: 'Fixed', text: 'Classification society combo now correctly pre-selects the saved value when opening a vessel in edit mode' },
+      { tag: 'Improved', text: 'Address book redesigned with a two-panel layout — sticky filter sidebar with collapsible sections and a clean results card with icon-prefixed contact cells' },
+    ],
+  },
+  {
     version: '5.4.0',
     date: 'March 2026',
     items: [
