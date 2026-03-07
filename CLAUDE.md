@@ -46,6 +46,17 @@ This is an Electron desktop application for maritime vessel compliance managemen
 - **IPC**: All database operations exposed through preload's `window.api` interface
 - **Types**: Shared interfaces in `src/shared/types.ts`
 
+### Adding a New Feature (IPC Chain)
+Every new backend-connected feature must touch all 5 layers in order:
+1. `src/shared/types.ts` — add interfaces/types
+2. `src/main/mysql/adapter.ts` — add DB method
+3. `src/main/index.ts` — add `ipcMain.handle` / `safeHandle` IPC handler
+4. `src/preload/index.ts` — expose via `ipcRenderer.invoke`
+5. `src/preload/index.d.ts` — add TypeScript declaration for `window.api`
+6. Component — call via `window.api.methodName()`
+
+Missing any layer causes silent runtime failures.
+
 ### Toast Notifications
 Global notification system for user feedback:
 - **ToastContext** (`src/renderer/src/contexts/ToastContext.tsx`): Provides `showToast`, `showError`, `showSuccess` functions
@@ -77,6 +88,7 @@ The app integrates with sanctions.network API for OFAC/UN/EU sanctions checking:
 - Each component with sanctions badges (VesselManager, AssuredManager, EntityDirectory) has its own `OfacBadge` component that must handle all statuses
 - **Loading States**: OfacBadge shows "CHECKING..." spinner during API calls
 - **Theme-Aware Colors**: Badge colors adapt for light/dark mode (darker colors in light mode for readability)
+- **Auto-clean toggle**: `ComplianceScheduleSettings.autoMarkCleanOnCheck` — when false, a CLEARED result is not auto-saved (toast only)
 
 ### Scheduled Compliance Checks
 Automated weekly sanctions screening for all entities and vessels:
@@ -93,7 +105,7 @@ Automated weekly sanctions screening for all entities and vessels:
 Vessel inspection tracking with defects management:
 - **Surveyors**: Directory of surveyor companies (`SurveyorDirectory.tsx`) — table + slide-in panel layout (see UI Pattern below). Stats strip: Total Surveyors / Total Surveys / Open Surveys. Slide-in panel shows per-surveyor survey history with OPEN / CLOSED / NO DEFECTS status computed from defects (open=0 → CLOSED, no defects → NO DEFECTS). Add/Edit via modal.
 - **Surveys**: Condition surveys attached to vessels (`ConditionSurveyManager.tsx`) with date, surveyor, type, location
-- **Survey List**: Cross-vessel survey overview (`ConditionSurveyList.tsx`) with search, navigates directly to vessel's survey section
+- **Survey List**: Cross-vessel survey overview (`ConditionSurveyList.tsx`) with search, navigates directly to vessel's survey section. Sortable columns (vessel, date, type, surveyor, location, defects); default sort: date desc.
 - **Defects**: Each survey can have multiple defects (`DefectManager.tsx`) with severity (optional), status (OPEN/CLOSED), due dates
 - **Defect Notes**: Notes button visible for all defects with notes (not just closed), shows both general notes and closure notes
 - **Attachments**: Multiple file attachments per survey (reports, photos, certificates)
@@ -119,6 +131,7 @@ Vessels can be assigned to a customer entity with a customer type:
 - **Per-Vessel**: The same entity can be a broker for one vessel and a direct client for another
 - **Indexed**: `idx_vessels_customer` index on `customer_id`
 - **Orphan Cleanup**: Deleting an entity clears `customer_id`/`customer_type` on its vessels (no CASCADE)
+- **Audit Log**: Customer changes are stored as entity **names** (not UUIDs) in `vessel_audit_log`. The `updateVessel` adapter method resolves both old and new `customer_id` values to entity names via a SELECT before writing the audit entry. Legacy UUID entries (from before this fix) are resolved at render time in `VesselHistoryView` via a lazy `getEntities()` call.
 
 ### Fleet Management
 
@@ -132,6 +145,17 @@ Dual-view fleet management page (`src/renderer/src/components/FleetManager.tsx`)
   - Remove is immediate (single API call); add is multi-select then batch-confirmed
 - **By Customer view**: Vessels grouped under customer entities, split into Brokers / Direct Clients / Unassigned sections; collapsible with glass-card styling; customer type filter and text search
 - **Flag Column**: Fleet and customer vessel tables show flag icons
+
+### Fleet Analytics
+
+Analytics dashboard for the fleet (`src/renderer/src/components/FleetAnalytics.tsx`):
+
+- **KPI row**: Horizontal layout — 48px gradient icon circle left, label (small-caps) → number (bold 1.75rem) → subtitle stacked right
+- **Histograms**: Vertical column bars for vessel age and gross tonnage distributions. Each bar shows count + percentage above, x-axis label below. Bars sized proportionally to the tallest bucket.
+- **Bar charts**: 8px-tall horizontal bars for flag states and vessel types; percentage annotation at right (`pctOfTotal% · count`)
+- **OFAC status row**: Status pill badge (colored per status) + horizontal bar + percentage
+- **Layout**: Flag states get 3fr, vessel types get 2fr in the first row (asymmetric)
+- **ChartCard**: accent-colored icon + small-caps title + count badge pill on right, `borderBottom` divider separating header from content
 
 ### Entity Directory
 
@@ -147,6 +171,7 @@ Entity management page (`src/renderer/src/components/EntityDirectory.tsx`) — t
 - **Create Entity**: Modal with auto-sanctions check after creation (shows spinner)
 - **Delete**: With confirmation warning about linked vessels; clears customer references
 - **Vessel Navigation**: Clicking vessel names navigates to VesselDetail
+- **Find Duplicates**: Button scans all entities for similar names using Jaro-Winkler similarity with an adjustable threshold slider. Pairs can be merged directly from the results via `mergeEntities` adapter method.
 
 ### Entity Documents
 Required documents vary by entity type:
@@ -158,9 +183,13 @@ Required documents vary by entity type:
 
 For `annualRenewal = true` document types, the effective expiry is inherited from the active P&I policy via `resolveEffectivePolicyExpiry()` (`src/renderer/src/utils/policyUtils.ts`) instead of the document's own expiry date.
 
+- **Priority**: P&I policy end date → Hull & Machinery end date → document's own stored expiry date
+- **`resolveEffectivePolicyExpiry(policies)`**: filters `status === 'active'`, matches policy name containing "p&i" or "protection" first, then "hull" or "h&m". Looks for a characteristic whose name contains "end date" and returns its `valueDate`.
 - **Short-cycle rule**: if `(expiryDate − receivedDate) < 60 days`, the document is treated as **Compliant** even when it would otherwise be flagged "Expiring Soon". Rationale: a document placed today against a P&I policy expiring in 30 days was intentionally uploaded knowing its short remaining life.
 - **Helper**: `annualShortCycle(expiry, received)` — returns `true` if span < 60 days
 - **Applied in**: `VesselDocumentsView.tsx` (`getDocStatus`), `ReportService.ts` (`getDocStatus` / `getExcelDocStatus`), `ReportServiceV2.ts` (`getStatus`), `Dashboard.tsx` (`allAlerts` memo)
+- **CRITICAL — loading order**: `dynamicPolicies` must be loaded inside `VesselDetail.loadData()` (not just on Policies/Surveys tab switch), otherwise `effectivePolicyExpiry` is always `undefined` when the Documents tab opens. The fix: add `getVesselDynamicPolicies(vessel.id)` to the supplementary try/catch blocks in `loadData()`.
+- **Editable date**: Annual doc expiry row in `VesselDocumentsView` shows a P&I reference badge (cyan, read-only) above an always-editable date input. The stored doc date is the fallback when no P&I policy end date exists; editing it does NOT override the P&I date for compliance (P&I still takes priority in `effectiveExpiry` calculation).
 
 ### Window Preferences
 - **Per-User Storage**: Window size and position stored in database per user (`users.window_width`, `window_height`, `window_x`, `window_y`)
@@ -189,6 +218,20 @@ Vessel document expiry monitoring and notification system:
 - **Settings** (Admin Panel → Vessel Reminder Settings): Snooze period (days) and clipboard template
 - **IPC Handlers**: `reminders:getSettings`, `reminders:setSettings`, `reminders:getVesselReminders`, `reminders:snoozeVessel`, `reminders:unsnoozeVessel`
 
+### Dashboard
+
+Aggregate health overview (`src/renderer/src/components/Dashboard.tsx`):
+
+- **Layout** (top to bottom):
+  1. KPI row (5 cards): Active Vessels | Entities | Doc Compliance % | Critical Issues | Sanctions Pending
+  2. 2-col main row (60/40 split): Upcoming Expirations card (merged docs + policies, max 12, sorted by urgency) + Operational Status card (6 status rows)
+  3. 3-col activity row (equal width): Recently Added Vessels | Recently Added Entities | Recent Changes (audit)
+- **`dashboardGetActivity` IPC**: returns `{ recentVessels, recentEntities, recentAuditEntries }`. Vessels include `created_at`; entities include `created_at`; audit entries include `changedAt`.
+- **`loadData` wrapped in `useCallback([], [])`**: prevents infinite re-render loop; called once on mount and on refresh button click
+- **`allAlerts` memo**: filters to active vessels only (via `activeVesselIds`) to avoid inactive vessel alerts inflating Missing/Expired counts
+- **`fullyCompliantCount`**: filters `allAlerts` by `activeVesselIds` to avoid negative compliance numbers
+- **Upcoming Expirations**: merges document alerts (type expired/expiring, active vessels only) + policy expiry (within 90 days). Sorted: expired first → missing → expiring soonest
+
 ### Calculators
 
 Extensible calculator section with sub-navigation for insurance calculation tools:
@@ -205,6 +248,14 @@ Extensible calculator section with sub-navigation for insurance calculation tool
   - Calculates adjusted Total Loss Only premium when vessel value changes
   - **6-step calculation**: Current rate, rate/3, value difference, additional premium, new premium, new rate
   - **Pure calculator**: No database persistence, instant reactive computation via `useMemo`
+- **War Breach Calculator** (`src/renderer/src/components/WarBreachCalculator.tsx`):
+  - Calculates net due on war breach scenarios
+  - **Persistent history**: Saves each calculation to DB with date, cover note, breach details, net due
+  - **View modal**: Click any saved record to see full calculation breakdown
+  - **Export/Copy**: Export saved records to Excel; copy individual records formatted for email
+  - **Save + clear**: Saving a record automatically clears all fields for the next entry
+  - **Clear button**: Resets all fields without saving
+  - **IPC prefix**: `warBreach:`; tables: `war_breach_records`
 
 ### Sanctions Search
 
@@ -219,18 +270,19 @@ Ad-hoc sanctions lookup page (`src/renderer/src/components/SanctionsSearch.tsx`)
 
 System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with collapsible sections (all collapsed by default):
 
-1. **Document Types**: CRUD with drag-to-reorder and active/inactive toggle
+1. **Document Types**: CRUD with reorder and active/inactive toggle
 2. **Assured Roles**: CRUD for entity role types
 3. **Survey Types**: CRUD for condition survey types
 4. **Policy Types**: CRUD with reorder for vessel policy classifications
 5. **Scheduled Compliance Check**: Enable/disable, schedule, threshold, include vessels, skip cleared
 6. **Vessel Reminder Settings**: Snooze period and clipboard template
 7. **File Upload Security**: Allowed/blocked file extensions for uploads
-8. **Database Configuration**: View/change MySQL connection settings
-9. **Danger Zone**: Purge all vessels and entities (double confirmation required, admin-only)
+8. **Report Settings**: Company name, logo, accent color used in PDF reports
+9. **Database Configuration**: View/change MySQL connection settings
 
 - **Collapsible Pattern**: Uses `collapsedSections` state (`Set<string>`) with `toggleSection` function; each section header has ChevronRight/ChevronDown toggle
 - **All sections collapsed by default**: Initial state includes all section IDs
+- **Report Settings**: stored in `app_settings` table under key `reportSettings` (JSON blob). IPC: `reportSettings:get` / `reportSettings:set`. Section id: `reportSettings`. Service: `ReportSettingsService` at `src/renderer/src/services/ReportSettingsService.ts` — `getReportSettings()` (cached), `saveReportSettings()`, `invalidateReportSettingsCache()`, `rgbToHex()`, `hexToRgb()`, `tintColor()`.
 
 ### IPC Session Cache Pattern
 
@@ -260,6 +312,7 @@ Classification system for vessel insurance policies:
 - **Dynamic Policies**: `vessel_dynamic_policies` with configurable characteristics per policy type (`policy_type_characteristics`)
 - **Policy Values**: `vessel_policy_values` stores field values (text, date, number) per policy
 - **Date Storage**: All policy dates stored in ISO `YYYY-MM-DD` format for MySQL comparison compatibility
+- **Broker field**: `broker_entity_id` on `vessel_dynamic_policies`; custom combobox (text input + dropdown) with `onBlur+setTimeout(150)` for click-outside handling
 
 ### Policy Renewals
 
@@ -271,6 +324,7 @@ Monthly view of expiring policies (`src/renderer/src/components/PolicyRenewals.t
 - **Filters**: Only active vessels (`v.is_active = TRUE`) and active policies (`vdp.status = 'active'`)
 - **Export**: Excel export via `xlsx` library
 - **IPC Handler**: `policies:getRenewalsByMonth`
+- **Renewal States**: `renewal_status_types` table, `renewal_status_id` FK on `vessel_dynamic_policies`. IPC prefix: `renewalStates:`. Status badge in table: text always black, background `statusColor + "22"` (hex opacity), border `2px solid statusColor`.
 
 ### Vessel Active Status
 
@@ -283,13 +337,15 @@ Vessel lifecycle management with cascade behavior:
 
 ### Dynamic Address Book (DAB)
 
-Query builder for finding entity contacts across the fleet:
+Query builder for finding entity contacts across the fleet (`src/renderer/src/components/DynamicAddressBook.tsx`):
 
-- **Component**: `DynamicAddressBook.tsx` within Directory page
-- **Filters**: Policy types, flag states (with All/Unassigned), customer type, vessel status
+- **Layout**: Two-panel — sticky filter sidebar (270px left) + results card (flex-1 right)
+- **Filter sidebar**: Compact chip-based sections with labels: Match Logic | Contact Scope | Policy Types (collapsible) | Flag States (collapsible, default collapsed) | Vessel Status | Customer Type | Export Fields
 - **Logic**: AND/OR toggle for combining filter criteria
-- **Export**: Email only (default), phone only, or both; copy to clipboard
-- **Results**: Table with entity name, type, contacts, associated vessels
+- **Export**: Email only (default), phone only, or both; Copy to Clipboard + Copy for Outlook (semicolon-separated)
+- **Results**: Professional table with icon-prefixed entity name, type badge, email/phone with icon prefix, associated vessels. Alternating row shading. Count badge in header.
+- **Empty states**: "No query run yet" (before first search), "No contacts found" (after search with 0 results)
+- **Chip component**: Selected = accent border + tinted bg; unselected = subtle border + transparent
 
 ### Vessel Excel Import
 
@@ -297,7 +353,7 @@ Bulk vessel import from Excel files (`src/main/vesselExcelImport.ts`):
 
 - **Date Handling**: Excel serial dates converted to ISO `YYYY-MM-DD` via `excelDateToISO()` with Lotus 123 leap year bug correction
 - **Fallback Parsing**: Text dates parsed via `new Date()` constructor
-- **Migration**: Startup migration in `initializeSchema()` normalizes existing non-ISO dates in `vessel_policy_values`
+- **Migration**: Startup migration in `initSchema()` normalizes existing non-ISO dates in `vessel_policy_values`
 
 ### Vessel Filter
 
@@ -348,8 +404,9 @@ Quotation management system:
 - **External Navigation**: `initialSection` prop allows navigating directly to any tab
 - **Navigation Chain**: App.tsx → VesselManager (initialVesselSection) → VesselDetail (initialSection)
 - **Section Values**: `'documents'`, `'assureds'`, `'surveys'`, `'policies'`, `'history'`
-- **Auto-edit on add**: `VesselDetail` accepts `initialEditing?: boolean` prop → `useState(initialEditing)` opens in edit mode immediately. `VesselManager` sets `openInEditMode = true` after successful vessel creation; back handler resets it to `false`.
+- **Auto-edit on add**: `VesselDetail` accepts `initialEditing?: boolean` prop → `useState(initialEditing)` opens in edit mode immediately. `VesselManager` sets `openInEditMode = true` after successful vessel creation; back handler resets it to `false`. Also requires `useEffect(() => { if (initialEditing) setIsEditing(true) }, [initialEditing])` to handle prop changes after mount.
 - **Searchable edit dropdowns**: Classification society and flag state fields use custom searchable dropdowns (`classSearch`, `flagDropdownOpen`, `flagSearch` states). Classification shows search input when `classSocieties.length > 6`; flag filters by name AND iso3Code. The flag `+` (add new) button is retained alongside the dropdown.
+- **Stale classification IDs**: The seeding `useEffect` checks `validIds.length === 0` (IDs that match current `classSocieties` list), not just `vesselClassificationIds.size === 0`. This handles the case where the junction table has IDs for societies that were deleted and re-added with new UUIDs.
 
 ### Vessel History Tab (`VesselHistoryView`)
 
@@ -360,11 +417,21 @@ Redesigned history view inside `VesselDetail.tsx` (rendered when `detailView ===
 - **Date-grouped timeline**: entries grouped into Today / Yesterday / specific date labels; each group has a bold header + entry count badge
 - **`getFieldMeta(fieldName)`**: returns `{ icon, color, bg }` by keyword category (name=blue, flag=purple, status=amber, imo=cyan, class=green, type=pink)
 - **Entry row**: colored 3px left border + icon in rounded square, field name, old value (strikethrough) → new value (bold), Clock icon + time, "by username"
+- **Flag UUID resolution**: `resolveFlagValue(val)` maps flag UUIDs → `"Name (ISO3)"` using `flagStates` prop
+- **Customer name resolution**: `entityNameMap` state populated by a `useEffect` on mount — detects UUID-shaped values in `fieldName === 'Customer'` entries, calls `window.api.getEntities()` once, builds an ID→name map. `resolveEntityValue(val)` applies it at render. Handles legacy entries stored as raw UUIDs before the adapter-level name resolution fix.
 
-### Vessel Document Expiry Fixes (`VesselDocumentsView`)
+### Vessel Document Expiry (`VesselDocumentsView`)
 
 - **Expiry clear button**: explicit `×` (`X` icon, 18px circle) button renders next to the expiry date input when a date is set; calls `updateVesselDocumentExpiry(..., null)` directly. Chromium date input native clear is unreliable for controlled React inputs.
 - **No expiry inheritance**: `uploadDoc` sets `expiryDate: undefined` (not `existing?.expiryDate || undefined`) so a newly uploaded file never inherits the previous file's expiry date.
+- **Annual doc expiry row**: shows P&I date as a read-only cyan badge if found, plus an always-editable `<input type="date">` for the document's own stored expiry (with clear button). The doc's stored date is the fallback for compliance when no P&I policy end date is configured.
+
+### Vessel Audit Log (`adapter.ts` — `updateVessel`)
+
+The audit loop in `updateVessel` has two special normalizations:
+
+- **Numeric fields** (`builtYear`, `grossTonnage`): MySQL `DECIMAL` columns return `"4737.00"` as a string from raw SELECT queries, but TypeScript sends `4737` as a number. Normalize both sides with `String(parseFloat(val))` before comparing to avoid false audit entries on every edit.
+- **Customer field** (`customerId`): Before writing the audit entry, both old and new UUIDs are resolved to entity names via `SELECT id, name FROM entities WHERE id IN (?)`. Stores readable names instead of UUIDs in the log.
 
 ### Vessel List
 
@@ -382,18 +449,47 @@ Used across EntityDirectory, SurveyorDirectory, FleetManager (fleet view), and V
 - Panel content is always derived from already-loaded data (no extra API calls on row click)
 - Stats strip above the table: 3–5 glass-card KPI cards with colored gradient icon circles
 
+### What's New Modal & Release Notes Workflow
+
+Auto-shown modal after each update displaying the changelog:
+
+- **Component**: `WhatsNewModal.tsx` — shown automatically after login when `package.json` version > last-seen version stored per user in DB
+- **Data source (priority)**:
+  1. GitHub Releases API (`update:getChangelogs` IPC → `UpdateService.getChangelogs()`) — fetches live release notes for the installed version
+  2. Fallback: `src/renderer/src/whatsNew.ts` `WHATS_NEW` array — used when GitHub is unreachable or the release has no body text
+- **Version matching**: GitHub tag_name is `v5.x.x`; modal strips the leading `v` with `.replace(/^v/, '')` to match `package.json` version
+- **Parsing**: `parseNotes(body)` extracts bullet lines (`- Tag: Text`); falls back to `WHATS_NEW` when parsed items array is empty
+
+**Release workflow for each new version:**
+1. Bump version in `package.json`
+2. Replace `RELEASE_NOTES.md` content with the new version's changes (this file is used as the GitHub release body)
+3. Add a new entry at the **top** of `WHATS_NEW` in `src/renderer/src/whatsNew.ts` (same version, same items as RELEASE_NOTES)
+4. Create GitHub release tagged `vX.Y.Z`, paste `RELEASE_NOTES.md` as the release body
+5. `RELEASE_NOTES.md` has a `!RELEASE_NOTES.md` exception in `.gitignore` (the file itself uses `*.md` exclusion)
+
 ### Code Style
 - Prettier: Single quotes, no semicolons, 100 char width, no trailing commas
 - Path alias: `@renderer/*` maps to `src/renderer/src/*`
 - **Vessel Names**: Always uppercase (enforced via `toUpperCase()` on input and `textTransform: uppercase` CSS)
+- **Danger color**: always `color: 'var(--danger)'` — never hardcode `#ff4d4d`, `#c00`, or `red`
+- **Modal background**: `isLight ? '#ffffff' : '#1a1d28'` — never use `glass-card` class or `var(--bg-sidebar)` for modals
+- **Input borders**: use `var(--input-border)` (color-only token), NOT `var(--glass-border)` (full border shorthand) for form controls
 
 ## Database Setup
 
 On first launch, admin enters MySQL credentials which are saved to `db-config.json`. Default admin credentials are `admin/admin123`. The schema auto-migrates on startup.
 
+### Schema Migration Pattern
+
+- Migration function: `initSchema()` in `adapter.ts` (around line 84)
+- Pattern: `SHOW COLUMNS FROM table` → check if column exists → `ALTER TABLE ADD COLUMN` if missing
+- All new columns must be **nullable** or have a **DEFAULT** value — never add `NOT NULL` without a default, as older versions may INSERT without the new column
+- Add new table migrations before the `} catch (error)` block at the end of `initSchema()`
+- Use unique variable names per migration block (block-scoped `const [cols]` repeated = TS2451 error)
+
 ### Key Tables
 
-- `users` - User accounts with auth, theme, window preferences
+- `users` - User accounts with auth, theme, window preferences, sidebar state, sanctions threshold
 - `vessels`, `fleets` - Vessel registry and fleet grouping
 - `entities`, `vessel_assureds`, `entity_ubos` - Assured parties and beneficial owners
 - `document_types`, `vessel_documents` - Document requirements and uploads
@@ -402,8 +498,11 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - `policy_types`, `policy_type_characteristics` - Insurance policy type classifications and configurable fields
 - `vessel_dynamic_policies`, `vessel_policy_values` - Dynamic policy instances and their field values
 - `surveyors`, `condition_surveys`, `survey_defects`, `survey_attachments` - Survey management
+- `survey_warranties`, `warranty_reminders` - Warranty tracking and reminder log
 - `compliance_check_logs` - History of scheduled/manual compliance runs
 - `compliance_check_results` - Individual sanctions matches pending review
 - `vessel_name_history`, `vessel_audit_log` - Vessel change tracking
+- `war_breach_records` - Saved War Breach Calculator results
 - `quotations` - Insurance quotation records
-- `settings` - Key-value store for app settings (file types, compliance schedule, etc.)
+- `renewal_status_types` - Custom renewal status labels for policies
+- `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, etc.)
