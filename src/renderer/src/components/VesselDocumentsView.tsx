@@ -359,22 +359,25 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
           </div>
         </div>
 
-        {/* Expiry row — annual docs show P&I policy date as informational; non-annual show editable input */}
+        {/* Expiry row — annual docs: P&I reference badge (read-only) + always-editable document date */}
         {hasFile && annualRenewal && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Calendar size={12} color="var(--text-secondary)" />
-            {effectivePolicyExpiry ? (
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                Expires with P&I ·{' '}
-                <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                  {new Date(effectivePolicyExpiry).toLocaleDateString()}
-                </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {effectivePolicyExpiry && (
+              <span style={{
+                fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: '4px',
+                background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)',
+                border: '1px solid rgba(0, 210, 255, 0.2)',
+                display: 'inline-flex', alignItems: 'center', gap: '4px', alignSelf: 'flex-start',
+              }}>
+                P&I · {new Date(effectivePolicyExpiry).toLocaleDateString()}
               </span>
-            ) : doc?.expiryDate ? (
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={12} color="var(--text-secondary)" />
               <input
                 type="date"
-                value={editingExpiry[id] !== undefined ? editingExpiry[id] : (doc.expiryDate || '')}
-                onFocus={() => setEditingExpiry(prev => ({ ...prev, [id]: doc.expiryDate || '' }))}
+                value={editingExpiry[id] !== undefined ? editingExpiry[id] : (doc?.expiryDate || '')}
+                onFocus={() => setEditingExpiry(prev => ({ ...prev, [id]: doc?.expiryDate || '' }))}
                 onChange={e => setEditingExpiry(prev => ({ ...prev, [id]: e.target.value }))}
                 onBlur={async e => {
                   const val = e.target.value
@@ -384,9 +387,16 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
                 min="1900-01-01" max="2100-12-31"
                 style={{ fontSize: '0.78rem', padding: '3px 6px', borderRadius: '5px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
               />
-            ) : (
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No P&I policy expiry set</span>
-            )}
+              {doc?.expiryDate && (
+                <button
+                  title="Clear expiry date"
+                  onClick={async () => { await window.api.updateVesselDocumentExpiry(vessel.id, id, null); loadData() }}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', padding: 0, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
         )}
         {hasFile && !annualRenewal && (!doc?.expiryDate || doc.expiryDate === '0000-00-00') && (

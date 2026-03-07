@@ -111,6 +111,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             setVesselPolicies(Array.isArray(vp) ? vp : [])
             setAssignedPolicyTypeIds(new Set(Array.isArray(vp) ? vp.map((p: VesselPolicy) => p.policyTypeId) : []))
         } catch { /* ignore */ }
+        try {
+            const dp = await window.api.getVesselDynamicPolicies(vessel.id)
+            setDynamicPolicies(Array.isArray(dp) ? dp : [])
+        } catch { /* ignore */ }
     }
 
     const loadDynamicPolicies = async () => {
