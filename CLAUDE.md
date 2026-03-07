@@ -237,7 +237,8 @@ Aggregate health overview (`src/renderer/src/components/Dashboard.tsx`):
 - **`loadData` wrapped in `useCallback([], [])`**: prevents infinite re-render loop; called once on mount and on refresh button click
 - **`allAlerts` memo**: filters to active vessels only (via `activeVesselIds`) to avoid inactive vessel alerts inflating Missing/Expired counts
 - **`fullyCompliantCount`**: filters `allAlerts` by `activeVesselIds` to avoid negative compliance numbers
-- **Upcoming Expirations**: merges document alerts (type expired/expiring, active vessels only) + policy expiry (within 90 days). Sorted: expired first → missing → expiring soonest
+- **Upcoming Expirations**: merges document alerts (type expired/expiring, active vessels only) + policy expiry (within 90 days). Sorted: expired first → missing → expiring soonest. Rows are clickable — navigates to vessel's Documents or Policies tab via `onNavigateToVessel` prop
+- **Operational Status — Entity Docs Missing**: `entityDocMissingCount` memo counts entities with missing required documents (CoI/AoA/KYC for companies, passport for persons); shown as a status row with amber/green color
 
 ### Calculators
 
@@ -326,6 +327,7 @@ Classification system for vessel insurance policies:
 Monthly view of expiring policies (`src/renderer/src/components/PolicyRenewals.tsx`):
 
 - **Month Selector**: Navigate months with arrows, "Today" button to jump to current month
+- **3-Month View**: Toggle button switches between single-month and 3-consecutive-months view; multi-month fetches 3 parallel IPC calls tagged with `_monthLabel`, renders with month group headers in the table
 - **Table Columns**: Vessel, IMO, Customer, Fleet, Policy Type, Policy Number, End Date, Actions (View)
 - **Query**: Joins `vessel_dynamic_policies` → `vessel_policy_values` where characteristic name contains "end" and field_type is date
 - **Filters**: Only active vessels (`v.is_active = TRUE`) and active policies (`vdp.status = 'active'`)
@@ -376,6 +378,19 @@ Advanced vessel search page (`src/renderer/src/components/VesselFilter.tsx`):
 Tab-based reports page (`src/renderer/src/components/Reports.tsx`) with sub-navigation:
 
 - **LossRecordReport** (`src/renderer/src/components/LossRecordReport.tsx`): Imports Book1.xlsx (UWY in col 6), outputs a PDF grouped by Underwriting Year → vessel → claim
+
+### Customer Compliance Report
+
+Per-customer document compliance overview (`src/renderer/src/components/CustomerComplianceReport.tsx`), accessible via the Reports page "Customer Compliance" tab:
+
+- **On-screen view**: Select customer (or all), click "Generate Report" to load grouped vessels with per-vessel compliance stats (Compliant / Missing / Expiring Soon / Expired / %)
+- **Compliance %**: `compliant / totalRequired * 100` — only fully-compliant docs count. Expired and expiring-soon docs do NOT inflate the percentage.
+- **Scope**: active vessels only; includes both global `document_types` and per-vessel `vessel_custom_doc_types`
+- **Expiry window**: "Expiring Soon" = within 60 days (intentionally wider than the 30-day Dashboard threshold)
+- **Export PDF**: per-customer via `exportCustomerCompliancePDF()` (exported function, also called from EntityDirectory); full-fleet via "Export PDF" button in the component. Uses `ReportSettingsService` for company name, colors, footer
+- **Export Excel**: flat rows with customer header rows interspersed
+- **N+1 prevention**: custom doc types for all vessels in scope are batch-fetched with `Promise.all` before the vessel loop — never one IPC call per vessel
+- **`buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes)`**: pure synchronous helper, takes pre-fetched data only
 
 ### Professional PDF Report (ReportServiceV2)
 

@@ -57,10 +57,12 @@ function daysUntil(dateStr: string): number {
 
 export default function Dashboard({
   onViewAlerts,
-  onViewSurveyFollowUp
+  onViewSurveyFollowUp,
+  onNavigateToVessel
 }: {
   onViewAlerts: () => void
   onViewSurveyFollowUp?: () => void
+  onNavigateToVessel?: (vesselId: string, section: 'documents' | 'policies') => void
 }) {
   const { theme } = useTheme()
   const isLight = theme === 'light'
@@ -239,6 +241,20 @@ export default function Dashboard({
 
   const sanctionsPending = pendingSanctions.length
 
+  const entityDocMissingCount = useMemo(() => {
+    let count = 0
+    for (const e of entities) {
+      if (e.type === 'company') {
+        if (!e.certificateOfIncorporationPath) count++
+        if (!e.articlesOfAssociationPath) count++
+        if (!e.kycFilePath) count++
+      } else {
+        if (!e.passportFilePath) count++
+      }
+    }
+    return count
+  }, [entities])
+
   // ── Styles ────────────────────────────────────────────────────────
   const cardStyle: React.CSSProperties = {
     background: isLight ? '#fff' : 'rgba(255,255,255,0.04)',
@@ -370,7 +386,11 @@ export default function Dashboard({
                   const rowBg = idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.018)' : 'rgba(255,255,255,0.012)')
 
                   return (
-                    <tr key={idx} style={{ background: rowBg }}>
+                    <tr
+                      key={idx}
+                      onClick={() => onNavigateToVessel?.(item.vesselId, item.kind === 'policy' ? 'policies' : 'documents')}
+                      style={{ background: rowBg, cursor: onNavigateToVessel ? 'pointer' : 'default' }}
+                    >
                       <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
                         <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: '800', background: bgLabel, color, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
                           {isMiss ? <AlertCircle size={9} /> : isExp ? <AlertTriangle size={9} /> : <Clock size={9} />}
@@ -417,6 +437,7 @@ export default function Dashboard({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <StatusRow icon={<FileText size={14} />} label="Critical Documents" value={missingCount + expiredCount} color={(missingCount + expiredCount) > 0 ? 'var(--danger)' : '#10b981'} />
             <StatusRow icon={<Clock size={14} />} label="Expiring in 30 days" value={soonCount} color={soonCount > 0 ? '#f59e0b' : '#10b981'} />
+            <StatusRow icon={<Users size={14} />} label="Entity Docs Missing" value={entityDocMissingCount} color={entityDocMissingCount > 0 ? '#f97316' : '#10b981'} />
             <StatusRow icon={<Wrench size={14} />} label="Open Defects" value={openDefects.length} color={openDefects.length > 0 ? '#f97316' : '#10b981'} />
             <StatusRow icon={<FileWarning size={14} />} label="Active Warranties" value={activeWarranties.length} color={activeWarranties.length > 0 ? '#f59e0b' : '#10b981'} />
             {overdueWarranties > 0 && (

@@ -7,15 +7,17 @@ import {
   ChevronRight,
   RefreshCw,
   Search,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react'
 import { VesselReminder, ReminderSettings } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 const DEFAULT_TEMPLATE = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
 
-export default function ReminderCenter() {
+export default function ReminderCenter({ onNavigateToVessel }: { onNavigateToVessel?: (vesselId: string) => void } = {}) {
   const [reminders, setReminders] = useState<VesselReminder[]>([])
   const [settings, setSettings] = useState<ReminderSettings>({ periodDays: 7, reminderTemplate: DEFAULT_TEMPLATE })
   const [isLoading, setIsLoading] = useState(false)
@@ -25,6 +27,8 @@ export default function ReminderCenter() {
   const [showSnoozed, setShowSnoozed] = useState(false)
   const { user } = useAuth()
   const { showError, showSuccess } = useToast()
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
 
   const loadData = async () => {
     setIsLoading(true)
@@ -159,7 +163,7 @@ export default function ReminderCenter() {
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               aria-label="Search reminders"
-              style={{ width: '100%', padding: '8px 12px 8px 36px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
+              style={{ width: '100%', padding: '8px 12px 8px 36px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
             />
             {searchTerm && (
               <button
@@ -175,7 +179,7 @@ export default function ReminderCenter() {
             value={fleetFilter}
             onChange={e => setFleetFilter(e.target.value)}
             aria-label="Filter by fleet"
-            style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
+            style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
           >
             <option value="all">All Fleets</option>
             {fleets.map(f => <option key={f} value={f}>{f}</option>)}
@@ -279,6 +283,17 @@ export default function ReminderCenter() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                  {onNavigateToVessel && (
+                    <button
+                      className="btn-secondary"
+                      onClick={() => onNavigateToVessel(reminder.vesselId)}
+                      title="View vessel"
+                      aria-label={'View vessel ' + reminder.vesselName}
+                      style={{ padding: '6px 10px' }}
+                    >
+                      <ExternalLink size={14} />
+                    </button>
+                  )}
                   <button
                     className="btn-secondary"
                     onClick={() => handleCopy(reminder)}
@@ -314,14 +329,14 @@ export default function ReminderCenter() {
 
               {/* Expanded Details */}
               {isExpanded && (
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--table-border)' }}>
                   {/* Vessel Documents */}
                   {reminder.missingVesselDocs.length > 0 && (
                     <div style={{ marginBottom: '12px' }}>
                       <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--text-primary)' }}>Vessel Documents</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {reminder.missingVesselDocs.map((doc, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', padding: '4px 8px', borderRadius: '4px', background: 'var(--input-bg)' }}>
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', padding: '4px 8px', borderRadius: '4px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)' }}>
                             <span style={{
                               width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
                               background: doc.status === 'expired' ? 'var(--warning)' : 'var(--danger)'
@@ -341,7 +356,7 @@ export default function ReminderCenter() {
                     <div>
                       <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--text-primary)' }}>Assured Documents</h4>
                       {reminder.assuredAlerts.map((alert, i) => (
-                        <div key={i} style={{ marginBottom: '8px', padding: '8px', borderRadius: '6px', background: 'var(--input-bg)' }}>
+                        <div key={i} style={{ marginBottom: '8px', padding: '8px', borderRadius: '6px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)' }}>
                           <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                             {alert.entityName}
                             <span style={{ fontWeight: 400, color: 'var(--text-secondary)', marginLeft: '8px' }}>

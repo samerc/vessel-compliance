@@ -272,13 +272,14 @@ function App(): React.JSX.Element {
         </aside>
 
         <main id="main-content" className="main-content">
-          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} />}
+          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} />}
           {activeTab === 'vessels' && <VesselManager
             initialVesselId={navigateToVesselId}
             initialVesselSection={navigateToVesselSection}
             onClearInitialVessel={() => { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }}
             onNavigateBack={navigateBackTab ? () => { setActiveTab(navigateBackTab as any); setNavigateBackTab(undefined) } : undefined}
             navigateBackLabel={navigateBackTab ? ({
+              'dashboard': 'Back to Dashboard',
               'surveys': 'Back to Surveys',
               'compliance': 'Back to Compliance',
               'directory': 'Back to Directory',
@@ -296,7 +297,7 @@ function App(): React.JSX.Element {
           {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} />}
           {activeTab === 'compliance' && <ComplianceCenter onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} />}
           {activeTab === 'sanctions-search' && <SanctionsSearch />}
-          {activeTab === 'reminders' && <ReminderCenter />}
+          {activeTab === 'reminders' && <ReminderCenter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('documents'); setNavigateBackTab('reminders'); setActiveTab('vessels') }} />}
           {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} />}
           {activeTab === 'survey-followup' && <SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} />}
           {activeTab === 'calculators' && <Calculators />}

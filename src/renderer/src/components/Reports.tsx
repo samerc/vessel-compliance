@@ -17,7 +17,7 @@ export default function Reports() {
     <div className="fade-in">
       <header style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Reports</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Generate formatted reports from imported data.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Generate and export compliance and loss reports.</p>
       </header>
 
       {/* Tab bar */}

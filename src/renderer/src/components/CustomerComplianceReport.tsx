@@ -43,14 +43,15 @@ function docStatus(hasFile: boolean, expiry: string | null | undefined): string 
   return 'COMPLIANT'
 }
 
-async function buildVesselRow(
+function buildVesselRow(
   vessel: any,
   docTypes: any[],
   allVesselDocs: any[],
   allAssureds: any[],
-): Promise<CustomerVesselRow> {
+  allCustomDocTypes: any[],
+): CustomerVesselRow {
   const vesselDocs = allVesselDocs.filter(d => d.vesselId === vessel.id)
-  const customTypes = await window.api.getVesselCustomDocTypes(vessel.id)
+  const customTypes = allCustomDocTypes.filter(t => t.vesselId === vessel.id)
 
   const allTypes = [
     ...docTypes.map((t: any) => {
@@ -68,8 +69,8 @@ async function buildVesselRow(
     const status = docStatus(!!(t.doc?.filePath), t.doc?.expiryDate || null)
     if (status === 'COMPLIANT') compliant++
     else if (status === 'MISSING') missing++
-    else if (status === 'EXPIRING SOON') { expiringSoonCount++; compliant++ }
-    else if (status === 'EXPIRED') { expiredCount++; compliant++ }
+    else if (status === 'EXPIRING SOON') expiringSoonCount++
+    else if (status === 'EXPIRED') expiredCount++
   }
 
   const vesselAssureds = allAssureds.filter(a => a.vesselId === vessel.id)
@@ -108,10 +109,13 @@ export async function exportCustomerCompliancePDF(
   const customerVessels = (vessels as any[]).filter(v => v.isActive && v.customerId === customerId)
   if (customerVessels.length === 0) return
 
-  const vesselRows: CustomerVesselRow[] = []
-  for (const vessel of customerVessels) {
-    vesselRows.push(await buildVesselRow(vessel, docTypes as any[], allVesselDocs as any[], allAssureds as any[]))
-  }
+  const allCustomDocTypes = (await Promise.all(
+    customerVessels.map(v => window.api.getVesselCustomDocTypes(v.id))
+  )).flat()
+
+  const vesselRows: CustomerVesselRow[] = customerVessels.map(vessel =>
+    buildVesselRow(vessel, docTypes as any[], allVesselDocs as any[], allAssureds as any[], allCustomDocTypes)
+  )
 
   const s = await getReportSettings()
   const primary = s.primaryColor
@@ -229,6 +233,10 @@ export default function CustomerComplianceReport() {
         ? activeVessels
         : activeVessels.filter(v => v.customerId === selectedCustomerId)
 
+      const allCustomDocTypes = (await Promise.all(
+        filtered.map((v: any) => window.api.getVesselCustomDocTypes(v.id))
+      )).flat()
+
       const customerMap = new Map<string, CustomerGroup>()
 
       for (const vessel of filtered) {
@@ -245,7 +253,7 @@ export default function CustomerComplianceReport() {
           })
         }
 
-        const row = await buildVesselRow(vessel, docTypes as any[], allVesselDocs as any[], allAssureds as any[])
+        const row = buildVesselRow(vessel, docTypes as any[], allVesselDocs as any[], allAssureds as any[], allCustomDocTypes)
         customerMap.get(groupKey)!.vessels.push(row)
       }
 
@@ -467,12 +475,12 @@ export default function CustomerComplianceReport() {
           {[
             { label: 'Customers', value: groups.length, icon: <Users size={18} /> },
             { label: 'Vessels', value: totalVessels, icon: <FileText size={18} /> },
-            { label: 'Missing Docs', value: totalMissing, icon: <AlertCircle size={18} />, color: totalMissing > 0 ? (isLight ? '#c00000' : '#ff4d4d') : undefined },
+            { label: 'Missing Docs', value: totalMissing, icon: <AlertCircle size={18} />, color: totalMissing > 0 ? 'var(--danger)' : undefined },
             {
               label: 'Avg. Compliance',
               value: `${avgPct}%`,
               icon: <CheckCircle size={18} />,
-              color: avgPct === 100 ? (isLight ? '#008c46' : '#00c264') : avgPct >= 70 ? (isLight ? '#b45309' : '#f59e0b') : (isLight ? '#c00000' : '#ff4d4d'),
+              color: avgPct === 100 ? (isLight ? '#008c46' : '#00c264') : avgPct >= 70 ? (isLight ? '#b45309' : '#f59e0b') : 'var(--danger)',
             },
           ].map(s => (
             <div key={s.label} style={{ padding: '14px 20px', background: 'var(--bg-card)', borderRadius: '10px', border, display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -518,7 +526,7 @@ export default function CustomerComplianceReport() {
               {group.vessels.map(v => {
                 const pctColor = v.pct === 100
                   ? (isLight ? '#008c46' : '#00c264')
-                  : v.missing > 0 ? (isLight ? '#c00000' : '#ff4d4d')
+                  : v.missing > 0 ? 'var(--danger)'
                   : (isLight ? '#b45309' : '#f59e0b')
                 return (
                   <tr key={v.vesselId} style={{ borderTop: '1px solid var(--table-border)' }}>
@@ -526,7 +534,7 @@ export default function CustomerComplianceReport() {
                     <td style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontSize: '0.82rem', fontFamily: 'monospace' }}>{v.imoNumber}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{v.assured}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-primary)', fontSize: '0.82rem' }}>{v.compliant}/{v.totalRequired}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '0.82rem', fontWeight: v.missing > 0 ? '700' : '400', color: v.missing > 0 ? (isLight ? '#c00000' : '#ff4d4d') : 'var(--text-secondary)' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '0.82rem', fontWeight: v.missing > 0 ? '700' : '400', color: v.missing > 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>
                       {v.missing > 0 ? v.missing : '—'}
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '0.82rem', fontWeight: v.expiringSoon > 0 ? '600' : '400', color: v.expiringSoon > 0 ? (isLight ? '#b45309' : '#f59e0b') : 'var(--text-secondary)' }}>

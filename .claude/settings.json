@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance && node_modules\\\\.bin\\\\tsc --noEmit -p tsconfig.web.json --composite false\")",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance && node_modules\\\\.bin\\\\eslint src --ext .ts,.tsx --max-warnings=0 2>&1\")",
+      "Bash(cmd /c \"grep -n \"\"Policy Renewals\\\\|### Dashboard\"\" c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\")",
+      "Bash(cmd /c \"findstr /n \"\"Policy Renewals\"\" c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\")",
+      "Bash(cmd /c \"findstr /n /i \"\"renewals\\\\|dashboard\"\" \"\"c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\"\"\")",
+      "Bash(findstr /n \"Renewals Dashboard\")"
     ]
   }
 }

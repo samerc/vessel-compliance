@@ -42,6 +42,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const [sortField, setSortField] = useState<SortField>('endDate')
     const [sortDir, setSortDir] = useState<SortDir>('asc')
     const [groupByFleet, setGroupByFleet] = useState(false)
+    const [multiMonthView, setMultiMonthView] = useState(false)
 
     // Renewal status management
     const [statusTypes, setStatusTypes] = useState<RenewalStatusType[]>([])
@@ -100,13 +101,35 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     useEffect(() => {
         loadRenewals()
         loadStatusTypes()
-    }, [selectedYear, selectedMonth])
+    }, [selectedYear, selectedMonth, multiMonthView])
 
     const loadRenewals = async () => {
         setLoading(true)
         try {
-            const data = await window.api.getPolicyRenewalsByMonth(selectedYear, selectedMonth)
-            setRenewals(Array.isArray(data) ? data : [])
+            if (multiMonthView) {
+                // Build list of 3 consecutive months starting from selectedYear/selectedMonth
+                const months: { year: number; month: number }[] = []
+                let y = selectedYear, m = selectedMonth
+                for (let i = 0; i < 3; i++) {
+                    months.push({ year: y, month: m })
+                    m++
+                    if (m > 12) { m = 1; y++ }
+                }
+                const results = await Promise.all(months.map(({ year, month }) =>
+                    window.api.getPolicyRenewalsByMonth(year, month)
+                ))
+                // Tag each record with its month label so grouping works
+                const combined = results.flatMap((data, i) =>
+                    (Array.isArray(data) ? data : []).map((r: any) => ({
+                        ...r,
+                        _monthLabel: `${MONTH_NAMES[months[i].month - 1]} ${months[i].year}`
+                    }))
+                )
+                setRenewals(combined)
+            } else {
+                const data = await window.api.getPolicyRenewalsByMonth(selectedYear, selectedMonth)
+                setRenewals(Array.isArray(data) ? data : [])
+            }
         } catch {
             setRenewals([])
         }
@@ -358,7 +381,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                     style={{
                         padding: '4px 8px',
                         borderRadius: '12px',
-                        border: r.renewalStatusColor ? `2px solid ${r.renewalStatusColor}` : '1px solid var(--glass-border)',
+                        border: r.renewalStatusColor ? `2px solid ${r.renewalStatusColor}` : '1px solid var(--input-border)',
                         background: r.renewalStatusColor ? `${r.renewalStatusColor}22` : 'var(--input-bg)',
                         color: r.renewalStatusId ? (isLight ? '#111111' : '#ffffff') : 'var(--text-secondary)',
                         fontSize: '0.8rem',
@@ -451,6 +474,15 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 <button onClick={goToCurrentMonth} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Today</button>
 
                 <button
+                    onClick={() => setMultiMonthView(v => !v)}
+                    className={multiMonthView ? 'btn-primary' : 'btn-secondary'}
+                    style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    title={multiMonthView ? 'Switch to single month view' : 'Show 3 months from selected month'}
+                >
+                    3-Month View
+                </button>
+
+                <button
                     onClick={() => setGroupByFleet(v => !v)}
                     className={groupByFleet ? 'btn-primary' : 'btn-secondary'}
                     style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -491,8 +523,8 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                             <div key={st.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 {editingStatusId === st.id ? (
                                     <>
-                                        <input type="color" value={editStatusColor} onChange={e => setEditStatusColor(e.target.value)} style={{ width: '36px', height: '32px', padding: '2px', borderRadius: '4px', border: '1px solid var(--glass-border)', cursor: 'pointer' }} />
-                                        <input type="text" value={editStatusName} onChange={e => setEditStatusName(e.target.value)} style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+                                        <input type="color" value={editStatusColor} onChange={e => setEditStatusColor(e.target.value)} style={{ width: '36px', height: '32px', padding: '2px', borderRadius: '4px', border: '1px solid var(--input-border)', cursor: 'pointer' }} />
+                                        <input type="text" value={editStatusName} onChange={e => setEditStatusName(e.target.value)} style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
                                         <button onClick={() => handleSaveEditStatus(st.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10b981', display: 'flex' }}><Check size={16} /></button>
                                         <button onClick={() => setEditingStatusId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}><X size={16} /></button>
                                     </>
@@ -510,8 +542,8 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
 
                     {/* Add new status */}
                     <form onSubmit={handleAddStatus} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input type="color" value={newStatusColor} onChange={e => setNewStatusColor(e.target.value)} style={{ width: '36px', height: '32px', padding: '2px', borderRadius: '4px', border: '1px solid var(--glass-border)', cursor: 'pointer', flexShrink: 0 }} />
-                        <input type="text" value={newStatusName} onChange={e => setNewStatusName(e.target.value)} placeholder="Status name (e.g. Quote Sent)" style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+                        <input type="color" value={newStatusColor} onChange={e => setNewStatusColor(e.target.value)} style={{ width: '36px', height: '32px', padding: '2px', borderRadius: '4px', border: '1px solid var(--input-border)', cursor: 'pointer', flexShrink: 0 }} />
+                        <input type="text" value={newStatusName} onChange={e => setNewStatusName(e.target.value)} placeholder="Status name (e.g. Quote Sent)" style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
                         <button type="submit" className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Plus size={14} /> Add</button>
                     </form>
                 </div>
@@ -600,9 +632,80 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                 <tr>
                                     <td colSpan={11} style={{ padding: '52px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                         <Calendar size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }} />
-                                        No policies expiring in {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+                                        {multiMonthView
+                                            ? `No policies expiring in the selected 3-month range`
+                                            : `No policies expiring in ${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`}
                                     </td>
                                 </tr>
+                            ) : multiMonthView ? (
+                                // Group by month label, then optionally by fleet within each month
+                                (() => {
+                                    const monthOrder: string[] = []
+                                    const byMonth = new Map<string, any[]>()
+                                    for (const r of sortedRenewals) {
+                                        const lbl = r._monthLabel || ''
+                                        if (!byMonth.has(lbl)) { byMonth.set(lbl, []); monthOrder.push(lbl) }
+                                        byMonth.get(lbl)!.push(r)
+                                    }
+                                    return monthOrder.map(lbl => {
+                                        const monthRows = byMonth.get(lbl)!
+                                        const fleetGroups = groupByFleet
+                                            ? (() => {
+                                                const map = new Map<string, any[]>()
+                                                for (const r of monthRows) {
+                                                    const k = r.fleetName || '— Unassigned —'
+                                                    if (!map.has(k)) map.set(k, [])
+                                                    map.get(k)!.push(r)
+                                                }
+                                                return Array.from(map.entries()).sort((a, b) => {
+                                                    if (a[0] === '— Unassigned —') return 1
+                                                    if (b[0] === '— Unassigned —') return -1
+                                                    return a[0].localeCompare(b[0])
+                                                })
+                                            })()
+                                            : null
+                                        return (
+                                            <React.Fragment key={lbl}>
+                                                <tr>
+                                                    <td colSpan={11} style={{
+                                                        padding: '10px 16px',
+                                                        borderBottom: '1px solid var(--table-border)',
+                                                        borderTop: '2px solid var(--accent-primary)',
+                                                        fontWeight: '800',
+                                                        fontSize: '0.85rem',
+                                                        color: 'var(--text-primary)',
+                                                        position: 'sticky' as const,
+                                                        top: '49px',
+                                                        zIndex: 1,
+                                                        background: isLight ? '#eef0f3' : '#181b24',
+                                                        letterSpacing: '0.02em'
+                                                    }}>
+                                                        {lbl}
+                                                        <span style={{ marginLeft: '10px', fontWeight: 400, color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                                                            {monthRows.length} {monthRows.length === 1 ? 'policy' : 'policies'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {fleetGroups ? fleetGroups.map(([fleetName, rows]) => (
+                                                    <React.Fragment key={fleetName}>
+                                                        <tr>
+                                                            <td colSpan={11} style={{
+                                                                padding: '6px 16px 6px 28px',
+                                                                borderBottom: '1px solid var(--table-border)',
+                                                                fontWeight: '700', fontSize: '0.75rem',
+                                                                color: 'var(--accent-primary)', textTransform: 'uppercase' as const, letterSpacing: '0.5px',
+                                                                background: isLight ? '#f4f6fa' : '#1a1d28'
+                                                            }}>
+                                                                {fleetName} <span style={{ fontWeight: 400, color: 'var(--text-secondary)', textTransform: 'none', letterSpacing: 0 }}>({rows.length})</span>
+                                                            </td>
+                                                        </tr>
+                                                        {rows.map((r: any, idx: number) => renderRenewalRow(r, idx))}
+                                                    </React.Fragment>
+                                                )) : monthRows.map((r: any, idx: number) => renderRenewalRow(r, idx))}
+                                            </React.Fragment>
+                                        )
+                                    })
+                                })()
                             ) : groupedRenewals ? (
                                 groupedRenewals.map(([fleetName, rows]) => (
                                     <React.Fragment key={fleetName}>
