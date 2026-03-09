@@ -411,14 +411,47 @@ Vessel compliance PDF (`src/renderer/src/services/ReportServiceV2.ts`), exported
 
 ### Quotations
 
-Quotation management system:
+Quotation management system for P&I insurance:
 
 - **QuotationManager** (`src/renderer/src/components/QuotationManager.tsx`): Main quotation list and management
-- **QuotationEditor** (`src/renderer/src/components/QuotationEditor.tsx`): Create/edit quotation details
+- **QuotationEditor** (`src/renderer/src/components/QuotationEditor.tsx`): Create/edit quotation details with tabbed sections (Conditions, Warranties, Deductibles, Exclusions, etc.)
 - **QuotationList** (`src/renderer/src/components/QuotationList.tsx`): Quotation listing view
-- **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Quotation configuration
+- **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Quotation configuration with tabs: Clauses, Warranties, Deductibles, Exclusions, Sub-Limits, Addl. Clauses, Trading Countries, Trading Warranty, Sanctions Versions, Standard Texts, Instalment Defaults, Logo
 - **RichTextEditor** (`src/renderer/src/components/RichTextEditor.tsx`): Rich text editing for quotation content
 - **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export
+
+### Quotation Warranties System
+
+Tag-based warranty categorization with sets, custom warranties, and bulk management:
+
+- **Warranty Tags** (`pi_warranty_tags`): Admin-created category labels (e.g. "Cargo", "Navigation"). Managed in QuotationSettings Warranties tab.
+- **Warranty Sets** (`pi_warranty_sets`, `pi_warranty_set_items`): Named groups of warranties (e.g. "Default", "Cargo Warranties") with optional `default_selected` flag. Default sets auto-apply to new quotations on first load via `useRef` guard (`defaultsApplied`).
+- **Cargo Tag Auto-Linking**: In QuotationEditor, a tag named "Cargo" (case-insensitive) automatically includes warranties with `isCargoRelated = true` in its tab, even if they don't have the tag explicitly assigned via `tagIds`. The "Other" (untagged) tab excludes these to avoid duplication.
+- **Bulk Tag Assignment**: QuotationSettings has a "Bulk Tag" mode — checkboxes on each warranty row, Select All/Deselect All, toolbar with tag assign/remove chips, + Cargo/- Cargo, + Default/- Default bulk actions.
+- **Custom Warranties** (`quotation_custom_warranties`): Per-quotation ad-hoc warranties added inline in the selected list. Support add, edit, delete, reorder, and bulk import (paste with bullet extraction).
+- **Custom Warranty Input**: Auto-growing textarea (`resize: none`, dynamic height via `scrollHeight` on change, max 200px).
+- **Import Modal**: Bulk paste warranties with bullet/dash/number stripping, parse preview, then confirm to add as custom warranties.
+- **Selected Warranties Order**: `selectedWarrantyIds` array preserves selection order; reorderable via up/down arrows in the selected list.
+
+### Quotation Standard Texts
+
+Section text templates stored in `pi_section_texts` (global defaults) with per-quotation overrides in `quotations.section_texts_override` (MEDIUMTEXT JSON):
+
+- **`PISectionTexts` interface** (`src/shared/types.ts`): All optional string fields for each section
+- **`DEFAULT_SECTION_TEXTS`** (`QuotationSettings.tsx`): Hardcoded fallback defaults
+- **`SECTION_TEXT_FIELDS`** (`QuotationSettings.tsx`): Defines which fields appear in the Standard Texts settings tab with labels, sections, and row counts
+- **Per-quotation override**: `getEffectiveText(key)` checks `quotation.sectionTextsOverride?.[key]` → global texts → `DEFAULT_SECTION_TEXTS[key]`
+- **Warranty texts order in export**: warranties list → `warrantiesAdditionalText` → `warrantiesBreach` (warrantiesNote removed from settings UI)
+- **CRITICAL — double stringify bug**: When passing `sectionTextsOverride` to `updateField()`, pass the **object** directly, NOT `JSON.stringify(object)`. The adapter's `updateQuotation` already calls `JSON.stringify()` on the value. Double-stringifying causes exponential growth and "Data too long" errors.
+- **Column type**: `section_texts_override` must be `MEDIUMTEXT` (16MB), not `TEXT` (64KB). Migration always runs `MODIFY COLUMN` to ensure this.
+
+### Quotation Collation Workaround
+
+MariaDB collation mismatch (`utf8mb4_uca1400_ai_ci` vs `utf8mb4_unicode_ci`) causes FK constraint errors (errno 150) on quotation-related tables:
+
+- **Affected tables**: `pi_warranty_set_items`, `quotation_custom_warranties`
+- **Defense layers**: (1) `schema.sql` execution wrapped with `SET FOREIGN_KEY_CHECKS=0/1`, (2) migration CREATE TABLE blocks wrapped, (3) CRUD methods (`addPIWarrantySet`, `updatePIWarrantySet`, `addQuotationCustomWarranty`) wrapped with FK_CHECKS=0/1
+- **`safeHandle` error pattern**: IPC handlers using `safeHandle` return `{ error: true, message }` on failure instead of throwing. Components must guard with `Array.isArray()` checks on all IPC results used in setState, and check `result.error` on single-object returns.
 
 ### Vessel Detail Navigation
 
@@ -525,6 +558,12 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - `compliance_check_results` - Individual sanctions matches pending review
 - `vessel_name_history`, `vessel_audit_log` - Vessel change tracking
 - `war_breach_records` - Saved War Breach Calculator results
-- `quotations` - Insurance quotation records
+- `quotations` - Insurance quotation records (section_texts_override is MEDIUMTEXT)
+- `pi_warranties`, `pi_warranty_tags`, `pi_warranty_tag_map` - P&I warranty definitions with tag categorization
+- `pi_warranty_sets`, `pi_warranty_set_items` - Named warranty groups with default_selected flag
+- `quotation_warranties` - Per-quotation warranty selections with order_index
+- `quotation_custom_warranties` - Per-quotation ad-hoc custom warranties
+- `pi_clauses`, `pi_clause_sets`, `pi_deductibles`, `pi_exclusions` - Other quotation config tables
+- `pi_section_texts` - Global default section text templates
 - `renewal_status_types` - Custom renewal status labels for policies
 - `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, etc.)
