@@ -226,6 +226,11 @@ const api = {
   piDeleteWarranty: (id: string) => ipcRenderer.invoke('pi:deleteWarranty', id),
   piReorderWarranties: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderWarranties', orderedIds),
 
+  piGetWarrantySets: () => ipcRenderer.invoke('pi:getWarrantySets'),
+  piAddWarrantySet: (name: string, warrantyIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:addWarrantySet', name, warrantyIds, defaultSelected),
+  piUpdateWarrantySet: (id: string, name: string, warrantyIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:updateWarrantySet', id, name, warrantyIds, defaultSelected),
+  piDeleteWarrantySet: (id: string) => ipcRenderer.invoke('pi:deleteWarrantySet', id),
+
   piGetDeductibles: () => ipcRenderer.invoke('pi:getDeductibles'),
   piAddDeductible: (ded: any) => ipcRenderer.invoke('pi:addDeductible', ded),
   piUpdateDeductible: (id: string, updates: any) => ipcRenderer.invoke('pi:updateDeductible', id, updates),
@@ -251,10 +256,14 @@ const api = {
   piReorderSubLimitTemplates: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderSubLimitTemplates', orderedIds),
 
   piGetAdditionalClauses: () => ipcRenderer.invoke('pi:getAdditionalClauses'),
-  piAddAdditionalClause: (text: string) => ipcRenderer.invoke('pi:addAdditionalClause', text),
-  piUpdateAdditionalClause: (id: string, text: string) => ipcRenderer.invoke('pi:updateAdditionalClause', id, text),
+  piAddAdditionalClause: (code: string | null, text: string) => ipcRenderer.invoke('pi:addAdditionalClause', code, text),
+  piUpdateAdditionalClause: (id: string, code: string | null, text: string) => ipcRenderer.invoke('pi:updateAdditionalClause', id, code, text),
   piDeleteAdditionalClause: (id: string) => ipcRenderer.invoke('pi:deleteAdditionalClause', id),
   piReorderAdditionalClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderAdditionalClauses', orderedIds),
+  piGetAdditionalClauseSets: () => ipcRenderer.invoke('pi:getAdditionalClauseSets'),
+  piAddAdditionalClauseSet: (name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:addAdditionalClauseSet', name, clauseIds),
+  piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:updateAdditionalClauseSet', id, name, clauseIds),
+  piDeleteAdditionalClauseSet: (id: string) => ipcRenderer.invoke('pi:deleteAdditionalClauseSet', id),
 
   piGetTradingExcludedCountries: () => ipcRenderer.invoke('pi:getTradingExcludedCountries'),
   piAddTradingExcludedCountry: (country: any) => ipcRenderer.invoke('pi:addTradingExcludedCountry', country),
@@ -360,6 +369,12 @@ const api = {
   deleteQuotationAssured: (id: string) => ipcRenderer.invoke('db:deleteQuotationAssured', id),
   reorderQuotationAssureds: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationAssureds', ids),
 
+  getQuotationVessels: (qId: string) => ipcRenderer.invoke('db:getQuotationVessels', qId),
+  addQuotationVessel: (data: any) => ipcRenderer.invoke('db:addQuotationVessel', data),
+  updateQuotationVessel: (id: string, data: any) => ipcRenderer.invoke('db:updateQuotationVessel', id, data),
+  deleteQuotationVessel: (id: string) => ipcRenderer.invoke('db:deleteQuotationVessel', id),
+  reorderQuotationVessels: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationVessels', ids),
+
   getQuotationNewVessel: (qId: string) => ipcRenderer.invoke('db:getQuotationNewVessel', qId),
   upsertQuotationNewVessel: (qId: string, data: any) => ipcRenderer.invoke('db:upsertQuotationNewVessel', qId, data),
   deleteQuotationNewVessel: (qId: string) => ipcRenderer.invoke('db:deleteQuotationNewVessel', qId),
@@ -380,6 +395,11 @@ const api = {
 
   getQuotationWarranties: (qId: string) => ipcRenderer.invoke('db:getQuotationWarranties', qId),
   setQuotationWarranties: (qId: string, ids: string[]) => ipcRenderer.invoke('db:setQuotationWarranties', qId, ids),
+  getQuotationCustomWarranties: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomWarranties', qId),
+  addQuotationCustomWarranty: (data: { quotationId: string; text: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomWarranty', data),
+  updateQuotationCustomWarranty: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomWarranty', id, updates),
+  deleteQuotationCustomWarranty: (id: string) => ipcRenderer.invoke('db:deleteQuotationCustomWarranty', id),
+  reorderQuotationCustomWarranties: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationCustomWarranties', ids),
 
   getQuotationDeductibles: (qId: string) => ipcRenderer.invoke('db:getQuotationDeductibles', qId),
   addQuotationDeductible: (data: any) => ipcRenderer.invoke('db:addQuotationDeductible', data),

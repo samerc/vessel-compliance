@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Image, Calendar } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, PISectionTexts, PISanctionsVersion, InstalmentDefaults } from '../../../shared/types'
+import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Image, Calendar, Download } from 'lucide-react'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, PISectionTexts, PISanctionsVersion, InstalmentDefaults } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
@@ -8,7 +8,7 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'tradingCountries' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'logo'
+type SettingsTab = 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'tradingCountries' | 'tradingWarranty' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'logo'
 
 export default function QuotationSettings() {
     const [activeTab, setActiveTab] = useState<SettingsTab>('clauses')
@@ -24,6 +24,7 @@ export default function QuotationSettings() {
         { id: 'subLimits', label: 'Sub-Limits', icon: <FileText size={15} /> },
         { id: 'additionalClauses', label: 'Addl. Clauses', icon: <FileText size={15} /> },
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
+        { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
         { id: 'sanctionsVersions', label: 'Sanctions Versions', icon: <Shield size={15} /> },
         { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
@@ -64,6 +65,7 @@ export default function QuotationSettings() {
             {activeTab === 'subLimits' && <SubLimitsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'additionalClauses' && <AdditionalClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'tradingCountries' && <TradingCountriesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'tradingWarranty' && <TradingWarrantyTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'sanctionsVersions' && <SanctionsVersionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
@@ -299,37 +301,56 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
 
 // ==================== Warranties Tab ====================
 
-function WarrantiesTab({ showSuccess, isLight }: TabProps) {
+function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     const [warranties, setWarranties] = useState<PIWarranty[]>([])
     const [tags, setTags] = useState<PIWarrantyTag[]>([])
+    const [warrantySets, setWarrantySets] = useState<PIWarrantySet[]>([])
     const [newText, setNewText] = useState('')
     const [newDefaultSelected, setNewDefaultSelected] = useState(false)
+    const [newCargoRelated, setNewCargoRelated] = useState(false)
     const [newTagIds, setNewTagIds] = useState<string[]>([])
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDefaultSelected, setEditDefaultSelected] = useState(false)
+    const [editCargoRelated, setEditCargoRelated] = useState(false)
     const [editTagIds, setEditTagIds] = useState<string[]>([])
     // Tag management
     const [newTagName, setNewTagName] = useState('')
     const [editingTagId, setEditingTagId] = useState<string | null>(null)
     const [editTagName, setEditTagName] = useState('')
+    // Set management
+    const [showSetForm, setShowSetForm] = useState(false)
+    const [setName, setSetName] = useState('')
+    const [setWarrantyIds, setSetWarrantyIds] = useState<Set<string>>(new Set())
+    const [editingSetId, setEditingSetId] = useState<string | null>(null)
+    const [setDefaultSelected, setSetDefaultSelected] = useState(false)
+    // Import modal
+    const [showImport, setShowImport] = useState(false)
+    const [importText, setImportText] = useState('')
+    // Bulk tag assignment
+    const [bulkMode, setBulkMode] = useState(false)
+    const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
-        setWarranties(await window.api.piGetWarranties())
-        setTags(await window.api.piGetWarrantyTags())
+        const [w, t, s] = await Promise.all([
+            window.api.piGetWarranties(),
+            window.api.piGetWarrantyTags(),
+            window.api.piGetWarrantySets()
+        ])
+        setWarranties(Array.isArray(w) ? w : []); setTags(Array.isArray(t) ? t : []); setWarrantySets(Array.isArray(s) ? s : [])
     }
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newText.trim()) return
-        await window.api.piAddWarranty({ text: newText, isCargoRelated: false, defaultSelected: newDefaultSelected, tagIds: newTagIds, order: 0 })
-        setNewText(''); setNewDefaultSelected(false); setNewTagIds([])
+        await window.api.piAddWarranty({ text: newText, isCargoRelated: newCargoRelated, defaultSelected: newDefaultSelected, tagIds: newTagIds, order: 0 })
+        setNewText(''); setNewDefaultSelected(false); setNewCargoRelated(false); setNewTagIds([])
         showSuccess('Warranty added'); loadData()
     }
 
     const saveEdit = async (id: string) => {
-        await window.api.piUpdateWarranty(id, { text: editText, defaultSelected: editDefaultSelected, tagIds: editTagIds })
+        await window.api.piUpdateWarranty(id, { text: editText, isCargoRelated: editCargoRelated, defaultSelected: editDefaultSelected, tagIds: editTagIds })
         setEditingId(null); showSuccess('Warranty updated'); loadData()
     }
 
@@ -371,6 +392,73 @@ function WarrantiesTab({ showSuccess, isLight }: TabProps) {
         )
     }
 
+    // Warranty set handlers
+    const handleSaveSet = async () => {
+        if (!setName.trim() || setWarrantyIds.size === 0) return
+        try {
+            if (editingSetId) {
+                await window.api.piUpdateWarrantySet(editingSetId, setName, Array.from(setWarrantyIds), setDefaultSelected)
+                showSuccess('Warranty set updated')
+            } else {
+                await window.api.piAddWarrantySet(setName, Array.from(setWarrantyIds), setDefaultSelected)
+                showSuccess('Warranty set created')
+            }
+            setShowSetForm(false); setSetName(''); setSetWarrantyIds(new Set()); setEditingSetId(null); setSetDefaultSelected(false)
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to save set') }
+    }
+
+    // Import handler
+    const handleImport = async () => {
+        const lines = importText.split('\n')
+            .map(l => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219]+/, '').trim())
+            .filter(l => l.length > 0)
+        if (lines.length === 0) return
+        for (const line of lines) {
+            await window.api.piAddWarranty({ text: line, isCargoRelated: false, defaultSelected: false, tagIds: [], order: 0 })
+        }
+        showSuccess(`Imported ${lines.length} warranties`)
+        setImportText(''); setShowImport(false); loadData()
+    }
+
+    const toggleBulkSelect = (id: string) => {
+        const n = new Set(bulkSelected)
+        n.has(id) ? n.delete(id) : n.add(id)
+        setBulkSelected(n)
+    }
+    const bulkSelectAll = () => setBulkSelected(new Set(warranties.map(w => w.id)))
+    const bulkDeselectAll = () => setBulkSelected(new Set())
+    const bulkAssignTag = async (tagId: string) => {
+        const toUpdate = warranties.filter(w => bulkSelected.has(w.id) && !(w.tagIds || []).includes(tagId))
+        for (const w of toUpdate) {
+            await window.api.piUpdateWarranty(w.id, { text: w.text, isCargoRelated: w.isCargoRelated, defaultSelected: w.defaultSelected, tagIds: [...(w.tagIds || []), tagId] })
+        }
+        if (toUpdate.length > 0) { showSuccess(`Tag assigned to ${toUpdate.length} warranties`); loadData() }
+    }
+    const bulkRemoveTag = async (tagId: string) => {
+        const toUpdate = warranties.filter(w => bulkSelected.has(w.id) && (w.tagIds || []).includes(tagId))
+        for (const w of toUpdate) {
+            await window.api.piUpdateWarranty(w.id, { text: w.text, isCargoRelated: w.isCargoRelated, defaultSelected: w.defaultSelected, tagIds: (w.tagIds || []).filter(t => t !== tagId) })
+        }
+        if (toUpdate.length > 0) { showSuccess(`Tag removed from ${toUpdate.length} warranties`); loadData() }
+    }
+    const bulkToggleCargo = async (value: boolean) => {
+        const toUpdate = warranties.filter(w => bulkSelected.has(w.id) && w.isCargoRelated !== value)
+        for (const w of toUpdate) {
+            await window.api.piUpdateWarranty(w.id, { text: w.text, isCargoRelated: value, defaultSelected: w.defaultSelected, tagIds: w.tagIds || [] })
+        }
+        if (toUpdate.length > 0) { showSuccess(`${toUpdate.length} warranties updated`); loadData() }
+    }
+    const bulkToggleDefault = async (value: boolean) => {
+        const toUpdate = warranties.filter(w => bulkSelected.has(w.id) && w.defaultSelected !== value)
+        for (const w of toUpdate) {
+            await window.api.piUpdateWarranty(w.id, { text: w.text, isCargoRelated: w.isCargoRelated, defaultSelected: value, tagIds: w.tagIds || [] })
+        }
+        if (toUpdate.length > 0) { showSuccess(`${toUpdate.length} warranties updated`); loadData() }
+    }
+
+    const ckStyle = { width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Tag Manager */}
@@ -389,26 +477,104 @@ function WarrantiesTab({ showSuccess, isLight }: TabProps) {
                                 <>
                                     <span>{tag.name}</span>
                                     <button onClick={() => { setEditingTagId(tag.id); setEditTagName(tag.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><Pencil size={10} /></button>
-                                    <button onClick={async () => { await window.api.piDeleteWarrantyTag(tag.id); showSuccess('Tag deleted'); loadData() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isLight ? '#c00' : '#ff4d4d', padding: '0' }}><X size={10} /></button>
+                                    <button onClick={async () => { await window.api.piDeleteWarrantyTag(tag.id); showSuccess('Tag deleted'); loadData() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={10} /></button>
                                 </>
                             )}
                         </div>
                     ))}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <input value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="New tag..." style={{ width: '100px', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} onKeyDown={e => e.key === 'Enter' && handleAddTag()} />
+                        <input value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="New tag..." style={{ width: '100px', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '12px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} onKeyDown={e => e.key === 'Enter' && handleAddTag()} />
                         <button onClick={handleAddTag} className="btn-primary" style={{ padding: '3px 8px', fontSize: '0.75rem', borderRadius: '10px' }}><Plus size={12} /></button>
                     </div>
                 </div>
             </section>
 
+            {/* Warranty Sets */}
+            <section className="glass-card" style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Shield size={14} /> Warranty Sets</h4>
+                    {!showSetForm && <button onClick={() => { setShowSetForm(true); setEditingSetId(null); setSetName(''); setSetWarrantyIds(new Set()); setSetDefaultSelected(false) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Plus size={14} /> New Set</button>}
+                </div>
+                {showSetForm && (
+                    <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--accent-primary)', marginBottom: '10px' }}>
+                        <input value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name (e.g. Cargo Warranties)..." style={{ width: '100%', marginBottom: '8px', padding: '6px 10px' }} />
+                        <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '8px' }}>
+                            {warranties.map(w => (
+                                <label key={w.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '4px 0', fontSize: '0.82rem', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={setWarrantyIds.has(w.id)} onChange={() => { const n = new Set(setWarrantyIds); n.has(w.id) ? n.delete(w.id) : n.add(w.id); setSetWarrantyIds(n) }} style={ckStyle} />
+                                    <span style={{ whiteSpace: 'pre-wrap' }}>{w.text}</span>
+                                </label>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer', marginRight: 'auto' }}>
+                                <input type="checkbox" checked={setDefaultSelected} onChange={e => setSetDefaultSelected(e.target.checked)} style={ckStyle} /> Selected by default in new quotations
+                            </label>
+                            <button onClick={() => { setShowSetForm(false); setEditingSetId(null) }} className="btn-secondary" style={{ fontSize: '0.78rem' }}>Cancel</button>
+                            <button onClick={handleSaveSet} className="btn-primary" style={{ fontSize: '0.78rem' }}>{editingSetId ? 'Update' : 'Create'} Set</button>
+                        </div>
+                    </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {warrantySets.map(ws => (
+                        <div key={ws.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', fontSize: '0.82rem' }}>
+                            <span>{ws.name}</span>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>({(ws.warrantyIds || []).length})</span>
+                            {ws.defaultSelected && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864' }}>Default</span>}
+                            <button onClick={() => { setShowSetForm(true); setEditingSetId(ws.id); setSetName(ws.name); setSetWarrantyIds(new Set(ws.warrantyIds || [])); setSetDefaultSelected(!!ws.defaultSelected) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><Pencil size={12} /></button>
+                            <button onClick={async () => { await window.api.piDeleteWarrantySet(ws.id); showSuccess('Set deleted'); loadData() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><Trash2 size={12} /></button>
+                        </div>
+                    ))}
+                    {warrantySets.length === 0 && !showSetForm && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No sets created yet.</span>}
+                </div>
+            </section>
+
             {/* Warranties List */}
             <section className="glass-card" style={{ padding: '20px' }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>P&I Warranties</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <h3 style={{ fontSize: '1rem' }}>P&I Warranties</h3>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => { setBulkMode(!bulkMode); setBulkSelected(new Set()) }} className={bulkMode ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Tag size={14} /> Bulk Tag</button>
+                        <button onClick={() => setShowImport(true)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Download size={14} /> Import</button>
+                    </div>
+                </div>
+                {bulkMode && (
+                    <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid var(--accent-primary)', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{bulkSelected.size} selected</span>
+                        <button onClick={bulkSelectAll} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>Select All</button>
+                        <button onClick={bulkDeselectAll} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>Deselect All</button>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 4px' }}>|</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Assign tag:</span>
+                        {tags.map(t => (
+                            <span key={t.id} onClick={() => bulkSelected.size > 0 && bulkAssignTag(t.id)} style={{
+                                fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
+                                background: 'rgba(0, 210, 255, 0.15)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
+                                opacity: bulkSelected.size > 0 ? 1 : 0.4
+                            }}>+ {t.name}</span>
+                        ))}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Remove tag:</span>
+                        {tags.map(t => (
+                            <span key={t.id} onClick={() => bulkSelected.size > 0 && bulkRemoveTag(t.id)} style={{
+                                fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
+                                background: 'rgba(255, 80, 80, 0.1)', border: '1px solid var(--danger)', color: 'var(--danger)',
+                                opacity: bulkSelected.size > 0 ? 1 : 0.4
+                            }}>- {t.name}</span>
+                        ))}
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 4px' }}>|</span>
+                        <span onClick={() => bulkSelected.size > 0 && bulkToggleCargo(true)} style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', cursor: bulkSelected.size > 0 ? 'pointer' : 'default', background: 'rgba(255, 180, 0, 0.12)', border: '1px solid #ffb400', color: '#ffb400', opacity: bulkSelected.size > 0 ? 1 : 0.4 }}>+ Cargo</span>
+                        <span onClick={() => bulkSelected.size > 0 && bulkToggleCargo(false)} style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', cursor: bulkSelected.size > 0 ? 'pointer' : 'default', background: 'rgba(255, 80, 80, 0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', opacity: bulkSelected.size > 0 ? 1 : 0.4 }}>- Cargo</span>
+                        <span onClick={() => bulkSelected.size > 0 && bulkToggleDefault(true)} style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', cursor: bulkSelected.size > 0 ? 'pointer' : 'default', background: 'rgba(0, 200, 100, 0.12)', border: '1px solid #00c864', color: '#00c864', opacity: bulkSelected.size > 0 ? 1 : 0.4 }}>+ Default</span>
+                        <span onClick={() => bulkSelected.size > 0 && bulkToggleDefault(false)} style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', cursor: bulkSelected.size > 0 ? 'pointer' : 'default', background: 'rgba(255, 80, 80, 0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', opacity: bulkSelected.size > 0 ? 1 : 0.4 }}>- Default</span>
+                    </div>
+                )}
                 <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                     <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Warranty text..." style={{ flex: 1, minHeight: '60px', resize: 'vertical' }} required />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'flex-end' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                            <input type="checkbox" checked={newDefaultSelected} onChange={e => setNewDefaultSelected(e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} /> Default selected
+                            <input type="checkbox" checked={newDefaultSelected} onChange={e => setNewDefaultSelected(e.target.checked)} style={ckStyle} /> Default selected
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={newCargoRelated} onChange={e => setNewCargoRelated(e.target.checked)} style={ckStyle} /> Cargo related
                         </label>
                         {tags.length > 0 && (
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -420,13 +586,19 @@ function WarrantiesTab({ showSuccess, isLight }: TabProps) {
                 </form>
 
                 {warranties.map((w, i) => (
-                    <div key={w.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <div key={w.id} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(w.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(w.id) ? 'rgba(0, 210, 255, 0.04)' : 'transparent' }}>
+                        {bulkMode && (
+                            <input type="checkbox" checked={bulkSelected.has(w.id)} onChange={() => toggleBulkSelect(w.id)} style={{ ...ckStyle, marginTop: '3px', flexShrink: 0 }} />
+                        )}
                         {editingId === w.id ? (
                             <div style={{ flex: 1 }}>
                                 <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ width: '100%', minHeight: '60px', resize: 'vertical', marginBottom: '8px' }} />
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer' }}>
-                                        <input type="checkbox" checked={editDefaultSelected} onChange={e => setEditDefaultSelected(e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} /> Default selected
+                                        <input type="checkbox" checked={editDefaultSelected} onChange={e => setEditDefaultSelected(e.target.checked)} style={ckStyle} /> Default
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer' }}>
+                                        <input type="checkbox" checked={editCargoRelated} onChange={e => setEditCargoRelated(e.target.checked)} style={ckStyle} /> Cargo
                                     </label>
                                     {tags.length > 0 && tags.map(t => tagChip(t.id, editTagIds.includes(t.id), () => toggleTagId(t.id, editTagIds, setEditTagIds)))}
                                     <div style={{ flex: 1 }} />
@@ -440,6 +612,7 @@ function WarrantiesTab({ showSuccess, isLight }: TabProps) {
                                     <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{w.text}</div>
                                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                                         {w.defaultSelected && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864' }}>Default</span>}
+                                        {w.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
                                         {(w.tagIds || []).map(tid => {
                                             const tag = tags.find(t => t.id === tid)
                                             return tag ? <span key={tid} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
@@ -449,14 +622,42 @@ function WarrantiesTab({ showSuccess, isLight }: TabProps) {
                                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
                                     <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                     <button onClick={() => handleMove(i, 'down')} disabled={i === warranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === warranties.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                    <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditTagIds(w.tagIds || []) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                    <button onClick={async () => { await window.api.piDeleteWarranty(w.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+                                    <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={async () => { await window.api.piDeleteWarranty(w.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
                             </>
                         )}
                     </div>
                 ))}
             </section>
+
+            {/* Import Modal */}
+            {showImport && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', width: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h3 style={{ fontSize: '1rem' }}>Import Warranties</h3>
+                            <button onClick={() => setShowImport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Paste warranties below (one per line). Bullet points, dashes, and leading symbols will be stripped automatically.</p>
+                        <textarea
+                            value={importText}
+                            onChange={e => setImportText(e.target.value)}
+                            placeholder={'- First warranty text\n- Second warranty text\n• Third warranty text'}
+                            style={{ flex: 1, minHeight: '300px', resize: 'vertical', marginBottom: '12px', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                {importText.split('\n').map(l => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219]+/, '').trim()).filter(l => l.length > 0).length} warranties detected
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => setShowImport(false)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                                <button onClick={handleImport} className="btn-primary" style={{ fontSize: '0.82rem' }}>Import</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -628,14 +829,12 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
 
 // ==================== Sub-Limits Tab ====================
 
-function SubLimitsTab({ showSuccess, isLight }: TabProps) {
+function SubLimitsTab({ showSuccess }: TabProps) {
     const [templates, setTemplates] = useState<PISubLimitTemplate[]>([])
     const [newTemplate, setNewTemplate] = useState('')
-    const [newAmount, setNewAmount] = useState('')
     const [newCurrency, setNewCurrency] = useState('USD')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editTemplate, setEditTemplate] = useState('')
-    const [editAmount, setEditAmount] = useState('')
     const [editCurrency, setEditCurrency] = useState('USD')
 
     useEffect(() => { loadData() }, [])
@@ -644,8 +843,8 @@ function SubLimitsTab({ showSuccess, isLight }: TabProps) {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newTemplate.trim()) return
-        await window.api.piAddSubLimitTemplate({ textTemplate: newTemplate, defaultAmount: parseFloat(newAmount) || 0, defaultCurrency: newCurrency, order: 0 })
-        setNewTemplate(''); setNewAmount(''); setNewCurrency('USD')
+        await window.api.piAddSubLimitTemplate({ textTemplate: newTemplate, defaultAmount: 0, defaultCurrency: newCurrency, order: 0 })
+        setNewTemplate(''); setNewCurrency('USD')
         showSuccess('Sub-limit template added'); loadData()
     }
 
@@ -661,11 +860,10 @@ function SubLimitsTab({ showSuccess, isLight }: TabProps) {
     return (
         <section className="glass-card" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Sub-Limit Templates</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Use {'{amount}'} in the template text as a placeholder for the value.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Use {'{amount}'} and {'{currency}'} as placeholders. Amounts are set per-quotation.</p>
             <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-                <input type="text" value={newTemplate} onChange={e => setNewTemplate(e.target.value)} placeholder='e.g., Liability for crew sub-limited to maximum {amount} any one accident...' style={{ flex: 1 }} required />
-                <input type="text" value={newCurrency} onChange={e => setNewCurrency(e.target.value)} style={{ width: '70px' }} />
-                <input type="number" value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="Default" style={{ width: '120px' }} />
+                <input type="text" value={newTemplate} onChange={e => setNewTemplate(e.target.value)} placeholder='e.g., Liability for crew sub-limited to {currency} {amount} any one accident...' style={{ flex: 1 }} required />
+                <input type="text" value={newCurrency} onChange={e => setNewCurrency(e.target.value)} placeholder="CCY" style={{ width: '70px' }} />
                 <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Add</button>
             </form>
 
@@ -674,21 +872,21 @@ function SubLimitsTab({ showSuccess, isLight }: TabProps) {
                     {editingId === t.id ? (
                         <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <input type="text" value={editTemplate} onChange={e => setEditTemplate(e.target.value)} style={{ flex: 1 }} />
-                            <input type="text" value={editCurrency} onChange={e => setEditCurrency(e.target.value)} style={{ width: '70px' }} />
-                            <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} style={{ width: '100px' }} />
-                            <button onClick={async () => { await window.api.piUpdateSubLimitTemplate(t.id, { textTemplate: editTemplate, defaultAmount: parseFloat(editAmount) || 0, defaultCurrency: editCurrency }); setEditingId(null); showSuccess('Updated'); loadData() }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
+                            <input type="text" value={editCurrency} onChange={e => setEditCurrency(e.target.value)} placeholder="CCY" style={{ width: '70px' }} />
+                            <button onClick={async () => { await window.api.piUpdateSubLimitTemplate(t.id, { textTemplate: editTemplate, defaultCurrency: editCurrency }); setEditingId(null); showSuccess('Updated'); loadData() }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
                             <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Cancel</button>
                         </div>
                     ) : (
                         <>
                             <div style={{ flex: 1, fontSize: '0.85rem' }}>
-                                {t.textTemplate.replace('{amount}', `${t.defaultCurrency} ${t.defaultAmount.toLocaleString()}`)}
+                                <span style={{ fontFamily: 'monospace', marginRight: '8px', fontSize: '0.78rem', color: 'var(--accent-primary)' }}>{t.defaultCurrency}</span>
+                                {t.textTemplate}
                             </div>
                             <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
                                 <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                 <button onClick={() => handleMove(i, 'down')} disabled={i === templates.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === templates.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(t.id); setEditTemplate(t.textTemplate); setEditAmount(String(t.defaultAmount)); setEditCurrency(t.defaultCurrency) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={async () => { await window.api.piDeleteSubLimitTemplate(t.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+                                <button onClick={() => { setEditingId(t.id); setEditTemplate(t.textTemplate); setEditCurrency(t.defaultCurrency) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button onClick={async () => { await window.api.piDeleteSubLimitTemplate(t.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         </>
                     )}
@@ -698,22 +896,35 @@ function SubLimitsTab({ showSuccess, isLight }: TabProps) {
     )
 }
 
-// ==================== Additional Clauses Tab ====================
+// ==================== Additional Clauses Tab (includes Sets) ====================
 
-function AdditionalClausesTab({ showSuccess, isLight }: TabProps) {
+function AdditionalClausesTab({ showSuccess }: TabProps) {
     const [clauses, setClauses] = useState<PIAdditionalClause[]>([])
+    const [newCode, setNewCode] = useState('')
     const [newText, setNewText] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [editCode, setEditCode] = useState('')
     const [editText, setEditText] = useState('')
 
+    // Sets state
+    const [sets, setSets] = useState<PIAdditionalClauseSet[]>([])
+    const [newSetName, setNewSetName] = useState('')
+    const [editSetId, setEditSetId] = useState<string | null>(null)
+    const [editSetName, setEditSetName] = useState('')
+    const [editSetOrder, setEditSetOrder] = useState<string[]>([]) // ordered IDs of clauses in the set
+
     useEffect(() => { loadData() }, [])
-    const loadData = async () => { setClauses(await window.api.piGetAdditionalClauses()) }
+    const loadData = async () => {
+        const [c, s] = await Promise.all([window.api.piGetAdditionalClauses(), window.api.piGetAdditionalClauseSets()])
+        setClauses(c)
+        setSets(s)
+    }
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newText.trim()) return
-        await window.api.piAddAdditionalClause(newText)
-        setNewText(''); showSuccess('Additional clause added'); loadData()
+        await window.api.piAddAdditionalClause(newCode.trim(), newText.trim())
+        setNewCode(''); setNewText(''); showSuccess('Additional clause added'); loadData()
     }
 
     const handleMove = async (index: number, direction: 'up' | 'down') => {
@@ -725,37 +936,150 @@ function AdditionalClausesTab({ showSuccess, isLight }: TabProps) {
         await window.api.piReorderAdditionalClauses(newOrder.map(c => c.id))
     }
 
-    return (
-        <section className="glass-card" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clauses</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions).</p>
-            <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Clause text..." style={{ flex: 1, minHeight: '50px', resize: 'vertical' }} required />
-                <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-end' }}><Plus size={16} /> Add</button>
-            </form>
+    const startEditSet = (s: PIAdditionalClauseSet) => {
+        setEditSetId(s.id)
+        setEditSetName(s.name)
+        setEditSetOrder(s.clauseIds || [])
+    }
 
-            {clauses.map((c, i) => (
-                <div key={c.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    {editingId === c.id ? (
-                        <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                            <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minHeight: '50px', resize: 'vertical' }} />
-                            <button onClick={async () => { await window.api.piUpdateAdditionalClause(c.id, editText); setEditingId(null); showSuccess('Updated'); loadData() }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
-                            <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Cancel</button>
-                        </div>
-                    ) : (
-                        <>
-                            <div style={{ flex: 1, fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{c.text}</div>
-                            <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(c.id); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={async () => { await window.api.piDeleteAdditionalClause(c.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+    const toggleSetClause = (id: string) => {
+        setEditSetOrder(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    }
+
+    const moveSetClause = (index: number, direction: 'up' | 'down') => {
+        setEditSetOrder(prev => {
+            const next = [...prev]
+            const swapIndex = direction === 'up' ? index - 1 : index + 1
+            if (swapIndex < 0 || swapIndex >= next.length) return prev
+            ;[next[index], next[swapIndex]] = [next[swapIndex], next[index]]
+            return next
+        })
+    }
+
+    const saveSet = async () => {
+        if (!editSetId) return
+        await window.api.piUpdateAdditionalClauseSet(editSetId, editSetName.trim(), editSetOrder)
+        setEditSetId(null)
+        showSuccess('Set saved')
+        loadData()
+    }
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <section className="glass-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clauses</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions). Formatted as bullet points in the export.</p>
+                <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start' }}>
+                    <input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (e.g. JH2021-008)" style={{ width: '160px', flexShrink: 0 }} />
+                    <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Clause text..." style={{ flex: 1, minHeight: '50px', resize: 'vertical' }} required />
+                    <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-end' }}><Plus size={16} /> Add</button>
+                </form>
+
+                {clauses.map((c, i) => (
+                    <div key={c.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                        {editingId === c.id ? (
+                            <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                <input value={editCode} onChange={e => setEditCode(e.target.value)} placeholder="Code" style={{ width: '140px' }} />
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minWidth: '200px', minHeight: '50px', resize: 'vertical' }} />
+                                <button onClick={async () => { await window.api.piUpdateAdditionalClause(c.id, editCode.trim(), editText.trim()); setEditingId(null); showSuccess('Updated'); loadData() }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
+                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Cancel</button>
                             </div>
-                        </>
-                    )}
-                </div>
-            ))}
-        </section>
+                        ) : (
+                            <>
+                                <div style={{ flex: 1, fontSize: '0.85rem' }}>
+                                    {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, marginRight: '8px', color: 'var(--accent-primary)' }}>{c.code}</span>}
+                                    <span style={{ whiteSpace: 'pre-wrap' }}>{c.text}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
+                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                    <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                    <button onClick={() => { setEditingId(c.id); setEditCode(c.code || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={async () => { await window.api.piDeleteAdditionalClause(c.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                ))}
+            </section>
+
+            <section className="glass-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clause Sets</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Preset groups of additional clauses that can be applied in one click from the Conditions tab. Drag the order within each set to control how they appear in the export.</p>
+                <form onSubmit={async e => { e.preventDefault(); if (!newSetName.trim()) return; await window.api.piAddAdditionalClauseSet(newSetName.trim(), []); setNewSetName(''); showSuccess('Set created'); loadData() }} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <input value={newSetName} onChange={e => setNewSetName(e.target.value)} placeholder="Set name (e.g. Standard Fleet)" style={{ flex: 1, maxWidth: '300px' }} required />
+                    <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Create Set</button>
+                </form>
+
+                {sets.map(s => (
+                    <div key={s.id} style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '10px' }}>
+                        {editSetId === s.id ? (
+                            <div>
+                                <input value={editSetName} onChange={e => setEditSetName(e.target.value)} style={{ width: '100%', marginBottom: '12px' }} />
+
+                                {/* Selected clauses — sortable */}
+                                {editSetOrder.length > 0 && (
+                                    <div style={{ marginBottom: '10px' }}>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selected (in order)</div>
+                                        {editSetOrder.map((id, idx) => {
+                                            const c = clauses.find(x => x.id === id)
+                                            if (!c) return null
+                                            return (
+                                                <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 6px', borderRadius: '4px', background: 'rgba(0,210,255,0.07)', marginBottom: '3px' }}>
+                                                    <button onClick={() => moveSetClause(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={13} /></button>
+                                                    <button onClick={() => moveSetClause(idx, 'down')} disabled={idx === editSetOrder.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === editSetOrder.length - 1 ? 0.3 : 1 }}><ChevronDown size={13} /></button>
+                                                    {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.78rem', color: 'var(--accent-primary)', minWidth: '80px' }}>{c.code}</span>}
+                                                    <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-primary)' }}>{c.text.substring(0, 70)}{c.text.length > 70 ? '…' : ''}</span>
+                                                    <button onClick={() => toggleSetClause(id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><X size={13} /></button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Available clauses — not yet selected */}
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                                    {clauses.filter(c => !editSetOrder.includes(c.id)).map(c => (
+                                        <div key={c.id} onClick={() => toggleSetClause(c.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--table-border)' }}
+                                            onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.05)')}
+                                            onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
+                                            <Plus size={13} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--accent-primary)' }} />
+                                            {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, flexShrink: 0, color: 'var(--accent-primary)', minWidth: '80px' }}>{c.code}</span>}
+                                            <span style={{ color: 'var(--text-secondary)' }}>{c.text.substring(0, 80)}{c.text.length > 80 ? '…' : ''}</span>
+                                        </div>
+                                    ))}
+                                    {clauses.filter(c => !editSetOrder.includes(c.id)).length === 0 && (
+                                        <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.82rem', margin: 0 }}>All clauses selected.</p>
+                                    )}
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button onClick={saveSet} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save</button>
+                                    <button onClick={() => setEditSetId(null)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</div>
+                                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                        {(s.clauseIds?.length || 0)} clause{(s.clauseIds?.length || 0) !== 1 ? 's' : ''}
+                                        {s.clauseIds && s.clauseIds.length > 0 && (
+                                            <span style={{ marginLeft: '8px' }}>
+                                                {s.clauseIds.map(id => clauses.find(c => c.id === id)?.code).filter(Boolean).join(', ')}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <button onClick={() => startEditSet(s)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Pencil size={12} /> Edit</button>
+                                <button onClick={async () => { await window.api.piDeleteAdditionalClauseSet(s.id); showSuccess('Set deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                            </div>
+                        )}
+                    </div>
+                ))}
+                {sets.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No sets defined yet.</p>}
+            </section>
+        </div>
     )
 }
 
@@ -868,6 +1192,118 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
                 </section>
             </div>
         </div>
+    )
+}
+
+// ==================== Trading Warranty Tab ====================
+
+const TRADING_CONDITION_SUB_FIELDS: { key: keyof PISectionTexts; label: string }[] = [
+    { key: 'tradingConditionB', label: 'a) Sanctioned cargoes' },
+    { key: 'tradingConditionC', label: 'b) Sanctioned individuals / entities' },
+    { key: 'tradingConditionD', label: 'c) Compliance Screening Questionnaire' },
+    { key: 'tradingConditionE', label: 'd) Further information' },
+    { key: 'tradingConditionF', label: 'e) Insurer discretion' },
+    { key: 'tradingConditionG', label: 'f) Paramount clause' }
+]
+
+function TradingWarrantyTab({ showSuccess }: TabProps) {
+    const [texts, setTexts] = useState<PISectionTexts>({})
+    const [loaded, setLoaded] = useState(false)
+
+    useEffect(() => { loadData() }, [])
+
+    const loadData = async () => {
+        const saved = await window.api.piGetSectionTexts()
+        if (saved && Object.keys(saved).length > 0) {
+            setTexts(saved)
+        } else {
+            setTexts(DEFAULT_SECTION_TEXTS)
+        }
+        setLoaded(true)
+    }
+
+    const handleSave = async () => {
+        await window.api.piSetSectionTexts(texts)
+        showSuccess('Trading warranty texts saved')
+    }
+
+    const handleReset = () => {
+        setTexts(prev => {
+            const reset = { ...prev }
+            reset.tradingIsrael = DEFAULT_SECTION_TEXTS.tradingIsrael
+            reset.ddqCountriesIntro = DEFAULT_SECTION_TEXTS.ddqCountriesIntro
+            reset.tradingConditionA = DEFAULT_SECTION_TEXTS.tradingConditionA
+            for (const f of TRADING_CONDITION_SUB_FIELDS) {
+                ;(reset as any)[f.key] = (DEFAULT_SECTION_TEXTS as any)[f.key]
+            }
+            return reset
+        })
+    }
+
+    if (!loaded) return <div style={{ color: 'var(--text-secondary)', padding: '20px' }}>Loading...</div>
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Trading Warranty Texts</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Default texts for the Trading Warranty section of quotations.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={handleReset} className="btn-secondary" style={{ fontSize: '0.8rem' }}>Reset Defaults</button>
+                    <button onClick={handleSave} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}><Save size={14} /> Save All</button>
+                </div>
+            </div>
+
+            {/* 1) DDQ Countries Intro */}
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: '8px', borderBottom: '1px solid var(--table-border)', paddingBottom: '4px' }}>
+                1) DDQ Countries Intro
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Text shown with the DDQ country list ({'{ddq_countries}'} placeholder)</label>
+                <RichTextEditor
+                    value={texts.ddqCountriesIntro || ''}
+                    onChange={val => setTexts(prev => ({ ...prev, ddqCountriesIntro: val }))}
+                    minHeight={60}
+                />
+            </div>
+
+            {/* 2) Trading Conditions */}
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '16px', marginBottom: '8px', borderBottom: '1px solid var(--table-border)', paddingBottom: '4px' }}>
+                2) Trading Conditions
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Intro paragraph</label>
+                <RichTextEditor
+                    value={texts.tradingConditionA || ''}
+                    onChange={val => setTexts(prev => ({ ...prev, tradingConditionA: val }))}
+                    minHeight={60}
+                />
+            </div>
+            {TRADING_CONDITION_SUB_FIELDS.map(field => (
+                <div key={field.key} style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{field.label}</label>
+                    <RichTextEditor
+                        value={(texts as any)[field.key] || ''}
+                        onChange={val => setTexts(prev => ({ ...prev, [field.key]: val }))}
+                        minHeight={60}
+                    />
+                </div>
+            ))}
+
+            {/* Israel Warranty */}
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '16px', marginBottom: '8px', borderBottom: '1px solid var(--table-border)', paddingBottom: '4px' }}>
+                3) Israel Warranty
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Israel Exclusion Text</label>
+                <RichTextEditor
+                    value={texts.tradingIsrael || ''}
+                    onChange={val => setTexts(prev => ({ ...prev, tradingIsrael: val }))}
+                    minHeight={60}
+                />
+            </div>
+        </section>
     )
 }
 
@@ -985,19 +1421,13 @@ export const DEFAULT_SECTION_TEXTS: PISectionTexts = {
     limitOfLiabilityDefaultText: 'The limit of liability of the Insurer under this Policy shall not exceed {amount} {currency} any one vessel any one accident or occurrence and in the aggregate during the policy period, except where otherwise specifically provided.',
     conditionsIntro: 'Al-Bahriah Protection & Indemnity Wording 01.01.2025 covering the following Risks Insured:',
     tradingIntro: 'Subject to Paragraph 2 below, any trade of whatsoever nature with the following countries is excluded.',
-    tradingConditions: `Trade with the countries set out in paragraph 1 above is however permitted subject to and provided always that the following express conditions are fully complied with in every respect.
-
-No cargoes to be carried by the vessel are sanctioned cargoes, the insured to provide all such documentary evidence as we may reasonably require to evidence the same including but not limited to Mates' receipts, Bills of Lading etc
-
-No individual or entity listed by any of the US, UK or EU sanctions regimes in respect of the country in question is involved in any way with the vessel, intended trade or cargoes to be carried.
-
-The Insured is to provide a Compliance Screening Questionnaire to us not less than 3 working days in advance of the vessel's entry into the territorial waters of the sanctioned country.
-
-The Insured to provide such further information as we may reasonably require about the intended trade in or with the sanctioned country.
-
-The Insurer may decide in our sole and absolute discretion whether or not the Insurer is prepared to offer cover for the trade with the sanctioned country and, if so, on what terms and conditions.
-
-Cover under this Paragraph 2 to be expressly subject, in any event, to the Sanction Limitation and Exclusion clause contained elsewhere in the Policy, which shall remain paramount.`,
+    tradingConditionA: 'Trade with the countries set out in paragraph 1 above is however permitted subject to and provided always that the following express conditions are fully complied with in every respect.',
+    tradingConditionB: 'No cargoes to be carried by the vessel are sanctioned cargoes, the insured to provide all such documentary evidence as we may reasonably require to evidence the same including but not limited to Mates\' receipts, Bills of Lading etc',
+    tradingConditionC: 'No individual or entity listed by any of the US, UK or EU sanctions regimes in respect of the country in question is involved in any way with the vessel, intended trade or cargoes to be carried.',
+    tradingConditionD: 'The Insured is to provide a Compliance Screening Questionnaire to us not less than 3 working days in advance of the vessel\'s entry into the territorial waters of the sanctioned country.',
+    tradingConditionE: 'The Insured to provide such further information as we may reasonably require about the intended trade in or with the sanctioned country.',
+    tradingConditionF: 'The Insurer may decide in our sole and absolute discretion whether or not the Insurer is prepared to offer cover for the trade with the sanctioned country and, if so, on what terms and conditions.',
+    tradingConditionG: 'Cover under this Paragraph 2 to be expressly subject, in any event, to the Sanction Limitation and Exclusion clause contained elsewhere in the Policy, which shall remain paramount.',
     tradingIsrael: 'Warranted no Israeli trading, involvement, cargo, counterparts whatsoever. A breach of this warranty will automatically void the cover, and discharge Insurer\'s from any liability howsoever arising as from inception of the policy.',
     ddqCountriesIntro: 'Due Diligence Questionnaire required for trading with the following countries:',
     warrantiesBreach: `In the event of any breach of the above warranties the Insurer shall be discharged from all liability from the date of the breach whether or not the breach is material to or in any way connected with the risk or any loss or claim and whether or not the breach is remedied before loss but without prejudice to any liability incurred by the Insurer before that date.
@@ -1024,12 +1454,7 @@ const SECTION_TEXT_FIELDS: { key: keyof PISectionTexts; label: string; section: 
     { key: 'insuredFooter', label: 'Insured Footer', section: 'Insured', rows: 2 },
     { key: 'limitOfLiabilityDefaultText', label: 'Default Liability Text ({amount}, {currency} placeholders)', section: 'Limit of Liability', rows: 3 },
     { key: 'conditionsIntro', label: 'Conditions Intro', section: 'Conditions', rows: 2 },
-    { key: 'tradingIntro', label: 'Trading Intro', section: 'Trading Warranty', rows: 2 },
-    { key: 'tradingConditions', label: 'Trading Conditions (numbered paragraphs)', section: 'Trading Warranty', rows: 10 },
-    { key: 'tradingIsrael', label: 'Israel Warranty', section: 'Trading Warranty', rows: 3 },
-    { key: 'ddqCountriesIntro', label: 'DDQ Countries Intro', section: 'Trading Warranty', rows: 2 },
     { key: 'warrantiesBreach', label: 'Breach of Warranties', section: 'Warranties', rows: 8 },
-    { key: 'warrantiesNote', label: 'Warranties Note', section: 'Warranties', rows: 2 },
     { key: 'deductiblesAggregate', label: 'Aggregate Clause', section: 'Deductibles', rows: 2 },
     { key: 'deductiblesVDR', label: 'VDR Clause', section: 'Deductibles', rows: 3 },
     { key: 'subjectivitiesIntro', label: 'Subjectivities Intro', section: 'Subjectivities', rows: 2 },

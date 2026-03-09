@@ -139,6 +139,21 @@ CREATE TABLE IF NOT EXISTS pi_warranty_tag_assignments (
   FOREIGN KEY (tag_id) REFERENCES pi_warranty_tags(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS pi_warranty_sets (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  default_selected BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pi_warranty_set_items (
+  id VARCHAR(36) PRIMARY KEY,
+  set_id VARCHAR(36) NOT NULL,
+  warranty_id VARCHAR(36) NOT NULL,
+  FOREIGN KEY (set_id) REFERENCES pi_warranty_sets(id) ON DELETE CASCADE,
+  FOREIGN KEY (warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS pi_deductibles (
   id VARCHAR(36) PRIMARY KEY,
   description TEXT NOT NULL,
@@ -218,7 +233,7 @@ CREATE TABLE IF NOT EXISTS quotations (
   num_instalments INT DEFAULT 1,
   trading_warranty_intro TEXT,
   sanctions_clause_version VARCHAR(50) DEFAULT 'standard',
-  section_texts_override TEXT,
+  section_texts_override MEDIUMTEXT,
   sanctions_text_override TEXT,
   vdr_deductible_enabled BOOLEAN DEFAULT TRUE,
   deductible_aggregate_text TEXT,
@@ -293,8 +308,17 @@ CREATE TABLE IF NOT EXISTS quotation_warranties (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
   pi_warranty_id VARCHAR(36) NOT NULL,
+  order_index INT DEFAULT 0,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotation_custom_warranties (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS quotation_deductibles (

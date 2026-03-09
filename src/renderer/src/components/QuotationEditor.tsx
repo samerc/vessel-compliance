@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, Save, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download } from 'lucide-react'
-import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIExclusion, PIAdditionalClause, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, PISectionTexts, PISanctionsVersion, InstalmentDefaults } from '../../../shared/types'
+import { useState, useEffect, useRef } from 'react'
+import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download } from 'lucide-react'
+import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, PISectionTexts, PISanctionsVersion, InstalmentDefaults, QuotationVessel } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Plus, Trash2, ChevronUp, ChevronDown, X, Tag } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS } from './QuotationSettings'
 import RichTextEditor from './RichTextEditor'
+import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 
 const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
@@ -19,8 +20,8 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 type EditorTab = 'insured' | 'vessel' | 'liability' | 'conditions' | 'period' | 'trading' | 'warranties' | 'deductibles' | 'exclusions' | 'sanctions' | 'subjectivities' | 'premium' | 'information' | 'notes'
 
 const tabs: { key: EditorTab; label: string; icon: any }[] = [
-    { key: 'insured', label: 'Insured', icon: Users },
     { key: 'vessel', label: 'Vessel', icon: Ship },
+    { key: 'insured', label: 'Insured', icon: Users },
     { key: 'liability', label: 'Limit of Liability', icon: Shield },
     { key: 'conditions', label: 'Conditions', icon: FileText },
     { key: 'period', label: 'Period', icon: Clock },
@@ -41,7 +42,7 @@ interface QuotationEditorProps {
 }
 
 export default function QuotationEditor({ quotation, onBack }: QuotationEditorProps) {
-    const [activeTab, setActiveTab] = useState<EditorTab>('insured')
+    const [activeTab, setActiveTab] = useState<EditorTab>('vessel')
     const [q, setQ] = useState<Quotation>(quotation)
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
     const [vessels, setVessels] = useState<Vessel[]>([])
@@ -170,7 +171,17 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                         />
                         Renewal
                     </label>
-                    <div style={{ flex: 1 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', flexShrink: 0 }}>Title:</span>
+                        <input
+                            type="text"
+                            value={q.title || ''}
+                            onChange={e => setQ(prev => ({ ...prev, title: e.target.value }))}
+                            onBlur={e => updateField('title', e.target.value || null)}
+                            placeholder="Auto from vessel/fleet name…"
+                            style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                        />
+                    </div>
                     <button
                         onClick={async () => { try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }}
                         className="btn-secondary"
@@ -222,12 +233,12 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
             {/* Tab Content */}
             <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
                 {activeTab === 'insured' && <InsuredTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
-                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} />}
+                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'conditions' && <ConditionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'period' && <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'trading' && <TradingTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
-                {activeTab === 'warranties' && <WarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'warranties' && <WarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'deductibles' && <DeductiblesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'exclusions' && <ExclusionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'sanctions' && <SanctionsTab quotation={q} updateField={updateField} setQ={setQ} sanctionsVersions={sanctionsVersions} />}
@@ -242,25 +253,33 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
 
 // ==================== Insured Tab ====================
 
-function InsuredTab({ quotation, vessels, showSuccess, showError, updateField }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
+function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateField }: { quotation: Quotation; vessels?: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
     const [assureds, setAssureds] = useState<QuotationAssured[]>([])
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
+    const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [newName, setNewName] = useState('')
     const [newRole, setNewRole] = useState('')
     const [newEntityId, setNewEntityId] = useState('')
+    const [newVesselLabel, setNewVesselLabel] = useState('')
+    const [showNewRoleInput, setShowNewRoleInput] = useState(false)
+    const [newRoleName, setNewRoleName] = useState('')
+    const [coInputValue, setCoInputValue] = useState(quotation.coName || '')
+    const [showCoDropdown, setShowCoDropdown] = useState(false)
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [a, r, e] = await Promise.all([
+        const [a, r, e, qv] = await Promise.all([
             window.api.getQuotationAssureds(quotation.id),
             window.api.getAssuredRoles(),
-            window.api.getEntities()
+            window.api.getEntities(),
+            window.api.getQuotationVessels(quotation.id)
         ])
         setAssureds(Array.isArray(a) ? a : [])
         setRoles(Array.isArray(r) ? r : [])
         setEntities(Array.isArray(e) ? e : [])
+        setQVessels(Array.isArray(qv) ? qv : [])
     }
 
     const handleAddAssured = async () => {
@@ -271,44 +290,35 @@ function InsuredTab({ quotation, vessels, showSuccess, showError, updateField }:
                 entityId: newEntityId || undefined,
                 name: newName,
                 role: newRole || undefined,
+                vesselLabel: newVesselLabel || undefined,
                 order: assureds.length
             })
-            setNewName(''); setNewRole(''); setNewEntityId('')
+            setNewName(''); setNewRole(''); setNewEntityId(''); setNewVesselLabel('')
             showSuccess('Assured added')
             loadData()
         } catch (err: any) { showError(err.message || 'Failed to add assured') }
     }
 
-    const handleSelectVessel = async (vesselId: string) => {
-        updateField('vesselId', vesselId || null)
-        if (vesselId) {
-            // Load vessel assureds and pre-populate
-            try {
-                const va = await window.api.getVesselAssureds(vesselId)
-                const allEntities = await window.api.getEntities()
-                if (va.length > 0 && assureds.length === 0) {
-                    for (let i = 0; i < va.length; i++) {
-                        const entity = allEntities.find(e => e.id === va[i].entityId)
-                        if (entity) {
-                            await window.api.addQuotationAssured({
-                                quotationId: quotation.id,
-                                entityId: entity.id,
-                                name: entity.name,
-                                role: va[i].role,
-                                order: i
-                            })
-                        }
-                    }
-                    showSuccess('Assureds imported from vessel')
-                    loadData()
-                }
-            } catch { /* ignore */ }
-        }
+    const handleCreateRole = async () => {
+        if (!newRoleName.trim()) return
+        try {
+            const created = await window.api.addAssuredRole({ name: newRoleName.trim() })
+            await loadData()
+            setNewRole(created.name)
+            setNewRoleName('')
+            setShowNewRoleInput(false)
+            showSuccess('Role created')
+        } catch (err: any) { showError(err.message || 'Failed to create role') }
     }
 
     const handleDeleteAssured = async (id: string) => {
         await window.api.deleteQuotationAssured(id)
         showSuccess('Assured removed')
+        loadData()
+    }
+
+    const handleUpdateVesselLabel = async (id: string, label: string) => {
+        await window.api.updateQuotationAssured(id, { vesselLabel: label || undefined })
         loadData()
     }
 
@@ -321,22 +331,45 @@ function InsuredTab({ quotation, vessels, showSuccess, showError, updateField }:
         await window.api.reorderQuotationAssureds(newOrder.map(a => a.id))
     }
 
+    const saveCoName = (val: string) => updateField('coName', val || null)
+
+    const coFiltered = entities.filter(e =>
+        coInputValue.length > 0 && e.name.toLowerCase().includes(coInputValue.toLowerCase())
+    ).slice(0, 8)
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Vessel Selection</h3>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '24px' }}>
-                <select
-                    value={quotation.vesselId || ''}
-                    onChange={e => handleSelectVessel(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: '8px', flex: 1, maxWidth: '400px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
-                >
-                    <option value="">New vessel (enter details in Vessel tab)</option>
-                    {vessels.map(v => <option key={v.id} value={v.id}>{v.name} (IMO: {v.imoNumber})</option>)}
-                </select>
+            {/* c/o Broker */}
+            <h3 style={{ fontSize: '1rem', marginBottom: '10px' }}>C/O (Broker)</h3>
+            <div style={{ position: 'relative', maxWidth: '420px', marginBottom: '28px' }}>
+                <input
+                    type="text"
+                    value={coInputValue}
+                    onChange={e => { setCoInputValue(e.target.value); setShowCoDropdown(true) }}
+                    onBlur={() => { setTimeout(() => setShowCoDropdown(false), 150); saveCoName(coInputValue) }}
+                    onFocus={() => { if (coInputValue) setShowCoDropdown(true) }}
+                    placeholder="Broker / c/o — type to search entities or enter free text"
+                    style={{ width: '100%', border: '1px solid var(--input-border)' }}
+                />
+                {showCoDropdown && coFiltered.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '200px', overflowY: 'auto' }}>
+                        {coFiltered.map(e => (
+                            <div
+                                key={e.id}
+                                onMouseDown={() => { setCoInputValue(e.name); setShowCoDropdown(false); saveCoName(e.name) }}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
+                                onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.08)')}
+                                onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}
+                            >
+                                {e.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({e.type})</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Assureds</h3>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Assureds</h3>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <select
                     value={newEntityId}
                     onChange={e => {
@@ -344,7 +377,7 @@ function InsuredTab({ quotation, vessels, showSuccess, showError, updateField }:
                         const ent = entities.find(x => x.id === e.target.value)
                         if (ent) setNewName(ent.name)
                     }}
-                    style={{ padding: '8px 12px', borderRadius: '8px', minWidth: '200px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', minWidth: '180px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
                 >
                     <option value="">Select entity or type manually</option>
                     {entities.map(e => <option key={e.id} value={e.id}>{e.name} ({e.type})</option>)}
@@ -354,124 +387,295 @@ function InsuredTab({ quotation, vessels, showSuccess, showError, updateField }:
                     value={newName}
                     onChange={e => setNewName(e.target.value)}
                     placeholder="Assured name"
-                    style={{ flex: 1, minWidth: '200px' }}
+                    style={{ flex: 1, minWidth: '160px' }}
                 />
-                <select
-                    value={newRole}
-                    onChange={e => setNewRole(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: '8px', minWidth: '150px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
-                >
-                    <option value="">Role</option>
-                    {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                </select>
+                {showNewRoleInput ? (
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <input
+                            type="text"
+                            value={newRoleName}
+                            onChange={e => setNewRoleName(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleCreateRole() }}
+                            placeholder="New role name"
+                            style={{ width: '140px', border: '1px solid var(--input-border)' }}
+                            autoFocus
+                        />
+                        <button onClick={handleCreateRole} className="btn-primary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>Save</button>
+                        <button onClick={() => { setShowNewRoleInput(false); setNewRoleName('') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><X size={14} /></button>
+                    </div>
+                ) : (
+                    <select
+                        value={newRole}
+                        onChange={e => { if (e.target.value === '__new__') { setShowNewRoleInput(true); setNewRole('') } else setNewRole(e.target.value) }}
+                        style={{ padding: '8px 12px', borderRadius: '8px', minWidth: '140px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
+                    >
+                        <option value="">Role</option>
+                        {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                        <option value="__new__">+ Create new role…</option>
+                    </select>
+                )}
+                {qVessels.length > 0 && (
+                    <select
+                        value={newVesselLabel}
+                        onChange={e => setNewVesselLabel(e.target.value)}
+                        style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
+                    >
+                        <option value="">All vessels</option>
+                        {qVessels.map(v => <option key={v.id} value={v.vesselLabel}>{v.vesselLabel}</option>)}
+                    </select>
+                )}
                 <button onClick={handleAddAssured} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Add</button>
             </div>
 
-            {assureds.map((a, i) => (
-                <div key={a.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
-                    {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
-                    <div style={{ display: 'flex', gap: '2px' }}>
-                        <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                        <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                        <button onClick={() => handleDeleteAssured(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
-                    </div>
-                </div>
-            ))}
-            {assureds.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No assureds added yet. Select a vessel to auto-populate or add manually.</p>}
+            <div style={{ marginTop: '14px' }}>
+                {qVessels.length > 1 ? (
+                    // Grouped view: one section per vessel + unassigned
+                    <>
+                        {[...qVessels, null].map(qv => {
+                            const label = qv?.vesselLabel || null
+                            const group = label
+                                ? assureds.filter(a => a.vesselLabel === label)
+                                : assureds.filter(a => !a.vesselLabel)
+                            if (group.length === 0 && label) return null
+                            return (
+                                <div key={label || 'unassigned'} style={{ marginBottom: '16px' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--table-border)' }}>
+                                        {label ? `${label} — ${qv && vessels.find(v => v.id === qv.vesselId)?.name || qv?.name || label}` : 'All Vessels / Unassigned'}
+                                    </div>
+                                    {group.map(a => {
+                                        const i = assureds.indexOf(a)
+                                        return (
+                                            <div key={a.id} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <select
+                                                    value={a.vesselLabel || ''}
+                                                    onChange={e => handleUpdateVesselLabel(a.id, e.target.value)}
+                                                    style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.3)', minWidth: '52px' }}
+                                                >
+                                                    <option value="">—</option>
+                                                    {qVessels.map(v => <option key={v.id} value={v.vesselLabel}>{v.vesselLabel}</option>)}
+                                                </select>
+                                                <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
+                                                {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
+                                                <div style={{ display: 'flex', gap: '2px' }}>
+                                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                                    <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                                    <button onClick={() => handleDeleteAssured(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )
+                        })}
+                    </>
+                ) : (
+                    // Flat view for single vessel
+                    assureds.map((a, i) => (
+                        <div key={a.id} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
+                            {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
+                            <div style={{ display: 'flex', gap: '2px' }}>
+                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button onClick={() => handleDeleteAssured(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                            </div>
+                        </div>
+                    ))
+                )}
+                {assureds.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No assureds added yet. Add manually or go to the Vessel tab to import from a vessel.</p>}
+            </div>
         </div>
     )
 }
 
 // ==================== Vessel Tab ====================
 
-function VesselTab({ quotation, vessels }: { quotation: Quotation; vessels: Vessel[] }) {
-    const vessel = vessels.find(v => v.id === quotation.vesselId)
+const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
 
-    if (vessel) {
-        return (
-            <div>
-                <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Vessel Details (from existing vessel)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', maxWidth: '600px' }}>
-                    <div><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Name</span><div style={{ fontWeight: 600 }}>{vessel.name}</div></div>
-                    <div><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>IMO</span><div>{vessel.imoNumber}</div></div>
-                    <div><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Built Year</span><div>{vessel.builtYear || '-'}</div></div>
-                    <div><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Gross Tonnage</span><div>{vessel.grossTonnage || '-'}</div></div>
-                    <div><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Type</span><div>{vessel.vesselType || '-'}</div></div>
-                    <div><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Classification</span><div>{vessel.classificationSociety || '-'}</div></div>
-                    <div><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Call Sign</span><div>{vessel.callSign || '-'}</div></div>
-                </div>
-                <p style={{ marginTop: '16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>To edit vessel details, go to the Vessels page.</p>
-            </div>
-        )
+function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+    const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [showAddForm, setShowAddForm] = useState(false)
+    const [addMode, setAddMode] = useState<'existing' | 'new'>('existing')
+    const [selectedVesselId, setSelectedVesselId] = useState('')
+    const [newData, setNewData] = useState(EMPTY_NEW_VESSEL)
+
+    useEffect(() => { loadData() }, [])
+
+    const loadData = async () => {
+        const qv = await window.api.getQuotationVessels(quotation.id)
+        setQVessels(Array.isArray(qv) ? qv : [])
     }
 
-    // New vessel form - managed via quotation_new_vessels
-    return <NewVesselForm quotationId={quotation.id} />
-}
+    const nextLabel = (list: QuotationVessel[]) => `V${list.length + 1}`
 
-function NewVesselForm({ quotationId }: { quotationId: string }) {
-    const [data, setData] = useState({ name: '', imoNumber: '', builtYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' })
-    const { showSuccess } = useToast()
-
-    useEffect(() => {
-        window.api.getQuotationNewVessel(quotationId).then(nv => {
-            if (nv) setData({
-                name: nv.name || '', imoNumber: nv.imoNumber || '', builtYear: nv.builtYear?.toString() || '',
-                grossTonnage: nv.grossTonnage?.toString() || '', flag: nv.flag || '', vesselType: nv.vesselType || '',
-                classification: nv.classification || '', callSign: nv.callSign || ''
+    const handleAddExisting = async () => {
+        if (!selectedVesselId) return
+        try {
+            const vLabel = nextLabel(qVessels)
+            await window.api.addQuotationVessel({
+                quotationId: quotation.id,
+                vesselId: selectedVesselId,
+                vesselLabel: vLabel,
+                order: qVessels.length
             })
-        })
-    }, [quotationId])
 
-    const handleSave = async () => {
-        await window.api.upsertQuotationNewVessel(quotationId, {
-            name: data.name, imoNumber: data.imoNumber,
-            builtYear: data.builtYear ? parseInt(data.builtYear) : undefined,
-            grossTonnage: data.grossTonnage ? parseFloat(data.grossTonnage) : undefined,
-            flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign
-        })
-        showSuccess('Vessel details saved')
+            // Auto-load vessel assureds into the quotation
+            const [vassureds, allEntities, existingQAssureds] = await Promise.all([
+                window.api.getVesselAssureds(selectedVesselId),
+                window.api.getEntities(),
+                window.api.getQuotationAssureds(quotation.id)
+            ])
+            const existingEntityIds = new Set(existingQAssureds.map(a => a.entityId).filter(Boolean))
+            const toAdd = vassureds.filter(va => !existingEntityIds.has(va.entityId))
+            for (let i = 0; i < toAdd.length; i++) {
+                const va = toAdd[i]
+                const entity = allEntities.find(e => e.id === va.entityId)
+                if (entity) {
+                    await window.api.addQuotationAssured({
+                        quotationId: quotation.id,
+                        entityId: va.entityId,
+                        name: entity.name,
+                        role: va.role || undefined,
+                        vesselLabel: vLabel,
+                        order: existingQAssureds.length + i
+                    })
+                }
+            }
+
+            setSelectedVesselId('')
+            setShowAddForm(false)
+            showSuccess(`Vessel added${toAdd.length > 0 ? ` — ${toAdd.length} assured(s) loaded` : ''}`)
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add vessel') }
     }
+
+    const handleAddNew = async () => {
+        if (!newData.name.trim()) return
+        try {
+            await window.api.addQuotationVessel({
+                quotationId: quotation.id,
+                vesselLabel: nextLabel(qVessels),
+                order: qVessels.length,
+                name: newData.name,
+                imoNumber: newData.imoNumber || undefined,
+                builtYear: newData.builtYear ? parseInt(newData.builtYear) : undefined,
+                grossTonnage: newData.grossTonnage ? parseFloat(newData.grossTonnage) : undefined,
+                flag: newData.flag || undefined,
+                vesselType: newData.vesselType || undefined,
+                classification: newData.classification || undefined,
+                callSign: newData.callSign || undefined
+            })
+            setNewData(EMPTY_NEW_VESSEL)
+            setShowAddForm(false)
+            showSuccess('Vessel added')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add vessel') }
+    }
+
+    const handleDelete = async (id: string) => {
+        await window.api.deleteQuotationVessel(id)
+        showSuccess('Vessel removed')
+        loadData()
+    }
+
+    const alreadyAdded = new Set(qVessels.map(v => v.vesselId).filter(Boolean) as string[])
+    const availableVessels = vessels.filter(v => !alreadyAdded.has(v.id))
 
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>New Vessel Details</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', maxWidth: '600px' }}>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Name</label>
-                    <input type="text" value={data.name} onChange={e => setData(p => ({ ...p, name: e.target.value.toUpperCase() }))} style={{ width: '100%', textTransform: 'uppercase' }} />
-                </div>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>IMO Number</label>
-                    <input type="text" value={data.imoNumber} onChange={e => setData(p => ({ ...p, imoNumber: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Built Year</label>
-                    <input type="number" value={data.builtYear} onChange={e => setData(p => ({ ...p, builtYear: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Gross Tonnage</label>
-                    <input type="number" value={data.grossTonnage} onChange={e => setData(p => ({ ...p, grossTonnage: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Flag</label>
-                    <input type="text" value={data.flag} onChange={e => setData(p => ({ ...p, flag: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Vessel Type</label>
-                    <input type="text" value={data.vesselType} onChange={e => setData(p => ({ ...p, vesselType: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Classification</label>
-                    <input type="text" value={data.classification} onChange={e => setData(p => ({ ...p, classification: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-                <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Call Sign</label>
-                    <input type="text" value={data.callSign} onChange={e => setData(p => ({ ...p, callSign: e.target.value.toUpperCase() }))} style={{ width: '100%', textTransform: 'uppercase' }} />
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '1rem', margin: 0 }}>Vessels ({qVessels.length})</h3>
+                {!showAddForm && (
+                    <button onClick={() => setShowAddForm(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                        <Plus size={14} /> Add Vessel
+                    </button>
+                )}
             </div>
-            <button onClick={handleSave} className="btn-primary" style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}><Save size={16} /> Save Vessel Details</button>
+
+            {showAddForm && (
+                <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border)', marginBottom: '20px', background: 'rgba(0,210,255,0.03)' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                        <button onClick={() => setAddMode('existing')} className={addMode === 'existing' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px' }}>From Registry</button>
+                        <button onClick={() => setAddMode('new')} className={addMode === 'new' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px' }}>New Vessel</button>
+                    </div>
+                    {addMode === 'existing' ? (
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <select
+                                value={selectedVesselId}
+                                onChange={e => setSelectedVesselId(e.target.value)}
+                                style={{ flex: 1, maxWidth: '400px', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
+                            >
+                                <option value="">Select vessel from registry…</option>
+                                {availableVessels.map(v => <option key={v.id} value={v.id}>{v.name} (IMO: {v.imoNumber})</option>)}
+                            </select>
+                            <button onClick={handleAddExisting} disabled={!selectedVesselId} className="btn-primary" style={{ fontSize: '0.82rem' }}>Add</button>
+                            <button onClick={() => setShowAddForm(false)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                        </div>
+                    ) : (
+                        <div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', maxWidth: '600px', marginBottom: '12px' }}>
+                                {([
+                                    ['name', 'Name *', 'text', true],
+                                    ['imoNumber', 'IMO Number', 'text', false],
+                                    ['builtYear', 'Built Year', 'number', false],
+                                    ['grossTonnage', 'Gross Tonnage', 'number', false],
+                                    ['flag', 'Flag', 'text', false],
+                                    ['vesselType', 'Vessel Type', 'text', false],
+                                    ['classification', 'Classification', 'text', false],
+                                    ['callSign', 'Call Sign', 'text', false]
+                                ] as [keyof typeof EMPTY_NEW_VESSEL, string, string, boolean][]).map(([field, label, type, upper]) => (
+                                    <div key={field}>
+                                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{label}</label>
+                                        <input
+                                            type={type}
+                                            value={newData[field]}
+                                            onChange={e => setNewData(p => ({ ...p, [field]: upper ? e.target.value.toUpperCase() : e.target.value }))}
+                                            style={{ width: '100%', ...(upper ? { textTransform: 'uppercase' } : {}) }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={handleAddNew} className="btn-primary" style={{ fontSize: '0.82rem' }}>Add Vessel</button>
+                                <button onClick={() => { setShowAddForm(false); setNewData(EMPTY_NEW_VESSEL) }} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {qVessels.length === 0 && !showAddForm && (
+                <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No vessels added yet. Click "Add Vessel" to begin.</p>
+            )}
+
+            {qVessels.map(qv => {
+                const reg = qv.vesselId ? vessels.find(v => v.id === qv.vesselId) : null
+                const name = reg?.name || qv.name || '(unnamed)'
+                const imo = reg?.imoNumber || qv.imoNumber
+                const built = reg?.builtYear || qv.builtYear
+                const gt = reg?.grossTonnage || qv.grossTonnage
+                const vtype = reg?.vesselType || qv.vesselType
+                const classif = reg?.classificationSociety || qv.classification
+                return (
+                    <div key={qv.id} style={{ padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--table-border)', marginBottom: '10px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', borderRadius: '8px', background: 'rgba(0,210,255,0.12)', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'monospace', flexShrink: 0 }}>
+                            {qv.vesselLabel}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase' }}>{name}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                                {imo && <span>IMO: {imo}</span>}
+                                {built && <span>Built: {built}</span>}
+                                {gt && <span>GT: {Number(gt).toLocaleString()}</span>}
+                                {vtype && <span>Type: {vtype}</span>}
+                                {classif && <span>Class: {classif}</span>}
+                                {reg && <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem' }}>● From registry</span>}
+                            </div>
+                        </div>
+                        <button onClick={() => handleDelete(qv.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', flexShrink: 0 }}><Trash2 size={16} /></button>
+                    </div>
+                )
+            })}
         </div>
     )
 }
@@ -480,19 +684,35 @@ function NewVesselForm({ quotationId }: { quotationId: string }) {
 
 function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void }) {
     const [subLimits, setSubLimits] = useState<QuotationSubLimit[]>([])
+    const [templates, setTemplates] = useState<import('../../../shared/types').PISubLimitTemplate[]>([])
     const [newText, setNewText] = useState('')
     const [newAmount, setNewAmount] = useState('')
     const [newCurrency, setNewCurrency] = useState('USD')
 
-    useEffect(() => { loadSubLimits() }, [])
-    const loadSubLimits = async () => { setSubLimits(await window.api.getQuotationSubLimits(quotation.id)) }
+    useEffect(() => { loadData() }, [])
+    const loadData = async () => {
+        const [sl, tmpl] = await Promise.all([
+            window.api.getQuotationSubLimits(quotation.id),
+            window.api.piGetSubLimitTemplates()
+        ])
+        setSubLimits(sl)
+        setTemplates(Array.isArray(tmpl) ? tmpl : [])
+    }
 
     const handleAddSubLimit = async () => {
         if (!newText.trim()) return
         await window.api.addQuotationSubLimit({ quotationId: quotation.id, text: newText, amount: parseFloat(newAmount) || 0, currency: newCurrency })
         setNewText(''); setNewAmount(''); setNewCurrency('USD')
         showSuccess('Sub-limit added')
-        loadSubLimits()
+        loadData()
+    }
+
+    const applyTemplate = (templateId: string) => {
+        const t = templates.find(x => x.id === templateId)
+        if (!t) return
+        setNewText(t.textTemplate)
+        setNewCurrency(t.defaultCurrency || 'USD')
+        setNewAmount('')
     }
 
     return (
@@ -519,7 +739,23 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation
             </div>
 
             <h4 style={{ fontSize: '0.9rem', marginBottom: '10px' }}>Sub-Limits</h4>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+
+            {templates.length > 0 && (
+                <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', flexShrink: 0 }}>From template:</span>
+                    <select
+                        onChange={e => { if (e.target.value) { applyTemplate(e.target.value); e.target.value = '' } }}
+                        style={{ flex: 1, maxWidth: '420px', padding: '6px 10px', borderRadius: '6px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)', fontSize: '0.83rem' }}
+                    >
+                        <option value="">Pick a template…</option>
+                        {templates.map(t => (
+                            <option key={t.id} value={t.id}>{t.defaultCurrency} — {t.textTemplate}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <input type="text" value={newText} onChange={e => setNewText(e.target.value)} placeholder="Sub-limit description..." style={{ flex: 1, minWidth: '200px' }} />
                 <input type="text" value={newCurrency} onChange={e => setNewCurrency(e.target.value)} style={{ width: '70px' }} placeholder="USD" />
                 <input type="number" value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="Amount" style={{ width: '140px' }} />
@@ -527,8 +763,8 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation
             </div>
             {subLimits.map(sl => (
                 <div key={sl.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ flex: 1, fontSize: '0.85rem' }}>{sl.currency} {sl.amount.toLocaleString()} - {sl.text}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationSubLimit(sl.id); loadSubLimits() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
+                    <span style={{ flex: 1, fontSize: '0.85rem' }}>{sl.currency} {sl.amount.toLocaleString()} — {sl.text}</span>
+                    <button onClick={async () => { await window.api.deleteQuotationSubLimit(sl.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                 </div>
             ))}
         </div>
@@ -537,24 +773,26 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation
 
 // ==================== Conditions Tab ====================
 
-function ConditionsTab({ quotation, showSuccess }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
     const [allClauses, setAllClauses] = useState<PIClause[]>([])
     const [clauseSets, setClauseSets] = useState<PIClauseSet[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [descOverrides, setDescOverrides] = useState<Record<string, string>>({})
     const [additionalClauses, setAdditionalClauses] = useState<any[]>([])
     const [allAdditional, setAllAdditional] = useState<PIAdditionalClause[]>([])
+    const [additionalClauseSets, setAdditionalClauseSets] = useState<PIAdditionalClauseSet[]>([])
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [clauses, sets, selected, overrides, addClauses, allAdd] = await Promise.all([
+        const [clauses, sets, selected, overrides, addClauses, allAdd, addSets] = await Promise.all([
             window.api.piGetClauses(),
             window.api.piGetClauseSets(),
             window.api.getQuotationClauses(quotation.id),
             window.api.getQuotationClauseOverrides(quotation.id),
             window.api.getQuotationAdditionalClauses(quotation.id),
-            window.api.piGetAdditionalClauses()
+            window.api.piGetAdditionalClauses(),
+            window.api.piGetAdditionalClauseSets()
         ])
         setAllClauses(clauses)
         setClauseSets(sets)
@@ -562,14 +800,37 @@ function ConditionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
         setDescOverrides(overrides)
         setAdditionalClauses(addClauses)
         setAllAdditional(allAdd)
+        setAdditionalClauseSets(addSets)
     }
 
     const toggleClause = async (clauseId: string) => {
         const newSet = new Set(selectedIds)
-        if (newSet.has(clauseId)) newSet.delete(clauseId)
+        const isDeselecting = newSet.has(clauseId)
+        if (isDeselecting) newSet.delete(clauseId)
         else newSet.add(clauseId)
         setSelectedIds(newSet)
-        await window.api.setQuotationClauses(quotation.id, Array.from(newSet), descOverrides)
+        try {
+            await window.api.setQuotationClauses(quotation.id, Array.from(newSet), descOverrides)
+            // When deselecting a cargo-related clause, auto-deselect cargo warranties
+            const clause = allClauses.find(c => c.id === clauseId)
+            if (isDeselecting && clause?.isCargoRelated) {
+                const remainingCargoClauseSelected = allClauses.some(c => c.isCargoRelated && c.id !== clauseId && newSet.has(c.id))
+                if (!remainingCargoClauseSelected) {
+                    const [allWarranties, currentWarrantyIds] = await Promise.all([
+                        window.api.piGetWarranties(),
+                        window.api.getQuotationWarranties(quotation.id)
+                    ])
+                    const cargoWarrantyIds = new Set(allWarranties.filter((w: PIWarranty) => w.isCargoRelated).map((w: PIWarranty) => w.id))
+                    const filtered = currentWarrantyIds.filter((id: string) => !cargoWarrantyIds.has(id))
+                    if (filtered.length < currentWarrantyIds.length) {
+                        await window.api.setQuotationWarranties(quotation.id, filtered)
+                        showSuccess('Cargo warranties auto-removed (no cargo clauses selected)')
+                    }
+                }
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to save clause selection')
+        }
     }
 
     const applySet = async (setId: string) => {
@@ -596,6 +857,18 @@ function ConditionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
         if (!clause) return
         await window.api.addQuotationAdditionalClause({ quotationId: quotation.id, piAdditionalClauseId: clauseId, order: additionalClauses.length })
         showSuccess('Additional clause added')
+        loadData()
+    }
+
+    const applyAdditionalSet = async (setId: string) => {
+        const set = additionalClauseSets.find(s => s.id === setId)
+        if (!set?.clauseIds) return
+        const alreadyIds = new Set(additionalClauses.map((ac: any) => ac.piAdditionalClauseId))
+        const toAdd = set.clauseIds.filter(id => !alreadyIds.has(id))
+        for (let i = 0; i < toAdd.length; i++) {
+            await window.api.addQuotationAdditionalClause({ quotationId: quotation.id, piAdditionalClauseId: toAdd[i], order: additionalClauses.length + i })
+        }
+        showSuccess(`Applied "${set.name}"`)
         loadData()
     }
 
@@ -628,7 +901,7 @@ function ConditionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
                                     onChange={e => setDescOverrides(prev => ({ ...prev, [c.id]: e.target.value }))}
                                     onBlur={e => updateDescOverride(c.id, e.target.value)}
                                     placeholder="Clause description..."
-                                    style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
+                                    style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
                                 />
                             </div>
                         )}
@@ -637,35 +910,117 @@ function ConditionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
             </div>
 
             <h4 style={{ fontSize: '0.9rem', marginBottom: '10px' }}>Additional Clauses</h4>
-            {allAdditional.length > 0 && (
-                <div style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {additionalClauseSets.length > 0 && (
+                    <>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Presets:</span>
+                        {additionalClauseSets.map(s => (
+                            <button key={s.id} onClick={() => applyAdditionalSet(s.id)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }}>{s.name}</button>
+                        ))}
+                        <span style={{ color: 'var(--table-border)', fontSize: '0.7rem' }}>|</span>
+                    </>
+                )}
+                {allAdditional.length > 0 && (
                     <select
                         onChange={e => { if (e.target.value) { addAdditionalClause(e.target.value); e.target.value = '' } }}
-                        style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
+                        style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)', fontSize: '0.83rem' }}
                         value=""
                     >
-                        <option value="">Add additional clause...</option>
-                        {allAdditional.map(ac => <option key={ac.id} value={ac.id}>{ac.text.substring(0, 80)}...</option>)}
+                        <option value="">Add individual clause…</option>
+                        {allAdditional.map(ac => (
+                            <option key={ac.id} value={ac.id}>
+                                {ac.code ? `[${ac.code}] ` : ''}{ac.text.substring(0, 70)}{ac.text.length > 70 ? '…' : ''}
+                            </option>
+                        ))}
                     </select>
-                </div>
-            )}
-            {additionalClauses.map(ac => (
-                <div key={ac.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <span style={{ flex: 1, fontSize: '0.83rem', whiteSpace: 'pre-wrap' }}>{ac.customText || allAdditional.find(a => a.id === ac.piAdditionalClauseId)?.text || ''}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
-                </div>
-            ))}
+                )}
+            </div>
+            {additionalClauses.map((ac: any) => {
+                const def = allAdditional.find(a => a.id === ac.piAdditionalClauseId)
+                const code = def?.code || ''
+                const text = ac.customText || def?.text || ''
+                return (
+                    <div key={ac.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <span style={{ color: 'var(--accent-primary)', fontFamily: 'monospace', fontSize: '0.9rem', flexShrink: 0, marginTop: '1px' }}>-</span>
+                        <span style={{ flex: 1, fontSize: '0.83rem', whiteSpace: 'pre-wrap' }}>
+                            {code && <span style={{ fontWeight: 700, marginRight: '6px', color: 'var(--text-primary)' }}>{code}</span>}
+                            {text}
+                        </span>
+                        <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
+                    </div>
+                )
+            })}
+            {additionalClauses.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No additional clauses added yet.</p>}
         </div>
     )
 }
 
 // ==================== Period Tab ====================
 
+function fmtNiceDate(iso: string): string {
+    if (!iso) return iso
+    const [y, m, d] = iso.split('-').map(Number)
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    const sfx = (n: number) => (n === 1 || n === 21 || n === 31 ? 'st' : n === 2 || n === 22 ? 'nd' : n === 3 || n === 23 ? 'rd' : 'th')
+    return `${d}${sfx(d)} ${months[m - 1]} ${y}`
+}
+
 function PeriodTab({ quotation, updateField, setQ }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void }) {
+    const [suggestion, setSuggestion] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => { buildSuggestion() }, [])
+
+    const buildSuggestion = async () => {
+        setLoading(true)
+        try {
+            const qv: QuotationVessel[] = await window.api.getQuotationVessels(quotation.id)
+            const withVessel = qv.filter(v => v.vesselId)
+            if (withVessel.length === 0) {
+                setSuggestion('12 months from date to be advised')
+                return
+            }
+            const dates: { label: string; date: string }[] = []
+            for (const v of withVessel) {
+                const policies = await window.api.getVesselDynamicPolicies(v.vesselId!)
+                const endDate = resolveEffectivePolicyExpiry(policies)
+                if (endDate) dates.push({ label: v.vesselLabel, date: endDate })
+            }
+            if (dates.length === 0) {
+                setSuggestion('12 months from date to be advised')
+            } else {
+                const unique = [...new Set(dates.map(d => d.date))]
+                if (unique.length === 1) {
+                    setSuggestion(`12 months from ${fmtNiceDate(unique[0])}`)
+                } else {
+                    setSuggestion(dates.map(d => `${d.label}: 12 months from ${fmtNiceDate(d.date)}`).join('\n'))
+                }
+            }
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const useSuggestion = () => {
+        setQ(p => ({ ...p, periodText: suggestion }))
+        updateField('periodText', suggestion)
+    }
+
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Period of Insurance</h3>
-            <div style={{ maxWidth: '600px' }}>
+            {(suggestion || loading) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0,210,255,0.07)', border: '1px solid rgba(0,210,255,0.2)', marginBottom: '16px', maxWidth: '640px' }}>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600, marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Auto-detected from P&I policies</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{loading ? 'Loading…' : suggestion}</div>
+                    </div>
+                    {!loading && (
+                        <button onClick={useSuggestion} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '5px 12px', flexShrink: 0 }}>Use this</button>
+                    )}
+                </div>
+            )}
+            <div style={{ maxWidth: '640px' }}>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Period description</label>
                 <textarea
                     value={quotation.periodText || ''}
@@ -683,7 +1038,7 @@ function PeriodTab({ quotation, updateField, setQ }: { quotation: Quotation; upd
 
 function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [countries, setCountries] = useState<QuotationExcludedCountry[]>([])
-    const [initialized, setInitialized] = useState(false)
+    const initRef = useRef(false)
     const [newCountryName, setNewCountryName] = useState('')
     const [newCountryType, setNewCountryType] = useState<'excluded' | 'ddq'>('excluded')
 
@@ -694,12 +1049,26 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
             window.api.getQuotationExcludedCountries(quotation.id),
             window.api.piGetTradingExcludedCountries()
         ])
+        // Deduplicate by name+listType (legacy data may have duplicates)
+        const seen = new Set<string>()
+        const deduped = qc.filter(c => {
+            const key = `${c.name}|${c.listType}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+        })
+        if (deduped.length < qc.length) {
+            await window.api.setQuotationExcludedCountries(quotation.id, deduped.map(c => ({ name: c.name, listType: c.listType })))
+            const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
+            setCountries(refreshed)
+            return
+        }
         setCountries(qc)
-        if (qc.length === 0 && masterCountries.length > 0 && !initialized) {
+        if (qc.length === 0 && masterCountries.length > 0 && !initRef.current) {
+            initRef.current = true
             await window.api.setQuotationExcludedCountries(quotation.id, masterCountries.map(c => ({ name: c.name, listType: c.listType })))
             const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
             setCountries(refreshed)
-            setInitialized(true)
         }
     }
 
@@ -846,103 +1215,381 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
 
 // ==================== Warranties Tab ====================
 
-function WarrantiesTab({ quotation, showSuccess }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [allWarranties, setAllWarranties] = useState<PIWarranty[]>([])
     const [tags, setTags] = useState<PIWarrantyTag[]>([])
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-    const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
+    const [warrantySets, setWarrantySets] = useState<PIWarrantySet[]>([])
+    const [selectedIds, setSelectedIds] = useState<string[]>([])
+    const [customWarranties, setCustomWarranties] = useState<QuotationCustomWarranty[]>([])
+    const [activeTab, setActiveTab] = useState<string>('all')
+    const [newCustomText, setNewCustomText] = useState('')
+    const [editingCustomId, setEditingCustomId] = useState<string | null>(null)
+    const [editCustomText, setEditCustomText] = useState('')
+    const [showImportModal, setShowImportModal] = useState(false)
+    const [importText, setImportText] = useState('')
+    const [importedItems, setImportedItems] = useState<string[]>([])
+    const [showTexts, setShowTexts] = useState(false)
+    const defaultsApplied = useRef(false)
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [all, allTags, selected] = await Promise.all([
+        const [all, allTags, sets, selected, custom] = await Promise.all([
             window.api.piGetWarranties(),
             window.api.piGetWarrantyTags(),
-            window.api.getQuotationWarranties(quotation.id)
+            window.api.piGetWarrantySets(),
+            window.api.getQuotationWarranties(quotation.id),
+            window.api.getQuotationCustomWarranties(quotation.id)
         ])
-        setAllWarranties(all)
-        setTags(allTags)
-        setSelectedIds(new Set(selected))
+        const safeAll = Array.isArray(all) ? all : []
+        const safeTags = Array.isArray(allTags) ? allTags : []
+        const safeSets = Array.isArray(sets) ? sets : []
+        const safeSelected = Array.isArray(selected) ? selected : []
+        const safeCustom = Array.isArray(custom) ? custom : []
+        setAllWarranties(safeAll)
+        setTags(safeTags)
+        setWarrantySets(safeSets)
+        setSelectedIds(safeSelected)
+        setCustomWarranties(safeCustom)
+
+        // Apply default-selected sets on first load if quotation has no warranties yet
+        if (!defaultsApplied.current && safeSelected.length === 0 && safeSets.length > 0) {
+            defaultsApplied.current = true
+            const defaultIds: string[] = []
+            for (const ws of safeSets) {
+                if (ws.defaultSelected && ws.warrantyIds) {
+                    for (const wid of ws.warrantyIds) {
+                        if (!defaultIds.includes(wid)) defaultIds.push(wid)
+                    }
+                }
+            }
+            if (defaultIds.length > 0) {
+                setSelectedIds(defaultIds)
+                await window.api.setQuotationWarranties(quotation.id, defaultIds)
+            }
+        } else {
+            defaultsApplied.current = true
+        }
+    }
+
+    const saveSelected = async (ids: string[]) => {
+        setSelectedIds(ids)
+        await window.api.setQuotationWarranties(quotation.id, ids)
     }
 
     const toggle = async (id: string) => {
-        const newSet = new Set(selectedIds)
-        if (newSet.has(id)) newSet.delete(id)
-        else newSet.add(id)
-        setSelectedIds(newSet)
-        await window.api.setQuotationWarranties(quotation.id, Array.from(newSet))
+        const newIds = selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]
+        await saveSelected(newIds)
     }
 
-    const toggleTag = async (tagId: string) => {
-        const tagWarranties = allWarranties.filter(w => (w.tagIds || []).includes(tagId))
-        const allSelected = tagWarranties.every(w => selectedIds.has(w.id))
-        const newSet = new Set(selectedIds)
-        for (const w of tagWarranties) {
-            if (allSelected) newSet.delete(w.id)
-            else newSet.add(w.id)
+    const selectAllInTab = async () => {
+        const tabWarranties = getTabWarranties()
+        const newIds = [...selectedIds]
+        for (const w of tabWarranties) {
+            if (!newIds.includes(w.id)) newIds.push(w.id)
         }
-        setSelectedIds(newSet)
-        await window.api.setQuotationWarranties(quotation.id, Array.from(newSet))
-        showSuccess(allSelected ? `Deselected all "${tags.find(t => t.id === tagId)?.name}" warranties` : `Selected all "${tags.find(t => t.id === tagId)?.name}" warranties`)
+        await saveSelected(newIds)
     }
 
-    const filteredWarranties = activeTagFilter
-        ? allWarranties.filter(w => (w.tagIds || []).includes(activeTagFilter))
-        : allWarranties
+    const deselectAllInTab = async () => {
+        const tabWarranties = getTabWarranties()
+        const tabIds = new Set(tabWarranties.map(w => w.id))
+        await saveSelected(selectedIds.filter(id => !tabIds.has(id)))
+    }
+
+    const applySet = async (setId: string) => {
+        const ws = warrantySets.find(s => s.id === setId)
+        if (!ws?.warrantyIds) return
+        const newIds = [...selectedIds]
+        for (const wid of ws.warrantyIds) {
+            if (!newIds.includes(wid)) newIds.push(wid)
+        }
+        await saveSelected(newIds)
+        showSuccess(`Applied "${ws.name}"`)
+    }
+
+    const moveSelected = async (index: number, direction: 'up' | 'down') => {
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= selectedIds.length) return
+        const newIds = [...selectedIds]
+        ;[newIds[index], newIds[swapIndex]] = [newIds[swapIndex], newIds[index]]
+        await saveSelected(newIds)
+    }
+
+    const addCustom = async () => {
+        if (!newCustomText.trim()) return
+        const result = await window.api.addQuotationCustomWarranty({ quotationId: quotation.id, text: newCustomText.trim(), order: customWarranties.length })
+        if (result && (result as any).error) {
+            showError((result as any).message || 'Failed to add custom warranty')
+            return
+        }
+        setNewCustomText('')
+        showSuccess('Custom warranty added')
+        loadData()
+    }
+
+    const saveCustomEdit = async (id: string) => {
+        await window.api.updateQuotationCustomWarranty(id, { text: editCustomText })
+        setEditingCustomId(null)
+        loadData()
+    }
+
+    const deleteCustom = async (id: string) => {
+        await window.api.deleteQuotationCustomWarranty(id)
+        loadData()
+    }
+
+    const moveCustom = async (index: number, direction: 'up' | 'down') => {
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= customWarranties.length) return
+        const newOrder = [...customWarranties]
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setCustomWarranties(newOrder)
+        await window.api.reorderQuotationCustomWarranties(newOrder.map(c => c.id))
+    }
+
+    const parseImportText = () => {
+        const lines = importText.split('\n').map(l => l.replace(/^[\s•\-–—\*\d+\.\)]+/, '').trim()).filter(l => l.length > 0)
+        setImportedItems(lines)
+    }
+
+    const confirmImport = async () => {
+        let order = customWarranties.length
+        for (const text of importedItems) {
+            await window.api.addQuotationCustomWarranty({ quotationId: quotation.id, text, order: order++ })
+        }
+        showSuccess(`Imported ${importedItems.length} warranties`)
+        setShowImportModal(false)
+        setImportText('')
+        setImportedItems([])
+        loadData()
+    }
+
+    const getTabWarranties = () => {
+        if (activeTab === 'all') return allWarranties
+        if (activeTab === 'untagged') return allWarranties.filter(w => !(w.tagIds || []).length && !w.isCargoRelated)
+        const tag = tags.find(t => t.id === activeTab)
+        const isCargoTag = tag && tag.name.toLowerCase() === 'cargo'
+        return allWarranties.filter(w => (w.tagIds || []).includes(activeTab) || (isCargoTag && w.isCargoRelated))
+    }
+
+    const tabWarranties = getTabWarranties()
+    const selectedSet = new Set(selectedIds)
+    const tabAllSelected = tabWarranties.length > 0 && tabWarranties.every(w => selectedSet.has(w.id))
+    const tabNoneSelected = tabWarranties.every(w => !selectedSet.has(w.id))
+    const tabSelectedCount = tabWarranties.filter(w => selectedSet.has(w.id)).length
+    const hasCargoTag = tags.some(t => t.name.toLowerCase() === 'cargo')
+    const untaggedCount = allWarranties.filter(w => !(w.tagIds || []).length && !(hasCargoTag && w.isCargoRelated)).length
+    const ckStyle = { width: '16px', height: '16px', accentColor: 'var(--accent-primary)', marginTop: '2px' }
+    const tabStyle = (isActive: boolean) => ({
+        padding: '6px 14px', borderRadius: '8px 8px 0 0', fontSize: '0.8rem', cursor: 'pointer',
+        background: isActive ? 'rgba(0, 210, 255, 0.1)' : 'transparent',
+        border: '1px solid ' + (isActive ? 'var(--accent-primary)' : 'var(--table-border)'),
+        borderBottom: isActive ? '2px solid var(--accent-primary)' : '1px solid var(--table-border)',
+        color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+        fontWeight: isActive ? 600 : 400
+    })
 
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Warranties</h3>
 
-            {tags.length > 0 && (
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Tag size={14} style={{ color: 'var(--text-secondary)' }} />
-                    <button onClick={() => setActiveTagFilter(null)} style={{
-                        padding: '4px 10px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer',
-                        background: !activeTagFilter ? 'rgba(0, 210, 255, 0.15)' : 'transparent',
-                        border: `1px solid ${!activeTagFilter ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
-                        color: !activeTagFilter ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                    }}>All</button>
-                    {tags.map(tag => {
-                        const tagWarranties = allWarranties.filter(w => (w.tagIds || []).includes(tag.id))
-                        const allSelected = tagWarranties.length > 0 && tagWarranties.every(w => selectedIds.has(w.id))
-                        return (
-                            <div key={tag.id} style={{ display: 'flex', gap: '2px' }}>
-                                <button onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)} style={{
-                                    padding: '4px 10px', borderRadius: '12px 0 0 12px', fontSize: '0.78rem', cursor: 'pointer',
-                                    background: activeTagFilter === tag.id ? 'rgba(0, 210, 255, 0.15)' : 'transparent',
-                                    border: `1px solid ${activeTagFilter === tag.id ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
-                                    color: activeTagFilter === tag.id ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                                }}>{tag.name}</button>
-                                <button onClick={() => toggleTag(tag.id)} title={allSelected ? `Deselect all ${tag.name}` : `Select all ${tag.name}`} style={{
-                                    padding: '4px 8px', borderRadius: '0 12px 12px 0', fontSize: '0.72rem', cursor: 'pointer',
-                                    background: allSelected ? 'rgba(0, 200, 100, 0.15)' : 'rgba(150, 150, 150, 0.1)',
-                                    border: `1px solid ${allSelected ? 'rgba(0, 200, 100, 0.3)' : 'var(--glass-border)'}`,
-                                    color: allSelected ? '#00c864' : 'var(--text-secondary)', borderLeft: 'none'
-                                }}>{allSelected ? '✓' : '○'}</button>
-                            </div>
-                        )
-                    })}
+            {/* Preset sets */}
+            {warrantySets.length > 0 && (
+                <div style={{ marginBottom: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Sets:</span>
+                    {warrantySets.map(ws => (
+                        <button key={ws.id} onClick={() => applySet(ws.id)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }}>
+                            {ws.name}
+                            {ws.defaultSelected && <span style={{ marginLeft: '4px', fontSize: '0.65rem', color: '#00c864' }}>*</span>}
+                        </button>
+                    ))}
                 </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {filteredWarranties.map(w => (
-                    <label key={w.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--table-border)', background: selectedIds.has(w.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
-                        <input type="checkbox" checked={selectedIds.has(w.id)} onChange={() => toggle(w.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)', marginTop: '2px' }} />
-                        <div>
-                            <span style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{w.text}</span>
-                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
-                                {(w.tagIds || []).map(tid => {
+            {/* Category tabs */}
+            <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--table-border)', marginBottom: '12px', flexWrap: 'wrap' }}>
+                <button onClick={() => setActiveTab('all')} style={tabStyle(activeTab === 'all')}>
+                    All <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>({allWarranties.length})</span>
+                </button>
+                {tags.map(tag => {
+                    const isCargoTag = tag.name.toLowerCase() === 'cargo'
+                    const matchesTag = (w: PIWarranty) => (w.tagIds || []).includes(tag.id) || (isCargoTag && w.isCargoRelated)
+                    const count = allWarranties.filter(matchesTag).length
+                    const selCount = allWarranties.filter(w => matchesTag(w) && selectedSet.has(w.id)).length
+                    return (
+                        <button key={tag.id} onClick={() => setActiveTab(tag.id)} style={tabStyle(activeTab === tag.id)}>
+                            {tag.name} <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>({selCount}/{count})</span>
+                        </button>
+                    )
+                })}
+                {untaggedCount > 0 && (
+                    <button onClick={() => setActiveTab('untagged')} style={tabStyle(activeTab === 'untagged')}>
+                        Other <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>({untaggedCount})</span>
+                    </button>
+                )}
+            </div>
+
+            {/* Select All / Deselect All toolbar */}
+            {tabWarranties.length > 0 && (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+                    <button onClick={selectAllInTab} disabled={tabAllSelected} className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.75rem', opacity: tabAllSelected ? 0.4 : 1 }}>Select All ({tabWarranties.length})</button>
+                    <button onClick={deselectAllInTab} disabled={tabNoneSelected} className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.75rem', opacity: tabNoneSelected ? 0.4 : 1 }}>Deselect All</button>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{tabSelectedCount} of {tabWarranties.length} selected</span>
+                </div>
+            )}
+
+            {/* Warranty checkboxes for active tab */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '0', maxHeight: '300px', overflowY: 'auto', padding: '2px' }}>
+                {tabWarranties.map(w => (
+                    <label key={w.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--table-border)', background: selectedSet.has(w.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
+                        <input type="checkbox" checked={selectedSet.has(w.id)} onChange={() => toggle(w.id)} style={ckStyle} />
+                        <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: '0.83rem', whiteSpace: 'pre-wrap' }}>{w.text}</span>
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+                                {w.isCargoRelated && <span style={{ fontSize: '0.63rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
+                                {activeTab === 'all' && (w.tagIds || []).map(tid => {
                                     const tag = tags.find(t => t.id === tid)
-                                    return tag ? <span key={tid} style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
+                                    return tag ? <span key={tid} style={{ fontSize: '0.63rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
                                 })}
                             </div>
                         </div>
                     </label>
                 ))}
+                {tabWarranties.length === 0 && allWarranties.length > 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.82rem', padding: '8px' }}>No warranties in this category. Assign tags to warranties in Settings.</p>}
             </div>
-            {allWarranties.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No warranties defined. Add them in Settings.</p>}
+            {allWarranties.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '16px' }}>No warranties defined. Add them in Settings.</p>}
+
+            {/* ═══════ Divider ═══════ */}
+            <div style={{ borderTop: '2px solid var(--table-border)', margin: '18px 0 14px' }} />
+
+            {/* ─── Selected Warranties ─── */}
+            {selectedIds.length > 0 ? (
+                <div style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Selected Warranties</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'rgba(0, 210, 255, 0.1)', padding: '2px 8px', borderRadius: '10px' }}>{selectedIds.length}{customWarranties.length > 0 ? ` + ${customWarranties.length} custom` : ''}</span>
+                    </div>
+                    <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', overflow: 'hidden', maxHeight: '280px', overflowY: 'auto' }}>
+                        {selectedIds.map((id, i) => {
+                            const w = allWarranties.find(aw => aw.id === id)
+                            if (!w) return null
+                            return (
+                                <div key={id} style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 8px', fontSize: '0.8rem', borderBottom: '1px solid var(--table-border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', minWidth: '18px', textAlign: 'right' }}>{i + 1}.</span>
+                                    <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
+                                        <button onClick={() => moveSelected(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
+                                        <button onClick={() => moveSelected(i, 'down')} disabled={i === selectedIds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === selectedIds.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
+                                    </div>
+                                    <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>{w.text}</span>
+                                    <button onClick={() => toggle(id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }} title="Remove"><X size={12} /></button>
+                                </div>
+                            )
+                        })}
+                        {/* Custom warranties inline in the same list */}
+                        {customWarranties.map((cw, i) => {
+                            const idx = selectedIds.length + i
+                            return (
+                                <div key={cw.id} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', padding: '4px 8px', fontSize: '0.8rem', borderBottom: i < customWarranties.length - 1 ? '1px solid var(--table-border)' : 'none', background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                                    <span style={{ color: 'var(--accent-primary)', fontSize: '0.72rem', minWidth: '18px', textAlign: 'right' }}>{idx + 1}.</span>
+                                    {editingCustomId === cw.id ? (
+                                        <>
+                                            <textarea value={editCustomText} onChange={e => setEditCustomText(e.target.value)} style={{ flex: 1, minHeight: '32px', resize: 'vertical', fontSize: '0.8rem', padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                                            <button onClick={() => saveCustomEdit(cw.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }}><Save size={12} /></button>
+                                            <button onClick={() => setEditingCustomId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{ display: 'flex', gap: '0', flexDirection: 'column' }}>
+                                                <button onClick={() => moveCustom(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
+                                                <button onClick={() => moveCustom(i, 'down')} disabled={i === customWarranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === customWarranties.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
+                                            </div>
+                                            <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>{cw.text}</span>
+                                            <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', whiteSpace: 'nowrap', alignSelf: 'center' }}>custom</span>
+                                            <button onClick={() => { setEditingCustomId(cw.id); setEditCustomText(cw.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '1px', opacity: 0.6 }}><Pencil size={10} /></button>
+                                            <button onClick={() => deleteCustom(cw.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }}><Trash2 size={10} /></button>
+                                        </>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            ) : (
+                <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.82rem', marginBottom: '14px' }}>No warranties selected yet.</p>
+            )}
+
+            {/* Add custom warranty inline */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', alignItems: 'flex-end' }}>
+                <textarea value={newCustomText} onChange={e => { setNewCustomText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }} placeholder="Add a custom warranty..." rows={1} style={{ flex: 1, minHeight: '32px', maxHeight: '200px', resize: 'none', fontSize: '0.8rem', padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', overflow: 'auto' }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addCustom() } }} />
+                <button onClick={addCustom} className="btn-primary" style={{ padding: '5px 10px', fontSize: '0.75rem' }} title="Add custom warranty"><Plus size={12} /></button>
+                <button onClick={() => setShowImportModal(true)} className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.75rem' }} title="Bulk import"><Upload size={12} /></button>
+            </div>
+
+            {/* ─── Standard Texts (collapsible) ─── */}
+            <div style={{ marginBottom: '10px' }}>
+                <button onClick={() => setShowTexts(!showTexts)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0', width: '100%', textAlign: 'left' }}>
+                    <ChevronDown size={14} style={{ color: 'var(--text-secondary)', transform: showTexts ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Standard Texts</span>
+                </button>
+                {showTexts && (
+                    <div style={{ paddingLeft: '20px', marginTop: '8px' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Breach of Warranties</label>
+                        <RichTextEditor
+                            value={quotation.sectionTextsOverride?.warrantiesBreach ?? getEffectiveText('warrantiesBreach')}
+                            onChange={val => {
+                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesBreach: val }
+                                setQ(p => ({ ...p, sectionTextsOverride: override }))
+                                updateField('sectionTextsOverride', override)
+                            }}
+                            minHeight={60}
+                        />
+                        <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '4px', marginTop: '12px', color: 'var(--text-secondary)' }}>Additional Text (after warranties, before breach)</label>
+                        <RichTextEditor
+                            value={quotation.sectionTextsOverride?.warrantiesAdditionalText ?? getEffectiveText('warrantiesAdditionalText')}
+                            onChange={val => {
+                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesAdditionalText: val }
+                                setQ(p => ({ ...p, sectionTextsOverride: override }))
+                                updateField('sectionTextsOverride', override)
+                            }}
+                            minHeight={60}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Import modal */}
+            {showImportModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowImportModal(false)}>
+                    <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '24px', width: '560px', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Import Warranties</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Paste warranties with bullet points, dashes, or numbered lists. Each line becomes a separate warranty.</p>
+                        <textarea
+                            value={importText}
+                            onChange={e => setImportText(e.target.value)}
+                            placeholder="- Warranty one&#10;- Warranty two&#10;• Warranty three&#10;1. Warranty four"
+                            style={{ width: '100%', minHeight: '160px', resize: 'vertical', fontSize: '0.85rem', marginBottom: '10px', padding: '10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
+                        />
+                        <button onClick={parseImportText} className="btn-secondary" style={{ marginBottom: '12px', fontSize: '0.8rem' }}>Parse</button>
+                        {importedItems.length > 0 && (
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Preview ({importedItems.length} items):</label>
+                                {importedItems.map((item, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--table-border)', marginBottom: '3px', fontSize: '0.8rem' }}>
+                                        <span style={{ color: 'var(--text-secondary)', minWidth: '20px' }}>{i + 1}.</span>
+                                        <span style={{ flex: 1 }}>{item}</span>
+                                        <button onClick={() => setImportedItems(prev => prev.filter((_, j) => j !== i))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={12} /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => { setShowImportModal(false); setImportText(''); setImportedItems([]) }} className="btn-secondary" style={{ fontSize: '0.8rem' }}>Cancel</button>
+                            {importedItems.length > 0 && <button onClick={confirmImport} className="btn-primary" style={{ fontSize: '0.8rem' }}>Import {importedItems.length} Warranties</button>}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

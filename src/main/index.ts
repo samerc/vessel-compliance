@@ -1431,6 +1431,12 @@ app.whenReady().then(() => {
   safeHandle('pi:deleteWarranty', (event, id) => { requireAdmin(event); return db.deletePIWarranty(id) })
   safeHandle('pi:reorderWarranties', (event, orderedIds) => { requireAdmin(event); return db.reorderPIWarranties(orderedIds) })
 
+  // P&I Warranty Sets
+  safeHandle('pi:getWarrantySets', (event) => { requireSession(event); return db.getPIWarrantySets() })
+  safeHandle('pi:addWarrantySet', (event, name, warrantyIds, defaultSelected) => { requireAdmin(event); return db.addPIWarrantySet(name, warrantyIds, defaultSelected) })
+  safeHandle('pi:updateWarrantySet', (event, id, name, warrantyIds, defaultSelected) => { requireAdmin(event); return db.updatePIWarrantySet(id, name, warrantyIds, defaultSelected) })
+  safeHandle('pi:deleteWarrantySet', (event, id) => { requireAdmin(event); return db.deletePIWarrantySet(id) })
+
   // P&I Deductibles
   safeHandle('pi:getDeductibles', (event) => { requireSession(event); return db.getPIDeductibles() })
   safeHandle('pi:addDeductible', (event, ded) => { requireAdmin(event); return db.addPIDeductible(ded) })
@@ -1461,10 +1467,14 @@ app.whenReady().then(() => {
 
   // P&I Additional Clauses
   safeHandle('pi:getAdditionalClauses', (event) => { requireSession(event); return db.getPIAdditionalClauses() })
-  safeHandle('pi:addAdditionalClause', (event, text) => { requireAdmin(event); return db.addPIAdditionalClause(text) })
-  safeHandle('pi:updateAdditionalClause', (event, id, text) => { requireAdmin(event); return db.updatePIAdditionalClause(id, text) })
+  safeHandle('pi:addAdditionalClause', (event, code, text) => { requireAdmin(event); return db.addPIAdditionalClause(code, text) })
+  safeHandle('pi:updateAdditionalClause', (event, id, code, text) => { requireAdmin(event); return db.updatePIAdditionalClause(id, code, text) })
   safeHandle('pi:deleteAdditionalClause', (event, id) => { requireAdmin(event); return db.deletePIAdditionalClause(id) })
   safeHandle('pi:reorderAdditionalClauses', (event, orderedIds) => { requireAdmin(event); return db.reorderPIAdditionalClauses(orderedIds) })
+  safeHandle('pi:getAdditionalClauseSets', (event) => { requireSession(event); return db.piGetAdditionalClauseSets() })
+  safeHandle('pi:addAdditionalClauseSet', (event, name, clauseIds) => { requireAdmin(event); return db.piAddAdditionalClauseSet(name, clauseIds) })
+  safeHandle('pi:updateAdditionalClauseSet', (event, id, name, clauseIds) => { requireAdmin(event); return db.piUpdateAdditionalClauseSet(id, name, clauseIds) })
+  safeHandle('pi:deleteAdditionalClauseSet', (event, id) => { requireAdmin(event); return db.piDeleteAdditionalClauseSet(id) })
 
   // Trading Excluded Countries
   safeHandle('pi:getTradingExcludedCountries', (event) => { requireSession(event); return db.getTradingExcludedCountries() })
@@ -1890,6 +1900,12 @@ app.whenReady().then(() => {
   safeHandle('db:deleteQuotationAssured', (event, id) => { requireSession(event); return db.deleteQuotationAssured(id) })
   safeHandle('db:reorderQuotationAssureds', (event, ids) => { requireSession(event); return db.reorderQuotationAssureds(ids) })
 
+  safeHandle('db:getQuotationVessels', (event, qId) => { requireSession(event); return db.getQuotationVessels(qId) })
+  safeHandle('db:addQuotationVessel', (event, data) => { requireSession(event); return db.addQuotationVessel(data) })
+  safeHandle('db:updateQuotationVessel', (event, id, data) => { requireSession(event); return db.updateQuotationVessel(id, data) })
+  safeHandle('db:deleteQuotationVessel', (event, id) => { requireSession(event); return db.deleteQuotationVessel(id) })
+  safeHandle('db:reorderQuotationVessels', (event, ids) => { requireSession(event); return db.reorderQuotationVessels(ids) })
+
   safeHandle('db:getQuotationNewVessel', (event, qId) => { requireSession(event); return db.getQuotationNewVessel(qId) })
   safeHandle('db:upsertQuotationNewVessel', (event, qId, data) => { requireSession(event); return db.upsertQuotationNewVessel(qId, data) })
   safeHandle('db:deleteQuotationNewVessel', (event, qId) => { requireSession(event); return db.deleteQuotationNewVessel(qId) })
@@ -1910,6 +1926,12 @@ app.whenReady().then(() => {
 
   safeHandle('db:getQuotationWarranties', (event, qId) => { requireSession(event); return db.getQuotationWarranties(qId) })
   safeHandle('db:setQuotationWarranties', (event, qId, ids) => { requireSession(event); return db.setQuotationWarranties(qId, ids) })
+
+  safeHandle('db:getQuotationCustomWarranties', (event, qId) => { requireSession(event); return db.getQuotationCustomWarranties(qId) })
+  safeHandle('db:addQuotationCustomWarranty', (event, data) => { requireSession(event); return db.addQuotationCustomWarranty(data) })
+  safeHandle('db:updateQuotationCustomWarranty', (event, id, updates) => { requireSession(event); return db.updateQuotationCustomWarranty(id, updates) })
+  safeHandle('db:deleteQuotationCustomWarranty', (event, id) => { requireSession(event); return db.deleteQuotationCustomWarranty(id) })
+  safeHandle('db:reorderQuotationCustomWarranties', (event, ids) => { requireSession(event); return db.reorderQuotationCustomWarranties(ids) })
 
   safeHandle('db:getQuotationDeductibles', (event, qId) => { requireSession(event); return db.getQuotationDeductibles(qId) })
   safeHandle('db:addQuotationDeductible', (event, data) => { requireSession(event); return db.addQuotationDeductible(data) })

@@ -10,6 +10,7 @@ type QuotationView = 'list' | 'settings' | 'editor'
 export default function QuotationManager() {
     const [view, setView] = useState<QuotationView>('list')
     const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
+    const [listKey, setListKey] = useState(0)
 
     const handleOpenEditor = (quotation: Quotation) => {
         setEditingQuotation(quotation)
@@ -19,6 +20,7 @@ export default function QuotationManager() {
     const handleBackToList = () => {
         setEditingQuotation(null)
         setView('list')
+        setListKey(k => k + 1)
     }
 
     return (
@@ -71,7 +73,7 @@ export default function QuotationManager() {
                 </div>
             )}
 
-            {view === 'list' && <QuotationList onOpenQuotation={handleOpenEditor} />}
+            {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} />}
             {view === 'settings' && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
                 <QuotationEditor quotation={editingQuotation} onBack={handleBackToList} />

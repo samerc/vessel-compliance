@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, TradingExcludedCountry, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -106,11 +106,13 @@ export class MySQLAdapter {
 
             const statements = schemaSql.split(';').filter((s: string) => s.trim())
 
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
             for (const statement of statements) {
                 if (statement.trim()) {
                     await this.pool.query(statement)
                 }
             }
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
 
             // Migration: Normalize all existing tables to utf8mb4_unicode_ci.
             // Multi-pass (up to 5 rounds) so that FK-parent tables converted in
@@ -593,7 +595,10 @@ export class MySQLAdapter {
             // Migration: Add section_texts_override and sanctions_text_override to quotations
             const [qStoCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'section_texts_override'")
             if ((qStoCol as any[]).length === 0) {
-                await this.pool.query('ALTER TABLE quotations ADD COLUMN section_texts_override TEXT NULL')
+                await this.pool.query('ALTER TABLE quotations ADD COLUMN section_texts_override MEDIUMTEXT NULL')
+            } else {
+                // Always ensure MEDIUMTEXT (upgrade from TEXT if needed)
+                await this.pool.query('ALTER TABLE quotations MODIFY COLUMN section_texts_override MEDIUMTEXT NULL')
             }
             const [qSanOvCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'sanctions_text_override'")
             if ((qSanOvCol as any[]).length === 0) {
@@ -636,6 +641,102 @@ export class MySQLAdapter {
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_show_israel BOOLEAN DEFAULT TRUE')
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_custom_text TEXT NULL')
             }
+            // Migration: Add co_name to quotations
+            const [qCoNameCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'co_name'")
+            if ((qCoNameCol as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE quotations ADD COLUMN co_name VARCHAR(255) NULL')
+            }
+
+            // Migration: Add title to quotations
+            const [qTitleCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'title'")
+            if ((qTitleCol as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE quotations ADD COLUMN title VARCHAR(500) NULL')
+            }
+
+            // Migration: Add vessel_label to quotation_assureds
+            const [qaVlCol] = await this.pool.query("SHOW COLUMNS FROM quotation_assureds LIKE 'vessel_label'")
+            if ((qaVlCol as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE quotation_assureds ADD COLUMN vessel_label VARCHAR(20) NULL')
+            }
+
+            // Migration: Add code column to pi_additional_clauses
+            const [acCodeCol] = await this.pool.query("SHOW COLUMNS FROM pi_additional_clauses LIKE 'code'")
+            if ((acCodeCol as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE pi_additional_clauses ADD COLUMN code VARCHAR(50) NULL AFTER id')
+            }
+
+            // Migration: Create quotation_vessels table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_vessels (
+                id VARCHAR(36) PRIMARY KEY,
+                quotation_id VARCHAR(36) NOT NULL,
+                vessel_id VARCHAR(36) NULL,
+                vessel_label VARCHAR(20) NOT NULL DEFAULT 'V1',
+                order_index INT DEFAULT 0,
+                name VARCHAR(255) NULL,
+                imo_number VARCHAR(50) NULL,
+                built_year INT NULL,
+                gross_tonnage DECIMAL(12,2) NULL,
+                flag VARCHAR(100) NULL,
+                vessel_type VARCHAR(100) NULL,
+                classification VARCHAR(100) NULL,
+                call_sign VARCHAR(50) NULL,
+                INDEX idx_qv_quotation_id (quotation_id),
+                INDEX idx_qv_vessel_id (vessel_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+
+            // Data migration: move existing quotations.vessel_id + quotation_new_vessels into quotation_vessels
+            {
+                const [existingQv] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotation_vessels')
+                if ((existingQv as any[])[0].cnt === 0) {
+                    // Migrate existing vessel_id references
+                    const [quotationsWithVessel] = await this.pool.query(
+                        'SELECT id, vessel_id FROM quotations WHERE vessel_id IS NOT NULL'
+                    )
+                    for (const q of quotationsWithVessel as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index) VALUES (?, ?, ?, ?, ?)',
+                            [uuidv4(), q.id, q.vessel_id, 'V1', 0]
+                        )
+                    }
+                    // Migrate quotation_new_vessels
+                    const [newVessels] = await this.pool.query('SELECT * FROM quotation_new_vessels')
+                    for (const nv of newVessels as any[]) {
+                        const [alreadyMigrated] = await this.pool.query(
+                            'SELECT id FROM quotation_vessels WHERE quotation_id = ? AND vessel_id IS NULL', [nv.quotation_id]
+                        )
+                        if ((alreadyMigrated as any[]).length === 0) {
+                            await this.pool.execute(
+                                `INSERT INTO quotation_vessels (id, quotation_id, vessel_label, order_index, name, imo_number, built_year, gross_tonnage, flag, vessel_type, classification, call_sign)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                [uuidv4(), nv.quotation_id, 'V1', 0, nv.name, nv.imo_number, nv.built_year, nv.gross_tonnage, nv.flag, nv.vessel_type, nv.classification, nv.call_sign]
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Migration: Create pi_additional_clause_sets tables
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_additional_clause_sets (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_additional_clause_set_items (
+                id VARCHAR(36) PRIMARY KEY,
+                set_id VARCHAR(36) NOT NULL,
+                clause_id VARCHAR(36) NOT NULL,
+                order_index INT DEFAULT 0,
+                INDEX idx_acsi_set_id (set_id),
+                INDEX idx_acsi_clause_id (clause_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+
+            // Migration: Add order_index to pi_additional_clause_set_items
+            {
+                const [acsiOrdCol] = await this.pool.query("SHOW COLUMNS FROM pi_additional_clause_set_items LIKE 'order_index'")
+                if ((acsiOrdCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE pi_additional_clause_set_items ADD COLUMN order_index INT DEFAULT 0')
+                }
+            }
+
             // Vessel insurance policies (imported from Excel)
             // --- Migrate legacy vessel_insurance_policies → vessel_dynamic_policies ---
             try {
@@ -1090,6 +1191,78 @@ export class MySQLAdapter {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_wbr_created (created_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            }
+
+            // Warranty sets tables (disable FK checks to avoid collation mismatch)
+            {
+                const [t] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'") as any[]
+                if (t.length === 0) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    await this.pool.query(`CREATE TABLE pi_warranty_sets (
+                        id VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+                const [t2] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_set_items'") as any[]
+                if (t2.length === 0) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    await this.pool.query(`CREATE TABLE pi_warranty_set_items (
+                        id VARCHAR(36) PRIMARY KEY,
+                        set_id VARCHAR(36) NOT NULL,
+                        warranty_id VARCHAR(36) NOT NULL,
+                        FOREIGN KEY (set_id) REFERENCES pi_warranty_sets(id) ON DELETE CASCADE,
+                        FOREIGN KEY (warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                } else {
+                    // Fix collation mismatch on existing table
+                    try {
+                        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                        await this.pool.query('ALTER TABLE pi_warranty_set_items CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
+                        await this.pool.query('ALTER TABLE pi_warranty_sets CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
+                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    } catch (e) {
+                        console.error('Migration warning: collation fix for warranty set tables:', e)
+                        try { await this.pool.query('SET FOREIGN_KEY_CHECKS=1') } catch { /* ignore */ }
+                    }
+                }
+            }
+
+            // Quotation custom warranties + order_index migration
+            {
+                const [t] = await this.pool.query("SHOW TABLES LIKE 'quotation_custom_warranties'") as any[]
+                if (t.length === 0) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    await this.pool.query(`CREATE TABLE quotation_custom_warranties (
+                        id VARCHAR(36) PRIMARY KEY,
+                        quotation_id VARCHAR(36) NOT NULL,
+                        text TEXT NOT NULL,
+                        order_index INT DEFAULT 0,
+                        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+            }
+
+            // Add order_index to quotation_warranties if missing
+            {
+                const [cols] = await this.pool.query("SHOW COLUMNS FROM quotation_warranties LIKE 'order_index'") as any[]
+                if (cols.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_warranties ADD COLUMN order_index INT DEFAULT 0')
+                }
+            }
+
+            // Add default_selected to pi_warranty_sets if missing
+            {
+                const [t] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'") as any[]
+                if (t.length > 0) {
+                    const [dsCols] = await this.pool.query("SHOW COLUMNS FROM pi_warranty_sets LIKE 'default_selected'") as any[]
+                    if (dsCols.length === 0) {
+                        await this.pool.query('ALTER TABLE pi_warranty_sets ADD COLUMN default_selected BOOLEAN DEFAULT FALSE')
+                    }
+                }
             }
 
             // Final collation normalization pass — catches any tables created or altered
@@ -3534,6 +3707,56 @@ export class MySQLAdapter {
         }
     }
 
+    // ==================== P&I Warranty Sets ====================
+
+    async getPIWarrantySets(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, default_selected as defaultSelected FROM pi_warranty_sets ORDER BY name ASC')
+        const sets = rows as any[]
+        for (const set of sets) {
+            set.defaultSelected = !!set.defaultSelected
+            const [items] = await this.pool.query('SELECT warranty_id FROM pi_warranty_set_items WHERE set_id = ?', [set.id])
+            set.warrantyIds = (items as any[]).map(i => i.warranty_id)
+        }
+        return sets
+    }
+
+    async addPIWarrantySet(name: string, warrantyIds: string[], defaultSelected?: boolean): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute('INSERT INTO pi_warranty_sets (id, name, default_selected) VALUES (?, ?, ?)', [id, name, defaultSelected ? 1 : 0])
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const [existing] = await this.pool.query('SELECT id FROM pi_warranties') as any[]
+        const validIds = new Set((existing as any[]).map((r: any) => r.id))
+        for (const wid of warrantyIds) {
+            if (validIds.has(wid)) {
+                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id) VALUES (?, ?, ?)', [uuidv4(), id, wid])
+            }
+        }
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        return { id, name, warrantyIds: warrantyIds.filter(w => validIds.has(w)), defaultSelected: !!defaultSelected }
+    }
+
+    async updatePIWarrantySet(id: string, name: string, warrantyIds: string[], defaultSelected?: boolean): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE pi_warranty_sets SET name = ?, default_selected = ? WHERE id = ?', [name, defaultSelected ? 1 : 0, id])
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        await this.pool.execute('DELETE FROM pi_warranty_set_items WHERE set_id = ?', [id])
+        const [existing] = await this.pool.query('SELECT id FROM pi_warranties') as any[]
+        const validIds = new Set((existing as any[]).map((r: any) => r.id))
+        for (const wid of warrantyIds) {
+            if (validIds.has(wid)) {
+                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id) VALUES (?, ?, ?)', [uuidv4(), id, wid])
+            }
+        }
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+    }
+
+    async deletePIWarrantySet(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM pi_warranty_sets WHERE id = ?', [id])
+    }
+
     // ==================== P&I Deductibles ====================
 
     async getPIDeductibles(): Promise<PIDeductible[]> {
@@ -3710,22 +3933,22 @@ export class MySQLAdapter {
 
     async getPIAdditionalClauses(): Promise<PIAdditionalClause[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, text, order_index as `order` FROM pi_additional_clauses ORDER BY order_index ASC')
+        const [rows] = await this.pool.query('SELECT id, code, text, order_index as `order` FROM pi_additional_clauses ORDER BY order_index ASC')
         return rows as PIAdditionalClause[]
     }
 
-    async addPIAdditionalClause(text: string): Promise<PIAdditionalClause> {
+    async addPIAdditionalClause(code: string | null, text: string): Promise<PIAdditionalClause> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         const [maxRow]: any[] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_additional_clauses')
         const order = maxRow[0].nextOrder
-        await this.pool.execute('INSERT INTO pi_additional_clauses (id, text, order_index) VALUES (?, ?, ?)', [id, text, order])
-        return { id, text, order }
+        await this.pool.execute('INSERT INTO pi_additional_clauses (id, code, text, order_index) VALUES (?, ?, ?, ?)', [id, code || null, text, order])
+        return { id, code: code || undefined, text, order }
     }
 
-    async updatePIAdditionalClause(id: string, text: string): Promise<void> {
+    async updatePIAdditionalClause(id: string, code: string | null, text: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE pi_additional_clauses SET text = ? WHERE id = ?', [text, id])
+        await this.pool.execute('UPDATE pi_additional_clauses SET code = ?, text = ? WHERE id = ?', [code || null, text, id])
     }
 
     async deletePIAdditionalClause(id: string): Promise<void> {
@@ -3737,6 +3960,104 @@ export class MySQLAdapter {
         if (!this.pool) return
         for (let i = 0; i < orderedIds.length; i++) {
             await this.pool.execute('UPDATE pi_additional_clauses SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // ==================== P&I Additional Clause Sets ====================
+
+    async piGetAdditionalClauseSets(): Promise<PIAdditionalClauseSet[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name FROM pi_additional_clause_sets ORDER BY name ASC')
+        const sets = rows as PIAdditionalClauseSet[]
+        for (const s of sets) {
+            const [items] = await this.pool.query('SELECT clause_id FROM pi_additional_clause_set_items WHERE set_id = ? ORDER BY order_index ASC', [s.id])
+            s.clauseIds = (items as any[]).map(r => r.clause_id)
+        }
+        return sets
+    }
+
+    async piAddAdditionalClauseSet(name: string, clauseIds: string[]): Promise<PIAdditionalClauseSet> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute('INSERT INTO pi_additional_clause_sets (id, name) VALUES (?, ?)', [id, name])
+        for (let i = 0; i < clauseIds.length; i++) {
+            await this.pool.execute('INSERT INTO pi_additional_clause_set_items (id, set_id, clause_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, clauseIds[i], i])
+        }
+        return { id, name, clauseIds }
+    }
+
+    async piUpdateAdditionalClauseSet(id: string, name: string, clauseIds: string[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE pi_additional_clause_sets SET name = ? WHERE id = ?', [name, id])
+        await this.pool.execute('DELETE FROM pi_additional_clause_set_items WHERE set_id = ?', [id])
+        for (let i = 0; i < clauseIds.length; i++) {
+            await this.pool.execute('INSERT INTO pi_additional_clause_set_items (id, set_id, clause_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, clauseIds[i], i])
+        }
+    }
+
+    async piDeleteAdditionalClauseSet(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM pi_additional_clause_sets WHERE id = ?', [id])
+    }
+
+    // ==================== Quotation Vessels ====================
+
+    async getQuotationVessels(quotationId: string): Promise<QuotationVessel[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT qv.id, qv.quotation_id as quotationId, qv.vessel_id as vesselId, qv.vessel_label as vesselLabel,
+                    qv.order_index as \`order\`,
+                    COALESCE(v.name, qv.name) as name,
+                    COALESCE(v.imo_number, qv.imo_number) as imoNumber,
+                    COALESCE(v.built_year, qv.built_year) as builtYear,
+                    COALESCE(v.gross_tonnage, qv.gross_tonnage) as grossTonnage,
+                    qv.flag, qv.vessel_type as vesselType, qv.classification, qv.call_sign as callSign
+             FROM quotation_vessels qv
+             LEFT JOIN vessels v ON qv.vessel_id = v.id
+             WHERE qv.quotation_id = ?
+             ORDER BY qv.order_index ASC`,
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({
+            ...r,
+            builtYear: r.builtYear != null ? Number(r.builtYear) : undefined,
+            grossTonnage: r.grossTonnage != null ? Number(r.grossTonnage) : undefined
+        }))
+    }
+
+    async addQuotationVessel(data: { quotationId: string; vesselId?: string; vesselLabel: string; order: number; name?: string; imoNumber?: string; builtYear?: number; grossTonnage?: number; flag?: string; vesselType?: string; classification?: string; callSign?: string }): Promise<QuotationVessel> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, gross_tonnage, flag, vessel_type, classification, call_sign)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.quotationId, data.vesselId || null, data.vesselLabel, data.order, data.name || null, data.imoNumber || null, data.builtYear || null, data.grossTonnage || null, data.flag || null, data.vesselType || null, data.classification || null, data.callSign || null]
+        )
+        return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign }
+    }
+
+    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label' }
+        for (const [key, col] of Object.entries(colMap)) {
+            if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
+        }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_vessels SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationVessel(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_vessels WHERE id = ?', [id])
+    }
+
+    async reorderQuotationVessels(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_vessels SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
         }
     }
 
@@ -3803,6 +4124,7 @@ export class MySQLAdapter {
                 q.ncb_enabled as ncbEnabled, q.ncb_discount_percent as ncbDiscountPercent, q.ncb_text as ncbText,
                 q.cpc_enabled as cpcEnabled, q.cpc_discount_percent as cpcDiscountPercent, q.cpc_text as cpcText,
                 q.discount_percent as discountPercent, q.discount_label as discountLabel,
+                q.co_name as coName, q.title as title,
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
@@ -3860,6 +4182,7 @@ export class MySQLAdapter {
             ncbEnabled: 'ncb_enabled', ncbDiscountPercent: 'ncb_discount_percent', ncbText: 'ncb_text',
             cpcEnabled: 'cpc_enabled', cpcDiscountPercent: 'cpc_discount_percent', cpcText: 'cpc_text',
             discountPercent: 'discount_percent', discountLabel: 'discount_label',
+            coName: 'co_name', title: 'title',
             sanctionsTextOverride: 'sanctions_text_override'
         }
         const fields: string[] = []
@@ -3891,26 +4214,27 @@ export class MySQLAdapter {
     async getQuotationAssureds(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT qa.id, qa.quotation_id as quotationId, qa.entity_id as entityId, qa.name, qa.role, qa.order_index as 'order'
+            `SELECT qa.id, qa.quotation_id as quotationId, qa.entity_id as entityId, qa.name, qa.role, qa.vessel_label as vesselLabel, qa.order_index as 'order'
              FROM quotation_assureds qa WHERE qa.quotation_id = ? ORDER BY qa.order_index`, [quotationId])
         return rows as any[]
     }
 
-    async addQuotationAssured(data: { quotationId: string; entityId?: string; name: string; role?: string; order?: number }): Promise<any> {
+    async addQuotationAssured(data: { quotationId: string; entityId?: string; name: string; role?: string; vesselLabel?: string; order?: number }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, order_index) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, data.quotationId, data.entityId || null, data.name, data.role || null, data.order || 0])
+            'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.entityId || null, data.name, data.role || null, data.vesselLabel || null, data.order || 0])
         return { id, ...data }
     }
 
-    async updateQuotationAssured(id: string, updates: { name?: string; role?: string; order?: number }): Promise<void> {
+    async updateQuotationAssured(id: string, updates: { name?: string; role?: string; vesselLabel?: string; order?: number }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.role !== undefined) { fields.push('role = ?'); values.push(updates.role) }
+        if (updates.vesselLabel !== undefined) { fields.push('vessel_label = ?'); values.push(updates.vesselLabel || null) }
         if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
         if (fields.length === 0) return
         values.push(id)
@@ -4052,15 +4376,54 @@ export class MySQLAdapter {
     // -- Quotation Warranties --
     async getQuotationWarranties(quotationId: string): Promise<string[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT pi_warranty_id FROM quotation_warranties WHERE quotation_id = ?', [quotationId])
+        const [rows] = await this.pool.query('SELECT pi_warranty_id FROM quotation_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
         return (rows as any[]).map(r => r.pi_warranty_id)
     }
 
     async setQuotationWarranties(quotationId: string, warrantyIds: string[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotation_warranties WHERE quotation_id = ?', [quotationId])
-        for (const wid of warrantyIds) {
-            await this.pool.execute('INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id) VALUES (?, ?, ?)', [uuidv4(), quotationId, wid])
+        for (let i = 0; i < warrantyIds.length; i++) {
+            await this.pool.execute('INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), quotationId, warrantyIds[i], i])
+        }
+    }
+
+    // -- Quotation Custom Warranties --
+    async getQuotationCustomWarranties(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order` FROM quotation_custom_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return rows as any[]
+    }
+
+    async addQuotationCustomWarranty(data: { quotationId: string; text: string; order?: number }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute('INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index) VALUES (?, ?, ?, ?)',
+                [id, data.quotationId, data.text, data.order ?? 0])
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+        return { id, quotationId: data.quotationId, text: data.text, order: data.order ?? 0 }
+    }
+
+    async updateQuotationCustomWarranty(id: string, updates: { text?: string }): Promise<void> {
+        if (!this.pool) return
+        if (updates.text !== undefined) {
+            await this.pool.execute('UPDATE quotation_custom_warranties SET text = ? WHERE id = ?', [updates.text, id])
+        }
+    }
+
+    async deleteQuotationCustomWarranty(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_custom_warranties WHERE id = ?', [id])
+    }
+
+    async reorderQuotationCustomWarranties(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_custom_warranties SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
         }
     }
 

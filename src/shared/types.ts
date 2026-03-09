@@ -423,9 +423,23 @@ export interface PIWarrantyTag {
 export interface PIWarranty {
   id: string
   text: string
-  isCargoRelated: boolean // legacy, kept for migration compatibility
+  isCargoRelated: boolean
   defaultSelected: boolean
   tagIds?: string[]
+  order: number
+}
+
+export interface PIWarrantySet {
+  id: string
+  name: string
+  warrantyIds?: string[]
+  defaultSelected?: boolean
+}
+
+export interface QuotationCustomWarranty {
+  id: string
+  quotationId: string
+  text: string
   order: number
 }
 
@@ -470,8 +484,15 @@ export interface PISubLimitTemplate {
 
 export interface PIAdditionalClause {
   id: string
+  code?: string
   text: string
   order: number
+}
+
+export interface PIAdditionalClauseSet {
+  id: string
+  name: string
+  clauseIds?: string[]
 }
 
 export interface TradingExcludedCountry {
@@ -520,6 +541,8 @@ export interface Quotation {
   cpcText?: string
   discountPercent?: number
   discountLabel?: string
+  coName?: string
+  title?: string
   sectionTextsOverride?: PISectionTexts
   sanctionsTextOverride?: string
   createdAt?: string
@@ -546,7 +569,25 @@ export interface QuotationAssured {
   entityId?: string
   name: string
   role: string
+  vesselLabel?: string
   order: number
+}
+
+export interface QuotationVessel {
+  id: string
+  quotationId: string
+  vesselId?: string
+  vesselLabel: string
+  order: number
+  // populated from vessels table when vesselId is set
+  name?: string
+  imoNumber?: string
+  builtYear?: number
+  grossTonnage?: number
+  flag?: string
+  vesselType?: string
+  classification?: string
+  callSign?: string
 }
 
 export interface QuotationSubLimit {
@@ -606,10 +647,17 @@ export interface PISectionTexts {
   conditionsIntro?: string
   limitOfLiabilityDefaultText?: string
   tradingIntro?: string
-  tradingConditions?: string
+  tradingConditionA?: string
+  tradingConditionB?: string
+  tradingConditionC?: string
+  tradingConditionD?: string
+  tradingConditionE?: string
+  tradingConditionF?: string
+  tradingConditionG?: string
   tradingIsrael?: string
   ddqCountriesIntro?: string
   warrantiesBreach?: string
+  warrantiesAdditionalText?: string
   warrantiesNote?: string
   deductiblesAggregate?: string
   deductiblesVDR?: string
