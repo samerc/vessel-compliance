@@ -715,6 +715,14 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Add premium_amount to quotation_vessels
+            {
+                const [qvPremCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'premium_amount'") as any[]
+                if (qvPremCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_vessels ADD COLUMN premium_amount DECIMAL(15,2) NULL')
+                }
+            }
+
             // Migration: Create pi_additional_clause_sets tables
             await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_additional_clause_sets (
                 id VARCHAR(36) PRIMARY KEY,
@@ -1265,8 +1273,119 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Create pi_text_deductibles table
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_text_deductibles (
+                id VARCHAR(36) PRIMARY KEY,
+                text TEXT NOT NULL,
+                default_included BOOLEAN DEFAULT FALSE,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+
+            // Migration: Add pi_text_deductible_id to quotation_text_deductibles if missing
+            {
+                const [ptdCol] = await this.pool.query("SHOW COLUMNS FROM quotation_text_deductibles LIKE 'pi_text_deductible_id'") as any[]
+                if (ptdCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_text_deductibles ADD COLUMN pi_text_deductible_id VARCHAR(36) NULL AFTER quotation_id')
+                }
+            }
+
+            // Migration: Add title column to pi_deductibles if missing
+            {
+                const [pdtCol] = await this.pool.query("SHOW COLUMNS FROM pi_deductibles LIKE 'title'") as any[]
+                if (pdtCol.length === 0) {
+                    await this.pool.query("ALTER TABLE pi_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER id")
+                }
+            }
+
+            // Migration: Add title column to quotation_deductibles if missing
+            {
+                const [qdtCol] = await this.pool.query("SHOW COLUMNS FROM quotation_deductibles LIKE 'title'") as any[]
+                if (qdtCol.length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER pi_deductible_id")
+                }
+            }
+
+            // Migration: Add title column to pi_text_deductibles if missing
+            {
+                const [ptdtCol] = await this.pool.query("SHOW COLUMNS FROM pi_text_deductibles LIKE 'title'") as any[]
+                if (ptdtCol.length === 0) {
+                    await this.pool.query("ALTER TABLE pi_text_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER id")
+                }
+            }
+
+            // Migration: Add title column to quotation_text_deductibles if missing
+            {
+                const [qtdtCol] = await this.pool.query("SHOW COLUMNS FROM quotation_text_deductibles LIKE 'title'") as any[]
+                if (qtdtCol.length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_text_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER pi_text_deductible_id")
+                }
+            }
+
+            // Migration: Add deductible_aggregate_enabled to quotations if missing
+            {
+                const [daeCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'deductible_aggregate_enabled'") as any[]
+                if (daeCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN deductible_aggregate_enabled BOOLEAN DEFAULT TRUE AFTER vdr_deductible_enabled')
+                }
+            }
+
+            // Migration: Create pi_subjectivities and pi_subjectivity_doc_types tables
+            {
+                const [piSubjTable] = await this.pool.query("SHOW TABLES LIKE 'pi_subjectivities'") as any[]
+                if (piSubjTable.length === 0) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_subjectivities (
+                        id VARCHAR(36) PRIMARY KEY,
+                        text TEXT NOT NULL,
+                        order_index INT DEFAULT 0
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_subjectivity_doc_types (
+                        id VARCHAR(36) PRIMARY KEY,
+                        subjectivity_id VARCHAR(36) NOT NULL,
+                        doc_type_id VARCHAR(36) NOT NULL,
+                        FOREIGN KEY (subjectivity_id) REFERENCES pi_subjectivities(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+            }
+
+            // Migration: Add new columns to quotation_subjectivities
+            {
+                const [psCol] = await this.pool.query("SHOW COLUMNS FROM quotation_subjectivities LIKE 'pi_subjectivity_id'") as any[]
+                if (psCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_subjectivities ADD COLUMN pi_subjectivity_id VARCHAR(36) AFTER quotation_id')
+                    await this.pool.query('ALTER TABLE quotation_subjectivities ADD COLUMN is_custom BOOLEAN DEFAULT FALSE AFTER text')
+                    await this.pool.query('ALTER TABLE quotation_subjectivities ADD COLUMN is_auto_populated BOOLEAN DEFAULT FALSE AFTER is_custom')
+                }
+            }
+
+            // Migration: Add non_refundable_type and non_refundable_percent to quotations
+            {
+                const [nrtCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'non_refundable_type'") as any[]
+                if (nrtCol.length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN non_refundable_type VARCHAR(20) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN non_refundable_percent DECIMAL(5,2) DEFAULT NULL")
+                }
+            }
+
+            // Migration: Add vessel_scope column to quotation item tables
+            {
+                const vscopeTables = [
+                    'quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles',
+                    'quotation_text_deductibles', 'quotation_subjectivities', 'quotation_clauses',
+                    'quotation_additional_clauses', 'quotation_exclusions'
+                ]
+                for (const tbl of vscopeTables) {
+                    const [vsCols] = await this.pool.query(`SHOW COLUMNS FROM ${tbl} LIKE 'vessel_scope'`) as any[]
+                    if (vsCols.length === 0) {
+                        await this.pool.query(`ALTER TABLE ${tbl} ADD COLUMN vessel_scope TEXT DEFAULT NULL`)
+                    }
+                }
+            }
+
             // Final collation normalization pass — catches any tables created or altered
-            // during migration blocks above (must run after all CREATE/ALTER TABLE statements).
+            // during migration blocks above (must run after all CREATE/ALTER Table statements).
             // Each table is converted independently so one failure never blocks the rest.
             try {
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
@@ -3761,7 +3880,7 @@ export class MySQLAdapter {
 
     async getPIDeductibles(): Promise<PIDeductible[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, description, default_amount as defaultAmount, default_currency as defaultCurrency, has_secondary as hasSecondary, secondary_description as secondaryDescription, secondary_default_amount as secondaryDefaultAmount, order_index as `order` FROM pi_deductibles ORDER BY order_index ASC')
+        const [rows] = await this.pool.query('SELECT id, title, description, default_amount as defaultAmount, default_currency as defaultCurrency, has_secondary as hasSecondary, secondary_description as secondaryDescription, secondary_default_amount as secondaryDefaultAmount, order_index as `order` FROM pi_deductibles ORDER BY order_index ASC')
         return (rows as any[]).map(r => ({ ...r, hasSecondary: Boolean(r.hasSecondary), defaultAmount: Number(r.defaultAmount), secondaryDefaultAmount: r.secondaryDefaultAmount ? Number(r.secondaryDefaultAmount) : undefined }))
     }
 
@@ -3771,8 +3890,8 @@ export class MySQLAdapter {
         const [maxRow]: any[] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_deductibles')
         const order = maxRow[0].nextOrder
         await this.pool.execute(
-            'INSERT INTO pi_deductibles (id, description, default_amount, default_currency, has_secondary, secondary_description, secondary_default_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, ded.description, ded.defaultAmount, ded.defaultCurrency || 'USD', ded.hasSecondary || false, ded.secondaryDescription || null, ded.secondaryDefaultAmount || null, order]
+            'INSERT INTO pi_deductibles (id, title, description, default_amount, default_currency, has_secondary, secondary_description, secondary_default_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, ded.title || '', ded.description, ded.defaultAmount, ded.defaultCurrency || 'USD', ded.hasSecondary || false, ded.secondaryDescription || null, ded.secondaryDefaultAmount || null, order]
         )
         return { ...ded, id, order }
     }
@@ -3781,6 +3900,7 @@ export class MySQLAdapter {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
         if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
         if (updates.defaultAmount !== undefined) { fields.push('default_amount = ?'); values.push(updates.defaultAmount) }
         if (updates.defaultCurrency !== undefined) { fields.push('default_currency = ?'); values.push(updates.defaultCurrency) }
@@ -3849,6 +3969,48 @@ export class MySQLAdapter {
     async deletePIDeductibleSet(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM pi_deductible_sets WHERE id = ?', [id])
+    }
+
+    // ==================== P&I Text Deductibles (Master) ====================
+
+    async getPITextDeductibles(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, title, text, default_included as defaultIncluded, order_index as `order` FROM pi_text_deductibles ORDER BY order_index ASC')
+        return (rows as any[]).map(r => ({ ...r, defaultIncluded: Boolean(r.defaultIncluded) }))
+    }
+
+    async addPITextDeductible(data: { title?: string; text: string; defaultIncluded?: boolean }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_text_deductibles')
+        const order = (maxRow as any[])[0]?.nextOrder || 0
+        await this.pool.execute('INSERT INTO pi_text_deductibles (id, title, text, default_included, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, data.title || '', data.text, data.defaultIncluded ? 1 : 0, order])
+        return { id, title: data.title || '', text: data.text, defaultIncluded: !!data.defaultIncluded, order }
+    }
+
+    async updatePITextDeductible(id: string, updates: { title?: string; text?: string; defaultIncluded?: boolean }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.defaultIncluded !== undefined) { fields.push('default_included = ?'); values.push(updates.defaultIncluded ? 1 : 0) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE pi_text_deductibles SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deletePITextDeductible(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM pi_text_deductibles WHERE id = ?', [id])
+    }
+
+    async reorderPITextDeductibles(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE pi_text_deductibles SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
     }
 
     // ==================== P&I Exclusions ====================
@@ -4011,7 +4173,8 @@ export class MySQLAdapter {
                     COALESCE(v.imo_number, qv.imo_number) as imoNumber,
                     COALESCE(v.built_year, qv.built_year) as builtYear,
                     COALESCE(v.gross_tonnage, qv.gross_tonnage) as grossTonnage,
-                    qv.flag, qv.vessel_type as vesselType, qv.classification, qv.call_sign as callSign
+                    qv.flag, qv.vessel_type as vesselType, qv.classification, qv.call_sign as callSign,
+                    qv.premium_amount as premiumAmount
              FROM quotation_vessels qv
              LEFT JOIN vessels v ON qv.vessel_id = v.id
              WHERE qv.quotation_id = ?
@@ -4021,7 +4184,8 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({
             ...r,
             builtYear: r.builtYear != null ? Number(r.builtYear) : undefined,
-            grossTonnage: r.grossTonnage != null ? Number(r.grossTonnage) : undefined
+            grossTonnage: r.grossTonnage != null ? Number(r.grossTonnage) : undefined,
+            premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined
         }))
     }
 
@@ -4036,11 +4200,11 @@ export class MySQLAdapter {
         return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign }
     }
 
-    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string }>): Promise<void> {
+    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; premiumAmount: number }>): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label' }
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', premiumAmount: 'premium_amount' }
         for (const [key, col] of Object.entries(colMap)) {
             if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
         }
@@ -4118,12 +4282,13 @@ export class MySQLAdapter {
                 q.trading_custom_text as tradingCustomText,
                 q.sanctions_clause_version as sanctionsClauseVersion,
                 q.vdr_deductible_enabled as vdrDeductibleEnabled,
+                q.deductible_aggregate_enabled as deductibleAggregateEnabled,
                 q.deductible_aggregate_text as deductibleAggregateText,
                 q.validity_days as validityDays,
                 q.premium_additional_text as premiumAdditionalText,
                 q.ncb_enabled as ncbEnabled, q.ncb_discount_percent as ncbDiscountPercent, q.ncb_text as ncbText,
-                q.cpc_enabled as cpcEnabled, q.cpc_discount_percent as cpcDiscountPercent, q.cpc_text as cpcText,
-                q.discount_percent as discountPercent, q.discount_label as discountLabel,
+                q.cpc_enabled as upccEnabled, q.cpc_discount_percent as upccDiscountPercent, q.cpc_text as upccText,
+                q.non_refundable_type as nonRefundableType, q.non_refundable_percent as nonRefundablePercent,
                 q.co_name as coName, q.title as title,
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
@@ -4137,15 +4302,14 @@ export class MySQLAdapter {
             isRenewal: Boolean(r.isRenewal),
             vdrDeductibleEnabled: Boolean(r.vdrDeductibleEnabled),
             ncbEnabled: Boolean(r.ncbEnabled),
-            cpcEnabled: Boolean(r.cpcEnabled),
+            upccEnabled: Boolean(r.upccEnabled),
             tradingShowDdqList: r.tradingShowDdqList == null ? true : Boolean(r.tradingShowDdqList),
             tradingShowDdqWarranties: r.tradingShowDdqWarranties == null ? true : Boolean(r.tradingShowDdqWarranties),
             tradingShowIsrael: r.tradingShowIsrael == null ? true : Boolean(r.tradingShowIsrael),
             limitOfLiabilityAmount: r.limitOfLiabilityAmount ? Number(r.limitOfLiabilityAmount) : undefined,
             premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
             ncbDiscountPercent: r.ncbDiscountPercent ? Number(r.ncbDiscountPercent) : undefined,
-            cpcDiscountPercent: r.cpcDiscountPercent ? Number(r.cpcDiscountPercent) : undefined,
-            discountPercent: r.discountPercent ? Number(r.discountPercent) : undefined,
+            upccDiscountPercent: r.upccDiscountPercent ? Number(r.upccDiscountPercent) : undefined,
             validityDays: r.validityDays ? Number(r.validityDays) : 14,
             sectionTextsOverride: r.sectionTextsOverrideRaw ? (() => { try { return JSON.parse(r.sectionTextsOverrideRaw) } catch { return undefined } })() : undefined,
             sectionTextsOverrideRaw: undefined
@@ -4163,7 +4327,7 @@ export class MySQLAdapter {
             q.isRenewal || false, q.status || 'draft', q.periodText || null, q.validityDays || 14,
             q.sanctionsClauseVersion || 'standard', q.vdrDeductibleEnabled !== false, q.createdBy || null
         ])
-        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || 'standard', vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, cpcEnabled: q.cpcEnabled || false, referenceNumber: q.referenceNumber || '' } as Quotation
+        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || 'standard', vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: q.referenceNumber || '' } as Quotation
     }
 
     async updateQuotation(id: string, updates: Partial<Quotation>): Promise<void> {
@@ -4177,11 +4341,11 @@ export class MySQLAdapter {
             tradingShowDdqList: 'trading_show_ddq_list', tradingShowDdqWarranties: 'trading_show_ddq_warranties',
             tradingShowIsrael: 'trading_show_israel', tradingCustomText: 'trading_custom_text',
             sanctionsClauseVersion: 'sanctions_clause_version', vdrDeductibleEnabled: 'vdr_deductible_enabled',
-            deductibleAggregateText: 'deductible_aggregate_text', validityDays: 'validity_days',
+            deductibleAggregateEnabled: 'deductible_aggregate_enabled', deductibleAggregateText: 'deductible_aggregate_text', validityDays: 'validity_days',
             premiumAdditionalText: 'premium_additional_text',
             ncbEnabled: 'ncb_enabled', ncbDiscountPercent: 'ncb_discount_percent', ncbText: 'ncb_text',
-            cpcEnabled: 'cpc_enabled', cpcDiscountPercent: 'cpc_discount_percent', cpcText: 'cpc_text',
-            discountPercent: 'discount_percent', discountLabel: 'discount_label',
+            upccEnabled: 'cpc_enabled', upccDiscountPercent: 'cpc_discount_percent', upccText: 'cpc_text',
+            nonRefundableType: 'non_refundable_type', nonRefundablePercent: 'non_refundable_percent',
             coName: 'co_name', title: 'title',
             sanctionsTextOverride: 'sanctions_text_override'
         }
@@ -4320,10 +4484,10 @@ export class MySQLAdapter {
     }
 
     // -- Quotation Clauses --
-    async getQuotationClauses(quotationId: string): Promise<string[]> {
+    async getQuotationClauses(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT pi_clause_id FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
-        return (rows as any[]).map(r => r.pi_clause_id)
+        const [rows] = await this.pool.query('SELECT pi_clause_id as piClauseId, vessel_scope as vesselScope FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
     async getQuotationClauseOverrides(quotationId: string): Promise<Record<string, string>> {
@@ -4338,10 +4502,14 @@ export class MySQLAdapter {
 
     async setQuotationClauses(quotationId: string, clauseIds: string[], descriptionOverrides?: Record<string, string>): Promise<void> {
         if (!this.pool) return
+        // Preserve existing vessel_scope values before delete+re-insert
+        const [existing] = await this.pool.query('SELECT pi_clause_id, vessel_scope FROM quotation_clauses WHERE quotation_id = ?', [quotationId]) as any[]
+        const scopeMap: Record<string, string | null> = {}
+        for (const r of existing) { scopeMap[r.pi_clause_id] = r.vessel_scope }
         await this.pool.execute('DELETE FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
         for (const cid of clauseIds) {
             const override = descriptionOverrides?.[cid] || null
-            await this.pool.execute('INSERT INTO quotation_clauses (id, quotation_id, pi_clause_id, description_override) VALUES (?, ?, ?, ?)', [uuidv4(), quotationId, cid, override])
+            await this.pool.execute('INSERT INTO quotation_clauses (id, quotation_id, pi_clause_id, description_override, vessel_scope) VALUES (?, ?, ?, ?, ?)', [uuidv4(), quotationId, cid, override, scopeMap[cid] || null])
         }
     }
 
@@ -4354,17 +4522,17 @@ export class MySQLAdapter {
     async getQuotationAdditionalClauses(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, pi_additional_clause_id as piAdditionalClauseId, custom_text as customText, order_index as 'order'
+            `SELECT id, quotation_id as quotationId, pi_additional_clause_id as piAdditionalClauseId, custom_text as customText, order_index as 'order', vessel_scope as vesselScope
              FROM quotation_additional_clauses WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return rows as any[]
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
-    async addQuotationAdditionalClause(data: { quotationId: string; piAdditionalClauseId?: string; customText?: string; order?: number }): Promise<any> {
+    async addQuotationAdditionalClause(data: { quotationId: string; piAdditionalClauseId?: string; customText?: string; order?: number; vesselScope?: string[] }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO quotation_additional_clauses (id, quotation_id, pi_additional_clause_id, custom_text, order_index) VALUES (?, ?, ?, ?, ?)',
-            [id, data.quotationId, data.piAdditionalClauseId || null, data.customText || null, data.order || 0])
+            'INSERT INTO quotation_additional_clauses (id, quotation_id, pi_additional_clause_id, custom_text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.piAdditionalClauseId || null, data.customText || null, data.order || 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
         return { id, ...data }
     }
 
@@ -4374,45 +4542,63 @@ export class MySQLAdapter {
     }
 
     // -- Quotation Warranties --
-    async getQuotationWarranties(quotationId: string): Promise<string[]> {
+    async getQuotationWarranties(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT pi_warranty_id FROM quotation_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => r.pi_warranty_id)
+        const [rows] = await this.pool.query('SELECT id, pi_warranty_id as piWarrantyId, order_index as `order`, vessel_scope as vesselScope FROM quotation_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+    }
+
+    async updateQuotationWarrantyVesselScope(quotationId: string, piWarrantyId: string, vesselScope: string[] | null): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE quotation_warranties SET vessel_scope = ? WHERE quotation_id = ? AND pi_warranty_id = ?', [vesselScope ? JSON.stringify(vesselScope) : null, quotationId, piWarrantyId])
+    }
+
+    async updateQuotationClauseVesselScope(quotationId: string, piClauseId: string, vesselScope: string[] | null): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE quotation_clauses SET vessel_scope = ? WHERE quotation_id = ? AND pi_clause_id = ?', [vesselScope ? JSON.stringify(vesselScope) : null, quotationId, piClauseId])
     }
 
     async setQuotationWarranties(quotationId: string, warrantyIds: string[]): Promise<void> {
         if (!this.pool) return
+        // Preserve existing vessel_scope values before delete+re-insert
+        const [existing] = await this.pool.query('SELECT pi_warranty_id, vessel_scope FROM quotation_warranties WHERE quotation_id = ?', [quotationId]) as any[]
+        const scopeMap: Record<string, string | null> = {}
+        for (const r of existing) { scopeMap[r.pi_warranty_id] = r.vessel_scope }
         await this.pool.execute('DELETE FROM quotation_warranties WHERE quotation_id = ?', [quotationId])
         for (let i = 0; i < warrantyIds.length; i++) {
-            await this.pool.execute('INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), quotationId, warrantyIds[i], i])
+            await this.pool.execute('INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)', [uuidv4(), quotationId, warrantyIds[i], i, scopeMap[warrantyIds[i]] || null])
         }
     }
 
     // -- Quotation Custom Warranties --
     async getQuotationCustomWarranties(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order` FROM quotation_custom_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return rows as any[]
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope FROM quotation_custom_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
-    async addQuotationCustomWarranty(data: { quotationId: string; text: string; order?: number }): Promise<any> {
+    async addQuotationCustomWarranty(data: { quotationId: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
-            await this.pool.execute('INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index) VALUES (?, ?, ?, ?)',
-                [id, data.quotationId, data.text, data.order ?? 0])
+            await this.pool.execute('INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
+                [id, data.quotationId, data.text, data.order ?? 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
         } finally {
             await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
         }
-        return { id, quotationId: data.quotationId, text: data.text, order: data.order ?? 0 }
+        return { id, quotationId: data.quotationId, text: data.text, order: data.order ?? 0, vesselScope: data.vesselScope || null }
     }
 
-    async updateQuotationCustomWarranty(id: string, updates: { text?: string }): Promise<void> {
+    async updateQuotationCustomWarranty(id: string, updates: { text?: string; vesselScope?: string[] | null }): Promise<void> {
         if (!this.pool) return
-        if (updates.text !== undefined) {
-            await this.pool.execute('UPDATE quotation_custom_warranties SET text = ? WHERE id = ?', [updates.text, id])
-        }
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_custom_warranties SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
     async deleteQuotationCustomWarranty(id: string): Promise<void> {
@@ -4431,30 +4617,32 @@ export class MySQLAdapter {
     async getQuotationDeductibles(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, pi_deductible_id as piDeductibleId, description, amount, currency,
-                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order'
+            `SELECT id, quotation_id as quotationId, pi_deductible_id as piDeductibleId, title, description, amount, currency,
+                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope
              FROM quotation_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined }))
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
-    async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number }): Promise<any> {
+    async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[] }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO quotation_deductibles (id, quotation_id, pi_deductible_id, description, amount, currency, secondary_amount, secondary_description, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, data.quotationId, data.piDeductibleId || null, data.description, data.amount, data.currency, data.secondaryAmount || null, data.secondaryDescription || null, data.order || 0])
+            'INSERT INTO quotation_deductibles (id, quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.piDeductibleId || null, data.title || '', data.description, data.amount, data.currency, data.secondaryAmount || null, data.secondaryDescription || null, data.order || 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
         return { id, ...data }
     }
 
-    async updateQuotationDeductible(id: string, updates: { description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string }): Promise<void> {
+    async updateQuotationDeductible(id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
         if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
         if (updates.amount !== undefined) { fields.push('amount = ?'); values.push(updates.amount) }
         if (updates.currency !== undefined) { fields.push('currency = ?'); values.push(updates.currency) }
         if (updates.secondaryAmount !== undefined) { fields.push('secondary_amount = ?'); values.push(updates.secondaryAmount) }
         if (updates.secondaryDescription !== undefined) { fields.push('secondary_description = ?'); values.push(updates.secondaryDescription) }
+        if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_deductibles SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -4465,20 +4653,44 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM quotation_deductibles WHERE id = ?', [id])
     }
 
+    async reorderQuotationDeductibles(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_deductibles SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
     // -- Quotation Text Deductibles --
     async getQuotationTextDeductibles(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, text, order_index as 'order' FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return rows as any[]
+            `SELECT id, quotation_id as quotationId, pi_text_deductible_id as piTextDeductibleId, title, text, order_index as 'order', vessel_scope as vesselScope FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
-    async addQuotationTextDeductible(data: { quotationId: string; text: string; order?: number }): Promise<any> {
+    async addQuotationTextDeductible(data: { quotationId: string; piTextDeductibleId?: string; title?: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.execute('INSERT INTO quotation_text_deductibles (id, quotation_id, text, order_index) VALUES (?, ?, ?, ?)',
-            [id, data.quotationId, data.text, data.order || 0])
-        return { id, ...data }
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute('INSERT INTO quotation_text_deductibles (id, quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [id, data.quotationId, data.piTextDeductibleId || null, data.title || '', data.text, data.order ?? 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+        return { id, quotationId: data.quotationId, piTextDeductibleId: data.piTextDeductibleId, title: data.title || '', text: data.text, order: data.order ?? 0, vesselScope: data.vesselScope || null }
+    }
+
+    async updateQuotationTextDeductible(id: string, updates: { title?: string; text?: string; vesselScope?: string[] | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_text_deductibles SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
     async deleteQuotationTextDeductible(id: string): Promise<void> {
@@ -4486,21 +4698,32 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM quotation_text_deductibles WHERE id = ?', [id])
     }
 
+    async reorderQuotationTextDeductibles(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_text_deductibles SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
     // -- Quotation Exclusions --
     async getQuotationExclusions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText
+            `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText, vessel_scope as vesselScope
              FROM quotation_exclusions WHERE quotation_id = ?`, [quotationId])
-        return rows as any[]
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
     async setQuotationExclusions(quotationId: string, items: { piExclusionId?: string; customText?: string }[]): Promise<void> {
         if (!this.pool) return
+        // Preserve existing vessel_scope values before delete+re-insert
+        const [existing] = await this.pool.query('SELECT pi_exclusion_id, vessel_scope FROM quotation_exclusions WHERE quotation_id = ?', [quotationId]) as any[]
+        const scopeMap: Record<string, string | null> = {}
+        for (const r of existing) { if (r.pi_exclusion_id) scopeMap[r.pi_exclusion_id] = r.vessel_scope }
         await this.pool.execute('DELETE FROM quotation_exclusions WHERE quotation_id = ?', [quotationId])
         for (const item of items) {
-            await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text) VALUES (?, ?, ?, ?)',
-                [uuidv4(), quotationId, item.piExclusionId || null, item.customText || null])
+            await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text, vessel_scope) VALUES (?, ?, ?, ?, ?)',
+                [uuidv4(), quotationId, item.piExclusionId || null, item.customText || null, (item.piExclusionId && scopeMap[item.piExclusionId]) || null])
         }
     }
 
@@ -4521,25 +4744,87 @@ export class MySQLAdapter {
         }
     }
 
+    // -- Master Subjectivities (PI) --
+    async getPISubjectivities(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, text, order_index as `order` FROM pi_subjectivities ORDER BY order_index ASC')
+        const subjs = rows as any[]
+        // Load doc type links
+        for (const s of subjs) {
+            const [links] = await this.pool.query(
+                'SELECT doc_type_id as docTypeId FROM pi_subjectivity_doc_types WHERE subjectivity_id = ?', [s.id])
+            s.docTypeIds = (links as any[]).map(l => l.docTypeId)
+        }
+        return subjs
+    }
+
+    async addPISubjectivity(data: { text: string; docTypeIds?: string[]; order?: number }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute('INSERT INTO pi_subjectivities (id, text, order_index) VALUES (?, ?, ?)',
+            [id, data.text, data.order || 0])
+        if (data.docTypeIds && data.docTypeIds.length > 0) {
+            for (const dtId of data.docTypeIds) {
+                await this.pool.execute('INSERT INTO pi_subjectivity_doc_types (id, subjectivity_id, doc_type_id) VALUES (?, ?, ?)',
+                    [uuidv4(), id, dtId])
+            }
+        }
+        return { id, text: data.text, docTypeIds: data.docTypeIds || [], order: data.order || 0 }
+    }
+
+    async updatePISubjectivity(id: string, data: { text: string; docTypeIds?: string[] }): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE pi_subjectivities SET text = ? WHERE id = ?', [data.text, id])
+        // Replace doc type links
+        await this.pool.execute('DELETE FROM pi_subjectivity_doc_types WHERE subjectivity_id = ?', [id])
+        if (data.docTypeIds && data.docTypeIds.length > 0) {
+            for (const dtId of data.docTypeIds) {
+                await this.pool.execute('INSERT INTO pi_subjectivity_doc_types (id, subjectivity_id, doc_type_id) VALUES (?, ?, ?)',
+                    [uuidv4(), id, dtId])
+            }
+        }
+    }
+
+    async deletePISubjectivity(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM pi_subjectivities WHERE id = ?', [id])
+    }
+
+    async reorderPISubjectivities(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE pi_subjectivities SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
     // -- Quotation Subjectivities --
     async getQuotationSubjectivities(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, text, order_index as 'order' FROM quotation_subjectivities WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return rows as any[]
+            `SELECT id, quotation_id as quotationId, pi_subjectivity_id as piSubjectivityId, text, is_custom as isCustom, is_auto_populated as isAutoPopulated, order_index as 'order', vessel_scope as vesselScope FROM quotation_subjectivities WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
+        return (rows as any[]).map(r => ({ ...r, isCustom: Boolean(r.isCustom), isAutoPopulated: Boolean(r.isAutoPopulated), vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
-    async addQuotationSubjectivity(data: { quotationId: string; text: string; order?: number }): Promise<any> {
+    async addQuotationSubjectivity(data: { quotationId: string; piSubjectivityId?: string; text: string; isCustom?: boolean; isAutoPopulated?: boolean; order?: number; vesselScope?: string[] }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.execute('INSERT INTO quotation_subjectivities (id, quotation_id, text, order_index) VALUES (?, ?, ?, ?)',
-            [id, data.quotationId, data.text, data.order || 0])
+        await this.pool.execute(
+            'INSERT INTO quotation_subjectivities (id, quotation_id, pi_subjectivity_id, text, is_custom, is_auto_populated, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.piSubjectivityId || null, data.text, data.isCustom ? 1 : 0, data.isAutoPopulated ? 1 : 0, data.order || 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
         return { id, ...data }
     }
 
-    async updateQuotationSubjectivity(id: string, text: string): Promise<void> {
+    async updateQuotationSubjectivity(id: string, data: { text?: string; order?: number; vesselScope?: string[] | null }): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE quotation_subjectivities SET text = ? WHERE id = ?', [text, id])
+        const sets: string[] = []
+        const vals: any[] = []
+        if (data.text !== undefined) { sets.push('text = ?'); vals.push(data.text) }
+        if (data.order !== undefined) { sets.push('order_index = ?'); vals.push(data.order) }
+        if (data.vesselScope !== undefined) { sets.push('vessel_scope = ?'); vals.push(data.vesselScope ? JSON.stringify(data.vesselScope) : null) }
+        if (sets.length === 0) return
+        vals.push(id)
+        await this.pool.execute(`UPDATE quotation_subjectivities SET ${sets.join(', ')} WHERE id = ?`, vals)
     }
 
     async deleteQuotationSubjectivity(id: string): Promise<void> {
@@ -4547,22 +4832,30 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM quotation_subjectivities WHERE id = ?', [id])
     }
 
+    // -- Generic vessel scope update for any quotation item table --
+    async updateQuotationItemVesselScope(table: string, id: string, vesselScope: string[] | null): Promise<void> {
+        if (!this.pool) return
+        const allowedTables = ['quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_subjectivities', 'quotation_clauses', 'quotation_additional_clauses', 'quotation_exclusions']
+        if (!allowedTables.includes(table)) return
+        await this.pool.execute(`UPDATE ${table} SET vessel_scope = ? WHERE id = ?`, [vesselScope ? JSON.stringify(vesselScope) : null, id])
+    }
+
     // -- Quotation Instalments --
     async getQuotationInstalments(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, instalment_number as instalmentNumber, days_from_inception as daysFromInception, description, non_refundable as nonRefundable, non_refundable_percent as nonRefundablePercent
+            `SELECT id, quotation_id as quotationId, instalment_number as instalmentNumber, days_from_inception as daysFromInception
              FROM quotation_instalments WHERE quotation_id = ? ORDER BY instalment_number`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, instalmentNumber: Number(r.instalmentNumber), daysFromInception: Number(r.daysFromInception), nonRefundable: Boolean(r.nonRefundable), nonRefundablePercent: r.nonRefundablePercent ? Number(r.nonRefundablePercent) : undefined }))
+        return (rows as any[]).map(r => ({ ...r, instalmentNumber: Number(r.instalmentNumber), daysFromInception: Number(r.daysFromInception) }))
     }
 
-    async setQuotationInstalments(quotationId: string, instalments: { instalmentNumber: number; daysFromInception: number; description?: string; nonRefundable?: boolean; nonRefundablePercent?: number }[]): Promise<void> {
+    async setQuotationInstalments(quotationId: string, instalments: { instalmentNumber: number; daysFromInception: number }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotation_instalments WHERE quotation_id = ?', [quotationId])
         for (const inst of instalments) {
             await this.pool.execute(
-                'INSERT INTO quotation_instalments (id, quotation_id, instalment_number, days_from_inception, description, non_refundable, non_refundable_percent) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [uuidv4(), quotationId, inst.instalmentNumber, inst.daysFromInception, inst.description || null, inst.nonRefundable || false, inst.nonRefundablePercent || null])
+                'INSERT INTO quotation_instalments (id, quotation_id, instalment_number, days_from_inception) VALUES (?, ?, ?, ?)',
+                [uuidv4(), quotationId, inst.instalmentNumber, inst.daysFromInception])
         }
     }
 

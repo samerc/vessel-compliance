@@ -63,8 +63,12 @@ export function parseHtmlToParagraphs(
     return segments
   }
 
-  function makeParagraphFromSegments(segments: TextSegment[], bullet?: boolean): Paragraph {
-    const children = segments.map(seg => new TextRun({
+  function makeParagraphFromSegments(segments: TextSegment[], listPrefix?: string): Paragraph {
+    const children: TextRun[] = []
+    if (listPrefix) {
+      children.push(new TextRun({ text: listPrefix, size, font, color }))
+    }
+    children.push(...segments.map(seg => new TextRun({
       text: seg.text,
       size,
       font,
@@ -72,12 +76,12 @@ export function parseHtmlToParagraphs(
       bold: seg.bold,
       italics: seg.italic,
       underline: seg.underline ? {} : undefined
-    }))
+    })))
 
     return new Paragraph({
       spacing: { after: 80 },
       alignment: opts?.alignment,
-      ...(bullet ? { bullet: { level: 0 }, indent: { left: 360, hanging: 360 } } : {}),
+      ...(listPrefix ? { indent: { left: 140, hanging: 140 } } : {}),
       children
     })
   }
@@ -105,10 +109,13 @@ export function parseHtmlToParagraphs(
             paragraphs.push(makeParagraphFromSegments(segments))
           }
         } else if (tag === 'ul' || tag === 'ol') {
+          let idx = 0
           for (const li of Array.from(el.children)) {
             if (li.tagName.toLowerCase() === 'li') {
+              idx++
+              const prefix = tag === 'ol' ? `${idx}. ` : '- '
               const segments = extractSegments(li)
-              paragraphs.push(makeParagraphFromSegments(segments, true))
+              paragraphs.push(makeParagraphFromSegments(segments, prefix))
             }
           }
         } else if (tag === 'br') {

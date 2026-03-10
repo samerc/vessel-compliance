@@ -243,6 +243,12 @@ const api = {
   piUpdateDeductibleSet: (id: string, name: string, items: any[]) => ipcRenderer.invoke('pi:updateDeductibleSet', id, name, items),
   piDeleteDeductibleSet: (id: string) => ipcRenderer.invoke('pi:deleteDeductibleSet', id),
 
+  piGetTextDeductibles: () => ipcRenderer.invoke('pi:getTextDeductibles'),
+  piAddTextDeductible: (data: { text: string; defaultIncluded?: boolean }) => ipcRenderer.invoke('pi:addTextDeductible', data),
+  piUpdateTextDeductible: (id: string, updates: { text?: string; defaultIncluded?: boolean }) => ipcRenderer.invoke('pi:updateTextDeductible', id, updates),
+  piDeleteTextDeductible: (id: string) => ipcRenderer.invoke('pi:deleteTextDeductible', id),
+  piReorderTextDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderTextDeductibles', orderedIds),
+
   piGetExclusions: () => ipcRenderer.invoke('pi:getExclusions'),
   piAddExclusion: (text: string) => ipcRenderer.invoke('pi:addExclusion', text),
   piUpdateExclusion: (id: string, text: string) => ipcRenderer.invoke('pi:updateExclusion', id, text),
@@ -395,6 +401,8 @@ const api = {
 
   getQuotationWarranties: (qId: string) => ipcRenderer.invoke('db:getQuotationWarranties', qId),
   setQuotationWarranties: (qId: string, ids: string[]) => ipcRenderer.invoke('db:setQuotationWarranties', qId, ids),
+  updateQuotationWarrantyVesselScope: (qId: string, piWarrantyId: string, vesselScope: string[] | null) => ipcRenderer.invoke('db:updateQuotationWarrantyVesselScope', qId, piWarrantyId, vesselScope),
+  updateQuotationClauseVesselScope: (qId: string, piClauseId: string, vesselScope: string[] | null) => ipcRenderer.invoke('db:updateQuotationClauseVesselScope', qId, piClauseId, vesselScope),
   getQuotationCustomWarranties: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomWarranties', qId),
   addQuotationCustomWarranty: (data: { quotationId: string; text: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomWarranty', data),
   updateQuotationCustomWarranty: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomWarranty', id, updates),
@@ -405,20 +413,31 @@ const api = {
   addQuotationDeductible: (data: any) => ipcRenderer.invoke('db:addQuotationDeductible', data),
   updateQuotationDeductible: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationDeductible', id, updates),
   deleteQuotationDeductible: (id: string) => ipcRenderer.invoke('db:deleteQuotationDeductible', id),
+  reorderQuotationDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('db:reorderQuotationDeductibles', orderedIds),
 
   getQuotationTextDeductibles: (qId: string) => ipcRenderer.invoke('db:getQuotationTextDeductibles', qId),
   addQuotationTextDeductible: (data: any) => ipcRenderer.invoke('db:addQuotationTextDeductible', data),
+  updateQuotationTextDeductible: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationTextDeductible', id, updates),
   deleteQuotationTextDeductible: (id: string) => ipcRenderer.invoke('db:deleteQuotationTextDeductible', id),
+  reorderQuotationTextDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('db:reorderQuotationTextDeductibles', orderedIds),
 
   getQuotationExclusions: (qId: string) => ipcRenderer.invoke('db:getQuotationExclusions', qId),
   setQuotationExclusions: (qId: string, items: any[]) => ipcRenderer.invoke('db:setQuotationExclusions', qId, items),
 
+  updateQuotationItemVesselScope: (table: string, id: string, vesselScope: string[] | null) => ipcRenderer.invoke('db:updateQuotationItemVesselScope', table, id, vesselScope),
+
   getQuotationExcludedCountries: (qId: string) => ipcRenderer.invoke('db:getQuotationExcludedCountries', qId),
   setQuotationExcludedCountries: (qId: string, countries: any[]) => ipcRenderer.invoke('db:setQuotationExcludedCountries', qId, countries),
 
+  getPISubjectivities: () => ipcRenderer.invoke('db:getPISubjectivities'),
+  addPISubjectivity: (data: any) => ipcRenderer.invoke('db:addPISubjectivity', data),
+  updatePISubjectivity: (id: string, data: any) => ipcRenderer.invoke('db:updatePISubjectivity', id, data),
+  deletePISubjectivity: (id: string) => ipcRenderer.invoke('db:deletePISubjectivity', id),
+  reorderPISubjectivities: (ids: string[]) => ipcRenderer.invoke('db:reorderPISubjectivities', ids),
+
   getQuotationSubjectivities: (qId: string) => ipcRenderer.invoke('db:getQuotationSubjectivities', qId),
   addQuotationSubjectivity: (data: any) => ipcRenderer.invoke('db:addQuotationSubjectivity', data),
-  updateQuotationSubjectivity: (id: string, text: string) => ipcRenderer.invoke('db:updateQuotationSubjectivity', id, text),
+  updateQuotationSubjectivity: (id: string, data: any) => ipcRenderer.invoke('db:updateQuotationSubjectivity', id, data),
   deleteQuotationSubjectivity: (id: string) => ipcRenderer.invoke('db:deleteQuotationSubjectivity', id),
 
   getQuotationInstalments: (qId: string) => ipcRenderer.invoke('db:getQuotationInstalments', qId),

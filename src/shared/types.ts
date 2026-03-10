@@ -441,10 +441,12 @@ export interface QuotationCustomWarranty {
   quotationId: string
   text: string
   order: number
+  vesselScope?: string[] | null
 }
 
 export interface PIDeductible {
   id: string
+  title: string
   description: string
   defaultAmount: number
   defaultCurrency: string
@@ -472,6 +474,24 @@ export interface PIExclusion {
   id: string
   text: string
   order: number
+}
+
+export interface PISubjectivity {
+  id: string
+  text: string
+  docTypeIds: string[]
+  order: number
+}
+
+export interface QuotationSubjectivity {
+  id: string
+  quotationId: string
+  piSubjectivityId?: string
+  text: string
+  isCustom: boolean
+  isAutoPopulated: boolean
+  order: number
+  vesselScope?: string[] | null
 }
 
 export interface PISubLimitTemplate {
@@ -530,17 +550,18 @@ export interface Quotation {
   tradingCustomText?: string
   sanctionsClauseVersion: string
   vdrDeductibleEnabled: boolean
+  deductibleAggregateEnabled: boolean
   deductibleAggregateText?: string
   validityDays: number
   premiumAdditionalText?: string
   ncbEnabled: boolean
   ncbDiscountPercent?: number
   ncbText?: string
-  cpcEnabled: boolean
-  cpcDiscountPercent?: number
-  cpcText?: string
-  discountPercent?: number
-  discountLabel?: string
+  upccEnabled: boolean
+  upccDiscountPercent?: number
+  upccText?: string
+  nonRefundableType?: 'first_instalment' | 'percentage' | null
+  nonRefundablePercent?: number
   coName?: string
   title?: string
   sectionTextsOverride?: PISectionTexts
@@ -588,6 +609,7 @@ export interface QuotationVessel {
   vesselType?: string
   classification?: string
   callSign?: string
+  premiumAmount?: number
 }
 
 export interface QuotationSubLimit {
@@ -602,19 +624,32 @@ export interface QuotationDeductible {
   id: string
   quotationId: string
   piDeductibleId?: string
+  title: string
   description: string
   amount: number
   currency: string
   secondaryAmount?: number
   secondaryDescription?: string
   order: number
+  vesselScope?: string[] | null
+}
+
+export interface PITextDeductible {
+  id: string
+  title: string
+  text: string
+  defaultIncluded: boolean
+  order: number
 }
 
 export interface QuotationTextDeductible {
   id: string
   quotationId: string
+  piTextDeductibleId?: string
+  title: string
   text: string
   order: number
+  vesselScope?: string[] | null
 }
 
 export interface QuotationExcludedCountry {
@@ -629,9 +664,6 @@ export interface QuotationInstalment {
   quotationId: string
   instalmentNumber: number
   daysFromInception: number
-  description?: string
-  nonRefundable?: boolean
-  nonRefundablePercent?: number
 }
 
 export interface QuotationNote {
@@ -659,6 +691,7 @@ export interface PISectionTexts {
   warrantiesBreach?: string
   warrantiesAdditionalText?: string
   warrantiesNote?: string
+  deductiblesAdditionalText?: string
   deductiblesAggregate?: string
   deductiblesVDR?: string
   subjectivitiesIntro?: string

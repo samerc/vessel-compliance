@@ -1451,6 +1451,13 @@ app.whenReady().then(() => {
   safeHandle('pi:updateDeductibleSet', (event, id, name, items) => { requireAdmin(event); return db.updatePIDeductibleSet(id, name, items) })
   safeHandle('pi:deleteDeductibleSet', (event, id) => { requireAdmin(event); return db.deletePIDeductibleSet(id) })
 
+  // P&I Text Deductibles (Master)
+  safeHandle('pi:getTextDeductibles', (event) => { requireSession(event); return db.getPITextDeductibles() })
+  safeHandle('pi:addTextDeductible', (event, data) => { requireAdmin(event); return db.addPITextDeductible(data) })
+  safeHandle('pi:updateTextDeductible', (event, id, updates) => { requireAdmin(event); return db.updatePITextDeductible(id, updates) })
+  safeHandle('pi:deleteTextDeductible', (event, id) => { requireAdmin(event); return db.deletePITextDeductible(id) })
+  safeHandle('pi:reorderTextDeductibles', (event, orderedIds) => { requireAdmin(event); return db.reorderPITextDeductibles(orderedIds) })
+
   // P&I Exclusions
   safeHandle('pi:getExclusions', (event) => { requireSession(event); return db.getPIExclusions() })
   safeHandle('pi:addExclusion', (event, text) => { requireAdmin(event); return db.addPIExclusion(text) })
@@ -1926,6 +1933,8 @@ app.whenReady().then(() => {
 
   safeHandle('db:getQuotationWarranties', (event, qId) => { requireSession(event); return db.getQuotationWarranties(qId) })
   safeHandle('db:setQuotationWarranties', (event, qId, ids) => { requireSession(event); return db.setQuotationWarranties(qId, ids) })
+  safeHandle('db:updateQuotationWarrantyVesselScope', (event, qId, piWarrantyId, vesselScope) => { requireSession(event); return db.updateQuotationWarrantyVesselScope(qId, piWarrantyId, vesselScope) })
+  safeHandle('db:updateQuotationClauseVesselScope', (event, qId, piClauseId, vesselScope) => { requireSession(event); return db.updateQuotationClauseVesselScope(qId, piClauseId, vesselScope) })
 
   safeHandle('db:getQuotationCustomWarranties', (event, qId) => { requireSession(event); return db.getQuotationCustomWarranties(qId) })
   safeHandle('db:addQuotationCustomWarranty', (event, data) => { requireSession(event); return db.addQuotationCustomWarranty(data) })
@@ -1937,20 +1946,31 @@ app.whenReady().then(() => {
   safeHandle('db:addQuotationDeductible', (event, data) => { requireSession(event); return db.addQuotationDeductible(data) })
   safeHandle('db:updateQuotationDeductible', (event, id, updates) => { requireSession(event); return db.updateQuotationDeductible(id, updates) })
   safeHandle('db:deleteQuotationDeductible', (event, id) => { requireSession(event); return db.deleteQuotationDeductible(id) })
+  safeHandle('db:reorderQuotationDeductibles', (event, orderedIds) => { requireSession(event); return db.reorderQuotationDeductibles(orderedIds) })
 
   safeHandle('db:getQuotationTextDeductibles', (event, qId) => { requireSession(event); return db.getQuotationTextDeductibles(qId) })
   safeHandle('db:addQuotationTextDeductible', (event, data) => { requireSession(event); return db.addQuotationTextDeductible(data) })
+  safeHandle('db:updateQuotationTextDeductible', (event, id, updates) => { requireSession(event); return db.updateQuotationTextDeductible(id, updates) })
   safeHandle('db:deleteQuotationTextDeductible', (event, id) => { requireSession(event); return db.deleteQuotationTextDeductible(id) })
+  safeHandle('db:reorderQuotationTextDeductibles', (event, orderedIds) => { requireSession(event); return db.reorderQuotationTextDeductibles(orderedIds) })
 
   safeHandle('db:getQuotationExclusions', (event, qId) => { requireSession(event); return db.getQuotationExclusions(qId) })
   safeHandle('db:setQuotationExclusions', (event, qId, items) => { requireSession(event); return db.setQuotationExclusions(qId, items) })
 
+  safeHandle('db:updateQuotationItemVesselScope', (event, table, id, vesselScope) => { requireSession(event); return db.updateQuotationItemVesselScope(table, id, vesselScope) })
+
   safeHandle('db:getQuotationExcludedCountries', (event, qId) => { requireSession(event); return db.getQuotationExcludedCountries(qId) })
   safeHandle('db:setQuotationExcludedCountries', (event, qId, countries) => { requireSession(event); return db.setQuotationExcludedCountries(qId, countries) })
 
+  safeHandle('db:getPISubjectivities', (event) => { requireSession(event); return db.getPISubjectivities() })
+  safeHandle('db:addPISubjectivity', (event, data) => { requireSession(event); return db.addPISubjectivity(data) })
+  safeHandle('db:updatePISubjectivity', (event, id, data) => { requireSession(event); return db.updatePISubjectivity(id, data) })
+  safeHandle('db:deletePISubjectivity', (event, id) => { requireSession(event); return db.deletePISubjectivity(id) })
+  safeHandle('db:reorderPISubjectivities', (event, ids) => { requireSession(event); return db.reorderPISubjectivities(ids) })
+
   safeHandle('db:getQuotationSubjectivities', (event, qId) => { requireSession(event); return db.getQuotationSubjectivities(qId) })
   safeHandle('db:addQuotationSubjectivity', (event, data) => { requireSession(event); return db.addQuotationSubjectivity(data) })
-  safeHandle('db:updateQuotationSubjectivity', (event, id, text) => { requireSession(event); return db.updateQuotationSubjectivity(id, text) })
+  safeHandle('db:updateQuotationSubjectivity', (event, id, data) => { requireSession(event); return db.updateQuotationSubjectivity(id, data) })
   safeHandle('db:deleteQuotationSubjectivity', (event, id) => { requireSession(event); return db.deleteQuotationSubjectivity(id) })
 
   safeHandle('db:getQuotationInstalments', (event, qId) => { requireSession(event); return db.getQuotationInstalments(qId) })

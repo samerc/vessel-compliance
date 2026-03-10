@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Image, Calendar, Download } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, PISectionTexts, PISanctionsVersion, InstalmentDefaults } from '../../../shared/types'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
@@ -8,7 +8,7 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'tradingCountries' | 'tradingWarranty' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'logo'
+type SettingsTab = 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'logo'
 
 export default function QuotationSettings() {
     const [activeTab, setActiveTab] = useState<SettingsTab>('clauses')
@@ -23,6 +23,7 @@ export default function QuotationSettings() {
         { id: 'exclusions', label: 'Exclusions', icon: <AlertTriangle size={15} /> },
         { id: 'subLimits', label: 'Sub-Limits', icon: <FileText size={15} /> },
         { id: 'additionalClauses', label: 'Addl. Clauses', icon: <FileText size={15} /> },
+        { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
         { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
         { id: 'sanctionsVersions', label: 'Sanctions Versions', icon: <Shield size={15} /> },
@@ -64,6 +65,7 @@ export default function QuotationSettings() {
             {activeTab === 'exclusions' && <ExclusionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'subLimits' && <SubLimitsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'additionalClauses' && <AdditionalClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'subjectivities' && <MasterSubjectivitiesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'tradingCountries' && <TradingCountriesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'tradingWarranty' && <TradingWarrantyTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'sanctionsVersions' && <SanctionsVersionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
@@ -664,33 +666,48 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
 
 // ==================== Deductibles Tab ====================
 
-function DeductiblesTab({ showSuccess, isLight }: TabProps) {
+function DeductiblesTab({ showSuccess }: TabProps) {
     const [deductibles, setDeductibles] = useState<PIDeductible[]>([])
+    const [textDeds, setTextDeds] = useState<PITextDeductible[]>([])
+    const [newTitle, setNewTitle] = useState('')
     const [newDesc, setNewDesc] = useState('')
     const [newHasSecondary, setNewHasSecondary] = useState(false)
     const [newSecDesc, setNewSecDesc] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [editTitle, setEditTitle] = useState('')
     const [editDesc, setEditDesc] = useState('')
     const [editHasSecondary, setEditHasSecondary] = useState(false)
     const [editSecDesc, setEditSecDesc] = useState('')
+    // Text deductible state
+    const [newTextTitle, setNewTextTitle] = useState('')
+    const [newTextDed, setNewTextDed] = useState('')
+    const [newTextDefault, setNewTextDefault] = useState(false)
+    const [editingTextId, setEditingTextId] = useState<string | null>(null)
+    const [editTextTitle, setEditTextTitle] = useState('')
+    const [editTextDedText, setEditTextDedText] = useState('')
+    const [editTextDefault, setEditTextDefault] = useState(false)
 
     useEffect(() => { loadData() }, [])
-    const loadData = async () => { setDeductibles(await window.api.piGetDeductibles()) }
+    const loadData = async () => {
+        const [d, td] = await Promise.all([window.api.piGetDeductibles(), window.api.piGetTextDeductibles()])
+        setDeductibles(Array.isArray(d) ? d : [])
+        setTextDeds(Array.isArray(td) ? td : [])
+    }
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!newDesc.trim()) return
+        if (!newTitle.trim()) return
         await window.api.piAddDeductible({
-            description: newDesc, defaultAmount: 0, defaultCurrency: 'USD',
+            title: newTitle, description: newDesc, defaultAmount: 0, defaultCurrency: 'USD',
             hasSecondary: newHasSecondary, secondaryDescription: newSecDesc || undefined, order: 0
         })
-        setNewDesc(''); setNewHasSecondary(false); setNewSecDesc('')
+        setNewTitle(''); setNewDesc(''); setNewHasSecondary(false); setNewSecDesc('')
         showSuccess('Deductible added'); loadData()
     }
 
     const saveEdit = async (id: string) => {
         await window.api.piUpdateDeductible(id, {
-            description: editDesc, hasSecondary: editHasSecondary,
+            title: editTitle, description: editDesc, hasSecondary: editHasSecondary,
             secondaryDescription: editSecDesc || undefined
         })
         setEditingId(null); showSuccess('Deductible updated'); loadData()
@@ -705,13 +722,37 @@ function DeductiblesTab({ showSuccess, isLight }: TabProps) {
         await window.api.piReorderDeductibles(newOrder.map(d => d.id))
     }
 
+    const handleAddTextDed = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newTextTitle.trim()) return
+        await window.api.piAddTextDeductible({ title: newTextTitle, text: newTextDed, defaultIncluded: newTextDefault })
+        setNewTextTitle(''); setNewTextDed(''); setNewTextDefault(false)
+        showSuccess('Text deductible added'); loadData()
+    }
+
+    const saveTextEdit = async (id: string) => {
+        await window.api.piUpdateTextDeductible(id, { title: editTextTitle, text: editTextDedText, defaultIncluded: editTextDefault })
+        setEditingTextId(null); showSuccess('Text deductible updated'); loadData()
+    }
+
+    const handleTextMove = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...textDeds]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setTextDeds(newOrder)
+        await window.api.piReorderTextDeductibles(newOrder.map(d => d.id))
+    }
+
     return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <section className="glass-card" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>P&I Deductibles</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define deductible types here. Amounts are set per quotation.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define deductible types here. Amounts are set per quotation. For multi-value deductibles, use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{currency} {amount}'}</code> in the secondary description to position the second amount.</p>
             <form onSubmit={handleAdd} style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <input type="text" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Deductible description..." style={{ flex: 1 }} required />
+                    <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. Crew Claims)" style={{ width: '200px' }} required />
+                    <input type="text" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Description..." style={{ flex: 1 }} />
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input type="checkbox" checked={newHasSecondary} onChange={e => setNewHasSecondary(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} /> Has secondary
                     </label>
@@ -719,7 +760,7 @@ function DeductiblesTab({ showSuccess, isLight }: TabProps) {
                 </div>
                 {newHasSecondary && (
                     <div style={{ marginTop: '8px' }}>
-                        <input type="text" value={newSecDesc} onChange={e => setNewSecDesc(e.target.value)} placeholder="Secondary description (e.g. 'whichever is greater')" style={{ width: '100%' }} />
+                        <input type="text" value={newSecDesc} onChange={e => setNewSecDesc(e.target.value)} placeholder="e.g. or one third up to {currency} {amount} for pollution claims" style={{ width: '100%' }} />
                     </div>
                 )}
             </form>
@@ -729,14 +770,15 @@ function DeductiblesTab({ showSuccess, isLight }: TabProps) {
                     {editingId === d.id ? (
                         <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                                <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)} style={{ flex: 1 }} />
+                                <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '200px' }} />
+                                <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Description" style={{ flex: 1 }} />
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
                                     <input type="checkbox" checked={editHasSecondary} onChange={e => setEditHasSecondary(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} /> Secondary
                                 </label>
                                 {editHasSecondary && (
-                                    <input type="text" value={editSecDesc} onChange={e => setEditSecDesc(e.target.value)} placeholder="Sec. description" style={{ flex: 1 }} />
+                                    <input type="text" value={editSecDesc} onChange={e => setEditSecDesc(e.target.value)} placeholder="e.g. or one third up to {currency} {amount}..." style={{ flex: 1 }} />
                                 )}
                                 <div style={{ flex: 1 }} />
                                 <button onClick={() => saveEdit(d.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
@@ -746,24 +788,75 @@ function DeductiblesTab({ showSuccess, isLight }: TabProps) {
                     ) : (
                         <>
                             <div style={{ flex: 1 }}>
-                                <span style={{ fontSize: '0.85rem' }}>{d.description}</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{d.title}</span>
+                                {d.hasSecondary && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)', marginLeft: '6px' }}>Multi-value</span>}
+                                {d.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{d.description}</div>}
                                 {d.hasSecondary && d.secondaryDescription && (
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', paddingLeft: '12px' }}>
-                                        Secondary: {d.secondaryDescription}
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px', paddingLeft: '12px' }}>
+                                        {d.secondaryDescription}
                                     </div>
                                 )}
                             </div>
                             <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
                                 <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                 <button onClick={() => handleMove(i, 'down')} disabled={i === deductibles.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === deductibles.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(d.id); setEditDesc(d.description); setEditHasSecondary(d.hasSecondary); setEditSecDesc(d.secondaryDescription || '') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={async () => { await window.api.piDeleteDeductible(d.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+                                <button onClick={() => { setEditingId(d.id); setEditTitle(d.title || ''); setEditDesc(d.description); setEditHasSecondary(d.hasSecondary); setEditSecDesc(d.secondaryDescription || '') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button onClick={async () => { await window.api.piDeleteDeductible(d.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         </>
                     )}
                 </div>
             ))}
         </section>
+
+        {/* Text Deductibles (Master) */}
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Text Deductibles</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Predefined text blocks that appear below the deductibles table. Mark as "Default" to auto-include in new quotations.</p>
+            <form onSubmit={handleAddTextDed} style={{ marginBottom: '16px' }}>
+                <input type="text" value={newTextTitle} onChange={e => setNewTextTitle(e.target.value)} placeholder="Title (e.g. Asbestos Clause)" style={{ width: '100%', marginBottom: '8px' }} required />
+                <textarea value={newTextDed} onChange={e => setNewTextDed(e.target.value)} placeholder="Text content..." style={{ width: '100%', minHeight: '60px', resize: 'vertical', marginBottom: '8px' }} />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', marginRight: 'auto' }}>
+                        <input type="checkbox" checked={newTextDefault} onChange={e => setNewTextDefault(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} /> Include by default
+                    </label>
+                    <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Add</button>
+                </div>
+            </form>
+            {textDeds.map((td, i) => (
+                <div key={td.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    {editingTextId === td.id ? (
+                        <div style={{ flex: 1 }}>
+                            <input type="text" value={editTextTitle} onChange={e => setEditTextTitle(e.target.value)} placeholder="Title" style={{ width: '100%', marginBottom: '8px' }} />
+                            <textarea value={editTextDedText} onChange={e => setEditTextDedText(e.target.value)} style={{ width: '100%', minHeight: '60px', resize: 'vertical', marginBottom: '8px' }} />
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer', marginRight: 'auto' }}>
+                                    <input type="checkbox" checked={editTextDefault} onChange={e => setEditTextDefault(e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} /> Include by default
+                                </label>
+                                <button onClick={() => saveTextEdit(td.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
+                                <button onClick={() => setEditingTextId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div style={{ flex: 1 }}>
+                                {td.title && <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '2px' }}>{td.title}</div>}
+                                {td.text && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{td.text}</div>}
+                                {td.defaultIncluded && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864', marginTop: '4px', display: 'inline-block' }}>Default</span>}
+                            </div>
+                            <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
+                                <button onClick={() => handleTextMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button onClick={() => handleTextMove(i, 'down')} disabled={i === textDeds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === textDeds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button onClick={() => { setEditingTextId(td.id); setEditTextTitle(td.title || ''); setEditTextDedText(td.text); setEditTextDefault(td.defaultIncluded) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button onClick={async () => { await window.api.piDeleteTextDeductible(td.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            ))}
+            {textDeds.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No text deductibles defined.</p>}
+        </section>
+        </div>
     )
 }
 
@@ -1307,21 +1400,164 @@ function TradingWarrantyTab({ showSuccess }: TabProps) {
     )
 }
 
+// ==================== Master Subjectivities Tab ====================
+
+function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
+    const [items, setItems] = useState<PISubjectivity[]>([])
+    const [docTypes, setDocTypes] = useState<DocumentType[]>([])
+    const [newText, setNewText] = useState('')
+    const [newDocTypeIds, setNewDocTypeIds] = useState<string[]>([])
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editText, setEditText] = useState('')
+    const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
+
+    useEffect(() => { loadData() }, [])
+    const loadData = async () => {
+        const [subjs, dts] = await Promise.all([
+            window.api.getPISubjectivities(),
+            window.api.getDocumentTypes()
+        ])
+        setItems(Array.isArray(subjs) ? subjs : [])
+        setDocTypes(Array.isArray(dts) ? dts : [])
+    }
+
+    const handleAdd = async () => {
+        if (!newText.trim()) return
+        try {
+            await window.api.addPISubjectivity({ text: newText.trim(), docTypeIds: newDocTypeIds, order: items.length })
+            setNewText(''); setNewDocTypeIds([])
+            showSuccess('Subjectivity added'); loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add') }
+    }
+
+    const startEdit = (s: PISubjectivity) => {
+        setEditingId(s.id); setEditText(s.text); setEditDocTypeIds(s.docTypeIds || [])
+    }
+
+    const handleUpdate = async () => {
+        if (!editingId || !editText.trim()) return
+        try {
+            await window.api.updatePISubjectivity(editingId, { text: editText.trim(), docTypeIds: editDocTypeIds })
+            setEditingId(null); showSuccess('Updated'); loadData()
+        } catch (err: any) { showError(err.message || 'Failed to update') }
+    }
+
+    const handleMove = async (idx: number, dir: -1 | 1) => {
+        const arr = [...items]
+        const targetIdx = idx + dir
+        if (targetIdx < 0 || targetIdx >= arr.length) return
+        ;[arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]]
+        setItems(arr)
+        await window.api.reorderPISubjectivities(arr.map(s => s.id))
+    }
+
+    const toggleDocType = (ids: string[], setIds: (v: string[]) => void, dtId: string) => {
+        setIds(ids.includes(dtId) ? ids.filter(id => id !== dtId) : [...ids, dtId])
+    }
+
+    const inputStyle = { padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.82rem' }
+    const chipStyle = (selected: boolean) => ({
+        padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer',
+        border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+        background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
+        color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+        fontWeight: selected ? 600 : 400
+    })
+
+    return (
+        <div>
+            <section className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Master Subjectivities</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Define subjectivities and link them to document types. Linked subjectivities auto-populate when the vessel has missing or expiring documents.
+                </p>
+
+                {/* Add form */}
+                <div style={{ marginBottom: '20px', padding: '14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <input value={newText} onChange={e => setNewText(e.target.value)} placeholder="Subjectivity text..." style={{ ...inputStyle, width: '100%', marginBottom: '8px' }} onKeyDown={e => { if (e.key === 'Enter') handleAdd() }} />
+                    <div style={{ marginBottom: '8px' }}>
+                        <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Linked Document Types (triggers auto-populate when missing/expiring)</label>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {docTypes.map(dt => (
+                                <span key={dt.id} onClick={() => toggleDocType(newDocTypeIds, setNewDocTypeIds, dt.id)} style={chipStyle(newDocTypeIds.includes(dt.id))}>{dt.name}</span>
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={handleAdd} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}><Plus size={14} /> Add Subjectivity</button>
+                </div>
+
+                {/* List */}
+                {items.length === 0 ? (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No subjectivities configured.</div>
+                ) : items.map((s, idx) => (
+                    <div key={s.id} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px' }}>
+                        {editingId === s.id ? (
+                            <div>
+                                <input value={editText} onChange={e => setEditText(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: '8px' }} />
+                                <div style={{ marginBottom: '8px' }}>
+                                    <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Linked Document Types</label>
+                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                        {docTypes.map(dt => (
+                                            <span key={dt.id} onClick={() => toggleDocType(editDocTypeIds, setEditDocTypeIds, dt.id)} style={chipStyle(editDocTypeIds.includes(dt.id))}>{dt.name}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.78rem' }}><Save size={12} /> Save</button>
+                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                    <span style={{ flex: 1, fontSize: '0.85rem' }}>{s.text}</span>
+                                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                        <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
+                                        <button onClick={() => handleMove(idx, 1)} disabled={idx === items.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
+                                        <button onClick={() => startEdit(s)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
+                                        <button onClick={async () => { if (confirm('Delete this subjectivity?')) { await window.api.deletePISubjectivity(s.id); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                    </div>
+                                </div>
+                                {s.docTypeIds && s.docTypeIds.length > 0 && (
+                                    <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                        {s.docTypeIds.map(dtId => {
+                                            const dt = docTypes.find(d => d.id === dtId)
+                                            return dt ? <span key={dtId} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0, 210, 255, 0.2)' }}>{dt.name}</span> : null
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </section>
+        </div>
+    )
+}
+
 // ==================== Sanctions Versions Tab ====================
 
 function SanctionsVersionsTab({ showSuccess, showError, isLight }: TabProps) {
     const [versions, setVersions] = useState<PISanctionsVersion[]>([])
+    const [editedTexts, setEditedTexts] = useState<Record<string, string>>({})
+    const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
     const [newName, setNewName] = useState('')
     const [newKey, setNewKey] = useState('')
     const [newText, setNewText] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
     const [editKey, setEditKey] = useState('')
-    const [editText, setEditText] = useState('')
     const [formResetKey, setFormResetKey] = useState(0)
 
     useEffect(() => { loadData() }, [])
-    const loadData = async () => { setVersions(await window.api.piGetSanctionsVersions()) }
+    const loadData = async () => {
+        const data = await window.api.piGetSanctionsVersions()
+        setVersions(data)
+        const textMap: Record<string, string> = {}
+        data.forEach((v: PISanctionsVersion) => { textMap[v.id] = v.text })
+        setEditedTexts(textMap)
+        setDirtyIds(new Set())
+    }
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -1335,15 +1571,32 @@ function SanctionsVersionsTab({ showSuccess, showError, isLight }: TabProps) {
     }
 
     const startEdit = (v: PISanctionsVersion) => {
-        setEditingId(v.id); setEditName(v.name); setEditKey(v.key); setEditText(v.text)
+        setEditingId(v.id); setEditName(v.name); setEditKey(v.key)
     }
 
-    const handleUpdate = async () => {
+    const handleUpdateNameKey = async () => {
         if (!editingId || !editName.trim() || !editKey.trim()) return
         try {
-            await window.api.piUpdateSanctionsVersion(editingId, { name: editName.trim(), key: editKey.trim(), text: editText.trim() })
+            const currentText = editedTexts[editingId] ?? versions.find(v => v.id === editingId)?.text ?? ''
+            await window.api.piUpdateSanctionsVersion(editingId, { name: editName.trim(), key: editKey.trim(), text: currentText })
             setEditingId(null); showSuccess('Version updated'); loadData()
         } catch (err: any) { showError(err.message || 'Failed to update') }
+    }
+
+    const handleSaveText = async (id: string) => {
+        const v = versions.find(ver => ver.id === id)
+        if (!v) return
+        const text = editedTexts[id] ?? v.text
+        try {
+            await window.api.piUpdateSanctionsVersion(id, { name: v.name, key: v.key, text })
+            setDirtyIds(prev => { const s = new Set(prev); s.delete(id); return s })
+            showSuccess('Text saved')
+        } catch (err: any) { showError(err.message || 'Failed to save') }
+    }
+
+    const handleTextChange = (id: string, val: string) => {
+        setEditedTexts(prev => ({ ...prev, [id]: val }))
+        setDirtyIds(prev => new Set(prev).add(id))
     }
 
     const handleMove = async (idx: number, dir: -1 | 1) => {
@@ -1379,32 +1632,34 @@ function SanctionsVersionsTab({ showSuccess, showError, isLight }: TabProps) {
                 ) : versions.map((v, idx) => (
                     <div key={v.id} style={{ padding: '14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '10px' }}>
                         {editingId === v.id ? (
-                            <div>
+                            <div style={{ marginBottom: '8px' }}>
                                 <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
                                     <input value={editName} onChange={e => setEditName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                                     <input value={editKey} onChange={e => setEditKey(e.target.value)} style={{ ...inputStyle, width: '160px' }} />
-                                </div>
-                                <div style={{ marginBottom: '8px' }}>
-                                    <RichTextEditor value={editText} onChange={setEditText} minHeight={150} />
-                                </div>
-                                <div style={{ display: 'flex', gap: '6px' }}>
-                                    <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.78rem' }}><Save size={12} /> Save</button>
+                                    <button onClick={handleUpdateNameKey} className="btn-primary" style={{ fontSize: '0.78rem' }}><Save size={12} /> Save</button>
                                     <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
                                 </div>
                             </div>
                         ) : (
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{v.name}</span>
-                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--table-header-bg)', padding: '2px 6px', borderRadius: '4px' }}>{v.key}</span>
-                                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                                        <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
-                                        <button onClick={() => handleMove(idx, 1)} disabled={idx === versions.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
-                                        <button onClick={() => startEdit(v)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
-                                        <button onClick={async () => { if (confirm(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={14} /></button>
-                                    </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{v.name}</span>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--table-header-bg)', padding: '2px 6px', borderRadius: '4px' }}>{v.key}</span>
+                                <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                                    <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
+                                    <button onClick={() => handleMove(idx, 1)} disabled={idx === versions.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
+                                    <button onClick={() => startEdit(v)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
+                                    <button onClick={async () => { if (confirm(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={14} /></button>
                                 </div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', maxHeight: '120px', overflow: 'auto' }} dangerouslySetInnerHTML={{ __html: v.text }} />
+                            </div>
+                        )}
+                        <RichTextEditor
+                            value={editedTexts[v.id] ?? v.text}
+                            onChange={val => handleTextChange(v.id, val)}
+                            minHeight={150}
+                        />
+                        {dirtyIds.has(v.id) && (
+                            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+                                <button onClick={() => handleSaveText(v.id)} className="btn-primary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Save size={12} /> Save Text</button>
                             </div>
                         )}
                     </div>
@@ -1439,7 +1694,6 @@ Cancel cover provided under this Policy by notice in writing to the Insured. Suc
 Continue the Policy on such terms and conditions as it may determine.`,
     warrantiesNote: 'NOTE: The Insured\'s attention is drawn to the provisions of the P&I Terms and Conditions, which also include Warranties.',
     deductiblesAggregate: 'When one incident gives rise to a claim of a different nature, the aggregate of all claims shall be subject to the highest deductible applicable to anyone such claim.',
-    deductiblesVDR: 'In any collision, grounding or other type of casualty the VDR (where fitted) will require to be saved and retrieved for insurers to investigate cause. In the event the VDR is not saved and/or retrieved for whatever reason, in addition to any rights of insurers under the applicable Terms and Conditions, the applicable deductible will be doubled.',
     subjectivitiesIntro: 'The following documents to be provided within 7 days prior inception:',
     subjectivitiesNote: 'NOTE: Failure to supply satisfactory information on any subjectivity may result in this quote being withdrawn and/or cover being cancelled and/or claims being excluded.',
     continuationPiClubText: '',
@@ -1455,11 +1709,19 @@ const SECTION_TEXT_FIELDS: { key: keyof PISectionTexts; label: string; section: 
     { key: 'limitOfLiabilityDefaultText', label: 'Default Liability Text ({amount}, {currency} placeholders)', section: 'Limit of Liability', rows: 3 },
     { key: 'conditionsIntro', label: 'Conditions Intro', section: 'Conditions', rows: 2 },
     { key: 'warrantiesBreach', label: 'Breach of Warranties', section: 'Warranties', rows: 8 },
-    { key: 'deductiblesAggregate', label: 'Aggregate Clause', section: 'Deductibles', rows: 2 },
-    { key: 'deductiblesVDR', label: 'VDR Clause', section: 'Deductibles', rows: 3 },
+    { key: 'tradingIntro', label: 'Trading Exclusion Intro', section: 'Trading / Sanctions', rows: 2 },
+    { key: 'tradingConditionA', label: 'Condition A — Permitted Trade', section: 'Trading / Sanctions', rows: 3 },
+    { key: 'tradingConditionB', label: 'Condition B — Sanctioned Cargoes', section: 'Trading / Sanctions', rows: 3 },
+    { key: 'tradingConditionC', label: 'Condition C — Listed Individuals', section: 'Trading / Sanctions', rows: 3 },
+    { key: 'tradingConditionD', label: 'Condition D — Compliance Questionnaire', section: 'Trading / Sanctions', rows: 3 },
+    { key: 'tradingConditionE', label: 'Condition E — Further Information', section: 'Trading / Sanctions', rows: 2 },
+    { key: 'tradingConditionF', label: 'Condition F — Insurer Discretion', section: 'Trading / Sanctions', rows: 3 },
+    { key: 'tradingConditionG', label: 'Condition G — Sanction Clause Paramount', section: 'Trading / Sanctions', rows: 2 },
+    { key: 'tradingIsrael', label: 'Israel Trading Warranty', section: 'Trading / Sanctions', rows: 3 },
+    { key: 'ddqCountriesIntro', label: 'DDQ Countries Intro', section: 'Trading / Sanctions', rows: 2 },
     { key: 'subjectivitiesIntro', label: 'Subjectivities Intro', section: 'Subjectivities', rows: 2 },
     { key: 'subjectivitiesNote', label: 'Subjectivities Note', section: 'Subjectivities', rows: 2 },
-    { key: 'continuationPiClubText', label: 'Continuation P&I Club Text', section: 'Continuation P&I Club', rows: 3 },
+    { key: 'continuationPiClubText', label: 'Upfront Continuity Credit (UPCC) Text', section: 'UPCC', rows: 3 },
     { key: 'premiumPaymentIntro', label: 'Payment Intro ({instalments} = number)', section: 'Premium', rows: 2 },
     { key: 'premiumCondition', label: 'Payment Condition Precedent', section: 'Premium', rows: 4 },
     { key: 'premiumEarned', label: 'Premium Earned Clause', section: 'Premium', rows: 3 },

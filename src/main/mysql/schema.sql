@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS pi_warranty_set_items (
 
 CREATE TABLE IF NOT EXISTS pi_deductibles (
   id VARCHAR(36) PRIMARY KEY,
+  title VARCHAR(255) DEFAULT '',
   description TEXT NOT NULL,
   default_amount DECIMAL(12,2) DEFAULT 0,
   default_currency VARCHAR(10) DEFAULT 'USD',
@@ -181,6 +182,15 @@ CREATE TABLE IF NOT EXISTS pi_deductible_set_items (
   secondary_amount DECIMAL(12,2),
   FOREIGN KEY (set_id) REFERENCES pi_deductible_sets(id) ON DELETE CASCADE,
   FOREIGN KEY (deductible_id) REFERENCES pi_deductibles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pi_text_deductibles (
+  id VARCHAR(36) PRIMARY KEY,
+  title VARCHAR(255) DEFAULT '',
+  text TEXT NOT NULL,
+  default_included BOOLEAN DEFAULT FALSE,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pi_exclusions (
@@ -236,6 +246,7 @@ CREATE TABLE IF NOT EXISTS quotations (
   section_texts_override MEDIUMTEXT,
   sanctions_text_override TEXT,
   vdr_deductible_enabled BOOLEAN DEFAULT TRUE,
+  deductible_aggregate_enabled BOOLEAN DEFAULT TRUE,
   deductible_aggregate_text TEXT,
   validity_days INT DEFAULT 14,
   premium_additional_text TEXT,
@@ -245,6 +256,10 @@ CREATE TABLE IF NOT EXISTS quotations (
   cpc_enabled BOOLEAN DEFAULT FALSE,
   cpc_discount_percent DECIMAL(5,2),
   cpc_text TEXT,
+  discount_percent DECIMAL(5,2),
+  discount_label VARCHAR(50),
+  non_refundable_type VARCHAR(20) DEFAULT NULL,
+  non_refundable_percent DECIMAL(5,2) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_by VARCHAR(100),
@@ -290,6 +305,7 @@ CREATE TABLE IF NOT EXISTS quotation_clauses (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
   pi_clause_id VARCHAR(36) NOT NULL,
+  vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_clause_id) REFERENCES pi_clauses(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -300,6 +316,7 @@ CREATE TABLE IF NOT EXISTS quotation_additional_clauses (
   pi_additional_clause_id VARCHAR(36),
   custom_text TEXT,
   order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_additional_clause_id) REFERENCES pi_additional_clauses(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -309,6 +326,7 @@ CREATE TABLE IF NOT EXISTS quotation_warranties (
   quotation_id VARCHAR(36) NOT NULL,
   pi_warranty_id VARCHAR(36) NOT NULL,
   order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -318,6 +336,7 @@ CREATE TABLE IF NOT EXISTS quotation_custom_warranties (
   quotation_id VARCHAR(36) NOT NULL,
   text TEXT NOT NULL,
   order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -325,12 +344,14 @@ CREATE TABLE IF NOT EXISTS quotation_deductibles (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
   pi_deductible_id VARCHAR(36),
+  title VARCHAR(255) DEFAULT '',
   description TEXT,
   amount DECIMAL(15,2) DEFAULT 0,
   currency VARCHAR(10) DEFAULT 'USD',
   secondary_amount DECIMAL(15,2),
   secondary_description TEXT,
   order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_deductible_id) REFERENCES pi_deductibles(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -338,9 +359,13 @@ CREATE TABLE IF NOT EXISTS quotation_deductibles (
 CREATE TABLE IF NOT EXISTS quotation_text_deductibles (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
+  pi_text_deductible_id VARCHAR(36),
+  title VARCHAR(255) DEFAULT '',
   text TEXT NOT NULL,
   order_index INT DEFAULT 0,
-  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+  vessel_scope TEXT DEFAULT NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (pi_text_deductible_id) REFERENCES pi_text_deductibles(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS quotation_exclusions (
@@ -348,6 +373,7 @@ CREATE TABLE IF NOT EXISTS quotation_exclusions (
   quotation_id VARCHAR(36) NOT NULL,
   pi_exclusion_id VARCHAR(36),
   custom_text TEXT,
+  vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_exclusion_id) REFERENCES pi_exclusions(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -360,11 +386,28 @@ CREATE TABLE IF NOT EXISTS quotation_excluded_countries (
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS pi_subjectivities (
+  id VARCHAR(36) PRIMARY KEY,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pi_subjectivity_doc_types (
+  id VARCHAR(36) PRIMARY KEY,
+  subjectivity_id VARCHAR(36) NOT NULL,
+  doc_type_id VARCHAR(36) NOT NULL,
+  FOREIGN KEY (subjectivity_id) REFERENCES pi_subjectivities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS quotation_subjectivities (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
+  pi_subjectivity_id VARCHAR(36),
   text TEXT NOT NULL,
+  is_custom BOOLEAN DEFAULT FALSE,
+  is_auto_populated BOOLEAN DEFAULT FALSE,
   order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

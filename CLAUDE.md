@@ -420,6 +420,31 @@ Quotation management system for P&I insurance:
 - **RichTextEditor** (`src/renderer/src/components/RichTextEditor.tsx`): Rich text editing for quotation content
 - **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export
 
+### Quotation Vessel Scope
+
+Per-item vessel scoping for multi-vessel quotations:
+
+- **`vessel_scope TEXT DEFAULT NULL`** on all 8 quotation item tables (warranties, custom warranties, deductibles, text deductibles, subjectivities, clauses, additional clauses, exclusions)
+- **NULL scope = all vessels**; array of quotation_vessel IDs = specific vessels
+- **VesselScopeChips** (`src/renderer/src/components/VesselScopeChips.tsx`): Compact chip row rendered under each item when 2+ vessels. "All" button + per-vessel toggle buttons
+- **Export annotation**: `vesselScopeSuffix()` helper appends `(VESSEL NAME, VESSEL NAME)` to scoped items in PDF/DOCX
+- **Bulk set preservation**: SET methods (warranties, clauses, exclusions) that delete-and-reinsert read existing `vessel_scope` into a `scopeMap` before delete, then restore during re-insert
+- **Update methods**: `updateQuotationWarrantyVesselScope` / `updateQuotationClauseVesselScope` update by `quotation_id + pi_*_id` pair; `updateQuotationItemVesselScope` is generic with `allowedTables` whitelist
+
+### Quotation Premium System
+
+Premium management with per-vessel amounts, sequential discounts, and non-refundable options:
+
+- **Per-vessel premiums**: `premium_amount DECIMAL(15,2)` on `quotation_vessels` table. Multi-vessel quotations show a premium table in PremiumTab with per-vessel inputs; total auto-syncs to `quotation.premiumAmount`
+- **Currency**: Quotation-level `premiumCurrency` field displayed in the header (applies to all sections)
+- **Auto-label**: Premium field shows "Technical Premium" when NCB or UPCC is enabled; "Premium" otherwise
+- **NCB (No Claims Bonus)**: Checkbox + percentage + rich text. Exports as separate section after Premium
+- **UPCC (Upfront Continuity)**: Checkbox + percentage + rich text. Exports as separate section after NCB. DB columns still named `cpc_*` (aliased to `upcc*` in adapter)
+- **Sequential discount calculation**: `Payable = Technical × (1 - NCB%) × (1 - UPCC%)` — discounts applied multiplicatively, not additively
+- **Non-refundable**: Quotation-level choice via `nonRefundableType` ('first_instalment' | 'percentage' | null) + `nonRefundablePercent`. Replaces old per-instalment non-refundable fields
+- **Instalments**: Number + days from inception only (description field removed). Default days: 1→`[0]`, 2→`[0,180]`, 3→`[0,120,240]`, 4→`[0,90,180,270]`, 12→`[0,30,60...330]`; admin `InstalmentDefaults` settings take priority when configured
+- **Export premium table**: Multi-vessel quotations render a vessel/premium/payable table in both PDF (formatted text) and DOCX (sub-table with right-aligned amounts)
+
 ### Quotation Warranties System
 
 Tag-based warranty categorization with sets, custom warranties, and bulk management:

@@ -82,6 +82,14 @@
   margin: 0.3em 0;
 }
 
+.rte-content .tiptap ul {
+  list-style-type: none;
+}
+
+.rte-content .tiptap ul li::before {
+  content: '- ';
+}
+
 .rte-content .tiptap li {
   margin-bottom: 0.15em;
 }

@@ -125,7 +125,7 @@ export function renderHtmlToPdf(
           for (const li of Array.from(el.children)) {
             if (li.tagName.toLowerCase() === 'li') {
               idx++
-              const bullet = tag === 'ul' ? '\u2022 ' : `${idx}. `
+              const bullet = tag === 'ul' ? '- ' : `${idx}. `
               const segments = extractSegments(li)
               renderSegments([{ text: bullet }, ...segments], 8)
             }
@@ -169,12 +169,44 @@ function renderPlainText(
 }
 
 /**
- * Strip HTML tags and return plain text.
+ * Strip HTML tags and return plain text, preserving list structure.
+ * <ul> items are prefixed with "- ", <ol> items with "1. ", "2. ", etc.
  */
 export function stripHtml(html: string): string {
   if (!html) return ''
   if (!/<[a-z][\s\S]*>/i.test(html)) return html
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
-  return doc.body.textContent || ''
+
+  function extractText(node: Node): string {
+    const parts: string[] = []
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        parts.push(child.textContent || '')
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const el = child as HTMLElement
+        const tag = el.tagName.toLowerCase()
+        if (tag === 'ul' || tag === 'ol') {
+          let idx = 0
+          for (const li of Array.from(el.children)) {
+            if (li.tagName.toLowerCase() === 'li') {
+              idx++
+              const prefix = tag === 'ol' ? `${idx}. ` : '- '
+              parts.push(prefix + (li.textContent || '').trim())
+            }
+          }
+        } else if (tag === 'br') {
+          parts.push('\n')
+        } else if (tag === 'p') {
+          const text = (el.textContent || '').trim()
+          if (text) parts.push(text)
+        } else {
+          parts.push(extractText(el))
+        }
+      }
+    }
+    return parts.join('\n')
+  }
+
+  return extractText(doc.body).replace(/\n{3,}/g, '\n\n').trim()
 }

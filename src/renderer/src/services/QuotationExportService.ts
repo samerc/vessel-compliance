@@ -17,7 +17,7 @@ import {
   Quotation, Vessel, QuotationAssured, QuotationSubLimit, QuotationDeductible,
   QuotationTextDeductible, QuotationExcludedCountry, QuotationInstalment, QuotationNote,
   PIClause, PIWarranty, PIExclusion, PIAdditionalClause, PISectionTexts,
-  PISanctionsVersion, QuotationVessel, QuotationCustomWarranty
+  PISanctionsVersion, QuotationVessel, QuotationCustomWarranty, QuotationSubjectivity
 } from '../../../shared/types'
 import { DEFAULT_SECTION_TEXTS } from '../components/QuotationSettings'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
@@ -32,18 +32,20 @@ interface QuotationData {
   assureds: QuotationAssured[]
   subLimits: QuotationSubLimit[]
   selectedClauseIds: string[]
+  clauseVesselScopes: Record<string, string[] | null>
   allClauses: PIClause[]
-  additionalClauses: { id: string; piAdditionalClauseId?: string; customText?: string; order: number }[]
+  additionalClauses: { id: string; piAdditionalClauseId?: string; customText?: string; order: number; vesselScope?: string[] | null }[]
   allAdditionalClauses: PIAdditionalClause[]
   selectedWarrantyIds: string[]
+  warrantyVesselScopes: Record<string, string[] | null>
   allWarranties: PIWarranty[]
   customWarranties: QuotationCustomWarranty[]
   deductibles: QuotationDeductible[]
   textDeductibles: QuotationTextDeductible[]
-  selectedExclusions: { id: string; piExclusionId?: string; customText?: string }[]
+  selectedExclusions: { id: string; piExclusionId?: string; customText?: string; vesselScope?: string[] | null }[]
   allExclusions: PIExclusion[]
   excludedCountries: QuotationExcludedCountry[]
-  subjectivities: { id: string; text: string; order: number }[]
+  subjectivities: QuotationSubjectivity[]
   instalments: QuotationInstalment[]
   information: { id: string; text: string; order: number }[]
   notes: QuotationNote[]
@@ -56,8 +58,8 @@ interface QuotationData {
 async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const [
     quotationVessels, allVessels, assureds, subLimits,
-    selectedClauseIds, allClauses, additionalClauses, allAdditionalClauses,
-    selectedWarrantyIds, allWarranties, customWarranties,
+    clauseRows, allClauses, additionalClauses, allAdditionalClauses,
+    warrantyRows, allWarranties, customWarranties,
     deductibles, textDeductibles,
     selectedExclusions, allExclusions,
     excludedCountries, subjectivities, instalments, information, notes,
@@ -89,6 +91,17 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     window.api.piGetQuotationLogoPath()
   ])
 
+  // Extract IDs and vessel scope maps from new object return format
+  const safeClauseRows = Array.isArray(clauseRows) ? clauseRows : []
+  const selectedClauseIds = safeClauseRows.map((r: any) => r.piClauseId)
+  const clauseVesselScopes: Record<string, string[] | null> = {}
+  for (const r of safeClauseRows) { if (r.vesselScope) clauseVesselScopes[r.piClauseId] = r.vesselScope }
+
+  const safeWarrantyRows = Array.isArray(warrantyRows) ? warrantyRows : []
+  const selectedWarrantyIds = safeWarrantyRows.map((r: any) => r.piWarrantyId)
+  const warrantyVesselScopes: Record<string, string[] | null> = {}
+  for (const r of safeWarrantyRows) { if (r.vesselScope) warrantyVesselScopes[r.piWarrantyId] = r.vesselScope }
+
   // Three-layer merge: defaults -> global settings -> per-quotation overrides
   const mergedTexts: PISectionTexts = {
     ...DEFAULT_SECTION_TEXTS,
@@ -103,8 +116,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
 
   return {
     quotation, quotationVessels, allVessels, assureds, subLimits,
-    selectedClauseIds, allClauses, additionalClauses, allAdditionalClauses,
-    selectedWarrantyIds, allWarranties, customWarranties,
+    selectedClauseIds, clauseVesselScopes, allClauses, additionalClauses, allAdditionalClauses,
+    selectedWarrantyIds, warrantyVesselScopes, allWarranties, customWarranties,
     deductibles, textDeductibles,
     selectedExclusions, allExclusions,
     excludedCountries, subjectivities, instalments, information, notes,
@@ -117,10 +130,24 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
 
 // ==================== Helpers ====================
 
+/**
+ * Resolve vessel scope to a display suffix like " (VESSEL A, VESSEL B)".
+ * Returns empty string when scope is null/undefined (all vessels) or only 1 vessel exists.
+ */
+function vesselScopeSuffix(vesselScope: string[] | null | undefined, quotationVessels: QuotationVessel[]): string {
+  if (!vesselScope || vesselScope.length === 0 || quotationVessels.length < 2) return ''
+  if (vesselScope.length === quotationVessels.length) return ''
+  const names = vesselScope
+    .map(id => quotationVessels.find(v => v.id === id))
+    .filter(Boolean)
+    .map(v => (v!.name || v!.vesselLabel).toUpperCase())
+  return names.length > 0 ? ` (${names.join(', ')})` : ''
+}
+
 function formatCurrency(amount: number | undefined, currency: string | undefined): string {
   if (amount == null) return '-'
   const c = currency || 'USD'
-  return `${c} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `${c} ${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
 function formatAmountOnly(amount: number | undefined): string {
@@ -152,10 +179,11 @@ function getFileName(data: QuotationData, ext: string): string {
 function getExclusionTexts(data: QuotationData): string[] {
   const texts: string[] = []
   for (const se of data.selectedExclusions) {
-    if (se.customText) texts.push(se.customText)
+    const eScope = vesselScopeSuffix(se.vesselScope, data.quotationVessels)
+    if (se.customText) texts.push(se.customText + eScope)
     else if (se.piExclusionId) {
       const found = data.allExclusions.find(e => e.id === se.piExclusionId)
-      if (found) texts.push(found.text)
+      if (found) texts.push(found.text + eScope)
     }
   }
   return texts
@@ -344,7 +372,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const desc = data.clauseOverrides[c.id] || c.description
       const clauseDesc = desc ? ` \u2013 ${desc}` : ''
       const displayName = stripClauseRef(c.name || '')
-      condText += `Section B Cl.${c.clauseNumber}${displayName ? ` \u2013 ${displayName}` : ''}${clauseDesc}\n`
+      const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
+      condText += `Section B Cl.${c.clauseNumber}${displayName ? ` \u2013 ${displayName}` : ''}${clauseDesc}${cScope}\n`
     }
     if (data.additionalClauses.length > 0) {
       condText += '\n'
@@ -352,7 +381,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const def = data.allAdditionalClauses.find(a => a.id === ac.piAdditionalClauseId)
         const code = def?.code || ''
         const text = ac.customText || def?.text || ''
-        if (text) condText += `- ${code ? code + ' ' : ''}${text}\n`
+        const acScope = vesselScopeSuffix(ac.vesselScope, data.quotationVessels)
+        if (text) condText += `- ${code ? code + ' ' : ''}${text}${acScope}\n`
       }
     }
     sections.push(['Conditions', condText.trim()])
@@ -422,11 +452,14 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   const sortedCustom = [...data.customWarranties].sort((a, b) => a.order - b.order)
   if (orderedWarranties.length > 0 || sortedCustom.length > 0) {
     let warText = ''
-    for (const w of orderedWarranties) {
-      warText += `- ${w!.text}\n`
+    for (let wi = 0; wi < orderedWarranties.length; wi++) {
+      const w = orderedWarranties[wi]!
+      const wScope = vesselScopeSuffix(data.warrantyVesselScopes[data.selectedWarrantyIds[wi]], data.quotationVessels)
+      warText += `- ${w.text}${wScope}\n`
     }
     for (const cw of sortedCustom) {
-      warText += `- ${cw.text}\n`
+      const cwScope = vesselScopeSuffix(cw.vesselScope, data.quotationVessels)
+      warText += `- ${cw.text}${cwScope}\n`
     }
     if (st(data, 'warrantiesAdditionalText')) warText += '\n' + stripHtml(st(data, 'warrantiesAdditionalText')) + '\n'
     if (st(data, 'warrantiesBreach')) warText += '\n' + stripHtml(st(data, 'warrantiesBreach'))
@@ -437,22 +470,29 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   if (data.deductibles.length > 0 || data.textDeductibles.length > 0) {
     let dedText = ''
     for (const d of data.deductibles) {
-      const mainDesc = d.description.replace(/\{sub_amount\}/g, d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '-')
-      dedText += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}\n`
-      if (d.secondaryAmount != null && d.secondaryDescription) {
-        const secDesc = d.secondaryDescription.replace(/\{sub_amount\}/g, formatCurrency(d.secondaryAmount, d.currency))
-        dedText += `${formatCurrency(d.secondaryAmount, d.currency)}  \u2014  ${secDesc}\n`
+      const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
+      const mainDesc = d.description
+        .replace(/\{currency\}/g, d.currency)
+        .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+      dedText += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}${dScope}\n`
+      if (d.secondaryDescription) {
+        const secDesc = d.secondaryDescription
+          .replace(/\{currency\}/g, d.currency)
+          .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+        dedText += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc}\n`
       }
     }
-    for (const td of data.textDeductibles) { dedText += '\n' + td.text + '\n' }
-    if (st(data, 'deductiblesAggregate')) dedText += '\n' + stripHtml(st(data, 'deductiblesAggregate')) + '\n'
-    if (data.quotation.vdrDeductibleEnabled && st(data, 'deductiblesVDR')) dedText += '\n' + stripHtml(st(data, 'deductiblesVDR'))
+    dedText += '\n'
+    if (data.quotation.deductibleAggregateEnabled && data.quotation.deductibleAggregateText) dedText += '\n' + data.quotation.deductibleAggregateText + '\n'
+    else if (data.quotation.deductibleAggregateEnabled && st(data, 'deductiblesAggregate')) dedText += '\n' + stripHtml(st(data, 'deductiblesAggregate')) + '\n'
+    for (const td of data.textDeductibles) { const tdScope = vesselScopeSuffix(td.vesselScope, data.quotationVessels); dedText += '\n' + td.text + tdScope + '\n' }
+    if (st(data, 'deductiblesAdditionalText')) dedText += '\n' + stripHtml(st(data, 'deductiblesAdditionalText')) + '\n'
     sections.push(['Deductibles', dedText.trim()])
   }
 
   // Exclusions
   if (exclusionTexts.length > 0) {
-    sections.push(['Exclusions', exclusionTexts.map(t => `\u2022 ${t}`).join('\n')])
+    sections.push(['Exclusions', exclusionTexts.map(t => `- ${t}`).join('\n')])
   }
 
   // Sanctions
@@ -465,60 +505,90 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   if (data.subjectivities.length > 0) {
     let subjText = ''
     if (st(data, 'subjectivitiesIntro')) subjText += stripHtml(st(data, 'subjectivitiesIntro')) + '\n\n'
-    for (const s of data.subjectivities) { subjText += `\u2022 ${s.text}\n` }
+    for (const s of data.subjectivities) { const sScope = vesselScopeSuffix(s.vesselScope, data.quotationVessels); subjText += `- ${s.text}${sScope}\n` }
     if (st(data, 'subjectivitiesNote')) subjText += '\n' + stripHtml(st(data, 'subjectivitiesNote'))
     sections.push(['Subjectivities', subjText.trim()])
-  }
-
-  // Continuation P&I Club
-  if (st(data, 'continuationPiClubText')) {
-    sections.push(['Continuation P&I Club', stripHtml(st(data, 'continuationPiClubText'))])
   }
 
   // Premium
   let premText = ''
   const q = data.quotation
-  if (q.premiumAmount != null) {
-    const techLabel = (q.discountPercent && q.discountPercent > 0) ? 'Technical Premium' : 'Premium'
+  const hasDiscount = q.ncbEnabled || q.upccEnabled
+  const ncbPct = q.ncbDiscountPercent || 0
+  const upccPct = q.upccDiscountPercent || 0
+  const discountMul = (1 - ncbPct / 100) * (1 - upccPct / 100)
+  const isMultiVessel = data.quotationVessels.length >= 2
+  const hasVesselPremiums = isMultiVessel && data.quotationVessels.some(v => v.premiumAmount)
+
+  if (hasVesselPremiums) {
+    // Multi-vessel premium table as formatted text
+    const techLabel = hasDiscount ? 'Technical Premium' : 'Premium'
+    const vesselLines = data.quotationVessels.map(v => {
+      const vName = (v.name || v.vesselLabel).toUpperCase()
+      const vPrem = v.premiumAmount || 0
+      if (hasDiscount) {
+        const vPayable = vPrem * discountMul
+        return `${vName}:  ${techLabel}: ${formatCurrency(vPrem, q.premiumCurrency)}  |  Payable: ${formatCurrency(vPayable, q.premiumCurrency)}`
+      }
+      return `${vName}:  ${formatCurrency(vPrem, q.premiumCurrency)}`
+    })
+    premText += vesselLines.join('\n') + '\n'
+    // Total
+    const totalTech = data.quotationVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
+    if (hasDiscount) {
+      const totalPayable = totalTech * discountMul
+      premText += `\nTotal ${techLabel}: ${formatCurrency(totalTech, q.premiumCurrency)} per annum\n`
+      premText += `Total Payable Premium: ${formatCurrency(totalPayable, q.premiumCurrency)} per annum\n`
+    } else {
+      premText += `\nTotal Premium: ${formatCurrency(totalTech, q.premiumCurrency)} per annum\n`
+    }
+    premText += '\n'
+  } else if (q.premiumAmount != null) {
+    const techLabel = hasDiscount ? 'Technical Premium' : 'Premium'
     premText += `${techLabel}: ${formatCurrency(q.premiumAmount, q.premiumCurrency)} per annum\n`
-    if (q.discountPercent && q.discountPercent > 0) {
-      const discountLabel = q.discountLabel || 'Discount'
-      premText += `${discountLabel}: ${q.discountPercent}%\n`
-      const payable = q.premiumAmount * (1 - q.discountPercent / 100)
+    if (hasDiscount) {
+      const payable = q.premiumAmount * discountMul
       premText += `Payable Premium: ${formatCurrency(payable, q.premiumCurrency)} per annum\n`
     }
     premText += '\n'
+  }
+  // Non-refundable
+  if (q.nonRefundableType === 'first_instalment') {
+    premText += 'First instalment is non-refundable.\n\n'
+  } else if (q.nonRefundableType === 'percentage' && q.nonRefundablePercent) {
+    premText += `${q.nonRefundablePercent}% of premium is non-refundable.\n\n`
   }
   if (st(data, 'premiumPaymentIntro')) {
     premText += stripHtml(st(data, 'premiumPaymentIntro')).replace('{instalments}', String(q.numInstalments || 1)) + '\n\n'
   }
   for (const inst of data.instalments) {
     const timing = inst.daysFromInception === 0 ? 'prior inception' : `within ${inst.daysFromInception} days of inception`
-    const desc = inst.description ? ` (${inst.description})` : ''
-    let nonRef = ''
-    if (inst.nonRefundable) {
-      nonRef = inst.nonRefundablePercent ? ` (${inst.nonRefundablePercent}% non-refundable)` : ' (non-refundable)'
-    }
-    premText += `${ordinal(inst.instalmentNumber)} Instalment ${timing}${desc}${nonRef}\n`
+    premText += `${ordinal(inst.instalmentNumber)} Instalment ${timing}\n`
   }
   if (data.instalments.length > 0) premText += '\n'
   if (st(data, 'premiumCondition')) premText += stripHtml(st(data, 'premiumCondition')) + '\n\n'
   if (st(data, 'premiumEarned')) premText += stripHtml(st(data, 'premiumEarned')) + '\n\n'
-  if (q.ncbEnabled) {
-    premText += `NCB Discount: ${q.ncbDiscountPercent || 0}%\n`
-    if (q.ncbText) premText += stripHtml(q.ncbText) + '\n\n'
-  }
-  if (q.cpcEnabled) {
-    premText += `CPC Discount: ${q.cpcDiscountPercent || 0}%\n`
-    if (q.cpcText) premText += stripHtml(q.cpcText) + '\n\n'
-  }
   if (q.premiumAdditionalText) premText += stripHtml(q.premiumAdditionalText)
   sections.push(['Premium Payment\nCondition Precedent', premText.trim()])
 
+  // NCB as separate section
+  if (q.ncbEnabled) {
+    let ncbText = `NCB Discount: ${ncbPct}%\n`
+    if (q.ncbText) ncbText += stripHtml(q.ncbText)
+    sections.push(['No Claims Bonus\n(NCB)', ncbText.trim()])
+  }
+
+  // UPCC as separate section
+  if (q.upccEnabled) {
+    let upccText = `UPCC Discount: ${upccPct}%\n`
+    if (q.upccText) upccText += stripHtml(q.upccText)
+    sections.push(['Upfront Continuity\n(UPCC)', upccText.trim()])
+  }
+
   // Information
   let infoText = ''
-  if (data.quotation.validityDays) infoText += `\u2022 Quote open for ${data.quotation.validityDays} days\n`
-  for (const info of data.information) { infoText += `\u2022 ${info.text}\n` }
+  if (data.quotation.validityDays) infoText += `- Quote open for ${data.quotation.validityDays} days\n`
+  for (const info of data.information) { infoText += `- ${info.text}\n` }
   sections.push(['Information', infoText.trim() || '-'])
 
   // Render main two-column table
@@ -631,7 +701,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   }
 
   // Border helpers for main table
-  const thin = { style: BorderStyle.SINGLE, size: 1, color: '000000' }
+  const thin = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
   const thinBorders = () => ({ top: thin, bottom: thin, left: thin, right: thin })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
@@ -798,7 +868,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const desc = data.clauseOverrides[c.id] || c.description
           const clauseDesc = desc ? ` \u2013 ${desc}` : ''
           const displayName = stripClauseRef(c.name || '')
-          const rightText = displayName ? `${displayName}${clauseDesc}` : (desc || '')
+          const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
+          const rightText = (displayName ? `${displayName}${clauseDesc}` : (desc || '')) + cScope
           return new TableRow({
             children: [
               new TableCell({
@@ -822,12 +893,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const def = data.allAdditionalClauses.find(a => a.id === ac.piAdditionalClauseId)
         const code = def?.code || ''
         const text = ac.customText || def?.text || ''
+        const acScope = vesselScopeSuffix(ac.vesselScope, data.quotationVessels)
         if (text) condContent.push(new Paragraph({
           numbering: { reference: 'dash-bullet', level: 0 },
           spacing: { after: 40 },
           children: [
             ...(code ? [new TextRun({ text: code + ' ', size: 22, font: 'Arial', color: '000000' })] : []),
-            new TextRun({ text, size: 22, font: 'Arial', color: '000000' })
+            new TextRun({ text: text + acScope, size: 22, font: 'Arial', color: '000000' })
           ]
         }))
       }
@@ -908,8 +980,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Warranties ----
   if (orderedWordWarranties.length > 0 || sortedWordCustom.length > 0) {
     const warContent: (Paragraph | Table)[] = []
-    for (const w of orderedWordWarranties) { warContent.push(bulletP(w.text)) }
-    for (const cw of sortedWordCustom) { warContent.push(bulletP(cw.text)) }
+    for (let wi = 0; wi < orderedWordWarranties.length; wi++) {
+      const w = orderedWordWarranties[wi]
+      const wScope = vesselScopeSuffix(data.warrantyVesselScopes[data.selectedWarrantyIds[wi]], data.quotationVessels)
+      warContent.push(bulletP(w.text + wScope))
+    }
+    for (const cw of sortedWordCustom) { warContent.push(bulletP(cw.text + vesselScopeSuffix(cw.vesselScope, data.quotationVessels))) }
     if (st(data, 'warrantiesAdditionalText')) {
       warContent.push(emptyP())
       warContent.push(...mp(st(data, 'warrantiesAdditionalText')))
@@ -925,36 +1001,57 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   if (data.deductibles.length > 0 || data.textDeductibles.length > 0) {
     const dedContent: (Paragraph | Table)[] = []
     if (data.deductibles.length > 0) {
-      const dedAmtW = Math.round(BODY_W * 0.25)
+      const dedAmtW = Math.round(BODY_W * 0.30)
       const dedDescW = BODY_W - dedAmtW
-      dedContent.push(new Table({
-        width: { size: BODY_W, type: WidthType.DXA },
-        rows: data.deductibles.map(d => {
-          let desc = d.description.replace(/\{sub_amount\}/g, d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '-')
-          if (d.secondaryAmount != null && d.secondaryDescription) {
-            const secDesc = d.secondaryDescription.replace(/\{sub_amount\}/g, formatCurrency(d.secondaryAmount, d.currency))
-            desc += ` (${secDesc}: ${formatCurrency(d.secondaryAmount, d.currency)})`
-          }
-          return new TableRow({
+      const dedRows: TableRow[] = []
+      for (const d of data.deductibles) {
+        const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
+        dedRows.push(new TableRow({
+          children: [
+            new TableCell({
+              width: { size: dedAmtW, type: WidthType.DXA },
+              borders: noBorders(),
+              children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: '000000' })] })]
+            }),
+            new TableCell({
+              width: { size: dedDescW, type: WidthType.DXA },
+              borders: noBorders(),
+              children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___') + dScope, size: 22, font: 'Arial', color: '000000' })] })]
+            })
+          ]
+        }))
+        if (d.secondaryDescription) {
+          const secDesc = d.secondaryDescription
+            .replace(/\{currency\}/g, d.currency)
+            .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+          dedRows.push(new TableRow({
             children: [
               new TableCell({
                 width: { size: dedAmtW, type: WidthType.DXA },
                 borders: noBorders(),
-                children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: '000000' })] })]
+                children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: '000000' })] })]
               }),
               new TableCell({
                 width: { size: dedDescW, type: WidthType.DXA },
                 borders: noBorders(),
-                children: [new Paragraph({ children: [new TextRun({ text: desc, size: 22, font: 'Arial', color: '000000' })] })]
+                children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: '000000' })] })]
               })
             ]
-          })
-        })
+          }))
+        }
+      }
+      dedContent.push(new Table({
+        width: { size: BODY_W, type: WidthType.DXA },
+        columnWidths: [dedAmtW, dedDescW],
+        layout: TableLayoutType.FIXED,
+        rows: dedRows
       }))
+      dedContent.push(emptyP())
     }
-    for (const td of data.textDeductibles) { dedContent.push(np(td.text)) }
-    if (st(data, 'deductiblesAggregate')) dedContent.push(...mp(st(data, 'deductiblesAggregate')))
-    if (data.quotation.vdrDeductibleEnabled && st(data, 'deductiblesVDR')) dedContent.push(...mp(st(data, 'deductiblesVDR')))
+    if (data.quotation.deductibleAggregateEnabled && data.quotation.deductibleAggregateText) dedContent.push(...mp(data.quotation.deductibleAggregateText))
+    else if (data.quotation.deductibleAggregateEnabled && st(data, 'deductiblesAggregate')) dedContent.push(...mp(st(data, 'deductiblesAggregate')))
+    for (const td of data.textDeductibles) { dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+    if (st(data, 'deductiblesAdditionalText')) dedContent.push(...mp(st(data, 'deductiblesAdditionalText')))
     rows.push(makeRow('Deductibles', dedContent))
   }
 
@@ -973,7 +1070,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   if (data.subjectivities.length > 0) {
     const subjContent: (Paragraph | Table)[] = []
     if (st(data, 'subjectivitiesIntro')) subjContent.push(...mp(st(data, 'subjectivitiesIntro')))
-    for (const s of data.subjectivities) { subjContent.push(bulletP(s.text)) }
+    for (const s of data.subjectivities) { subjContent.push(bulletP(s.text + vesselScopeSuffix(s.vesselScope, data.quotationVessels))) }
     if (st(data, 'subjectivitiesNote')) {
       subjContent.push(emptyP())
       subjContent.push(...mp(st(data, 'subjectivitiesNote')))
@@ -981,23 +1078,66 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     rows.push(makeRow('Subjectivities', subjContent))
   }
 
-  // ---- Continuation P&I Club ----
-  if (st(data, 'continuationPiClubText')) {
-    rows.push(makeRow('Continuation P&I Club', mp(st(data, 'continuationPiClubText'))))
-  }
-
   // ---- Premium ----
   const premContent: (Paragraph | Table)[] = []
   const wq = data.quotation
-  if (wq.premiumAmount != null) {
-    const techLabel = (wq.discountPercent && wq.discountPercent > 0) ? 'Technical Premium' : 'Premium'
+  const wHasDiscount = wq.ncbEnabled || wq.upccEnabled
+  const wNcbPct = wq.ncbDiscountPercent || 0
+  const wUpccPct = wq.upccDiscountPercent || 0
+  const wDiscountMul = (1 - wNcbPct / 100) * (1 - wUpccPct / 100)
+  const wIsMultiVessel = data.quotationVessels.length >= 2
+  const wHasVesselPremiums = wIsMultiVessel && data.quotationVessels.some(v => v.premiumAmount)
+
+  if (wHasVesselPremiums) {
+    const techLabel = wHasDiscount ? 'Technical Premium' : 'Premium'
+    // Vessel premium sub-table
+    const headerCells = [
+      new TableCell({ width: { size: 3000, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: 'Vessel', size: 20, font: 'Arial', bold: true, color: '000000' })] })] }),
+      new TableCell({ width: { size: 2500, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: techLabel, size: 20, font: 'Arial', bold: true, color: '000000' })] })] })
+    ]
+    if (wHasDiscount) {
+      headerCells.push(new TableCell({ width: { size: 2500, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Payable Premium', size: 20, font: 'Arial', bold: true, color: '000000' })] })] }))
+    }
+    const premTableRows = [new TableRow({ children: headerCells })]
+    for (const v of data.quotationVessels) {
+      const vName = (v.name || v.vesselLabel).toUpperCase()
+      const vPrem = v.premiumAmount || 0
+      const rowCells = [
+        new TableCell({ borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: vName, size: 22, font: 'Arial', color: '000000' })] })] }),
+        new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(vPrem, wq.premiumCurrency), size: 22, font: 'Arial', color: '000000' })] })] })
+      ]
+      if (wHasDiscount) {
+        const vPayable = vPrem * wDiscountMul
+        rowCells.push(new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: vPrem > 0 ? formatCurrency(vPayable, wq.premiumCurrency) : '-', size: 22, font: 'Arial', color: '000000' })] })] }))
+      }
+      premTableRows.push(new TableRow({ children: rowCells }))
+    }
+    // Total row
+    const totalTech = data.quotationVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
+    const totalCells = [
+      new TableCell({ borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: 'Total', size: 22, font: 'Arial', bold: true, color: '000000' })] })] }),
+      new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(totalTech, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })] })] })
+    ]
+    if (wHasDiscount) {
+      const totalPayable = totalTech * wDiscountMul
+      totalCells.push(new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(totalPayable, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })] })] }))
+    }
+    premTableRows.push(new TableRow({ children: totalCells }))
+    premContent.push(new Table({ rows: premTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }))
+    premContent.push(np('per annum'))
+  } else if (wq.premiumAmount != null) {
+    const techLabel = wHasDiscount ? 'Technical Premium' : 'Premium'
     premContent.push(bp(`${techLabel}: ${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`))
-    if (wq.discountPercent && wq.discountPercent > 0) {
-      const discountLabel = wq.discountLabel || 'Discount'
-      premContent.push(np(`${discountLabel}: ${wq.discountPercent}%`))
-      const payable = wq.premiumAmount * (1 - wq.discountPercent / 100)
+    if (wHasDiscount) {
+      const payable = wq.premiumAmount * wDiscountMul
       premContent.push(bp(`Payable Premium: ${formatCurrency(payable, wq.premiumCurrency)} per annum`))
     }
+  }
+  // Non-refundable
+  if (wq.nonRefundableType === 'first_instalment') {
+    premContent.push(np('First instalment is non-refundable.'))
+  } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
+    premContent.push(np(`${wq.nonRefundablePercent}% of premium is non-refundable.`))
   }
   if (st(data, 'premiumPaymentIntro')) {
     const introText = st(data, 'premiumPaymentIntro').replace('{instalments}', String(wq.numInstalments || 1))
@@ -1006,26 +1146,29 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   if (data.instalments.length > 0) {
     for (const inst of data.instalments) {
       const timing = inst.daysFromInception === 0 ? 'prior inception' : `within ${inst.daysFromInception} days of inception`
-      const desc = inst.description ? ` (${inst.description})` : ''
-      let nonRef = ''
-      if (inst.nonRefundable) {
-        nonRef = inst.nonRefundablePercent ? ` (${inst.nonRefundablePercent}% non-refundable)` : ' (non-refundable)'
-      }
-      premContent.push(np(`${ordinal(inst.instalmentNumber)} Instalment ${timing}${desc}${nonRef}`))
+      premContent.push(np(`${ordinal(inst.instalmentNumber)} Instalment ${timing}`))
     }
   }
   if (st(data, 'premiumCondition')) premContent.push(...mp(st(data, 'premiumCondition')))
   if (st(data, 'premiumEarned')) premContent.push(...mp(st(data, 'premiumEarned')))
-  if (wq.ncbEnabled) {
-    premContent.push(bp(`NCB Discount: ${wq.ncbDiscountPercent || 0}%`))
-    if (wq.ncbText) premContent.push(...mp(wq.ncbText))
-  }
-  if (wq.cpcEnabled) {
-    premContent.push(bp(`CPC Discount: ${wq.cpcDiscountPercent || 0}%`))
-    if (wq.cpcText) premContent.push(...mp(wq.cpcText))
-  }
   if (wq.premiumAdditionalText) premContent.push(...mp(wq.premiumAdditionalText))
   rows.push(makeRow('Premium Payment Condition Precedent', premContent.length > 0 ? premContent : [emptyP()]))
+
+  // ---- NCB as separate section ----
+  if (wq.ncbEnabled) {
+    const ncbContent: (Paragraph | Table)[] = []
+    ncbContent.push(bp(`NCB Discount: ${wNcbPct}%`))
+    if (wq.ncbText) ncbContent.push(...mp(wq.ncbText))
+    rows.push(makeRow('No Claims Bonus (NCB)', ncbContent))
+  }
+
+  // ---- UPCC as separate section ----
+  if (wq.upccEnabled) {
+    const upccContent: (Paragraph | Table)[] = []
+    upccContent.push(bp(`UPCC Discount: ${wUpccPct}%`))
+    if (wq.upccText) upccContent.push(...mp(wq.upccText))
+    rows.push(makeRow('Upfront Continuity (UPCC)', upccContent))
+  }
 
   // ---- Information ----
   const infoContent: (Paragraph | Table)[] = []
@@ -1038,6 +1181,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     width: { size: CONTENT_W, type: WidthType.DXA },
     columnWidths: [TITLE_W, BODY_W],
     layout: TableLayoutType.FIXED,
+    borders: {
+      top: thin, bottom: thin, left: thin, right: thin,
+      insideHorizontal: thin, insideVertical: thin
+    },
     rows
   })
 
@@ -1126,7 +1273,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           format: LevelFormat.BULLET,
           text: '-',
           alignment: AlignmentType.LEFT,
-          style: { paragraph: { indent: { left: 360, hanging: 360 } } }
+          style: { paragraph: { indent: { left: 140, hanging: 140 } } }
         }]
       }, {
         reference: 'trading-numbered',
@@ -1137,7 +1284,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           alignment: AlignmentType.LEFT,
           style: {
             run: { font: 'Arial', size: 22 },
-            paragraph: { indent: { left: 360, hanging: 360 } }
+            paragraph: { indent: { left: 240, hanging: 240 } }
           }
         }, {
           level: 1,

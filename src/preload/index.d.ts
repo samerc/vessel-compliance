@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -230,6 +230,12 @@ export interface Api {
   piUpdateDeductibleSet: (id: string, name: string, items: { deductibleId: string; amount: number; currency: string; secondaryAmount?: number }[]) => Promise<void>
   piDeleteDeductibleSet: (id: string) => Promise<void>
 
+  piGetTextDeductibles: () => Promise<PITextDeductible[]>
+  piAddTextDeductible: (data: { title?: string; text: string; defaultIncluded?: boolean }) => Promise<PITextDeductible>
+  piUpdateTextDeductible: (id: string, updates: { title?: string; text?: string; defaultIncluded?: boolean }) => Promise<void>
+  piDeleteTextDeductible: (id: string) => Promise<void>
+  piReorderTextDeductibles: (orderedIds: string[]) => Promise<void>
+
   piGetExclusions: () => Promise<PIExclusion[]>
   piAddExclusion: (text: string) => Promise<PIExclusion>
   piUpdateExclusion: (id: string, text: string) => Promise<void>
@@ -371,45 +377,58 @@ export interface Api {
   updateQuotationSubLimit: (id: string, updates: { text?: string; amount?: number; currency?: string }) => Promise<void>
   deleteQuotationSubLimit: (id: string) => Promise<void>
 
-  getQuotationClauses: (qId: string) => Promise<string[]>
+  getQuotationClauses: (qId: string) => Promise<{ piClauseId: string; vesselScope?: string[] | null }[]>
   setQuotationClauses: (qId: string, ids: string[], overrides?: Record<string, string>) => Promise<void>
   getQuotationClauseOverrides: (qId: string) => Promise<Record<string, string>>
   updateQuotationClauseOverride: (qId: string, clauseId: string, override: string | null) => Promise<void>
 
-  getQuotationAdditionalClauses: (qId: string) => Promise<{ id: string; quotationId: string; piAdditionalClauseId?: string; customText?: string; order: number }[]>
-  addQuotationAdditionalClause: (data: { quotationId: string; piAdditionalClauseId?: string; customText?: string; order?: number }) => Promise<any>
+  getQuotationAdditionalClauses: (qId: string) => Promise<{ id: string; quotationId: string; piAdditionalClauseId?: string; customText?: string; order: number; vesselScope?: string[] | null }[]>
+  addQuotationAdditionalClause: (data: { quotationId: string; piAdditionalClauseId?: string; customText?: string; order?: number; vesselScope?: string[] }) => Promise<any>
   deleteQuotationAdditionalClause: (id: string) => Promise<void>
 
-  getQuotationWarranties: (qId: string) => Promise<string[]>
+  getQuotationWarranties: (qId: string) => Promise<{ id: string; piWarrantyId: string; order: number; vesselScope?: string[] | null }[]>
   setQuotationWarranties: (qId: string, ids: string[]) => Promise<void>
+  updateQuotationWarrantyVesselScope: (qId: string, piWarrantyId: string, vesselScope: string[] | null) => Promise<void>
+  updateQuotationClauseVesselScope: (qId: string, piClauseId: string, vesselScope: string[] | null) => Promise<void>
   getQuotationCustomWarranties: (qId: string) => Promise<QuotationCustomWarranty[]>
-  addQuotationCustomWarranty: (data: { quotationId: string; text: string; order?: number }) => Promise<QuotationCustomWarranty>
-  updateQuotationCustomWarranty: (id: string, updates: { text?: string }) => Promise<void>
+  addQuotationCustomWarranty: (data: { quotationId: string; text: string; order?: number; vesselScope?: string[] }) => Promise<QuotationCustomWarranty>
+  updateQuotationCustomWarranty: (id: string, updates: { text?: string; vesselScope?: string[] | null }) => Promise<void>
   deleteQuotationCustomWarranty: (id: string) => Promise<void>
   reorderQuotationCustomWarranties: (ids: string[]) => Promise<void>
 
   getQuotationDeductibles: (qId: string) => Promise<QuotationDeductible[]>
-  addQuotationDeductible: (data: { quotationId: string; piDeductibleId?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number }) => Promise<QuotationDeductible>
-  updateQuotationDeductible: (id: string, updates: { description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string }) => Promise<void>
+  addQuotationDeductible: (data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[] }) => Promise<QuotationDeductible>
+  updateQuotationDeductible: (id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null }) => Promise<void>
   deleteQuotationDeductible: (id: string) => Promise<void>
+  reorderQuotationDeductibles: (orderedIds: string[]) => Promise<void>
 
   getQuotationTextDeductibles: (qId: string) => Promise<QuotationTextDeductible[]>
-  addQuotationTextDeductible: (data: { quotationId: string; text: string; order?: number }) => Promise<QuotationTextDeductible>
+  addQuotationTextDeductible: (data: { quotationId: string; piTextDeductibleId?: string; title?: string; text: string; order?: number; vesselScope?: string[] }) => Promise<QuotationTextDeductible>
+  updateQuotationTextDeductible: (id: string, updates: { title?: string; text?: string; vesselScope?: string[] | null }) => Promise<void>
   deleteQuotationTextDeductible: (id: string) => Promise<void>
+  reorderQuotationTextDeductibles: (orderedIds: string[]) => Promise<void>
 
-  getQuotationExclusions: (qId: string) => Promise<{ id: string; quotationId: string; piExclusionId?: string; customText?: string }[]>
+  getQuotationExclusions: (qId: string) => Promise<{ id: string; quotationId: string; piExclusionId?: string; customText?: string; vesselScope?: string[] | null }[]>
   setQuotationExclusions: (qId: string, items: { piExclusionId?: string; customText?: string }[]) => Promise<void>
+
+  updateQuotationItemVesselScope: (table: string, id: string, vesselScope: string[] | null) => Promise<void>
 
   getQuotationExcludedCountries: (qId: string) => Promise<QuotationExcludedCountry[]>
   setQuotationExcludedCountries: (qId: string, countries: { name: string; listType: string }[]) => Promise<void>
 
-  getQuotationSubjectivities: (qId: string) => Promise<{ id: string; quotationId: string; text: string; order: number }[]>
-  addQuotationSubjectivity: (data: { quotationId: string; text: string; order?: number }) => Promise<any>
-  updateQuotationSubjectivity: (id: string, text: string) => Promise<void>
+  getPISubjectivities: () => Promise<PISubjectivity[]>
+  addPISubjectivity: (data: { text: string; docTypeIds?: string[]; order?: number }) => Promise<PISubjectivity>
+  updatePISubjectivity: (id: string, data: { text: string; docTypeIds?: string[] }) => Promise<void>
+  deletePISubjectivity: (id: string) => Promise<void>
+  reorderPISubjectivities: (ids: string[]) => Promise<void>
+
+  getQuotationSubjectivities: (qId: string) => Promise<QuotationSubjectivity[]>
+  addQuotationSubjectivity: (data: { quotationId: string; piSubjectivityId?: string; text: string; isCustom?: boolean; isAutoPopulated?: boolean; order?: number; vesselScope?: string[] }) => Promise<any>
+  updateQuotationSubjectivity: (id: string, data: { text?: string; order?: number; vesselScope?: string[] | null }) => Promise<void>
   deleteQuotationSubjectivity: (id: string) => Promise<void>
 
   getQuotationInstalments: (qId: string) => Promise<QuotationInstalment[]>
-  setQuotationInstalments: (qId: string, instalments: { instalmentNumber: number; daysFromInception: number; description?: string; nonRefundable?: boolean; nonRefundablePercent?: number }[]) => Promise<void>
+  setQuotationInstalments: (qId: string, instalments: { instalmentNumber: number; daysFromInception: number }[]) => Promise<void>
 
   getQuotationInformation: (qId: string) => Promise<{ id: string; quotationId: string; text: string; order: number }[]>
   addQuotationInformation: (data: { quotationId: string; text: string; order?: number }) => Promise<any>
