@@ -107,3 +107,63 @@
 .rte-content[data-placeholder] .tiptap > p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
 }
+
+/* Font size button */
+.rte-font-size-btn {
+  width: auto !important;
+  padding: 0 4px !important;
+  gap: 2px;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Font size dropdown */
+.rte-font-size-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 4px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  min-width: 48px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.rte-font-size-option {
+  border: none;
+  background: none;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.rte-font-size-option:hover {
+  background: rgba(128,128,128,0.15);
+}
+
+.rte-font-size-option.active {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+/* Link styling */
+.rte-content .tiptap a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* RTL content support */
+.rte-content .tiptap [dir="rtl"],
+.rte-content .tiptap p[style*="text-align: right"] {
+  direction: rtl;
+  unicode-bidi: embed;
+}

@@ -196,8 +196,15 @@ CREATE TABLE IF NOT EXISTS pi_text_deductibles (
 CREATE TABLE IF NOT EXISTS pi_exclusions (
   id VARCHAR(36) PRIMARY KEY,
   text TEXT NOT NULL,
+  is_cargo_related BOOLEAN DEFAULT FALSE,
   order_index INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pi_exclusion_vessel_type_map (
+  exclusion_id VARCHAR(36) NOT NULL,
+  vessel_type_id VARCHAR(36) NOT NULL,
+  PRIMARY KEY (exclusion_id, vessel_type_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pi_sub_limit_templates (
@@ -213,6 +220,7 @@ CREATE TABLE IF NOT EXISTS pi_additional_clauses (
   id VARCHAR(36) PRIMARY KEY,
   text TEXT NOT NULL,
   order_index INT DEFAULT 0,
+  default_selected BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -226,9 +234,18 @@ CREATE TABLE IF NOT EXISTS trading_excluded_countries (
 
 -- Quotation Tables
 
+CREATE TABLE IF NOT EXISTS quotation_types (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  code VARCHAR(10) NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS quotations (
   id VARCHAR(36) PRIMARY KEY,
   reference_number VARCHAR(100),
+  quotation_type_id VARCHAR(36),
   quotation_date DATE,
   policy_type_id VARCHAR(36),
   vessel_id VARCHAR(36),
@@ -260,6 +277,7 @@ CREATE TABLE IF NOT EXISTS quotations (
   discount_label VARCHAR(50),
   non_refundable_type VARCHAR(20) DEFAULT NULL,
   non_refundable_percent DECIMAL(5,2) DEFAULT NULL,
+  section_order TEXT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_by VARCHAR(100),
@@ -376,6 +394,22 @@ CREATE TABLE IF NOT EXISTS quotation_exclusions (
   vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_exclusion_id) REFERENCES pi_exclusions(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotation_custom_exclusions (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotation_custom_sections (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  text TEXT,
+  order_index INT DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS quotation_excluded_countries (

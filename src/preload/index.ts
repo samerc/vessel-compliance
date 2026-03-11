@@ -250,8 +250,8 @@ const api = {
   piReorderTextDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderTextDeductibles', orderedIds),
 
   piGetExclusions: () => ipcRenderer.invoke('pi:getExclusions'),
-  piAddExclusion: (text: string) => ipcRenderer.invoke('pi:addExclusion', text),
-  piUpdateExclusion: (id: string, text: string) => ipcRenderer.invoke('pi:updateExclusion', id, text),
+  piAddExclusion: (exclusion: { text: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }) => ipcRenderer.invoke('pi:addExclusion', exclusion),
+  piUpdateExclusion: (id: string, updates: { text?: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }) => ipcRenderer.invoke('pi:updateExclusion', id, updates),
   piDeleteExclusion: (id: string) => ipcRenderer.invoke('pi:deleteExclusion', id),
   piReorderExclusions: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderExclusions', orderedIds),
 
@@ -266,6 +266,7 @@ const api = {
   piUpdateAdditionalClause: (id: string, code: string | null, text: string) => ipcRenderer.invoke('pi:updateAdditionalClause', id, code, text),
   piDeleteAdditionalClause: (id: string) => ipcRenderer.invoke('pi:deleteAdditionalClause', id),
   piReorderAdditionalClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderAdditionalClauses', orderedIds),
+  piToggleAdditionalClauseDefault: (id: string, defaultSelected: boolean) => ipcRenderer.invoke('pi:toggleAdditionalClauseDefault', id, defaultSelected),
   piGetAdditionalClauseSets: () => ipcRenderer.invoke('pi:getAdditionalClauseSets'),
   piAddAdditionalClauseSet: (name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:addAdditionalClauseSet', name, clauseIds),
   piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:updateAdditionalClauseSet', id, name, clauseIds),
@@ -362,8 +363,16 @@ const api = {
   addVesselNote: (vesselId: string, note: string) => ipcRenderer.invoke('vesselNotes:add', vesselId, note),
   deleteVesselNote: (noteId: string) => ipcRenderer.invoke('vesselNotes:delete', noteId),
 
+  // Quotation Types
+  getQuotationTypes: () => ipcRenderer.invoke('db:getQuotationTypes'),
+  addQuotationType: (data: any) => ipcRenderer.invoke('db:addQuotationType', data),
+  updateQuotationType: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationType', id, updates),
+  deleteQuotationType: (id: string) => ipcRenderer.invoke('db:deleteQuotationType', id),
+  reorderQuotationTypes: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationTypes', ids),
+
   // Quotations
   getQuotations: () => ipcRenderer.invoke('db:getQuotations'),
+  getQuotation: (id: string) => ipcRenderer.invoke('db:getQuotation', id),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
   updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),
   deleteQuotation: (id: string) => ipcRenderer.invoke('db:deleteQuotation', id),
@@ -423,8 +432,21 @@ const api = {
 
   getQuotationExclusions: (qId: string) => ipcRenderer.invoke('db:getQuotationExclusions', qId),
   setQuotationExclusions: (qId: string, items: any[]) => ipcRenderer.invoke('db:setQuotationExclusions', qId, items),
+  getQuotationCustomExclusions: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomExclusions', qId),
+  addQuotationCustomExclusion: (data: { quotationId: string; text: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomExclusion', data),
+  updateQuotationCustomExclusion: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomExclusion', id, updates),
+  deleteQuotationCustomExclusion: (id: string) => ipcRenderer.invoke('db:deleteQuotationCustomExclusion', id),
+  reorderQuotationCustomExclusions: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationCustomExclusions', ids),
 
   updateQuotationItemVesselScope: (table: string, id: string, vesselScope: string[] | null) => ipcRenderer.invoke('db:updateQuotationItemVesselScope', table, id, vesselScope),
+
+  getQuotationCustomSections: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomSections', qId),
+  addQuotationCustomSection: (data: { quotationId: string; title: string; text?: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomSection', data),
+  updateQuotationCustomSection: (id: string, updates: { title?: string; text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomSection', id, updates),
+  deleteQuotationCustomSection: (id: string) => ipcRenderer.invoke('db:deleteQuotationCustomSection', id),
+  reorderQuotationCustomSections: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationCustomSections', ids),
+  piGetSectionOrderDefaults: () => ipcRenderer.invoke('pi:getSectionOrderDefaults'),
+  piSetSectionOrderDefaults: (order: string[]) => ipcRenderer.invoke('pi:setSectionOrderDefaults', order),
 
   getQuotationExcludedCountries: (qId: string) => ipcRenderer.invoke('db:getQuotationExcludedCountries', qId),
   setQuotationExcludedCountries: (qId: string, countries: any[]) => ipcRenderer.invoke('db:setQuotationExcludedCountries', qId, countries),

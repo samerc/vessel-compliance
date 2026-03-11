@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -663,6 +663,12 @@ export class MySQLAdapter {
             const [acCodeCol] = await this.pool.query("SHOW COLUMNS FROM pi_additional_clauses LIKE 'code'")
             if ((acCodeCol as any[]).length === 0) {
                 await this.pool.query('ALTER TABLE pi_additional_clauses ADD COLUMN code VARCHAR(50) NULL AFTER id')
+            }
+
+            // Migration: Add default_selected to pi_additional_clauses
+            const [acDefCol] = await this.pool.query("SHOW COLUMNS FROM pi_additional_clauses LIKE 'default_selected'")
+            if ((acDefCol as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE pi_additional_clauses ADD COLUMN default_selected BOOLEAN DEFAULT FALSE')
             }
 
             // Migration: Create quotation_vessels table
@@ -1374,12 +1380,100 @@ export class MySQLAdapter {
                 const vscopeTables = [
                     'quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles',
                     'quotation_text_deductibles', 'quotation_subjectivities', 'quotation_clauses',
-                    'quotation_additional_clauses', 'quotation_exclusions'
+                    'quotation_additional_clauses', 'quotation_exclusions', 'quotation_custom_exclusions'
                 ]
                 for (const tbl of vscopeTables) {
                     const [vsCols] = await this.pool.query(`SHOW COLUMNS FROM ${tbl} LIKE 'vessel_scope'`) as any[]
                     if (vsCols.length === 0) {
                         await this.pool.query(`ALTER TABLE ${tbl} ADD COLUMN vessel_scope TEXT DEFAULT NULL`)
+                    }
+                }
+            }
+
+            // Migration: add section_order column to quotations, create quotation_custom_sections table
+            {
+                const [soCol] = await this.pool.query(`SHOW COLUMNS FROM quotations LIKE 'section_order'`) as any[]
+                if (soCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN section_order TEXT DEFAULT NULL')
+                }
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                try {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_custom_sections (
+                        id VARCHAR(36) PRIMARY KEY,
+                        quotation_id VARCHAR(36) NOT NULL,
+                        title VARCHAR(255) NOT NULL,
+                        text TEXT,
+                        order_index INT DEFAULT 0
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                } finally {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+            }
+
+            // Migration: add is_cargo_related to pi_exclusions, create vessel type map + custom exclusions tables
+            {
+                const [exCols] = await this.pool.query(`SHOW COLUMNS FROM pi_exclusions LIKE 'is_cargo_related'`) as any[]
+                if (exCols.length === 0) {
+                    await this.pool.query('ALTER TABLE pi_exclusions ADD COLUMN is_cargo_related BOOLEAN DEFAULT FALSE AFTER text')
+                }
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                try {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_exclusion_vessel_type_map (
+                        exclusion_id VARCHAR(36) NOT NULL,
+                        vessel_type_id VARCHAR(36) NOT NULL,
+                        PRIMARY KEY (exclusion_id, vessel_type_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_custom_exclusions (
+                        id VARCHAR(36) PRIMARY KEY,
+                        quotation_id VARCHAR(36) NOT NULL,
+                        text TEXT NOT NULL,
+                        order_index INT DEFAULT 0,
+                        vessel_scope TEXT DEFAULT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                } finally {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+            }
+
+            // Migration: quotation_types table + quotation_type_id on quotations
+            {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                try {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_types (
+                        id VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(100) NOT NULL,
+                        code VARCHAR(10) NOT NULL,
+                        order_index INT DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                } finally {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+                // Seed default quotation types if table is empty
+                const [qtRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotation_types') as any[]
+                if (qtRows[0].cnt === 0) {
+                    const defaults = [
+                        { name: 'P&I', code: 'P', order: 0 },
+                        { name: 'H&M', code: 'H', order: 1 },
+                        { name: 'War Risk', code: 'W', order: 2 },
+                        { name: 'FDD', code: 'F', order: 3 },
+                        { name: 'Loss of Hire', code: 'L', order: 4 }
+                    ]
+                    for (const d of defaults) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_types (id, name, code, order_index) VALUES (?, ?, ?, ?)',
+                            [uuidv4(), d.name, d.code, d.order]
+                        )
+                    }
+                }
+                // Add quotation_type_id column to quotations if missing
+                const [qtCols] = await this.pool.query(`SHOW COLUMNS FROM quotations LIKE 'quotation_type_id'`) as any[]
+                if (qtCols.length === 0) {
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN quotation_type_id VARCHAR(36) AFTER reference_number')
+                    // Migrate existing quotations to P&I type
+                    const [piType] = await this.pool.query(`SELECT id FROM quotation_types WHERE code = 'P' LIMIT 1`) as any[]
+                    if (piType.length > 0) {
+                        await this.pool.execute('UPDATE quotations SET quotation_type_id = ? WHERE quotation_type_id IS NULL', [piType[0].id])
                     }
                 }
             }
@@ -4017,22 +4111,47 @@ export class MySQLAdapter {
 
     async getPIExclusions(): Promise<PIExclusion[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, text, order_index as `order` FROM pi_exclusions ORDER BY order_index ASC')
-        return rows as PIExclusion[]
+        const [rows] = await this.pool.query('SELECT id, text, is_cargo_related as isCargoRelated, order_index as `order` FROM pi_exclusions ORDER BY order_index ASC')
+        // Fetch vessel type mappings
+        const [vtRows] = await this.pool.query('SELECT exclusion_id, vessel_type_id FROM pi_exclusion_vessel_type_map') as any[]
+        const vtMap: Record<string, string[]> = {}
+        for (const r of vtRows) {
+            if (!vtMap[r.exclusion_id]) vtMap[r.exclusion_id] = []
+            vtMap[r.exclusion_id].push(r.vessel_type_id)
+        }
+        return (rows as any[]).map(r => ({ ...r, isCargoRelated: !!r.isCargoRelated, vesselTypeIds: vtMap[r.id] || [] }))
     }
 
-    async addPIExclusion(text: string): Promise<PIExclusion> {
+    async addPIExclusion(exclusion: { text: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }): Promise<PIExclusion> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         const [maxRow]: any[] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_exclusions')
         const order = maxRow[0].nextOrder
-        await this.pool.execute('INSERT INTO pi_exclusions (id, text, order_index) VALUES (?, ?, ?)', [id, text, order])
-        return { id, text, order }
+        await this.pool.execute('INSERT INTO pi_exclusions (id, text, is_cargo_related, order_index) VALUES (?, ?, ?, ?)', [id, exclusion.text, exclusion.isCargoRelated || false, order])
+        if (exclusion.vesselTypeIds?.length) {
+            for (const vtId of exclusion.vesselTypeIds) {
+                await this.pool.execute('INSERT INTO pi_exclusion_vessel_type_map (exclusion_id, vessel_type_id) VALUES (?, ?)', [id, vtId])
+            }
+        }
+        return { id, text: exclusion.text, isCargoRelated: exclusion.isCargoRelated || false, vesselTypeIds: exclusion.vesselTypeIds || [], order }
     }
 
-    async updatePIExclusion(id: string, text: string): Promise<void> {
+    async updatePIExclusion(id: string, updates: { text?: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE pi_exclusions SET text = ? WHERE id = ?', [text, id])
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.isCargoRelated !== undefined) { fields.push('is_cargo_related = ?'); values.push(updates.isCargoRelated) }
+        if (fields.length > 0) {
+            values.push(id)
+            await this.pool.execute(`UPDATE pi_exclusions SET ${fields.join(', ')} WHERE id = ?`, values)
+        }
+        if (updates.vesselTypeIds !== undefined) {
+            await this.pool.execute('DELETE FROM pi_exclusion_vessel_type_map WHERE exclusion_id = ?', [id])
+            for (const vtId of updates.vesselTypeIds) {
+                await this.pool.execute('INSERT INTO pi_exclusion_vessel_type_map (exclusion_id, vessel_type_id) VALUES (?, ?)', [id, vtId])
+            }
+        }
     }
 
     async deletePIExclusion(id: string): Promise<void> {
@@ -4095,7 +4214,7 @@ export class MySQLAdapter {
 
     async getPIAdditionalClauses(): Promise<PIAdditionalClause[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, code, text, order_index as `order` FROM pi_additional_clauses ORDER BY order_index ASC')
+        const [rows] = await this.pool.query('SELECT id, code, text, order_index as `order`, default_selected as defaultSelected FROM pi_additional_clauses ORDER BY order_index ASC')
         return rows as PIAdditionalClause[]
     }
 
@@ -4116,6 +4235,11 @@ export class MySQLAdapter {
     async deletePIAdditionalClause(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM pi_additional_clauses WHERE id = ?', [id])
+    }
+
+    async togglePIAdditionalClauseDefault(id: string, defaultSelected: boolean): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE pi_additional_clauses SET default_selected = ? WHERE id = ?', [defaultSelected, id])
     }
 
     async reorderPIAdditionalClauses(orderedIds: string[]): Promise<void> {
@@ -4260,14 +4384,87 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM trading_excluded_countries WHERE id = ?', [id])
     }
 
+    // ==================== Quotation Types ====================
+
+    async getQuotationTypes(): Promise<QuotationType[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, name, code, order_index as orderIndex, created_at as createdAt FROM quotation_types ORDER BY order_index ASC'
+        )
+        return rows as QuotationType[]
+    }
+
+    async addQuotationType(data: { name: string; code: string }): Promise<QuotationType> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_types') as any[]
+        const orderIndex = maxRow[0].nextOrder
+        await this.pool.execute(
+            'INSERT INTO quotation_types (id, name, code, order_index) VALUES (?, ?, ?, ?)',
+            [id, data.name, data.code, orderIndex]
+        )
+        return { id, name: data.name, code: data.code, orderIndex }
+    }
+
+    async updateQuotationType(id: string, updates: { name?: string; code?: string }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.code !== undefined) { fields.push('code = ?'); values.push(updates.code) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_types SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationType(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_types WHERE id = ?', [id])
+    }
+
+    async reorderQuotationTypes(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE quotation_types SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
     // ==================== Quotations ====================
 
     async getQuotations(): Promise<Quotation[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`
-            SELECT q.id, q.reference_number as referenceNumber, q.quotation_date as quotationDate,
+            SELECT q.id, q.reference_number as referenceNumber,
+                q.quotation_type_id as quotationTypeId, qt.name as quotationTypeName, qt.code as quotationTypeCode,
+                q.quotation_date as quotationDate,
                 q.policy_type_id as policyTypeId, pt.name as policyTypeName,
-                q.vessel_id as vesselId, v.name as vesselName,
+                (SELECT COALESCE(vv.name, qv.name) FROM quotation_vessels qv LEFT JOIN vessels vv ON qv.vessel_id = vv.id WHERE qv.quotation_id = q.id ORDER BY qv.order_index ASC LIMIT 1) as vesselName,
+                (SELECT COUNT(*) FROM quotation_vessels qv2 WHERE qv2.quotation_id = q.id) as vesselCount,
+                q.is_renewal as isRenewal, q.status,
+                q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
+                q.co_name as coName, q.title as title,
+                q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
+            FROM quotations q
+            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
+            ORDER BY q.created_at DESC
+        `)
+        return (rows as any[]).map(r => ({
+            ...r,
+            isRenewal: Boolean(r.isRenewal),
+            premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
+            vesselCount: Number(r.vesselCount || 0)
+        }))
+    }
+
+    async getQuotation(id: string): Promise<Quotation | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(`
+            SELECT q.id, q.reference_number as referenceNumber,
+                q.quotation_type_id as quotationTypeId, qt.name as quotationTypeName, qt.code as quotationTypeCode,
+                q.quotation_date as quotationDate,
+                q.policy_type_id as policyTypeId, pt.name as policyTypeName,
+                q.vessel_id as vesselId,
                 q.is_renewal as isRenewal, q.status,
                 q.period_text as periodText,
                 q.limit_of_liability_amount as limitOfLiabilityAmount,
@@ -4290,14 +4487,17 @@ export class MySQLAdapter {
                 q.cpc_enabled as upccEnabled, q.cpc_discount_percent as upccDiscountPercent, q.cpc_text as upccText,
                 q.non_refundable_type as nonRefundableType, q.non_refundable_percent as nonRefundablePercent,
                 q.co_name as coName, q.title as title,
-                q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride,
+                q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride, q.section_order as sectionOrderRaw,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
+            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
-            LEFT JOIN vessels v ON q.vessel_id = v.id
-            ORDER BY q.created_at DESC
-        `)
-        return (rows as any[]).map(r => ({
+            WHERE q.id = ?
+        `, [id])
+        const arr = rows as any[]
+        if (arr.length === 0) return null
+        const r = arr[0]
+        return {
             ...r,
             isRenewal: Boolean(r.isRenewal),
             vdrDeductibleEnabled: Boolean(r.vdrDeductibleEnabled),
@@ -4312,28 +4512,39 @@ export class MySQLAdapter {
             upccDiscountPercent: r.upccDiscountPercent ? Number(r.upccDiscountPercent) : undefined,
             validityDays: r.validityDays ? Number(r.validityDays) : 14,
             sectionTextsOverride: r.sectionTextsOverrideRaw ? (() => { try { return JSON.parse(r.sectionTextsOverrideRaw) } catch { return undefined } })() : undefined,
-            sectionTextsOverrideRaw: undefined
-        }))
+            sectionTextsOverrideRaw: undefined,
+            sectionOrder: r.sectionOrderRaw ? (() => { try { return JSON.parse(r.sectionOrderRaw) } catch { return undefined } })() : undefined,
+            sectionOrderRaw: undefined
+        } as Quotation
     }
 
     async addQuotation(q: Partial<Quotation>): Promise<Quotation> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
+        // Auto-generate reference: Q/{type_code}/{global_sequential}
+        let referenceNumber = q.referenceNumber || null
+        if (!referenceNumber && q.quotationTypeId) {
+            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [q.quotationTypeId]) as any[]
+            const typeCode = typeRow.length > 0 ? typeRow[0].code : '?'
+            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotations') as any[]
+            const seq = (countRow[0].cnt || 0) + 1
+            referenceNumber = `Q/${typeCode}/${seq}`
+        }
         await this.pool.execute(`
-            INSERT INTO quotations (id, reference_number, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            id, q.referenceNumber || null, q.quotationDate || null, q.policyTypeId || null, q.vesselId || null,
+            id, referenceNumber, q.quotationTypeId || null, q.quotationDate || null, q.policyTypeId || null, q.vesselId || null,
             q.isRenewal || false, q.status || 'draft', q.periodText || null, q.validityDays || 14,
             q.sanctionsClauseVersion || 'standard', q.vdrDeductibleEnabled !== false, q.createdBy || null
         ])
-        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || 'standard', vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: q.referenceNumber || '' } as Quotation
+        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || 'standard', vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: referenceNumber || '' } as Quotation
     }
 
     async updateQuotation(id: string, updates: Partial<Quotation>): Promise<void> {
         if (!this.pool) return
         const fieldMap: Record<string, string> = {
-            referenceNumber: 'reference_number', quotationDate: 'quotation_date', policyTypeId: 'policy_type_id',
+            referenceNumber: 'reference_number', quotationTypeId: 'quotation_type_id', quotationDate: 'quotation_date', policyTypeId: 'policy_type_id',
             vesselId: 'vessel_id', isRenewal: 'is_renewal', status: 'status', periodText: 'period_text',
             limitOfLiabilityAmount: 'limit_of_liability_amount', limitOfLiabilityCurrency: 'limit_of_liability_currency',
             limitOfLiabilityText: 'limit_of_liability_text', premiumAmount: 'premium_amount', premiumCurrency: 'premium_currency',
@@ -4361,6 +4572,11 @@ export class MySQLAdapter {
         if (updates.sectionTextsOverride !== undefined) {
             fields.push('section_texts_override = ?')
             values.push(updates.sectionTextsOverride ? JSON.stringify(updates.sectionTextsOverride) : null)
+        }
+        // Handle JSON-serialized sectionOrder
+        if (updates.sectionOrder !== undefined) {
+            fields.push('section_order = ?')
+            values.push(updates.sectionOrder ? JSON.stringify(updates.sectionOrder) : null)
         }
         if (fields.length === 0) return
         values.push(id)
@@ -4727,6 +4943,93 @@ export class MySQLAdapter {
         }
     }
 
+    // -- Quotation Custom Exclusions --
+    async getQuotationCustomExclusions(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope FROM quotation_custom_exclusions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+    }
+
+    async addQuotationCustomExclusion(data: { quotationId: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute('INSERT INTO quotation_custom_exclusions (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.text, data.order ?? 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
+        return { id, quotationId: data.quotationId, text: data.text, order: data.order ?? 0, vesselScope: data.vesselScope || null }
+    }
+
+    async updateQuotationCustomExclusion(id: string, updates: { text?: string; vesselScope?: string[] | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_custom_exclusions SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationCustomExclusion(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_custom_exclusions WHERE id = ?', [id])
+    }
+
+    async reorderQuotationCustomExclusions(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_custom_exclusions SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // -- Quotation Custom Sections --
+    async getQuotationCustomSections(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, title, text, order_index as `order` FROM quotation_custom_sections WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return rows as any[]
+    }
+
+    async addQuotationCustomSection(data: { quotationId: string; title: string; text?: string; order?: number }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute('INSERT INTO quotation_custom_sections (id, quotation_id, title, text, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.title, data.text || null, data.order ?? 0])
+        return { id, quotationId: data.quotationId, title: data.title, text: data.text || null, order: data.order ?? 0 }
+    }
+
+    async updateQuotationCustomSection(id: string, updates: { title?: string; text?: string }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_custom_sections SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationCustomSection(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_custom_sections WHERE id = ?', [id])
+    }
+
+    async reorderQuotationCustomSections(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_custom_sections SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // -- Section Order Defaults --
+    async getSectionOrderDefaults(): Promise<string[]> {
+        const val = await this.getSetting('section_order_defaults')
+        if (!val) return []
+        try { return JSON.parse(val) } catch { return [] }
+    }
+
+    async setSectionOrderDefaults(order: string[], updatedBy?: string): Promise<void> {
+        await this.setSetting('section_order_defaults', JSON.stringify(order), updatedBy)
+    }
+
     // -- Quotation Excluded Countries --
     async getQuotationExcludedCountries(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
@@ -4835,7 +5138,7 @@ export class MySQLAdapter {
     // -- Generic vessel scope update for any quotation item table --
     async updateQuotationItemVesselScope(table: string, id: string, vesselScope: string[] | null): Promise<void> {
         if (!this.pool) return
-        const allowedTables = ['quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_subjectivities', 'quotation_clauses', 'quotation_additional_clauses', 'quotation_exclusions']
+        const allowedTables = ['quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_subjectivities', 'quotation_clauses', 'quotation_additional_clauses', 'quotation_exclusions', 'quotation_custom_exclusions']
         if (!allowedTables.includes(table)) return
         await this.pool.execute(`UPDATE ${table} SET vessel_scope = ? WHERE id = ?`, [vesselScope ? JSON.stringify(vesselScope) : null, id])
     }

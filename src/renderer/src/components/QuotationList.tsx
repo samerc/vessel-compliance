@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search, FileText, Trash2 } from 'lucide-react'
-import { Quotation, PolicyType } from '../../../shared/types'
+import { Quotation, QuotationType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import ConfirmationModal from './ConfirmationModal'
@@ -19,10 +19,12 @@ interface QuotationListProps {
 
 export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     const [quotations, setQuotations] = useState<Quotation[]>([])
-    const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
+    const [quotationTypes, setQuotationTypes] = useState<QuotationType[]>([])
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<string>('all')
+    const [typeFilter, setTypeFilter] = useState<string>('all')
     const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; quotation: Quotation | null }>({ show: false, quotation: null })
+    const [showNewMenu, setShowNewMenu] = useState(false)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
@@ -30,21 +32,21 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [q, pt] = await Promise.all([
+        const [q, qt] = await Promise.all([
             window.api.getQuotations(),
-            window.api.getPolicyTypes()
+            window.api.getQuotationTypes()
         ])
-        setQuotations(q)
-        setPolicyTypes(pt)
+        setQuotations(Array.isArray(q) ? q : [])
+        setQuotationTypes(Array.isArray(qt) ? qt : [])
     }
 
-    const handleCreate = async () => {
+    const handleCreate = async (quotationTypeId: string) => {
         try {
+            setShowNewMenu(false)
             const today = new Date().toISOString().split('T')[0]
-            const defaultPolicyType = policyTypes.length > 0 ? policyTypes[0].id : undefined
             const created = await window.api.addQuotation({
                 quotationDate: today,
-                policyTypeId: defaultPolicyType,
+                quotationTypeId,
                 status: 'draft'
             })
             showSuccess('Quotation created')
@@ -68,9 +70,10 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
 
     const filtered = quotations.filter(q => {
         if (statusFilter !== 'all' && q.status !== statusFilter) return false
+        if (typeFilter !== 'all' && q.quotationTypeId !== typeFilter) return false
         if (search) {
             const s = search.toLowerCase()
-            if (!((q.referenceNumber || '').toLowerCase().includes(s) || (q.vesselName || '').toLowerCase().includes(s) || (q.policyTypeName || '').toLowerCase().includes(s))) return false
+            if (!((q.referenceNumber || '').toLowerCase().includes(s) || (q.vesselName || '').toLowerCase().includes(s) || (q.quotationTypeName || '').toLowerCase().includes(s))) return false
         }
         return true
     })
@@ -89,6 +92,16 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                     />
                 </div>
                 <select
+                    value={typeFilter}
+                    onChange={e => setTypeFilter(e.target.value)}
+                    style={{ padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
+                >
+                    <option value="all">All Types</option>
+                    {quotationTypes.map(qt => (
+                        <option key={qt.id} value={qt.id}>{qt.name}</option>
+                    ))}
+                </select>
+                <select
                     value={statusFilter}
                     onChange={e => setStatusFilter(e.target.value)}
                     style={{ padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
@@ -100,9 +113,69 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                     <option value="rejected">Rejected</option>
                     <option value="converted">Converted</option>
                 </select>
-                <button onClick={handleCreate} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                    <Plus size={18} /> New Quotation
-                </button>
+                <div style={{ position: 'relative' }}>
+                    <button
+                        onClick={() => setShowNewMenu(!showNewMenu)}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                    >
+                        <Plus size={18} /> New Quotation
+                    </button>
+                    {showNewMenu && (
+                        <>
+                            <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNewMenu(false)} />
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '4px',
+                                background: isLight ? '#ffffff' : '#1a1d28',
+                                border: '1px solid var(--glass-border)',
+                                borderRadius: '10px',
+                                padding: '6px',
+                                zIndex: 100,
+                                minWidth: '180px',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                            }}>
+                                {quotationTypes.map(qt => (
+                                    <button
+                                        key={qt.id}
+                                        onClick={() => handleCreate(qt.id)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            width: '100%',
+                                            padding: '10px 14px',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            background: 'transparent',
+                                            color: 'var(--text-primary)',
+                                            cursor: 'pointer',
+                                            fontSize: '0.85rem',
+                                            textAlign: 'left'
+                                        }}
+                                        className="hover-effect"
+                                    >
+                                        <span style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: '24px',
+                                            height: '24px',
+                                            borderRadius: '6px',
+                                            background: 'var(--accent-primary)',
+                                            color: '#fff',
+                                            fontSize: '0.7rem',
+                                            fontWeight: 700
+                                        }}>{qt.code}</span>
+                                        {qt.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
 
             <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -110,8 +183,8 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                     <thead>
                         <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
                             <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Reference</th>
-                            <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Date</th>
                             <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Type</th>
+                            <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Date</th>
                             <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Vessel</th>
                             <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Status</th>
                             <th style={{ padding: '14px 16px', textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Actions</th>
@@ -137,11 +210,36 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                     <td style={{ padding: '14px 16px', fontWeight: 600 }}>
                                         {q.referenceNumber || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No ref</span>}
                                     </td>
+                                    <td style={{ padding: '14px 16px' }}>
+                                        {q.quotationTypeName ? (
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '3px 10px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.8rem',
+                                                fontWeight: 600,
+                                                background: 'rgba(0, 170, 200, 0.12)',
+                                                color: isLight ? '#007a91' : '#00aac8'
+                                            }}>
+                                                {q.quotationTypeName}
+                                            </span>
+                                        ) : '-'}
+                                    </td>
                                     <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                                         {q.quotationDate ? new Date(q.quotationDate).toLocaleDateString() : '-'}
                                     </td>
-                                    <td style={{ padding: '14px 16px' }}>{q.policyTypeName || '-'}</td>
-                                    <td style={{ padding: '14px 16px' }}>{q.vesselName || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>New vessel</span>}</td>
+                                    <td style={{ padding: '14px 16px' }}>
+                                        {q.vesselName ? (
+                                            <>
+                                                {q.vesselName}
+                                                {(q as any).vesselCount > 1 && (
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '6px' }}>+{(q as any).vesselCount - 1}</span>
+                                                )}
+                                            </>
+                                        ) : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No vessel</span>}
+                                    </td>
                                     <td style={{ padding: '14px 16px' }}>
                                         <span style={{
                                             padding: '4px 10px',
@@ -159,7 +257,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ show: true, quotation: q }) }}
                                             className="btn-secondary"
-                                            style={{ padding: '6px', color: isLight ? '#c00000' : '#ff4d4d' }}
+                                            style={{ padding: '6px', color: 'var(--danger)' }}
                                             title="Delete"
                                         >
                                             <Trash2 size={16} />

@@ -409,14 +409,29 @@ Vessel compliance PDF (`src/renderer/src/services/ReportServiceV2.ts`), exported
   - `'doc'`: alternating white/bgLight (by `row.index % 2`), left padding 12mm, ON FILE (green) / MISSING (red) status pill
 - **`resolveEffectivePolicyExpiry`**: utility at `src/renderer/src/utils/policyUtils.ts` — extracts P&I end date from dynamic policies for annual doc expiry resolution
 
+### Quotation Types
+
+Multi-type quotation system with admin-managed types:
+
+- **Table**: `quotation_types` (id, name, code, order_index) — seeded with P&I (P), H&M (H), War Risk (W), FDD (F), Loss of Hire (L)
+- **`quotation_type_id`** on `quotations` table — existing quotations migrated to P&I on first run
+- **Auto-reference**: `Q/{type_code}/{global_sequential}` generated on creation (e.g. `Q/P/1`, `Q/H/2`). Sequential number counts ALL quotations globally, not per-type
+- **QuotationList**: Type column (teal badge), type filter dropdown, "New Quotation" button opens dropdown to select type
+- **QuotationEditor**: Read-only type badge in header bar
+- **QuotationSettings**: "Quotation Types" tab (first tab) with add/edit/delete/reorder CRUD
+- **IPC**: `db:getQuotationTypes`, `db:addQuotationType`, `db:updateQuotationType`, `db:deleteQuotationType`, `db:reorderQuotationTypes`
+- **Lightweight list query**: `getQuotations()` returns only display fields (no MEDIUMTEXT blobs); `getQuotation(id)` loads full record for editor
+- **Vessel name in list**: Subquery on `quotation_vessels` with `COALESCE(v.name, qv.name)` to resolve fleet-linked or manually-entered vessel names; shows `+N` for multi-vessel quotations
+- **Shared tabs** (all types): insured, vessel, trading, period, premium, subjectivities. Type-specific tabs built separately per type (only P&I is fully built)
+
 ### Quotations
 
-Quotation management system for P&I insurance:
+Quotation management system:
 
 - **QuotationManager** (`src/renderer/src/components/QuotationManager.tsx`): Main quotation list and management
 - **QuotationEditor** (`src/renderer/src/components/QuotationEditor.tsx`): Create/edit quotation details with tabbed sections (Conditions, Warranties, Deductibles, Exclusions, etc.)
 - **QuotationList** (`src/renderer/src/components/QuotationList.tsx`): Quotation listing view
-- **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Quotation configuration with tabs: Clauses, Warranties, Deductibles, Exclusions, Sub-Limits, Addl. Clauses, Trading Countries, Trading Warranty, Sanctions Versions, Standard Texts, Instalment Defaults, Logo
+- **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Quotation configuration with tabs: Quotation Types, Clauses, Warranties, Deductibles, Exclusions, Sub-Limits, Addl. Clauses, Trading Countries, Trading Warranty, Sanctions Versions, Standard Texts, Instalment Defaults, Logo
 - **RichTextEditor** (`src/renderer/src/components/RichTextEditor.tsx`): Rich text editing for quotation content
 - **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export
 
@@ -583,7 +598,8 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - `compliance_check_results` - Individual sanctions matches pending review
 - `vessel_name_history`, `vessel_audit_log` - Vessel change tracking
 - `war_breach_records` - Saved War Breach Calculator results
-- `quotations` - Insurance quotation records (section_texts_override is MEDIUMTEXT)
+- `quotation_types` - Quotation type definitions (P&I, H&M, War Risk, FDD, Loss of Hire) with code and order
+- `quotations` - Insurance quotation records (section_texts_override is MEDIUMTEXT, quotation_type_id FK)
 - `pi_warranties`, `pi_warranty_tags`, `pi_warranty_tag_map` - P&I warranty definitions with tag categorization
 - `pi_warranty_sets`, `pi_warranty_set_items` - Named warranty groups with default_selected flag
 - `quotation_warranties` - Per-quotation warranty selections with order_index

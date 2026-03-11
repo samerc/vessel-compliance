@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download } from 'lucide-react'
-import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType } from '../../../shared/types'
+import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList } from 'lucide-react'
+import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
-import { DEFAULT_SECTION_TEXTS } from './QuotationSettings'
+import { DEFAULT_SECTION_TEXTS, DEFAULT_SECTION_ORDER, SECTION_LABELS } from './QuotationSettings'
 import RichTextEditor from './RichTextEditor'
 import VesselScopeChips from './VesselScopeChips'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
@@ -18,7 +18,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
 }
 
-type EditorTab = 'insured' | 'vessel' | 'liability' | 'conditions' | 'period' | 'trading' | 'warranties' | 'deductibles' | 'exclusions' | 'sanctions' | 'subjectivities' | 'premium' | 'information' | 'notes'
+type EditorTab = 'insured' | 'vessel' | 'liability' | 'conditions' | 'period' | 'trading' | 'warranties' | 'deductibles' | 'exclusions' | 'sanctions' | 'subjectivities' | 'premium' | 'information' | 'customSections' | 'notes'
 
 const tabs: { key: EditorTab; label: string; icon: any }[] = [
     { key: 'vessel', label: 'Vessel', icon: Ship },
@@ -34,6 +34,7 @@ const tabs: { key: EditorTab; label: string; icon: any }[] = [
     { key: 'subjectivities', label: 'Subjectivities', icon: Anchor },
     { key: 'premium', label: 'Premium', icon: DollarSign },
     { key: 'information', label: 'Information', icon: Info },
+    { key: 'customSections', label: 'Custom Sections', icon: Layers },
     { key: 'notes', label: 'Notes', icon: StickyNote }
 ]
 
@@ -49,6 +50,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [globalTexts, setGlobalTexts] = useState<PISectionTexts>(DEFAULT_SECTION_TEXTS)
     const [sanctionsVersions, setSanctionsVersions] = useState<PISanctionsVersion[]>([])
+    const [showSectionOrder, setShowSectionOrder] = useState(false)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
@@ -58,12 +60,14 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
     }, [])
 
     const loadMasterData = async () => {
-        const [pt, v, gt, sv] = await Promise.all([
+        const [fullQ, pt, v, gt, sv] = await Promise.all([
+            window.api.getQuotation(quotation.id),
             window.api.getPolicyTypes(),
             window.api.getVessels(),
             window.api.piGetSectionTexts(),
             window.api.piGetSanctionsVersions()
         ])
+        if (fullQ) setQ(fullQ)
         setPolicyTypes(Array.isArray(pt) ? pt : [])
         setVessels(Array.isArray(v) ? v : [])
         if (gt && Object.keys(gt).length > 0) setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
@@ -71,7 +75,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
     }
 
     const getEffectiveText = (key: keyof PISectionTexts): string => {
-        return q.sectionTextsOverride?.[key] ?? globalTexts[key] ?? DEFAULT_SECTION_TEXTS[key] ?? ''
+        return String(q.sectionTextsOverride?.[key] ?? globalTexts[key] ?? DEFAULT_SECTION_TEXTS[key] ?? '')
     }
 
     const updateField = async (field: string, value: any) => {
@@ -94,6 +98,19 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
             {/* Header */}
             <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {q.quotationTypeName && (
+                        <span style={{
+                            padding: '5px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            background: 'rgba(0, 170, 200, 0.15)',
+                            color: isLight ? '#007a91' : '#00aac8',
+                            letterSpacing: '0.03em'
+                        }}>
+                            {q.quotationTypeName}
+                        </span>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ref:</span>
                         <input
@@ -167,6 +184,13 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                         />
                     </div>
                     <button
+                        onClick={() => setShowSectionOrder(true)}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                    >
+                        <LayoutList size={16} /> Section Order
+                    </button>
+                    <button
                         onClick={async () => { try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
@@ -218,7 +242,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
             <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
                 {activeTab === 'insured' && <InsuredTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
                 {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} />}
-                {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'conditions' && <ConditionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'period' && <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'trading' && <TradingTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
@@ -229,8 +253,20 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                 {activeTab === 'subjectivities' && <SubjectivitiesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
                 {activeTab === 'premium' && <PremiumTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
                 {activeTab === 'information' && <InformationTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+                {activeTab === 'customSections' && <CustomSectionsTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
                 {activeTab === 'notes' && <NotesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             </div>
+
+            {showSectionOrder && (
+                <SectionOrderModal
+                    quotation={q}
+                    onClose={() => setShowSectionOrder(false)}
+                    onSave={(order) => { setQ(prev => ({ ...prev, sectionOrder: order })); setShowSectionOrder(false) }}
+                    showSuccess={showSuccess}
+                    showError={showError}
+                    isLight={isLight}
+                />
+            )}
         </div>
     )
 }
@@ -666,12 +702,13 @@ function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: 
 
 // ==================== Limit of Liability Tab ====================
 
-function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveText }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [subLimits, setSubLimits] = useState<QuotationSubLimit[]>([])
     const [templates, setTemplates] = useState<import('../../../shared/types').PISubLimitTemplate[]>([])
     const [newText, setNewText] = useState('')
     const [newAmount, setNewAmount] = useState('')
     const [newCurrency, setNewCurrency] = useState('USD')
+    const [showStandardText, setShowStandardText] = useState(false)
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
@@ -699,6 +736,11 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation
         setNewAmount('')
     }
 
+    // Standard text with placeholders replaced
+    const resolvedStandardText = (quotation.sectionTextsOverride?.limitOfLiabilityDefaultText ?? getEffectiveText('limitOfLiabilityDefaultText'))
+        .replace(/\{currency\}/g, quotation.limitOfLiabilityCurrency || 'USD')
+        .replace(/\{amount\}/g, quotation.limitOfLiabilityAmount ? quotation.limitOfLiabilityAmount.toLocaleString() : '___')
+
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Limit of Liability</h3>
@@ -712,14 +754,55 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess }: { quotation
                     <input type="number" value={quotation.limitOfLiabilityAmount || ''} onChange={e => { setQ(p => ({ ...p, limitOfLiabilityAmount: parseFloat(e.target.value) || undefined })) }} onBlur={e => updateField('limitOfLiabilityAmount', parseFloat(e.target.value) || null)} style={{ width: '180px' }} />
                 </div>
             </div>
-            <div style={{ marginBottom: '24px', maxWidth: '600px' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Full text (e.g. "USD 500,000,000 any one vessel any one accident or occurrence")</label>
-                <textarea
-                    value={quotation.limitOfLiabilityText || ''}
-                    onChange={e => setQ(p => ({ ...p, limitOfLiabilityText: e.target.value }))}
-                    onBlur={e => updateField('limitOfLiabilityText', e.target.value)}
-                    style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
+
+            {/* Standard text preview + override */}
+            <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Standard Text Preview:</div>
+                <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'var(--table-header-bg)', fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '8px' }}
+                    dangerouslySetInnerHTML={{ __html: resolvedStandardText || '<em style="color:var(--text-secondary)">No standard text configured</em>' }}
                 />
+                <button
+                    type="button"
+                    onClick={() => setShowStandardText(!showStandardText)}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                    <Pencil size={12} /> {showStandardText ? 'Hide Editor' : 'Override Standard Text'}
+                    {quotation.sectionTextsOverride?.limitOfLiabilityDefaultText && <span style={{ fontSize: '0.68rem', color: 'var(--accent-primary)', marginLeft: '4px' }}>(customized)</span>}
+                </button>
+                {showStandardText && (
+                    <div style={{ marginTop: '10px' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                            Use <code>{'{amount}'}</code> and <code>{'{currency}'}</code> placeholders. Changes apply to this quotation only.
+                        </div>
+                        <RichTextEditor
+                            value={String(quotation.sectionTextsOverride?.limitOfLiabilityDefaultText ?? getEffectiveText('limitOfLiabilityDefaultText'))}
+                            onChange={val => {
+                                const override = { ...(quotation.sectionTextsOverride || {}), limitOfLiabilityDefaultText: val }
+                                setQ(p => ({ ...p, sectionTextsOverride: override }))
+                                updateField('sectionTextsOverride', override)
+                            }}
+                            minHeight={60}
+                            showFontSize showAlignment showLineSpacing
+                        />
+                        {quotation.sectionTextsOverride?.limitOfLiabilityDefaultText && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const override = { ...(quotation.sectionTextsOverride || {}) }
+                                    delete override.limitOfLiabilityDefaultText
+                                    setQ(p => ({ ...p, sectionTextsOverride: override }))
+                                    updateField('sectionTextsOverride', override)
+                                    showSuccess('Reset to global default')
+                                }}
+                                className="btn-secondary"
+                                style={{ marginTop: '6px', fontSize: '0.75rem', padding: '3px 10px', color: 'var(--danger)' }}
+                            >
+                                Reset to Default
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             <h4 style={{ fontSize: '0.9rem', marginBottom: '10px' }}>Sub-Limits</h4>
@@ -767,6 +850,7 @@ function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quota
     const [allAdditional, setAllAdditional] = useState<PIAdditionalClause[]>([])
     const [additionalClauseSets, setAdditionalClauseSets] = useState<PIAdditionalClauseSet[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const additionalDefaultsApplied = useRef(false)
 
     useEffect(() => { loadData() }, [])
 
@@ -788,9 +872,26 @@ function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quota
         setClauseVesselScopes(safeSelected.reduce((m: Record<string, string[] | null>, r: any) => { if (r.vesselScope) m[r.piClauseId] = r.vesselScope; return m }, {}))
         setDescOverrides(overrides)
         setAdditionalClauses(addClauses)
-        setAllAdditional(allAdd)
+        const safeAllAdd = Array.isArray(allAdd) ? allAdd : []
+        setAllAdditional(safeAllAdd)
         setAdditionalClauseSets(addSets)
         setQVessels(Array.isArray(qv) ? qv : [])
+
+        // Auto-add default additional clauses on first load if none exist
+        const safeAddClauses = Array.isArray(addClauses) ? addClauses : []
+        if (!additionalDefaultsApplied.current && safeAddClauses.length === 0 && safeAllAdd.length > 0) {
+            additionalDefaultsApplied.current = true
+            const defaults = safeAllAdd.filter(c => c.defaultSelected)
+            for (let i = 0; i < defaults.length; i++) {
+                await window.api.addQuotationAdditionalClause({ quotationId: quotation.id, piAdditionalClauseId: defaults[i].id, order: i })
+            }
+            if (defaults.length > 0) {
+                const freshAdd = await window.api.getQuotationAdditionalClauses(quotation.id)
+                setAdditionalClauses(Array.isArray(freshAdd) ? freshAdd : [])
+            }
+        } else {
+            additionalDefaultsApplied.current = true
+        }
     }
 
     const toggleClause = async (clauseId: string) => {
@@ -806,16 +907,26 @@ function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quota
             if (isDeselecting && clause?.isCargoRelated) {
                 const remainingCargoClauseSelected = allClauses.some(c => c.isCargoRelated && c.id !== clauseId && newSet.has(c.id))
                 if (!remainingCargoClauseSelected) {
-                    const [allWarranties, currentWarrantyRows] = await Promise.all([
+                    const [allWarranties, currentWarrantyRows, allExclusions, currentExclusionRows] = await Promise.all([
                         window.api.piGetWarranties(),
-                        window.api.getQuotationWarranties(quotation.id)
+                        window.api.getQuotationWarranties(quotation.id),
+                        window.api.piGetExclusions(),
+                        window.api.getQuotationExclusions(quotation.id)
                     ])
                     const currentWarrantyIds = (Array.isArray(currentWarrantyRows) ? currentWarrantyRows : []).map((r: any) => r.piWarrantyId)
                     const cargoWarrantyIds = new Set(allWarranties.filter((w: PIWarranty) => w.isCargoRelated).map((w: PIWarranty) => w.id))
-                    const filtered = currentWarrantyIds.filter((id: string) => !cargoWarrantyIds.has(id))
-                    if (filtered.length < currentWarrantyIds.length) {
-                        await window.api.setQuotationWarranties(quotation.id, filtered)
+                    const filteredWarranties = currentWarrantyIds.filter((id: string) => !cargoWarrantyIds.has(id))
+                    if (filteredWarranties.length < currentWarrantyIds.length) {
+                        await window.api.setQuotationWarranties(quotation.id, filteredWarranties)
                         showSuccess('Cargo warranties auto-removed (no cargo clauses selected)')
+                    }
+                    // Also auto-remove cargo-related exclusions
+                    const safeExRows = Array.isArray(currentExclusionRows) ? currentExclusionRows : []
+                    const cargoExclusionIds = new Set((Array.isArray(allExclusions) ? allExclusions : []).filter((ex: PIExclusion) => ex.isCargoRelated).map((ex: PIExclusion) => ex.id))
+                    const filteredExclusions = safeExRows.filter((r: any) => !r.piExclusionId || !cargoExclusionIds.has(r.piExclusionId))
+                    if (filteredExclusions.length < safeExRows.length) {
+                        await window.api.setQuotationExclusions(quotation.id, filteredExclusions.map((r: any) => ({ piExclusionId: r.piExclusionId, customText: r.customText })))
+                        showSuccess('Cargo exclusions auto-removed (no cargo clauses selected)')
                     }
                 }
             }
@@ -1121,6 +1232,7 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                     onChange={val => { setQ(p => ({ ...p, tradingWarrantyIntro: val })); updateField('tradingWarrantyIntro', val) }}
                     placeholder="Enter the trading warranty text..."
                     minHeight={80}
+                    showFontSize showAlignment showLineSpacing
                 />
             </div>
 
@@ -1177,6 +1289,7 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                     onChange={val => { setQ(p => ({ ...p, tradingCustomText: val })); updateField('tradingCustomText', val) }}
                     placeholder="Add custom trading exclusion or condition text..."
                     minHeight={60}
+                    showFontSize showAlignment showLineSpacing
                 />
             </div>
 
@@ -1578,6 +1691,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
                                 updateField('sectionTextsOverride', override)
                             }}
                             minHeight={60}
+                            showFontSize showAlignment showLineSpacing
                         />
                         <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '4px', marginTop: '12px', color: 'var(--text-secondary)' }}>Additional Text (after warranties, before breach)</label>
                         <RichTextEditor
@@ -1588,6 +1702,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
                                 updateField('sectionTextsOverride', override)
                             }}
                             minHeight={60}
+                            showFontSize showAlignment showLineSpacing
                         />
                     </div>
                 )}
@@ -1779,6 +1894,12 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                         {d.title && <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{d.title}</span>}
                         <input type="text" defaultValue={d.currency} onBlur={e => handleUpdate(d.id, { currency: e.target.value })} style={{ width: '60px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         <input type="number" defaultValue={d.amount} onBlur={e => handleUpdate(d.id, { amount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                        {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
+                            <>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
+                                <input type="number" defaultValue={d.secondaryAmount || 0} onBlur={e => handleUpdate(d.id, { secondaryAmount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                            </>
+                        )}
                         {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>custom</span>}
                         <div style={{ flex: 1 }} />
                         <button onClick={() => { setEditingDescId(editingDescId === d.id ? null : d.id); setEditDescText(d.description) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
@@ -1793,17 +1914,9 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                     ) : (
                         <div style={{ fontSize: '0.83rem', paddingLeft: '24px', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString() : '___')}</div>
                     )}
-                    {/* Secondary amount (multi-value) — shows when secondary description exists or main description has placeholders */}
-                    {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', paddingLeft: '24px' }}>
-                            {d.secondaryDescription && (
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1 }}>
-                                    {d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString() : '___')}
-                                </span>
-                            )}
-                            {!d.secondaryDescription && <div style={{ flex: 1 }} />}
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Secondary:</span>
-                            <input type="number" defaultValue={d.secondaryAmount || 0} onBlur={e => handleUpdate(d.id, { secondaryAmount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                    {d.secondaryDescription && (
+                        <div style={{ fontSize: '0.78rem', paddingLeft: '24px', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            {d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString() : '___')}
                         </div>
                     )}
                     <div style={{ paddingLeft: '30px' }}>
@@ -1892,6 +2005,7 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                                 updateField('sectionTextsOverride', override)
                             }}
                             minHeight={60}
+                            showFontSize showAlignment showLineSpacing
                         />
 
                         <div style={{ marginTop: '16px', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
@@ -1917,26 +2031,89 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
 
 // ==================== Exclusions Tab ====================
 
-function ExclusionsTab({ quotation }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+function ExclusionsTab({ quotation, showSuccess }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [selectedRows, setSelectedRows] = useState<any[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [customExclusions, setCustomExclusions] = useState<QuotationCustomExclusion[]>([])
+    const [newCustomText, setNewCustomText] = useState('')
+    const [editingCustomId, setEditingCustomId] = useState<string | null>(null)
+    const [editCustomText, setEditCustomText] = useState('')
+    const [showImportModal, setShowImportModal] = useState(false)
+    const [importText, setImportText] = useState('')
+    const [allClauses, setAllClauses] = useState<PIClause[]>([])
+    const [selectedClauseIds, setSelectedClauseIds] = useState<Set<string>>(new Set())
+    const autoApplied = useRef(false)
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [all, qe, qv] = await Promise.all([
+        const [all, qe, qv, ce, clauses, qClauses, vesselList] = await Promise.all([
             window.api.piGetExclusions(),
             window.api.getQuotationExclusions(quotation.id),
-            window.api.getQuotationVessels(quotation.id)
+            window.api.getQuotationVessels(quotation.id),
+            window.api.getQuotationCustomExclusions(quotation.id),
+            window.api.piGetClauses(),
+            window.api.getQuotationClauses(quotation.id),
+            window.api.getVessels()
         ])
-        setAllExclusions(all)
+        const safeAll = Array.isArray(all) ? all : []
+        setAllExclusions(safeAll)
         const safeQe = Array.isArray(qe) ? qe : []
-        setSelectedIds(new Set(safeQe.filter((e: any) => e.piExclusionId).map((e: any) => e.piExclusionId)))
+        const currentIds = new Set(safeQe.filter((e: any) => e.piExclusionId).map((e: any) => e.piExclusionId))
+        setSelectedIds(currentIds)
         setSelectedRows(safeQe)
-        setQVessels(Array.isArray(qv) ? qv : [])
+        const safeQv = Array.isArray(qv) ? qv : []
+        setQVessels(safeQv)
+        setCustomExclusions(Array.isArray(ce) ? ce : [])
+        setAllClauses(Array.isArray(clauses) ? clauses : [])
+        const safeQClauses = Array.isArray(qClauses) ? qClauses : []
+        setSelectedClauseIds(new Set(safeQClauses.map((c: any) => c.piClauseId || c.pi_clause_id || c.id)))
+        const safeVesselList = Array.isArray(vesselList) ? vesselList : []
+
+        // Auto-apply vessel-type-based exclusions on first load
+        if (!autoApplied.current && safeQv.length > 0) {
+            autoApplied.current = true
+            const vesselTypeNames = new Set<string>()
+            for (const qvItem of safeQv) {
+                const reg = qvItem.vesselId ? safeVesselList.find((v: Vessel) => v.id === qvItem.vesselId) : null
+                const vtype = reg?.vesselType || qvItem.vesselType
+                if (vtype) vesselTypeNames.add(vtype.toLowerCase())
+            }
+            if (vesselTypeNames.size > 0) {
+                // Get vessel types to map names to IDs
+                const vesselTypes = await window.api.getVesselTypes()
+                const vtIds = new Set((Array.isArray(vesselTypes) ? vesselTypes : [])
+                    .filter((vt: any) => vesselTypeNames.has(vt.name.toLowerCase()))
+                    .map((vt: any) => vt.id))
+                const toAutoSelect = safeAll.filter(ex =>
+                    !currentIds.has(ex.id) &&
+                    (ex.vesselTypeIds || []).some((vtId: string) => vtIds.has(vtId))
+                )
+                if (toAutoSelect.length > 0) {
+                    const newIds = new Set(currentIds)
+                    for (const ex of toAutoSelect) newIds.add(ex.id)
+                    setSelectedIds(newIds)
+                    await window.api.setQuotationExclusions(quotation.id, Array.from(newIds).map(eid => ({ piExclusionId: eid })))
+                    const freshQe = await window.api.getQuotationExclusions(quotation.id)
+                    setSelectedRows(Array.isArray(freshQe) ? freshQe : [])
+                    showSuccess(`Auto-selected ${toAutoSelect.length} vessel-type exclusion${toAutoSelect.length > 1 ? 's' : ''}`)
+                }
+            }
+        }
     }
+
+    // Check if any cargo clause is selected
+    const hasCargoClause = allClauses.some(c => c.isCargoRelated && selectedClauseIds.has(c.id))
+
+    // Filter: hide cargo-related exclusions when no cargo clauses selected
+    const visibleExclusions = allExclusions.filter(e => {
+        if (e.isCargoRelated && !hasCargoClause) return false
+        return true
+    })
 
     const toggle = async (id: string) => {
         const newSet = new Set(selectedIds)
@@ -1944,7 +2121,6 @@ function ExclusionsTab({ quotation }: { quotation: Quotation; showSuccess: (m: s
         else newSet.add(id)
         setSelectedIds(newSet)
         await window.api.setQuotationExclusions(quotation.id, Array.from(newSet).map(eid => ({ piExclusionId: eid })))
-        // Reload to get fresh row IDs
         const qe = await window.api.getQuotationExclusions(quotation.id)
         setSelectedRows(Array.isArray(qe) ? qe : [])
     }
@@ -1954,19 +2130,97 @@ function ExclusionsTab({ quotation }: { quotation: Quotation; showSuccess: (m: s
         await window.api.updateQuotationItemVesselScope('quotation_exclusions', id, scope)
     }
 
+    // Custom exclusion handlers
+    const addCustom = async () => {
+        if (!newCustomText.trim()) return
+        const result = await window.api.addQuotationCustomExclusion({ quotationId: quotation.id, text: newCustomText.trim(), order: customExclusions.length })
+        if (result && !(result as any).error) {
+            setCustomExclusions(prev => [...prev, result])
+            setNewCustomText('')
+            showSuccess('Custom exclusion added')
+        }
+    }
+
+    const saveCustomEdit = async (id: string) => {
+        await window.api.updateQuotationCustomExclusion(id, { text: editCustomText })
+        setEditingCustomId(null)
+        setCustomExclusions(prev => prev.map(ce => ce.id === id ? { ...ce, text: editCustomText } : ce))
+        showSuccess('Updated')
+    }
+
+    const deleteCustom = async (id: string) => {
+        await window.api.deleteQuotationCustomExclusion(id)
+        setCustomExclusions(prev => prev.filter(ce => ce.id !== id))
+        showSuccess('Deleted')
+    }
+
+    const moveCustom = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...customExclusions]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setCustomExclusions(newOrder)
+        await window.api.reorderQuotationCustomExclusions(newOrder.map(ce => ce.id))
+    }
+
+    const updateCustomScope = async (id: string, scope: string[] | null) => {
+        setCustomExclusions(prev => prev.map(ce => ce.id === id ? { ...ce, vesselScope: scope } : ce))
+        await window.api.updateQuotationItemVesselScope('quotation_custom_exclusions', id, scope)
+    }
+
+    const handleImport = async () => {
+        const lines = importText.split('\n')
+            .map(l => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim())
+            .filter(l => l.length > 0)
+        if (lines.length === 0) return
+        for (let i = 0; i < lines.length; i++) {
+            await window.api.addQuotationCustomExclusion({ quotationId: quotation.id, text: lines[i], order: customExclusions.length + i })
+        }
+        showSuccess(`Imported ${lines.length} custom exclusions`)
+        setImportText(''); setShowImportModal(false)
+        const ce = await window.api.getQuotationCustomExclusions(quotation.id)
+        setCustomExclusions(Array.isArray(ce) ? ce : [])
+    }
+
+    const customTextareaRef = useRef<HTMLTextAreaElement>(null)
+    const handleCustomTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setNewCustomText(e.target.value)
+        if (customTextareaRef.current) {
+            customTextareaRef.current.style.height = 'auto'
+            customTextareaRef.current.style.height = Math.min(customTextareaRef.current.scrollHeight, 200) + 'px'
+        }
+    }
+
+    // Count hidden cargo exclusions
+    const hiddenCargoCount = allExclusions.filter(e => e.isCargoRelated && !hasCargoClause).length
+
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Exclusions</h3>
+
+            {hiddenCargoCount > 0 && (
+                <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(255, 180, 0, 0.08)', border: '1px solid rgba(255, 180, 0, 0.3)', marginBottom: '12px', fontSize: '0.82rem', color: '#ffb400', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertTriangle size={14} />
+                    {hiddenCargoCount} cargo-related exclusion{hiddenCargoCount > 1 ? 's' : ''} hidden (no cargo clauses selected in Conditions)
+                </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {allExclusions.map(e => {
+                {visibleExclusions.map(e => {
                     const row = selectedRows.find((r: any) => r.piExclusionId === e.id)
                     return (
                         <div key={e.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(e.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
                             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
                                 <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggle(e.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)', marginTop: '2px' }} />
-                                <span style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{e.text}</span>
+                                <div style={{ flex: 1 }}>
+                                    <span style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{e.text}</span>
+                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                                        {e.isCargoRelated && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
+                                        {(e.vesselTypeIds || []).length > 0 && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(160, 100, 255, 0.12)', color: '#a064ff' }}>Vessel Type</span>}
+                                    </div>
+                                </div>
                             </label>
-                            {row && (
+                            {row && qVessels.length > 1 && (
                                 <div style={{ paddingLeft: '30px' }}>
                                     <VesselScopeChips vessels={qVessels} vesselScope={row.vesselScope} onChange={scope => updateExclusionScope(row.id, scope)} />
                                 </div>
@@ -1975,7 +2229,70 @@ function ExclusionsTab({ quotation }: { quotation: Quotation; showSuccess: (m: s
                     )
                 })}
             </div>
-            {allExclusions.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No exclusions defined. Add them in Settings.</p>}
+            {visibleExclusions.length === 0 && allExclusions.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No exclusions defined. Add them in Settings.</p>}
+
+            {/* Custom Exclusions Section */}
+            <div style={{ marginTop: '24px', borderTop: '1px solid var(--table-border)', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ fontSize: '0.95rem', margin: 0 }}>Custom Exclusions</h4>
+                    <button onClick={() => setShowImportModal(true)} className="btn-secondary" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px' }}><Upload size={13} /> Import</button>
+                </div>
+
+                {customExclusions.map((ce, i) => (
+                    <div key={ce.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)' }}>
+                        {editingCustomId === ce.id ? (
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                                <textarea value={editCustomText} onChange={e => setEditCustomText(e.target.value)} style={{ flex: 1, minHeight: '40px', resize: 'none' }} />
+                                <button onClick={() => saveCustomEdit(ce.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
+                                <button onClick={() => setEditingCustomId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Cancel</button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                <span style={{ flex: 1, fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{ce.text}</span>
+                                <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
+                                    <button onClick={() => moveCustom(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                    <button onClick={() => moveCustom(i, 'down')} disabled={i === customExclusions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === customExclusions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                    <button onClick={() => { setEditingCustomId(ce.id); setEditCustomText(ce.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)' }}><Pencil size={12} /></button>
+                                    <button onClick={() => deleteCustom(ce.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                </div>
+                            </div>
+                        )}
+                        {editingCustomId !== ce.id && qVessels.length > 1 && (
+                            <div style={{ marginTop: '4px' }}>
+                                <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />
+                            </div>
+                        )}
+                    </div>
+                ))}
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginTop: '8px' }}>
+                    <textarea ref={customTextareaRef} value={newCustomText} onChange={handleCustomTextChange} placeholder="Add custom exclusion..." style={{ flex: 1, minHeight: '36px', maxHeight: '200px', resize: 'none', fontSize: '0.85rem' }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addCustom() } }} />
+                    <button onClick={addCustom} disabled={!newCustomText.trim()} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Plus size={14} /> Add</button>
+                </div>
+            </div>
+
+            {/* Import Modal */}
+            {showImportModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowImportModal(false)}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', width: '500px', maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 style={{ margin: 0, fontSize: '1rem' }}>Import Custom Exclusions</h3>
+                            <button onClick={() => setShowImportModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Paste exclusions (one per line). Bullets, dashes, and numbering will be stripped.</p>
+                        <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste exclusions here..." style={{ width: '100%', minHeight: '200px', resize: 'vertical', marginBottom: '12px' }} />
+                        {importText.trim() && (
+                            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                {importText.split('\n').map(l => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim()).filter(l => l.length > 0).length} exclusion(s) detected
+                            </p>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowImportModal(false)} className="btn-secondary">Cancel</button>
+                            <button onClick={handleImport} className="btn-primary" disabled={!importText.trim()}>Import</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -2045,6 +2362,7 @@ function SanctionsTab({ quotation, updateField, setQ, sanctionsVersions }: { quo
                         value={displayText}
                         onChange={handleTextChange}
                         minHeight={180}
+                        showFontSize showAlignment showLineSpacing
                     />
                 </div>
             )}
@@ -2476,7 +2794,7 @@ function PremiumTab({ quotation, updateField, setQ }: { quotation: Quotation; up
                                 <input type="number" min={0} max={100} step={0.1} value={quotation.ncbDiscountPercent || ''} onChange={e => setQ(p => ({ ...p, ncbDiscountPercent: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ncbDiscountPercent', parseFloat(e.target.value) || null)} style={{ width: '70px', padding: '3px 6px' }} />
                                 <span style={{ fontSize: '0.8rem' }}>%</span>
                             </div>
-                            <RichTextEditor value={quotation.ncbText || ''} onChange={val => { setQ(p => ({ ...p, ncbText: val })); updateField('ncbText', val) }} placeholder="NCB terms text..." minHeight={50} maxWidth="500px" />
+                            <RichTextEditor value={quotation.ncbText || ''} onChange={val => { setQ(p => ({ ...p, ncbText: val })); updateField('ncbText', val) }} placeholder="NCB terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />
                         </div>
                     )}
                 </div>
@@ -2492,7 +2810,7 @@ function PremiumTab({ quotation, updateField, setQ }: { quotation: Quotation; up
                                 <input type="number" min={0} max={100} step={0.1} value={quotation.upccDiscountPercent || ''} onChange={e => setQ(p => ({ ...p, upccDiscountPercent: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('upccDiscountPercent', parseFloat(e.target.value) || null)} style={{ width: '70px', padding: '3px 6px' }} />
                                 <span style={{ fontSize: '0.8rem' }}>%</span>
                             </div>
-                            <RichTextEditor value={quotation.upccText || ''} onChange={val => { setQ(p => ({ ...p, upccText: val })); updateField('upccText', val) }} placeholder="UPCC terms text..." minHeight={50} maxWidth="500px" />
+                            <RichTextEditor value={quotation.upccText || ''} onChange={val => { setQ(p => ({ ...p, upccText: val })); updateField('upccText', val) }} placeholder="UPCC terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />
                         </div>
                     )}
                 </div>
@@ -2540,7 +2858,7 @@ function PremiumTab({ quotation, updateField, setQ }: { quotation: Quotation; up
             {/* Additional premium instructions */}
             <div style={{ marginBottom: '20px' }}>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Additional premium instructions</label>
-                <RichTextEditor value={quotation.premiumAdditionalText || ''} onChange={val => { setQ(p => ({ ...p, premiumAdditionalText: val })); updateField('premiumAdditionalText', val) }} minHeight={60} maxWidth="600px" />
+                <RichTextEditor value={quotation.premiumAdditionalText || ''} onChange={val => { setQ(p => ({ ...p, premiumAdditionalText: val })); updateField('premiumAdditionalText', val) }} minHeight={60} maxWidth="600px" showFontSize showAlignment showLineSpacing />
             </div>
 
         </div>
@@ -2625,6 +2943,292 @@ function NotesTab({ quotation, showSuccess }: { quotation: Quotation; showSucces
                     <textarea defaultValue={note.content} onBlur={e => handleUpdate(note.id, { content: e.target.value })} style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontSize: '0.85rem' }} />
                 </div>
             ))}
+        </div>
+    )
+}
+
+// ==================== Custom Sections Tab ====================
+
+function CustomSectionsTab({ quotation, showSuccess, showError, isLight }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+    const [sections, setSections] = useState<QuotationCustomSection[]>([])
+    const [newTitle, setNewTitle] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editTitle, setEditTitle] = useState('')
+    const [editText, setEditText] = useState('')
+
+    useEffect(() => { loadData() }, [])
+    const loadData = async () => {
+        const result = await window.api.getQuotationCustomSections(quotation.id)
+        setSections(Array.isArray(result) ? result : [])
+    }
+
+    const handleAdd = async () => {
+        if (!newTitle.trim()) return
+        try {
+            const result = await window.api.addQuotationCustomSection({
+                quotationId: quotation.id,
+                title: newTitle.trim(),
+                text: '',
+                order: sections.length
+            })
+            if ((result as any).error) { showError((result as any).message); return }
+            setNewTitle('')
+            showSuccess('Section added')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add section') }
+    }
+
+    const handleDelete = async (id: string) => {
+        try {
+            await window.api.deleteQuotationCustomSection(id)
+            showSuccess('Section deleted')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to delete') }
+    }
+
+    const handleSaveEdit = async () => {
+        if (!editingId || !editTitle.trim()) return
+        try {
+            await window.api.updateQuotationCustomSection(editingId, { title: editTitle.trim(), text: editText })
+            showSuccess('Section updated')
+            setEditingId(null)
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to update') }
+    }
+
+    const handleMove = async (index: number, dir: 'up' | 'down') => {
+        const newSections = [...sections]
+        const swapIdx = dir === 'up' ? index - 1 : index + 1
+        if (swapIdx < 0 || swapIdx >= newSections.length) return
+        ;[newSections[index], newSections[swapIdx]] = [newSections[swapIdx], newSections[index]]
+        setSections(newSections)
+        try {
+            await window.api.reorderQuotationCustomSections(newSections.map(s => s.id))
+        } catch (err: any) { showError(err.message || 'Failed to reorder') }
+    }
+
+    const startEdit = (section: QuotationCustomSection) => {
+        setEditingId(section.id)
+        setEditTitle(section.title)
+        setEditText(section.text || '')
+    }
+
+    return (
+        <div>
+            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Custom Sections</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Add custom sections that will appear in the exported quotation. Use the Section Order button in the header to position them.
+            </p>
+
+            {/* Add form */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                <input
+                    type="text"
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    placeholder="Section title..."
+                    style={{ flex: 1 }}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+                />
+                <button onClick={handleAdd} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Plus size={16} /> Add Section
+                </button>
+            </div>
+
+            {sections.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    No custom sections yet. Add one above.
+                </div>
+            )}
+
+            {sections.map((section, i) => (
+                <div key={section.id} style={{
+                    padding: '16px', borderRadius: '8px', border: '1px solid var(--table-border)',
+                    marginBottom: '12px', background: editingId === section.id ? (isLight ? '#f0f4ff' : 'rgba(0,150,255,0.05)') : 'transparent'
+                }}>
+                    {editingId === section.id ? (
+                        <>
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' }}>
+                                <input
+                                    type="text"
+                                    value={editTitle}
+                                    onChange={e => setEditTitle(e.target.value)}
+                                    style={{ flex: 1, fontWeight: 600, fontSize: '0.95rem' }}
+                                />
+                                <button onClick={handleSaveEdit} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '6px 12px' }}>
+                                    <Save size={14} /> Save
+                                </button>
+                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
+                                    Cancel
+                                </button>
+                            </div>
+                            <RichTextEditor value={editText} onChange={setEditText} placeholder="Section content..." showFontSize showAlignment showLineSpacing />
+                        </>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
+                                <button onClick={() => handleMove(i, 'down')} disabled={i === sections.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === sections.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '4px' }}>{section.title}</div>
+                                {section.text ? (
+                                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                        dangerouslySetInnerHTML={{ __html: section.text.substring(0, 200) }}
+                                    />
+                                ) : (
+                                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No content</span>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                <button onClick={() => startEdit(section)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}><Pencil size={15} /></button>
+                                <button onClick={() => handleDelete(section.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={15} /></button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    )
+}
+
+// ==================== Section Order Modal ====================
+
+function SectionOrderModal({ quotation, onClose, onSave, showSuccess, showError, isLight }: {
+    quotation: Quotation
+    onClose: () => void
+    onSave: (order: string[]) => void
+    showSuccess: (m: string) => void
+    showError: (m: string) => void
+    isLight: boolean
+}) {
+    const [order, setOrder] = useState<string[]>([])
+    const [customSections, setCustomSections] = useState<QuotationCustomSection[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => { loadData() }, [])
+
+    const loadData = async () => {
+        setLoading(true)
+        const [cs, defaults] = await Promise.all([
+            window.api.getQuotationCustomSections(quotation.id),
+            window.api.piGetSectionOrderDefaults()
+        ])
+        const safeSections = Array.isArray(cs) ? cs : []
+        setCustomSections(safeSections)
+
+        // Build order: use quotation's saved order, or defaults, or DEFAULT_SECTION_ORDER
+        const baseOrder = quotation.sectionOrder && quotation.sectionOrder.length > 0
+            ? [...quotation.sectionOrder]
+            : Array.isArray(defaults) && defaults.length > 0
+                ? [...defaults]
+                : [...DEFAULT_SECTION_ORDER]
+
+        // Add any custom sections not already in the order
+        const customKeys = safeSections.map(s => `custom:${s.id}`)
+        for (const ck of customKeys) {
+            if (!baseOrder.includes(ck)) baseOrder.push(ck)
+        }
+
+        // Remove custom keys that no longer exist
+        const validCustomKeys = new Set(customKeys)
+        const filtered = baseOrder.filter(k => !k.startsWith('custom:') || validCustomKeys.has(k))
+
+        // Ensure all default keys are present
+        for (const dk of DEFAULT_SECTION_ORDER) {
+            if (!filtered.includes(dk)) filtered.push(dk)
+        }
+
+        setOrder(filtered)
+        setLoading(false)
+    }
+
+    const handleMove = (index: number, dir: 'up' | 'down') => {
+        const newOrder = [...order]
+        const swapIdx = dir === 'up' ? index - 1 : index + 1
+        if (swapIdx < 0 || swapIdx >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[index]]
+        setOrder(newOrder)
+    }
+
+    const handleSave = async () => {
+        try {
+            await window.api.updateQuotation(quotation.id, { sectionOrder: order } as any)
+            showSuccess('Section order saved')
+            onSave(order)
+        } catch (err: any) { showError(err.message || 'Failed to save order') }
+    }
+
+    const handleReset = async () => {
+        const defaults = await window.api.piGetSectionOrderDefaults()
+        const baseOrder = Array.isArray(defaults) && defaults.length > 0 ? [...defaults] : [...DEFAULT_SECTION_ORDER]
+        const customKeys = customSections.map(s => `custom:${s.id}`)
+        for (const ck of customKeys) {
+            if (!baseOrder.includes(ck)) baseOrder.push(ck)
+        }
+        setOrder(baseOrder)
+    }
+
+    const getLabel = (key: string): string => {
+        if (key.startsWith('custom:')) {
+            const id = key.replace('custom:', '')
+            const section = customSections.find(s => s.id === id)
+            return section ? section.title : 'Unknown Section'
+        }
+        return SECTION_LABELS[key] || key
+    }
+
+    const isCustom = (key: string) => key.startsWith('custom:')
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{
+                background: isLight ? '#ffffff' : '#1a1d28',
+                borderRadius: '12px', padding: '24px', width: '480px', maxHeight: '80vh', display: 'flex', flexDirection: 'column'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Section Order</h3>
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><X size={18} /></button>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                    Drag sections to reorder how they appear in the exported quotation.
+                </p>
+
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>Loading...</div>
+                ) : (
+                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px' }}>
+                        {order.map((key, i) => (
+                            <div key={key} style={{
+                                padding: '10px 14px', borderRadius: '8px',
+                                border: `1px solid ${isCustom(key) ? 'rgba(160,100,255,0.3)' : 'var(--table-border)'}`,
+                                marginBottom: '4px', display: 'flex', gap: '12px', alignItems: 'center',
+                                background: isCustom(key) ? 'rgba(160,100,255,0.06)' : 'transparent'
+                            }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: '22px' }}>{i + 1}.</span>
+                                <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>
+                                    {getLabel(key)}
+                                    {isCustom(key) && <span style={{ fontSize: '0.7rem', color: '#a064ff', marginLeft: '8px' }}>(Custom)</span>}
+                                </span>
+                                <div style={{ display: 'flex', gap: '2px' }}>
+                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
+                                    <button onClick={() => handleMove(i, 'down')} disabled={i === order.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === order.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
+                    <button onClick={handleReset} className="btn-secondary" style={{ fontSize: '0.82rem' }}>
+                        Reset to Defaults
+                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={onClose} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                        <button onClick={handleSave} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save Order</button>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

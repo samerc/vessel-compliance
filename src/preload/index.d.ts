@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -237,8 +237,8 @@ export interface Api {
   piReorderTextDeductibles: (orderedIds: string[]) => Promise<void>
 
   piGetExclusions: () => Promise<PIExclusion[]>
-  piAddExclusion: (text: string) => Promise<PIExclusion>
-  piUpdateExclusion: (id: string, text: string) => Promise<void>
+  piAddExclusion: (exclusion: { text: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }) => Promise<PIExclusion>
+  piUpdateExclusion: (id: string, updates: { text?: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }) => Promise<void>
   piDeleteExclusion: (id: string) => Promise<void>
   piReorderExclusions: (orderedIds: string[]) => Promise<void>
 
@@ -253,6 +253,7 @@ export interface Api {
   piUpdateAdditionalClause: (id: string, code: string | null, text: string) => Promise<void>
   piDeleteAdditionalClause: (id: string) => Promise<void>
   piReorderAdditionalClauses: (orderedIds: string[]) => Promise<void>
+  piToggleAdditionalClauseDefault: (id: string, defaultSelected: boolean) => Promise<void>
   piGetAdditionalClauseSets: () => Promise<PIAdditionalClauseSet[]>
   piAddAdditionalClauseSet: (name: string, clauseIds: string[]) => Promise<PIAdditionalClauseSet>
   piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[]) => Promise<void>
@@ -349,8 +350,16 @@ export interface Api {
   addVesselNote: (vesselId: string, note: string) => Promise<any>
   deleteVesselNote: (noteId: string) => Promise<void>
 
+  // Quotation Types
+  getQuotationTypes: () => Promise<QuotationType[]>
+  addQuotationType: (data: { name: string; code: string }) => Promise<QuotationType>
+  updateQuotationType: (id: string, updates: { name?: string; code?: string }) => Promise<void>
+  deleteQuotationType: (id: string) => Promise<void>
+  reorderQuotationTypes: (ids: string[]) => Promise<void>
+
   // Quotations
   getQuotations: () => Promise<Quotation[]>
+  getQuotation: (id: string) => Promise<Quotation | null>
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>
   deleteQuotation: (id: string) => Promise<void>
@@ -410,8 +419,21 @@ export interface Api {
 
   getQuotationExclusions: (qId: string) => Promise<{ id: string; quotationId: string; piExclusionId?: string; customText?: string; vesselScope?: string[] | null }[]>
   setQuotationExclusions: (qId: string, items: { piExclusionId?: string; customText?: string }[]) => Promise<void>
+  getQuotationCustomExclusions: (qId: string) => Promise<QuotationCustomExclusion[]>
+  addQuotationCustomExclusion: (data: { quotationId: string; text: string; order?: number }) => Promise<QuotationCustomExclusion>
+  updateQuotationCustomExclusion: (id: string, updates: { text?: string }) => Promise<void>
+  deleteQuotationCustomExclusion: (id: string) => Promise<void>
+  reorderQuotationCustomExclusions: (ids: string[]) => Promise<void>
 
   updateQuotationItemVesselScope: (table: string, id: string, vesselScope: string[] | null) => Promise<void>
+
+  getQuotationCustomSections: (qId: string) => Promise<QuotationCustomSection[]>
+  addQuotationCustomSection: (data: { quotationId: string; title: string; text?: string; order?: number }) => Promise<QuotationCustomSection>
+  updateQuotationCustomSection: (id: string, updates: { title?: string; text?: string }) => Promise<void>
+  deleteQuotationCustomSection: (id: string) => Promise<void>
+  reorderQuotationCustomSections: (ids: string[]) => Promise<void>
+  piGetSectionOrderDefaults: () => Promise<string[]>
+  piSetSectionOrderDefaults: (order: string[]) => Promise<void>
 
   getQuotationExcludedCountries: (qId: string) => Promise<QuotationExcludedCountry[]>
   setQuotationExcludedCountries: (qId: string, countries: { name: string; listType: string }[]) => Promise<void>

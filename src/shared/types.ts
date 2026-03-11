@@ -473,6 +473,24 @@ export interface PIDeductibleSetItem {
 export interface PIExclusion {
   id: string
   text: string
+  isCargoRelated: boolean
+  vesselTypeIds?: string[]
+  order: number
+}
+
+export interface QuotationCustomExclusion {
+  id: string
+  quotationId: string
+  text: string
+  order: number
+  vesselScope?: string[] | null
+}
+
+export interface QuotationCustomSection {
+  id: string
+  quotationId: string
+  title: string
+  text?: string
   order: number
 }
 
@@ -507,6 +525,7 @@ export interface PIAdditionalClause {
   code?: string
   text: string
   order: number
+  defaultSelected?: boolean
 }
 
 export interface PIAdditionalClauseSet {
@@ -524,12 +543,23 @@ export interface TradingExcludedCountry {
 
 // ==================== Quotation ====================
 
+export interface QuotationType {
+  id: string
+  name: string
+  code: string
+  orderIndex: number
+  createdAt?: string
+}
+
 export type QuotationStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'converted'
 
 export interface Quotation {
   id: string
   referenceNumber: string
   quotationDate: string
+  quotationTypeId?: string
+  quotationTypeName?: string
+  quotationTypeCode?: string
   policyTypeId: string
   policyTypeName?: string
   vesselId?: string
@@ -566,6 +596,7 @@ export interface Quotation {
   title?: string
   sectionTextsOverride?: PISectionTexts
   sanctionsTextOverride?: string
+  sectionOrder?: string[]
   createdAt?: string
   updatedAt?: string
   createdBy?: string
@@ -675,6 +706,10 @@ export interface QuotationNote {
 }
 
 export interface PISectionTexts {
+  docHeader?: string
+  docHeaderSpacing?: number
+  docFooter?: string
+  docFooterSpacing?: number
   insuredFooter?: string
   conditionsIntro?: string
   limitOfLiabilityDefaultText?: string
@@ -699,6 +734,7 @@ export interface PISectionTexts {
   premiumPaymentIntro?: string
   premiumCondition?: string
   premiumEarned?: string
+  ncbDefaultText?: string
   continuationPiClubText?: string
   informationNote?: string
   importantNotice?: string
