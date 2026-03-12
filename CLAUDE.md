@@ -422,7 +422,8 @@ Multi-type quotation system with admin-managed types:
 - **IPC**: `db:getQuotationTypes`, `db:addQuotationType`, `db:updateQuotationType`, `db:deleteQuotationType`, `db:reorderQuotationTypes`
 - **Lightweight list query**: `getQuotations()` returns only display fields (no MEDIUMTEXT blobs); `getQuotation(id)` loads full record for editor
 - **Vessel name in list**: Subquery on `quotation_vessels` with `COALESCE(v.name, qv.name)` to resolve fleet-linked or manually-entered vessel names; shows `+N` for multi-vessel quotations
-- **Shared tabs** (all types): insured, vessel, trading, period, premium, subjectivities. Type-specific tabs built separately per type (only P&I is fully built)
+- **Shared tabs** (all types): insured, vessel, trading, period, premium, warranties, subjectivities. Type-specific tabs: P&I gets conditions/deductibles/exclusions/liability; H&M gets agreed value/hull conditions
+- **Tab visibility**: `allTabs` array with optional `types?: string[]` field, filtered by `getTabsForType(typeCode)`
 
 ### Quotations
 
@@ -431,7 +432,7 @@ Quotation management system:
 - **QuotationManager** (`src/renderer/src/components/QuotationManager.tsx`): Main quotation list and management
 - **QuotationEditor** (`src/renderer/src/components/QuotationEditor.tsx`): Create/edit quotation details with tabbed sections (Conditions, Warranties, Deductibles, Exclusions, etc.)
 - **QuotationList** (`src/renderer/src/components/QuotationList.tsx`): Quotation listing view
-- **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Quotation configuration with tabs: Quotation Types, Clauses, Warranties, Deductibles, Exclusions, Sub-Limits, Addl. Clauses, Trading Countries, Trading Warranty, Sanctions Versions, Standard Texts, Instalment Defaults, Logo
+- **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Two-tier navigation — category selector (General / P&I / H&M) on top, filtered tab chips below. General: Quotation Types, Warranties, Subjectivities, Trading Countries, Trading Warranty, Sanctions Versions, Standard Texts, Instalment Defaults, Section Order, Logo. P&I: Conditions, Deductibles, Exclusions, Limits of Liability, Addl. Clauses. H&M: Agreed Value, Clauses, Addl. Conditions.
 - **RichTextEditor** (`src/renderer/src/components/RichTextEditor.tsx`): Rich text editing for quotation content
 - **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export
 
@@ -453,8 +454,8 @@ Premium management with per-vessel amounts, sequential discounts, and non-refund
 - **Per-vessel premiums**: `premium_amount DECIMAL(15,2)` on `quotation_vessels` table. Multi-vessel quotations show a premium table in PremiumTab with per-vessel inputs; total auto-syncs to `quotation.premiumAmount`
 - **Currency**: Quotation-level `premiumCurrency` field displayed in the header (applies to all sections)
 - **Auto-label**: Premium field shows "Technical Premium" when NCB or UPCC is enabled; "Premium" otherwise
-- **NCB (No Claims Bonus)**: Checkbox + percentage + rich text. Exports as separate section after Premium
-- **UPCC (Upfront Continuity)**: Checkbox + percentage + rich text. Exports as separate section after NCB. DB columns still named `cpc_*` (aliased to `upcc*` in adapter)
+- **NCB (No Claims Bonus)**: Checkbox + percentage/amount + rich text. Export renders only the `ncbText` with `{ncb_amount}` and `{ncb_percent}` placeholders replaced. Text is seeded from standard default on first enable.
+- **UPCC (Upfront Continuity)**: Checkbox + percentage/amount + rich text. Same placeholder pattern (`{upcc_amount}`, `{upcc_percent}`). DB columns still named `cpc_*` (aliased to `upcc*` in adapter)
 - **Sequential discount calculation**: `Payable = Technical × (1 - NCB%) × (1 - UPCC%)` — discounts applied multiplicatively, not additively
 - **Non-refundable**: Quotation-level choice via `nonRefundableType` ('first_instalment' | 'percentage' | null) + `nonRefundablePercent`. Replaces old per-instalment non-refundable fields
 - **Instalments**: Number + days from inception only (description field removed). Default days: 1→`[0]`, 2→`[0,180]`, 3→`[0,120,240]`, 4→`[0,90,180,270]`, 12→`[0,30,60...330]`; admin `InstalmentDefaults` settings take priority when configured
@@ -462,8 +463,9 @@ Premium management with per-vessel amounts, sequential discounts, and non-refund
 
 ### Quotation Warranties System
 
-Tag-based warranty categorization with sets, custom warranties, and bulk management:
+Tag-based warranty categorization with sets, custom warranties, type scope, and bulk management:
 
+- **Type Scope**: `type_scope` column on `pi_warranties` (`'pi'` | `'hull'` | `'both'`). Editor filters visible warranties by quotation type code. Admin UI shows scope selector and badge per warranty.
 - **Warranty Tags** (`pi_warranty_tags`): Admin-created category labels (e.g. "Cargo", "Navigation"). Managed in QuotationSettings Warranties tab.
 - **Warranty Sets** (`pi_warranty_sets`, `pi_warranty_set_items`): Named groups of warranties (e.g. "Default", "Cargo Warranties") with optional `default_selected` flag. Default sets auto-apply to new quotations on first load via `useRef` guard (`defaultsApplied`).
 - **Cargo Tag Auto-Linking**: In QuotationEditor, a tag named "Cargo" (case-insensitive) automatically includes warranties with `isCargoRelated = true` in its tab, even if they don't have the tag explicitly assigned via `tagIds`. The "Other" (untagged) tab excludes these to avoid duplication.
@@ -485,12 +487,52 @@ Section text templates stored in `pi_section_texts` (global defaults) with per-q
 - **CRITICAL — double stringify bug**: When passing `sectionTextsOverride` to `updateField()`, pass the **object** directly, NOT `JSON.stringify(object)`. The adapter's `updateQuotation` already calls `JSON.stringify()` on the value. Double-stringifying causes exponential growth and "Data too long" errors.
 - **Column type**: `section_texts_override` must be `MEDIUMTEXT` (16MB), not `TEXT` (64KB). Migration always runs `MODIFY COLUMN` to ensure this.
 
+### Hull Quotation System
+
+H&M quotation type with agreed value, hull clauses, and additional conditions:
+
+- **Agreed Value Tab** (`AgreedValueTab` in QuotationEditor): Amount + currency, template texts from `hull_agreed_value_texts`, custom texts, reorder, vessel scope. Stored in `quotation_agreed_value_items`.
+- **Hull Conditions Tab** (`HullConditionsTab` in QuotationEditor): Hull clause selector (from `hull_clauses`), clause conditions checkboxes (from `hull_clause_conditions`) with defaults auto-applied, text overrides, additional conditions (from `hull_additional_conditions`), vessel scope.
+- **Hull tables**: `hull_clauses` (name, code), `hull_clause_conditions` (condition_number, text, default_selected), `hull_additional_conditions` (title, text, default_selected), `hull_agreed_value_texts` (text)
+- **Per-quotation tables**: `quotation_hull_conditions`, `quotation_hull_additional_conditions`, `quotation_agreed_value_items` — all FK to `quotations(id)` with vessel_scope support
+- **Export**: PDF and DOCX include agreed value section (amount + text items) and hull conditions section (clause + conditions + additional conditions)
+- **Additional condition/clause titles**: `title VARCHAR(255) NULL` on both `pi_additional_clauses` and `hull_additional_conditions`. Shown bold before code/text in settings, editor, and exports.
+
+### Quotation Type Scope
+
+Warranty and subjectivity filtering by quotation type:
+
+- **`QuotationTypeScope`** (`src/shared/types.ts`): `'pi' | 'hull' | 'both'`
+- **`type_scope`** column on `pi_warranties` and `pi_subjectivities` — default `'both'` for backward compatibility
+- **Admin UI**: Scope selector (P&I / Hull / Both) in QuotationSettings Warranties and Subjectivities tabs, with colored badge per item
+- **Editor filtering**: `visibleWarranties` / `visibleSubjectivities` filtered by `typeScope === 'both' || typeScope === typeCode`
+
+### Quotation Section Order
+
+Type-specific section ordering for quotation exports:
+
+- **Per-type defaults**: Stored in `app_settings` with key `section_order_defaults_{typeCode}` (e.g. `section_order_defaults_P`)
+- **Hardcoded fallbacks**: `PI_SECTION_ORDER` and `HULL_SECTION_ORDER` in `QuotationSettings.tsx`, accessed via `getDefaultSectionOrder(typeCode)`
+- **Per-quotation override**: `quotations.sectionOrder` field overrides the type default
+- **Fallback chain**: per-quotation → type-specific default → hardcoded default
+- **Settings UI**: `SectionOrderTab` with P&I/Hull toggle to configure defaults per type
+- **Editor modal**: `SectionOrderModal` loads type-specific defaults, filters sections by type-relevant keys
+
+### Quotation Settings Organization
+
+Two-tier navigation in `QuotationSettings.tsx`:
+
+- **Top tier**: Segmented control — General (teal), P&I (blue `#6464ff`), H&M (pink `#ff64c8`)
+- **Bottom tier**: Tab chips filtered by active category, colored to match category accent
+- **Category mapping**: `CATEGORIES` array + `CATEGORY_TABS` record. Switching category auto-selects first tab.
+- **Scalability**: Adding a new quotation type only requires a new entry in `CATEGORIES` and `CATEGORY_TABS`
+
 ### Quotation Collation Workaround
 
 MariaDB collation mismatch (`utf8mb4_uca1400_ai_ci` vs `utf8mb4_unicode_ci`) causes FK constraint errors (errno 150) on quotation-related tables:
 
-- **Affected tables**: `pi_warranty_set_items`, `quotation_custom_warranties`
-- **Defense layers**: (1) `schema.sql` execution wrapped with `SET FOREIGN_KEY_CHECKS=0/1`, (2) migration CREATE TABLE blocks wrapped, (3) CRUD methods (`addPIWarrantySet`, `updatePIWarrantySet`, `addQuotationCustomWarranty`) wrapped with FK_CHECKS=0/1
+- **Affected tables**: `pi_warranty_set_items`, `quotation_custom_warranties`, `quotation_agreed_value_items`, `quotation_hull_conditions`, `quotation_hull_additional_conditions`
+- **Defense layers**: (1) `schema.sql` execution wrapped with `SET FOREIGN_KEY_CHECKS=0/1`, (2) migration CREATE TABLE blocks wrapped, (3) CRUD methods (`addPIWarrantySet`, `updatePIWarrantySet`, `addQuotationCustomWarranty`, `setQuotationHullConditions`, `setQuotationHullAdditionalConditions`, `setQuotationAgreedValueItems`) wrapped with FK_CHECKS=0/1 in try/finally
 - **`safeHandle` error pattern**: IPC handlers using `safeHandle` return `{ error: true, message }` on failure instead of throwing. Components must guard with `Array.isArray()` checks on all IPC results used in setState, and check `result.error` on single-object returns.
 
 ### Vessel Detail Navigation
@@ -605,6 +647,12 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - `quotation_warranties` - Per-quotation warranty selections with order_index
 - `quotation_custom_warranties` - Per-quotation ad-hoc custom warranties
 - `pi_clauses`, `pi_clause_sets`, `pi_deductibles`, `pi_exclusions` - Other quotation config tables
+- `pi_additional_clauses`, `pi_additional_clause_sets` - Additional clauses with title, code, text, and preset groups
+- `pi_subjectivities` - Subjectivity definitions with type_scope (pi/hull/both)
 - `pi_section_texts` - Global default section text templates
+- `hull_clauses`, `hull_clause_conditions` - Hull clause definitions and their conditions
+- `hull_additional_conditions` - Hull additional conditions with title field
+- `hull_agreed_value_texts` - Hull agreed value template texts
+- `quotation_agreed_value_items`, `quotation_hull_conditions`, `quotation_hull_additional_conditions` - Per-quotation hull item selections
 - `renewal_status_types` - Custom renewal status labels for policies
-- `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, etc.)
+- `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, section_order_defaults_{typeCode}, etc.)

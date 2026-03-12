@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Image, Calendar, Download, List } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType } from '../../../shared/types'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
@@ -8,22 +8,20 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'logo'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'logo' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions'
 
-export default function QuotationSettings() {
-    const [activeTab, setActiveTab] = useState<SettingsTab>('quotationTypes')
-    const { showSuccess, showError } = useToast()
-    const { theme } = useTheme()
-    const isLight = theme === 'light'
+type SettingsCategory = 'general' | 'pi' | 'hull'
 
-    const tabs: { id: SettingsTab; label: string; icon: any }[] = [
+const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
+    { id: 'general', label: 'General', color: 'var(--accent-primary)' },
+    { id: 'pi', label: 'P&I', color: '#6464ff' },
+    { id: 'hull', label: 'H&M', color: '#ff64c8' },
+]
+
+const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; icon: any }[]> = {
+    general: [
         { id: 'quotationTypes', label: 'Quotation Types', icon: <Tag size={15} /> },
-        { id: 'clauses', label: 'Conditions', icon: <BookOpen size={15} /> },
         { id: 'warranties', label: 'Warranties', icon: <Shield size={15} /> },
-        { id: 'deductibles', label: 'Deductibles', icon: <Scale size={15} /> },
-        { id: 'exclusions', label: 'Exclusions', icon: <AlertTriangle size={15} /> },
-        { id: 'subLimits', label: 'Limits of Liability', icon: <FileText size={15} /> },
-        { id: 'additionalClauses', label: 'Addl. Clauses', icon: <FileText size={15} /> },
         { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
         { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
@@ -31,22 +29,84 @@ export default function QuotationSettings() {
         { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
         { id: 'sectionOrder', label: 'Section Order', icon: <List size={15} /> },
-        { id: 'logo', label: 'Logo', icon: <Image size={15} /> }
-    ]
+        { id: 'logo', label: 'Logo', icon: <Image size={15} /> },
+    ],
+    pi: [
+        { id: 'clauses', label: 'Conditions', icon: <BookOpen size={15} /> },
+        { id: 'deductibles', label: 'Deductibles', icon: <Scale size={15} /> },
+        { id: 'exclusions', label: 'Exclusions', icon: <AlertTriangle size={15} /> },
+        { id: 'subLimits', label: 'Limits of Liability', icon: <FileText size={15} /> },
+        { id: 'additionalClauses', label: 'Addl. Clauses', icon: <FileText size={15} /> },
+    ],
+    hull: [
+        { id: 'hullAgreedValueTexts', label: 'Agreed Value', icon: <FileText size={15} /> },
+        { id: 'hullClauses', label: 'Clauses', icon: <BookOpen size={15} /> },
+        { id: 'hullAdditionalConditions', label: 'Addl. Conditions', icon: <AlertTriangle size={15} /> },
+    ],
+}
+
+export default function QuotationSettings() {
+    const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general')
+    const [activeTab, setActiveTab] = useState<SettingsTab>('quotationTypes')
+    const { showSuccess, showError } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+
+    const handleCategoryChange = (cat: SettingsCategory) => {
+        setActiveCategory(cat)
+        setActiveTab(CATEGORY_TABS[cat][0].id)
+    }
+
+    const catColor = CATEGORIES.find(c => c.id === activeCategory)?.color || 'var(--accent-primary)'
 
     return (
         <div>
+            {/* Category selector */}
+            <div style={{
+                display: 'flex',
+                gap: '2px',
+                marginBottom: '16px',
+                background: isLight ? '#e8eaf0' : 'rgba(255,255,255,0.06)',
+                borderRadius: '10px',
+                padding: '3px',
+                width: 'fit-content'
+            }}>
+                {CATEGORIES.map(cat => (
+                    <button
+                        key={cat.id}
+                        onClick={() => handleCategoryChange(cat.id)}
+                        style={{
+                            padding: '8px 22px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: activeCategory === cat.id
+                                ? (isLight ? '#ffffff' : 'rgba(255,255,255,0.12)')
+                                : 'transparent',
+                            color: activeCategory === cat.id ? cat.color : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: activeCategory === cat.id ? 600 : 400,
+                            boxShadow: activeCategory === cat.id ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        {cat.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Tab chips filtered by category */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                {tabs.map(t => (
+                {CATEGORY_TABS[activeCategory].map(t => (
                     <button
                         key={t.id}
                         onClick={() => setActiveTab(t.id)}
                         style={{
                             padding: '8px 14px',
                             borderRadius: '8px',
-                            border: activeTab === t.id ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
-                            background: activeTab === t.id ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
-                            color: activeTab === t.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            border: activeTab === t.id ? `1px solid ${catColor}` : '1px solid var(--glass-border)',
+                            background: activeTab === t.id ? `${catColor}1f` : 'transparent',
+                            color: activeTab === t.id ? catColor : 'var(--text-secondary)',
                             cursor: 'pointer',
                             fontSize: '0.82rem',
                             fontWeight: activeTab === t.id ? 600 : 400,
@@ -76,6 +136,9 @@ export default function QuotationSettings() {
             {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'sectionOrder' && <SectionOrderTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'logo' && <LogoTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'hullAgreedValueTexts' && <HullAgreedValueTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'hullClauses' && <HullClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'hullAdditionalConditions' && <HullAdditionalConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         </div>
     )
 }
@@ -315,6 +378,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
     const [showSetForm, setShowSetForm] = useState(false)
     const [setName, setSetName] = useState('')
     const [setClauseIds, setSetClauseIds] = useState<Set<string>>(new Set())
+    const [setDescOverrides, setSetDescOverrides] = useState<Record<string, string>>({})
     const [editingSetId, setEditingSetId] = useState<string | null>(null)
 
     useEffect(() => { loadData() }, [])
@@ -367,20 +431,24 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
     const handleSaveSet = async () => {
         if (!setName.trim() || setClauseIds.size === 0) return
         try {
+            const activeOverrides: Record<string, string> = {}
+            for (const [cid, desc] of Object.entries(setDescOverrides)) {
+                if (desc.trim() && setClauseIds.has(cid)) activeOverrides[cid] = desc.trim()
+            }
             if (editingSetId) {
-                await window.api.piUpdateClauseSet(editingSetId, setName, Array.from(setClauseIds))
+                await window.api.piUpdateClauseSet(editingSetId, setName, Array.from(setClauseIds), Object.keys(activeOverrides).length > 0 ? activeOverrides : undefined)
                 showSuccess('Clause set updated')
             } else {
-                await window.api.piAddClauseSet(setName, Array.from(setClauseIds))
+                await window.api.piAddClauseSet(setName, Array.from(setClauseIds), Object.keys(activeOverrides).length > 0 ? activeOverrides : undefined)
                 showSuccess('Clause set created')
             }
-            setShowSetForm(false); setSetName(''); setSetClauseIds(new Set()); setEditingSetId(null)
+            setShowSetForm(false); setSetName(''); setSetClauseIds(new Set()); setSetDescOverrides({}); setEditingSetId(null)
             loadData()
         } catch (err: any) { showError(err.message || 'Failed to save set') }
     }
 
     const startEditSet = (set: PIClauseSet) => {
-        setEditingSetId(set.id); setSetName(set.name); setSetClauseIds(new Set(set.clauseIds || [])); setShowSetForm(true)
+        setEditingSetId(set.id); setSetName(set.name); setSetClauseIds(new Set(set.clauseIds || [])); setSetDescOverrides(set.descriptionOverrides || {}); setShowSetForm(true)
     }
 
     const handleDeleteSet = async (id: string) => {
@@ -459,7 +527,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
             <section className="glass-card" style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <h3 style={{ fontSize: '1rem' }}>Clause Sets (Presets)</h3>
-                    <button onClick={() => { setShowSetForm(true); setEditingSetId(null); setSetName(''); setSetClauseIds(new Set()) }} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button onClick={() => { setShowSetForm(true); setEditingSetId(null); setSetName(''); setSetClauseIds(new Set()); setSetDescOverrides({}) }} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Plus size={14} /> New Set
                     </button>
                 </div>
@@ -470,7 +538,11 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                             <div key={s.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={{ fontWeight: 600, fontSize: '0.85rem', flex: 1 }}>{s.name}</span>
                                 <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                                    {(s.clauseIds || []).map(cid => clauses.find(c => c.id === cid)?.clauseNumber).filter(Boolean).sort((a, b) => (a || 0) - (b || 0)).join(', ')}
+                                    {(s.clauseIds || []).map(cid => {
+                                        const num = clauses.find(c => c.id === cid)?.clauseNumber
+                                        const hasOverride = s.descriptionOverrides?.[cid]
+                                        return num ? (hasOverride ? `${num}*` : String(num)) : null
+                                    }).filter(Boolean).sort().join(', ')}
                                 </span>
                                 <button onClick={() => startEditSet(s)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                 <button onClick={() => handleDeleteSet(s.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
@@ -502,6 +574,24 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                 </button>
                             ))}
                         </div>
+                        {/* Description overrides for selected clauses */}
+                        {clauses.filter(c => setClauseIds.has(c.id)).length > 0 && (
+                            <div style={{ marginBottom: '12px' }}>
+                                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Description overrides (optional — applied when this set is used):</p>
+                                {clauses.filter(c => setClauseIds.has(c.id)).map(c => (
+                                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '50px', color: 'var(--text-secondary)' }}>Cl. {c.clauseNumber}</span>
+                                        <input
+                                            type="text"
+                                            value={setDescOverrides[c.id] || ''}
+                                            onChange={e => setSetDescOverrides(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                            placeholder={c.description || 'Override description...'}
+                                            style={{ flex: 1, fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                             <button onClick={() => { setShowSetForm(false); setEditingSetId(null) }} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>Cancel</button>
                             <button onClick={handleSaveSet} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem' }} disabled={!setName.trim() || setClauseIds.size === 0}>
@@ -530,11 +620,13 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     const [newDefaultSelected, setNewDefaultSelected] = useState(false)
     const [newCargoRelated, setNewCargoRelated] = useState(false)
     const [newTagIds, setNewTagIds] = useState<string[]>([])
+    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDefaultSelected, setEditDefaultSelected] = useState(false)
     const [editCargoRelated, setEditCargoRelated] = useState(false)
     const [editTagIds, setEditTagIds] = useState<string[]>([])
+    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
     // Tag management
     const [newTagName, setNewTagName] = useState('')
     const [editingTagId, setEditingTagId] = useState<string | null>(null)
@@ -565,13 +657,13 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newText.trim()) return
-        await window.api.piAddWarranty({ text: newText, isCargoRelated: newCargoRelated, defaultSelected: newDefaultSelected, tagIds: newTagIds, order: 0 })
-        setNewText(''); setNewDefaultSelected(false); setNewCargoRelated(false); setNewTagIds([])
+        await window.api.piAddWarranty({ text: newText, isCargoRelated: newCargoRelated, defaultSelected: newDefaultSelected, tagIds: newTagIds, typeScope: newTypeScope, order: 0 })
+        setNewText(''); setNewDefaultSelected(false); setNewCargoRelated(false); setNewTagIds([]); setNewTypeScope('both')
         showSuccess('Warranty added'); loadData()
     }
 
     const saveEdit = async (id: string) => {
-        await window.api.piUpdateWarranty(id, { text: editText, isCargoRelated: editCargoRelated, defaultSelected: editDefaultSelected, tagIds: editTagIds })
+        await window.api.piUpdateWarranty(id, { text: editText, isCargoRelated: editCargoRelated, defaultSelected: editDefaultSelected, tagIds: editTagIds, typeScope: editTypeScope })
         setEditingId(null); showSuccess('Warranty updated'); loadData()
     }
 
@@ -636,7 +728,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
             .filter(l => l.length > 0)
         if (lines.length === 0) return
         for (const line of lines) {
-            await window.api.piAddWarranty({ text: line, isCargoRelated: false, defaultSelected: false, tagIds: [], order: 0 })
+            await window.api.piAddWarranty({ text: line, isCargoRelated: false, defaultSelected: false, tagIds: [], typeScope: 'both', order: 0 })
         }
         showSuccess(`Imported ${lines.length} warranties`)
         setImportText(''); setShowImport(false); loadData()
@@ -797,6 +889,14 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             <input type="checkbox" checked={newCargoRelated} onChange={e => setNewCargoRelated(e.target.checked)} style={ckStyle} /> Cargo related
                         </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Scope:</span>
+                            <select value={newTypeScope} onChange={e => setNewTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
+                                <option value="both">Both</option>
+                                <option value="pi">P&I only</option>
+                                <option value="hull">Hull only</option>
+                            </select>
+                        </div>
                         {tags.length > 0 && (
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 {tags.map(t => tagChip(t.id, newTagIds.includes(t.id), () => toggleTagId(t.id, newTagIds, setNewTagIds)))}
@@ -821,6 +921,11 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer' }}>
                                         <input type="checkbox" checked={editCargoRelated} onChange={e => setEditCargoRelated(e.target.checked)} style={ckStyle} /> Cargo
                                     </label>
+                                    <select value={editTypeScope} onChange={e => setEditTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
+                                        <option value="both">Both</option>
+                                        <option value="pi">P&I</option>
+                                        <option value="hull">Hull</option>
+                                    </select>
                                     {tags.length > 0 && tags.map(t => tagChip(t.id, editTagIds.includes(t.id), () => toggleTagId(t.id, editTagIds, setEditTagIds)))}
                                     <div style={{ flex: 1 }} />
                                     <button onClick={() => saveEdit(w.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
@@ -834,6 +939,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                                         {w.defaultSelected && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864' }}>Default</span>}
                                         {w.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
+                                        {w.typeScope && w.typeScope !== 'both' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: w.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : 'rgba(255, 100, 200, 0.15)', color: w.typeScope === 'pi' ? '#6464ff' : '#ff64c8' }}>{w.typeScope === 'pi' ? 'P&I' : 'Hull'}</span>}
                                         {(w.tagIds || []).map(tid => {
                                             const tag = tags.find(t => t.id === tid)
                                             return tag ? <span key={tid} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
@@ -843,7 +949,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
                                     <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                     <button onClick={() => handleMove(i, 'down')} disabled={i === warranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === warranties.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                    <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []); setEditTypeScope(w.typeScope || 'both') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                     <button onClick={async () => { await window.api.piDeleteWarranty(w.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
                             </>
@@ -1384,11 +1490,13 @@ function SubLimitsTab({ showSuccess }: TabProps) {
 
 // ==================== Additional Clauses Tab (includes Sets) ====================
 
-function AdditionalClausesTab({ showSuccess }: TabProps) {
+function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
     const [clauses, setClauses] = useState<PIAdditionalClause[]>([])
+    const [newTitle, setNewTitle] = useState('')
     const [newCode, setNewCode] = useState('')
     const [newText, setNewText] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [editTitle, setEditTitle] = useState('')
     const [editCode, setEditCode] = useState('')
     const [editText, setEditText] = useState('')
 
@@ -1402,15 +1510,16 @@ function AdditionalClausesTab({ showSuccess }: TabProps) {
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
         const [c, s] = await Promise.all([window.api.piGetAdditionalClauses(), window.api.piGetAdditionalClauseSets()])
-        setClauses(c)
-        setSets(s)
+        if (Array.isArray(c)) setClauses(c)
+        if (Array.isArray(s)) setSets(s)
     }
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newText.trim()) return
-        await window.api.piAddAdditionalClause(newCode.trim(), newText.trim())
-        setNewCode(''); setNewText(''); showSuccess('Additional clause added'); loadData()
+        const result = await window.api.piAddAdditionalClause(newTitle.trim() || null, newCode.trim(), newText.trim()) as any
+        if (result?.error) { showError(result.message || 'Failed to add clause'); return }
+        setNewTitle(''); setNewCode(''); setNewText(''); showSuccess('Additional clause added'); loadData()
     }
 
     const handleMove = async (index: number, direction: 'up' | 'down') => {
@@ -1455,9 +1564,10 @@ function AdditionalClausesTab({ showSuccess }: TabProps) {
             <section className="glass-card" style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clauses</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions). Formatted as bullet points in the export.</p>
-                <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start' }}>
+                <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. Conflict Exclusion)" style={{ width: '200px', flexShrink: 0 }} />
                     <input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (e.g. JH2021-008)" style={{ width: '160px', flexShrink: 0 }} />
-                    <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Clause text..." style={{ flex: 1, minHeight: '50px', resize: 'vertical' }} required />
+                    <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Clause text..." style={{ flex: 1, minHeight: '50px', minWidth: '200px', resize: 'vertical' }} required />
                     <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-end' }}><Plus size={16} /> Add</button>
                 </form>
 
@@ -1465,15 +1575,17 @@ function AdditionalClausesTab({ showSuccess }: TabProps) {
                     <div key={c.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                         {editingId === c.id ? (
                             <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '180px' }} />
                                 <input value={editCode} onChange={e => setEditCode(e.target.value)} placeholder="Code" style={{ width: '140px' }} />
                                 <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minWidth: '200px', minHeight: '50px', resize: 'vertical' }} />
-                                <button onClick={async () => { await window.api.piUpdateAdditionalClause(c.id, editCode.trim(), editText.trim()); setEditingId(null); showSuccess('Updated'); loadData() }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
+                                <button onClick={async () => { await window.api.piUpdateAdditionalClause(c.id, editTitle.trim() || null, editCode.trim(), editText.trim()); setEditingId(null); showSuccess('Updated'); loadData() }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
                                 <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Cancel</button>
                             </div>
                         ) : (
                             <>
                                 <div style={{ flex: 1, fontSize: '0.85rem' }}>
-                                    {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, marginRight: '8px', color: 'var(--accent-primary)' }}>{c.code}</span>}
+                                    {c.title && <span style={{ fontWeight: 600, marginRight: '8px', color: 'var(--text-primary)' }}>{c.title}</span>}
+                                    {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, marginRight: '8px', color: 'var(--accent-primary)', fontSize: '0.8rem' }}>{c.code}</span>}
                                     <span style={{ whiteSpace: 'pre-wrap' }}>{c.text}</span>
                                 </div>
                                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
@@ -1483,7 +1595,7 @@ function AdditionalClausesTab({ showSuccess }: TabProps) {
                                     </label>
                                     <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                     <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                    <button onClick={() => { setEditingId(c.id); setEditCode(c.code || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                     <button onClick={async () => { await window.api.piDeleteAdditionalClause(c.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
                             </>
@@ -1517,8 +1629,9 @@ function AdditionalClausesTab({ showSuccess }: TabProps) {
                                                 <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 6px', borderRadius: '4px', background: 'rgba(0,210,255,0.07)', marginBottom: '3px' }}>
                                                     <button onClick={() => moveSetClause(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={13} /></button>
                                                     <button onClick={() => moveSetClause(idx, 'down')} disabled={idx === editSetOrder.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === editSetOrder.length - 1 ? 0.3 : 1 }}><ChevronDown size={13} /></button>
+                                                    {c.title && <span style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)' }}>{c.title}</span>}
                                                     {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.78rem', color: 'var(--accent-primary)', minWidth: '80px' }}>{c.code}</span>}
-                                                    <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-primary)' }}>{c.text.substring(0, 70)}{c.text.length > 70 ? '…' : ''}</span>
+                                                    <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{c.text.substring(0, 70)}{c.text.length > 70 ? '…' : ''}</span>
                                                     <button onClick={() => toggleSetClause(id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><X size={13} /></button>
                                                 </div>
                                             )
@@ -1534,6 +1647,7 @@ function AdditionalClausesTab({ showSuccess }: TabProps) {
                                             onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.05)')}
                                             onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
                                             <Plus size={13} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--accent-primary)' }} />
+                                            {c.title && <span style={{ fontWeight: 600, flexShrink: 0, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{c.title}</span>}
                                             {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, flexShrink: 0, color: 'var(--accent-primary)', minWidth: '80px' }}>{c.code}</span>}
                                             <span style={{ color: 'var(--text-secondary)' }}>{c.text.substring(0, 80)}{c.text.length > 80 ? '…' : ''}</span>
                                         </div>
@@ -1804,9 +1918,11 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newText, setNewText] = useState('')
     const [newDocTypeIds, setNewDocTypeIds] = useState<string[]>([])
+    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
+    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
@@ -1821,20 +1937,20 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const handleAdd = async () => {
         if (!newText.trim()) return
         try {
-            await window.api.addPISubjectivity({ text: newText.trim(), docTypeIds: newDocTypeIds, order: items.length })
-            setNewText(''); setNewDocTypeIds([])
+            await window.api.addPISubjectivity({ text: newText.trim(), docTypeIds: newDocTypeIds, typeScope: newTypeScope, order: items.length })
+            setNewText(''); setNewDocTypeIds([]); setNewTypeScope('both')
             showSuccess('Subjectivity added'); loadData()
         } catch (err: any) { showError(err.message || 'Failed to add') }
     }
 
     const startEdit = (s: PISubjectivity) => {
-        setEditingId(s.id); setEditText(s.text); setEditDocTypeIds(s.docTypeIds || [])
+        setEditingId(s.id); setEditText(s.text); setEditDocTypeIds(s.docTypeIds || []); setEditTypeScope(s.typeScope || 'both')
     }
 
     const handleUpdate = async () => {
         if (!editingId || !editText.trim()) return
         try {
-            await window.api.updatePISubjectivity(editingId, { text: editText.trim(), docTypeIds: editDocTypeIds })
+            await window.api.updatePISubjectivity(editingId, { text: editText.trim(), docTypeIds: editDocTypeIds, typeScope: editTypeScope })
             setEditingId(null); showSuccess('Updated'); loadData()
         } catch (err: any) { showError(err.message || 'Failed to update') }
     }
@@ -1880,6 +1996,14 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                             ))}
                         </div>
                     </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
+                        <select value={newTypeScope} onChange={e => setNewTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
+                            <option value="both">Both</option>
+                            <option value="pi">P&I only</option>
+                            <option value="hull">Hull only</option>
+                        </select>
+                    </div>
                     <button onClick={handleAdd} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}><Plus size={14} /> Add Subjectivity</button>
                 </div>
 
@@ -1899,6 +2023,14 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                         ))}
                                     </div>
                                 </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
+                                    <select value={editTypeScope} onChange={e => setEditTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
+                                        <option value="both">Both</option>
+                                        <option value="pi">P&I only</option>
+                                        <option value="hull">Hull only</option>
+                                    </select>
+                                </div>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                     <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.78rem' }}><Save size={12} /> Save</button>
                                     <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
@@ -1915,14 +2047,13 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                         <button onClick={async () => { if (confirm('Delete this subjectivity?')) { await window.api.deletePISubjectivity(s.id); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                     </div>
                                 </div>
-                                {s.docTypeIds && s.docTypeIds.length > 0 && (
-                                    <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                        {s.docTypeIds.map(dtId => {
-                                            const dt = docTypes.find(d => d.id === dtId)
-                                            return dt ? <span key={dtId} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0, 210, 255, 0.2)' }}>{dt.name}</span> : null
-                                        })}
-                                    </div>
-                                )}
+                                <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                    {s.typeScope && s.typeScope !== 'both' && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: s.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : 'rgba(255, 100, 200, 0.15)', color: s.typeScope === 'pi' ? '#6464ff' : '#ff64c8' }}>{s.typeScope === 'pi' ? 'P&I' : 'Hull'}</span>}
+                                    {(s.docTypeIds || []).map(dtId => {
+                                        const dt = docTypes.find(d => d.id === dtId)
+                                        return dt ? <span key={dtId} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0, 210, 255, 0.2)' }}>{dt.name}</span> : null
+                                    })}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -2077,17 +2208,38 @@ function SanctionsVersionsTab({ showSuccess, showError, isLight }: TabProps) {
 // ==================== Standard Texts Tab ====================
 
 export const DEFAULT_SECTION_ORDER: string[] = [
+    'insured', 'vessel', 'agreedValue', 'liability', 'period', 'conditions', 'hullConditions',
+    'trading', 'warranties', 'deductibles', 'exclusions',
+    'sanctions', 'subjectivities', 'premium', 'ncb', 'upcc', 'information'
+]
+
+// Type-specific default section orders
+export const PI_SECTION_ORDER: string[] = [
     'insured', 'vessel', 'liability', 'period', 'conditions',
     'trading', 'warranties', 'deductibles', 'exclusions',
     'sanctions', 'subjectivities', 'premium', 'ncb', 'upcc', 'information'
 ]
+
+export const HULL_SECTION_ORDER: string[] = [
+    'insured', 'vessel', 'agreedValue', 'period', 'hullConditions',
+    'trading', 'warranties',
+    'sanctions', 'subjectivities', 'premium', 'ncb', 'upcc', 'information'
+]
+
+export function getDefaultSectionOrder(typeCode?: string): string[] {
+    if (typeCode === 'H') return [...HULL_SECTION_ORDER]
+    if (typeCode === 'P') return [...PI_SECTION_ORDER]
+    return [...DEFAULT_SECTION_ORDER]
+}
 
 export const SECTION_LABELS: Record<string, string> = {
     insured: 'Insured',
     vessel: 'Insured Vessel',
     liability: 'Limit of Liability',
     period: 'Period',
-    conditions: 'Conditions',
+    conditions: 'Conditions (P&I)',
+    agreedValue: 'Agreed Insured Value',
+    hullConditions: 'Conditions (Hull)',
     trading: 'Trading Warranty',
     warranties: 'Warranties',
     deductibles: 'Deductibles',
@@ -2130,6 +2282,7 @@ Continue the Policy on such terms and conditions as it may determine.`,
     subjectivitiesIntro: 'The following documents to be provided within 7 days prior inception:',
     subjectivitiesNote: 'NOTE: Failure to supply satisfactory information on any subjectivity may result in this quote being withdrawn and/or cover being cancelled and/or claims being excluded.',
     ncbDefaultText: 'Subject to {ncb_amount}, which is repayable to the insurer in case of claim.',
+    upccDefaultText: '',
     continuationPiClubText: '',
     premiumPaymentIntro: 'Premium shall be payable in {instalments} Instalments on the following dates, at Noon Lebanon LST, time being of the essence:',
     premiumCondition: 'Compliance with this clause shall be a condition precedent to coverage and/or the Insurer\'s liability under this policy. Any failure to comply shall entitle the Insurer to reject claims whether arising before or after the breach and demand payment of the full premium including all unpaid instalments.',
@@ -2145,8 +2298,9 @@ const SECTION_TEXT_FIELDS: { key: keyof PISectionTexts; label: string; section: 
     { key: 'warrantiesAdditionalText', label: 'Warranties Additional Text', section: 'Warranties', rows: 3 },
     { key: 'deductiblesAggregate', label: 'Deductibles Aggregate', section: 'Deductibles', rows: 3 },
     { key: 'deductiblesAdditionalText', label: 'Deductibles Additional Text', section: 'Deductibles', rows: 3 },
-    { key: 'ncbDefaultText', label: 'NCB Default Text ({ncb_amount} placeholder)', section: 'NCB', rows: 2 },
-    { key: 'continuationPiClubText', label: 'Upfront Continuity Credit (UPCC) Text', section: 'UPCC', rows: 3 },
+    { key: 'ncbDefaultText', label: 'NCB Default Text ({ncb_amount}, {ncb_percent} placeholders)', section: 'NCB', rows: 2 },
+    { key: 'upccDefaultText', label: 'UPCC Default Text ({upcc_amount}, {upcc_percent} placeholders)', section: 'UPCC', rows: 2 },
+    { key: 'continuationPiClubText', label: 'Upfront Continuity Credit (UPCC) Additional Text', section: 'UPCC', rows: 3 },
     { key: 'premiumPaymentIntro', label: 'Payment Intro ({instalments} = number)', section: 'Premium', rows: 2 },
     { key: 'premiumCondition', label: 'Payment Condition Precedent', section: 'Premium', rows: 4 },
     { key: 'premiumEarned', label: 'Premium Earned Clause', section: 'Premium', rows: 3 },
@@ -2414,12 +2568,14 @@ function LogoTab({ showSuccess }: TabProps) {
 function SectionOrderTab({ showSuccess }: TabProps) {
     const [order, setOrder] = useState<string[]>([])
     const [dirty, setDirty] = useState(false)
+    const [selectedType, setSelectedType] = useState<string>('P')
 
-    useEffect(() => { loadData() }, [])
+    useEffect(() => { loadData() }, [selectedType])
 
     const loadData = async () => {
-        const saved = await window.api.piGetSectionOrderDefaults()
-        setOrder(Array.isArray(saved) && saved.length > 0 ? saved : [...DEFAULT_SECTION_ORDER])
+        const saved = await window.api.piGetSectionOrderDefaultsByType(selectedType)
+        const fallback = getDefaultSectionOrder(selectedType)
+        setOrder(Array.isArray(saved) && saved.length > 0 ? saved : fallback)
         setDirty(false)
     }
 
@@ -2433,27 +2589,39 @@ function SectionOrderTab({ showSuccess }: TabProps) {
     }
 
     const handleSave = async () => {
-        await window.api.piSetSectionOrderDefaults(order)
+        await window.api.piSetSectionOrderDefaultsByType(selectedType, order)
         showSuccess('Section order saved')
         setDirty(false)
     }
 
     const handleReset = () => {
-        setOrder([...DEFAULT_SECTION_ORDER])
+        setOrder(getDefaultSectionOrder(selectedType))
         setDirty(true)
     }
 
     return (
         <section className="glass-card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <h3 style={{ fontSize: '1rem', margin: 0 }}>Default Section Order</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h3 style={{ fontSize: '1rem', margin: 0 }}>Default Section Order</h3>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                        {[{ code: 'P', label: 'P&I' }, { code: 'H', label: 'Hull' }].map(t => (
+                            <button key={t.code} onClick={() => setSelectedType(t.code)} style={{
+                                padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: selectedType === t.code ? 600 : 400,
+                                border: selectedType === t.code ? '2px solid var(--accent-primary)' : '1px solid var(--table-border)',
+                                background: selectedType === t.code ? 'rgba(0, 170, 200, 0.1)' : 'transparent',
+                                color: selectedType === t.code ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer'
+                            }}>{t.label}</button>
+                        ))}
+                    </div>
+                </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={handleReset} className="btn-secondary" style={{ fontSize: '0.78rem' }}>Reset to Default</button>
                     <button onClick={handleSave} className="btn-primary" disabled={!dirty} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Save size={14} /> Save</button>
                 </div>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                Set the default order of sections in exported quotations. Each quotation can override this order individually.
+                Set the default order of sections for {selectedType === 'H' ? 'Hull' : 'P&I'} quotation exports. Each quotation can override this order individually.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {order.map((key, i) => (
@@ -2467,6 +2635,414 @@ function SectionOrderTab({ showSuccess }: TabProps) {
                     </div>
                 ))}
             </div>
+        </section>
+    )
+}
+
+// ==================== Hull Agreed Value Texts Tab ====================
+
+function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
+    const [texts, setTexts] = useState<HullAgreedValueText[]>([])
+    const [newText, setNewText] = useState('')
+    const [newDefault, setNewDefault] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editText, setEditText] = useState('')
+
+    useEffect(() => { loadData() }, [])
+    const loadData = async () => {
+        const result = await window.api.hullGetAgreedValueTexts()
+        if (Array.isArray(result)) setTexts(result)
+    }
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newText.trim()) return
+        await window.api.hullAddAgreedValueText(newText.trim(), newDefault)
+        setNewText(''); setNewDefault(false)
+        showSuccess('Agreed value text added')
+        loadData()
+    }
+
+    const handleSaveEdit = async (id: string) => {
+        await window.api.hullUpdateAgreedValueText(id, { text: editText.trim() })
+        setEditingId(null)
+        showSuccess('Text updated')
+        loadData()
+    }
+
+    const handleToggleDefault = async (id: string, current: boolean) => {
+        await window.api.hullUpdateAgreedValueText(id, { defaultSelected: !current })
+        loadData()
+    }
+
+    const handleDelete = async (id: string) => {
+        await window.api.hullDeleteAgreedValueText(id)
+        showSuccess('Text deleted')
+        loadData()
+    }
+
+    const handleMove = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...texts]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setTexts(newOrder)
+        await window.api.hullReorderAgreedValueTexts(newOrder.map(t => t.id))
+    }
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Agreed Insured Value Texts</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Template texts for the Agreed Insured Value section in Hull quotations. Default texts are auto-added to new quotations.</p>
+
+            <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start' }}>
+                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="e.g., on Hull and Machinery, Gear and Equipment and everything connected therewith, nothing excluded." style={{ flex: 1, minHeight: '60px', fontSize: '0.85rem', padding: '8px' }} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    <input type="checkbox" checked={newDefault} onChange={e => setNewDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                </label>
+                <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+            </form>
+
+            {texts.map((t, i) => (
+                <div key={t.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                        <button onClick={() => handleMove(i, 'down')} disabled={i === texts.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === texts.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        {editingId === t.id ? (
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minHeight: '50px', fontSize: '0.82rem', padding: '6px' }} />
+                                <button onClick={() => handleSaveEdit(t.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                            </div>
+                        ) : (
+                            <span style={{ fontSize: '0.82rem' }}>{t.text}</span>
+                        )}
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input type="checkbox" checked={t.defaultSelected} onChange={() => handleToggleDefault(t.id, t.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                    </label>
+                    <button onClick={() => { setEditingId(t.id); setEditText(t.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                    <button onClick={() => handleDelete(t.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                </div>
+            ))}
+        </section>
+    )
+}
+
+// ==================== Hull Clauses Tab ====================
+
+function HullClausesTab({ showSuccess, showError }: TabProps) {
+    const [clauses, setClauses] = useState<HullClause[]>([])
+    const [conditions, setConditions] = useState<HullClauseCondition[]>([])
+    const [selectedClauseId, setSelectedClauseId] = useState<string | null>(null)
+
+    // Add clause form
+    const [newName, setNewName] = useState('')
+    const [newCode, setNewCode] = useState('')
+    const [newDesc, setNewDesc] = useState('')
+
+    // Edit clause
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editCode, setEditCode] = useState('')
+    const [editDesc, setEditDesc] = useState('')
+
+    // Add condition form
+    const [newCondNum, setNewCondNum] = useState('')
+    const [newCondText, setNewCondText] = useState('')
+    const [newCondDefault, setNewCondDefault] = useState(false)
+
+    // Edit condition
+    const [editCondId, setEditCondId] = useState<string | null>(null)
+    const [editCondNum, setEditCondNum] = useState('')
+    const [editCondText, setEditCondText] = useState('')
+
+    useEffect(() => { loadData() }, [])
+    const loadData = async () => {
+        const cls = await window.api.hullGetClauses()
+        if (Array.isArray(cls)) setClauses(cls)
+    }
+
+    const loadConditions = async (clauseId: string) => {
+        const conds = await window.api.hullGetClauseConditions(clauseId)
+        if (Array.isArray(conds)) setConditions(conds)
+    }
+
+    useEffect(() => { if (selectedClauseId) loadConditions(selectedClauseId) }, [selectedClauseId])
+
+    const handleAddClause = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newName.trim() || !newCode.trim()) return
+        try {
+            const result = await window.api.hullAddClause(newName.trim(), newCode.trim(), newDesc.trim() || undefined) as any
+            if (result?.error) { showError(result.message || 'Failed to add clause'); return }
+            setNewName(''); setNewCode(''); setNewDesc('')
+            showSuccess('Hull clause added')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add clause') }
+    }
+
+    const handleSaveClause = async () => {
+        if (!editingId) return
+        try { await window.api.hullUpdateClause(editingId, { name: editName.trim(), code: editCode.trim(), description: editDesc.trim() }) } catch {}
+        setEditingId(null)
+        showSuccess('Clause updated')
+        loadData()
+    }
+
+    const handleDeleteClause = async (id: string) => {
+        await window.api.hullDeleteClause(id)
+        if (selectedClauseId === id) { setSelectedClauseId(null); setConditions([]) }
+        showSuccess('Clause deleted')
+        loadData()
+    }
+
+    const handleMoveClause = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...clauses]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setClauses(newOrder)
+        await window.api.hullReorderClauses(newOrder.map(c => c.id))
+    }
+
+    // Condition CRUD
+    const handleAddCondition = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!selectedClauseId || !newCondNum.trim() || !newCondText.trim()) return
+        await window.api.hullAddClauseCondition(selectedClauseId, newCondNum.trim(), newCondText.trim(), newCondDefault)
+        setNewCondNum(''); setNewCondText(''); setNewCondDefault(false)
+        showSuccess('Condition added')
+        loadConditions(selectedClauseId)
+    }
+
+    const handleSaveCondition = async () => {
+        if (!editCondId || !selectedClauseId) return
+        await window.api.hullUpdateClauseCondition(editCondId, { conditionNumber: editCondNum.trim(), text: editCondText.trim() })
+        setEditCondId(null)
+        showSuccess('Condition updated')
+        loadConditions(selectedClauseId)
+    }
+
+    const handleToggleCondDefault = async (id: string, current: boolean) => {
+        if (!selectedClauseId) return
+        await window.api.hullUpdateClauseCondition(id, { defaultSelected: !current })
+        loadConditions(selectedClauseId)
+    }
+
+    const handleDeleteCondition = async (id: string) => {
+        if (!selectedClauseId) return
+        await window.api.hullDeleteClauseCondition(id)
+        showSuccess('Condition deleted')
+        loadConditions(selectedClauseId)
+    }
+
+    const handleMoveCondition = async (index: number, direction: 'up' | 'down') => {
+        if (!selectedClauseId) return
+        const newOrder = [...conditions]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setConditions(newOrder)
+        await window.api.hullReorderClauseConditions(newOrder.map(c => c.id))
+    }
+
+    const selectedClause = clauses.find(c => c.id === selectedClauseId)
+
+    return (
+        <div>
+            <section className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Hull Clauses</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Main clause types (e.g., CL.280, CL.280 FPA, CL.284). Each clause has its own set of conditions.</p>
+
+                <form onSubmit={handleAddClause} style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    <input type="text" value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (e.g., 280)" style={{ width: '100px' }} required />
+                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name (e.g., Institute Time Clauses – Hulls CL.280)" style={{ flex: 1, minWidth: '250px' }} required />
+                    <input type="text" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Description (optional)" style={{ flex: 1, minWidth: '200px' }} />
+                    <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                </form>
+
+                {clauses.map((c, i) => (
+                    <div key={c.id} style={{
+                        padding: '10px 14px', borderRadius: '8px', marginBottom: '6px', cursor: 'pointer',
+                        border: selectedClauseId === c.id ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)',
+                        background: selectedClauseId === c.id ? 'rgba(0, 210, 255, 0.06)' : 'transparent',
+                        display: 'flex', alignItems: 'center', gap: '10px'
+                    }} onClick={() => setSelectedClauseId(c.id)}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }} onClick={e => e.stopPropagation()}>
+                            <button onClick={() => handleMoveClause(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                            <button onClick={() => handleMoveClause(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                        </div>
+                        {editingId === c.id ? (
+                            <div style={{ flex: 1, display: 'flex', gap: '8px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                                <input type="text" value={editCode} onChange={e => setEditCode(e.target.value)} style={{ width: '80px', fontSize: '0.82rem', padding: '4px 8px' }} />
+                                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ flex: 1, minWidth: '200px', fontSize: '0.82rem', padding: '4px 8px' }} />
+                                <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Description" style={{ flex: 1, minWidth: '150px', fontSize: '0.82rem', padding: '4px 8px' }} />
+                                <button onClick={handleSaveClause} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                            </div>
+                        ) : (
+                            <>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '60px', color: 'var(--accent-primary)' }}>CL.{c.code}</span>
+                                <span style={{ fontSize: '0.82rem', flex: 1 }}>{c.name}</span>
+                                {c.description && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description}</span>}
+                                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '4px' }}>
+                                    <button onClick={() => { setEditingId(c.id); setEditCode(c.code); setEditName(c.name); setEditDesc(c.description || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={() => handleDeleteClause(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                ))}
+            </section>
+
+            {/* Conditions for selected clause */}
+            {selectedClause && (
+                <section className="glass-card" style={{ padding: '20px' }}>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Conditions for CL.{selectedClause.code}</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>{selectedClause.name}</p>
+
+                    <form onSubmit={handleAddCondition} style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                        <input type="text" value={newCondNum} onChange={e => setNewCondNum(e.target.value)} placeholder="Cl. #" style={{ width: '70px' }} required />
+                        <input type="text" value={newCondText} onChange={e => setNewCondText(e.target.value)} placeholder="Condition text (e.g., Collision Liability deleted.)" style={{ flex: 1, minWidth: '250px' }} required />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={newCondDefault} onChange={e => setNewCondDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                        </label>
+                        <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                    </form>
+
+                    {conditions.map((cond, i) => (
+                        <div key={cond.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <button onClick={() => handleMoveCondition(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
+                                <button onClick={() => handleMoveCondition(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
+                            </div>
+                            {editCondId === cond.id ? (
+                                <div style={{ flex: 1, display: 'flex', gap: '8px' }}>
+                                    <input type="text" value={editCondNum} onChange={e => setEditCondNum(e.target.value)} style={{ width: '60px', fontSize: '0.82rem', padding: '4px 6px' }} />
+                                    <input type="text" value={editCondText} onChange={e => setEditCondText(e.target.value)} style={{ flex: 1, fontSize: '0.82rem', padding: '4px 6px' }} />
+                                    <button onClick={handleSaveCondition} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                    <button onClick={() => setEditCondId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                                </div>
+                            ) : (
+                                <>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '50px', color: 'var(--accent-primary)' }}>Cl.{cond.conditionNumber}</span>
+                                    <span style={{ fontSize: '0.82rem', flex: 1 }}>{cond.text}</span>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                        <input type="checkbox" checked={cond.defaultSelected} onChange={() => handleToggleCondDefault(cond.id, cond.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                                    </label>
+                                    <button onClick={() => { setEditCondId(cond.id); setEditCondNum(cond.conditionNumber); setEditCondText(cond.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={() => handleDeleteCondition(cond.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                    {conditions.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No conditions yet. Add conditions for this clause above.</p>}
+                </section>
+            )}
+        </div>
+    )
+}
+
+// ==================== Hull Additional Conditions Tab ====================
+
+function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
+    const [conditions, setConditions] = useState<HullAdditionalCondition[]>([])
+    const [newTitle, setNewTitle] = useState('')
+    const [newText, setNewText] = useState('')
+    const [newDefault, setNewDefault] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editTitle, setEditTitle] = useState('')
+    const [editText, setEditText] = useState('')
+
+    useEffect(() => { loadData() }, [])
+    const loadData = async () => {
+        const result = await window.api.hullGetAdditionalConditions()
+        if (Array.isArray(result)) setConditions(result)
+    }
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newText.trim()) return
+        const result = await window.api.hullAddAdditionalCondition(newTitle.trim() || null, newText.trim(), newDefault) as any
+        if (result?.error) { showError(result.message || 'Failed to add condition'); return }
+        setNewTitle(''); setNewText(''); setNewDefault(false)
+        showSuccess('Condition added')
+        loadData()
+    }
+
+    const handleSaveEdit = async (id: string) => {
+        await window.api.hullUpdateAdditionalCondition(id, { title: editTitle.trim() || null, text: editText.trim() })
+        setEditingId(null)
+        showSuccess('Condition updated')
+        loadData()
+    }
+
+    const handleToggleDefault = async (id: string, current: boolean) => {
+        await window.api.hullUpdateAdditionalCondition(id, { defaultSelected: !current })
+        loadData()
+    }
+
+    const handleDelete = async (id: string) => {
+        await window.api.hullDeleteAdditionalCondition(id)
+        showSuccess('Condition deleted')
+        loadData()
+    }
+
+    const handleMove = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...conditions]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setConditions(newOrder)
+        await window.api.hullReorderAdditionalConditions(newOrder.map(c => c.id))
+    }
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Hull Additional Conditions</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Standalone condition paragraphs (exclusions, terms references, etc.) that can be added to Hull quotations. Default items are auto-added.</p>
+
+            <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. War Exclusion)" style={{ width: '200px', flexShrink: 0 }} />
+                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Condition text (e.g., Excluding all claims of whatsoever nature...)" style={{ flex: 1, minHeight: '60px', minWidth: '200px', fontSize: '0.85rem', padding: '8px' }} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    <input type="checkbox" checked={newDefault} onChange={e => setNewDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                </label>
+                <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+            </form>
+
+            {conditions.map((c, i) => (
+                <div key={c.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                        <button onClick={() => handleMove(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        {editingId === c.id ? (
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '180px' }} />
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minWidth: '200px', minHeight: '50px', fontSize: '0.82rem', padding: '6px' }} />
+                                <button onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: '0.82rem' }}>
+                                {c.title && <span style={{ fontWeight: 600, marginRight: '8px', color: 'var(--text-primary)' }}>{c.title}</span>}
+                                <span style={{ whiteSpace: 'pre-wrap' }}>{c.text}</span>
+                            </div>
+                        )}
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input type="checkbox" checked={c.defaultSelected} onChange={() => handleToggleDefault(c.id, c.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                    </label>
+                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                    <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                </div>
+            ))}
+            {conditions.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No additional conditions yet.</p>}
         </section>
     )
 }

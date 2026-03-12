@@ -210,9 +210,41 @@ const api = {
   piReorderClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderClauses', orderedIds),
 
   piGetClauseSets: () => ipcRenderer.invoke('pi:getClauseSets'),
-  piAddClauseSet: (name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:addClauseSet', name, clauseIds),
-  piUpdateClauseSet: (id: string, name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:updateClauseSet', id, name, clauseIds),
+  piAddClauseSet: (name: string, clauseIds: string[], descOverrides?: Record<string, string>) => ipcRenderer.invoke('pi:addClauseSet', name, clauseIds, descOverrides),
+  piUpdateClauseSet: (id: string, name: string, clauseIds: string[], descOverrides?: Record<string, string>) => ipcRenderer.invoke('pi:updateClauseSet', id, name, clauseIds, descOverrides),
   piDeleteClauseSet: (id: string) => ipcRenderer.invoke('pi:deleteClauseSet', id),
+
+  // Hull settings
+  hullGetAgreedValueTexts: () => ipcRenderer.invoke('hull:getAgreedValueTexts'),
+  hullAddAgreedValueText: (text: string, defaultSelected: boolean) => ipcRenderer.invoke('hull:addAgreedValueText', text, defaultSelected),
+  hullUpdateAgreedValueText: (id: string, updates: any) => ipcRenderer.invoke('hull:updateAgreedValueText', id, updates),
+  hullDeleteAgreedValueText: (id: string) => ipcRenderer.invoke('hull:deleteAgreedValueText', id),
+  hullReorderAgreedValueTexts: (ids: string[]) => ipcRenderer.invoke('hull:reorderAgreedValueTexts', ids),
+
+  hullGetClauses: () => ipcRenderer.invoke('hull:getClauses'),
+  hullAddClause: (name: string, code: string, description?: string) => ipcRenderer.invoke('hull:addClause', name, code, description),
+  hullUpdateClause: (id: string, updates: any) => ipcRenderer.invoke('hull:updateClause', id, updates),
+  hullDeleteClause: (id: string) => ipcRenderer.invoke('hull:deleteClause', id),
+  hullReorderClauses: (ids: string[]) => ipcRenderer.invoke('hull:reorderClauses', ids),
+
+  hullGetClauseConditions: (hullClauseId?: string) => ipcRenderer.invoke('hull:getClauseConditions', hullClauseId),
+  hullAddClauseCondition: (hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean) => ipcRenderer.invoke('hull:addClauseCondition', hullClauseId, conditionNumber, text, defaultSelected),
+  hullUpdateClauseCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateClauseCondition', id, updates),
+  hullDeleteClauseCondition: (id: string) => ipcRenderer.invoke('hull:deleteClauseCondition', id),
+  hullReorderClauseConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderClauseConditions', ids),
+
+  hullGetAdditionalConditions: () => ipcRenderer.invoke('hull:getAdditionalConditions'),
+  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean) => ipcRenderer.invoke('hull:addAdditionalCondition', title, text, defaultSelected),
+  hullUpdateAdditionalCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateAdditionalCondition', id, updates),
+  hullDeleteAdditionalCondition: (id: string) => ipcRenderer.invoke('hull:deleteAdditionalCondition', id),
+  hullReorderAdditionalConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAdditionalConditions', ids),
+
+  hullGetQuotationAgreedValueItems: (qId: string) => ipcRenderer.invoke('hull:getQuotationAgreedValueItems', qId),
+  hullSetQuotationAgreedValueItems: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationAgreedValueItems', qId, items),
+  hullGetQuotationHullConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationHullConditions', qId),
+  hullSetQuotationHullConditions: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationHullConditions', qId, items),
+  hullGetQuotationHullAdditionalConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationHullAdditionalConditions', qId),
+  hullSetQuotationHullAdditionalConditions: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationHullAdditionalConditions', qId, items),
 
   piGetWarrantyTags: () => ipcRenderer.invoke('pi:getWarrantyTags'),
   piAddWarrantyTag: (name: string) => ipcRenderer.invoke('pi:addWarrantyTag', name),
@@ -262,8 +294,8 @@ const api = {
   piReorderSubLimitTemplates: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderSubLimitTemplates', orderedIds),
 
   piGetAdditionalClauses: () => ipcRenderer.invoke('pi:getAdditionalClauses'),
-  piAddAdditionalClause: (code: string | null, text: string) => ipcRenderer.invoke('pi:addAdditionalClause', code, text),
-  piUpdateAdditionalClause: (id: string, code: string | null, text: string) => ipcRenderer.invoke('pi:updateAdditionalClause', id, code, text),
+  piAddAdditionalClause: (title: string | null, code: string | null, text: string) => ipcRenderer.invoke('pi:addAdditionalClause', title, code, text),
+  piUpdateAdditionalClause: (id: string, title: string | null, code: string | null, text: string) => ipcRenderer.invoke('pi:updateAdditionalClause', id, title, code, text),
   piDeleteAdditionalClause: (id: string) => ipcRenderer.invoke('pi:deleteAdditionalClause', id),
   piReorderAdditionalClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderAdditionalClauses', orderedIds),
   piToggleAdditionalClauseDefault: (id: string, defaultSelected: boolean) => ipcRenderer.invoke('pi:toggleAdditionalClauseDefault', id, defaultSelected),
@@ -447,6 +479,8 @@ const api = {
   reorderQuotationCustomSections: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationCustomSections', ids),
   piGetSectionOrderDefaults: () => ipcRenderer.invoke('pi:getSectionOrderDefaults'),
   piSetSectionOrderDefaults: (order: string[]) => ipcRenderer.invoke('pi:setSectionOrderDefaults', order),
+  piGetSectionOrderDefaultsByType: (typeCode: string) => ipcRenderer.invoke('pi:getSectionOrderDefaultsByType', typeCode),
+  piSetSectionOrderDefaultsByType: (typeCode: string, order: string[]) => ipcRenderer.invoke('pi:setSectionOrderDefaultsByType', typeCode, order),
 
   getQuotationExcludedCountries: (qId: string) => ipcRenderer.invoke('db:getQuotationExcludedCountries', qId),
   setQuotationExcludedCountries: (qId: string, countries: any[]) => ipcRenderer.invoke('db:setQuotationExcludedCountries', qId, countries),
