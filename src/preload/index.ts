@@ -216,35 +216,50 @@ const api = {
 
   // Hull settings
   hullGetAgreedValueTexts: () => ipcRenderer.invoke('hull:getAgreedValueTexts'),
-  hullAddAgreedValueText: (text: string, defaultSelected: boolean) => ipcRenderer.invoke('hull:addAgreedValueText', text, defaultSelected),
+  hullAddAgreedValueText: (text: string, defaultSelected: boolean, section?: string) => ipcRenderer.invoke('hull:addAgreedValueText', text, defaultSelected, section),
   hullUpdateAgreedValueText: (id: string, updates: any) => ipcRenderer.invoke('hull:updateAgreedValueText', id, updates),
   hullDeleteAgreedValueText: (id: string) => ipcRenderer.invoke('hull:deleteAgreedValueText', id),
   hullReorderAgreedValueTexts: (ids: string[]) => ipcRenderer.invoke('hull:reorderAgreedValueTexts', ids),
 
   hullGetClauses: () => ipcRenderer.invoke('hull:getClauses'),
-  hullAddClause: (name: string, code: string, description?: string) => ipcRenderer.invoke('hull:addClause', name, code, description),
+  hullAddClause: (name: string, code: string, description?: string, conditionSection?: string) => ipcRenderer.invoke('hull:addClause', name, code, description, conditionSection),
   hullUpdateClause: (id: string, updates: any) => ipcRenderer.invoke('hull:updateClause', id, updates),
   hullDeleteClause: (id: string) => ipcRenderer.invoke('hull:deleteClause', id),
   hullReorderClauses: (ids: string[]) => ipcRenderer.invoke('hull:reorderClauses', ids),
 
   hullGetClauseConditions: (hullClauseId?: string) => ipcRenderer.invoke('hull:getClauseConditions', hullClauseId),
-  hullAddClauseCondition: (hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean) => ipcRenderer.invoke('hull:addClauseCondition', hullClauseId, conditionNumber, text, defaultSelected),
+  hullAddClauseCondition: (hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean, conditionSection?: string, hasAmount?: boolean, amountPlaceholder?: string) => ipcRenderer.invoke('hull:addClauseCondition', hullClauseId, conditionNumber, text, defaultSelected, conditionSection, hasAmount, amountPlaceholder),
   hullUpdateClauseCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateClauseCondition', id, updates),
   hullDeleteClauseCondition: (id: string) => ipcRenderer.invoke('hull:deleteClauseCondition', id),
   hullReorderClauseConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderClauseConditions', ids),
 
   hullGetAdditionalConditions: () => ipcRenderer.invoke('hull:getAdditionalConditions'),
-  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean) => ipcRenderer.invoke('hull:addAdditionalCondition', title, text, defaultSelected),
+  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[]) => ipcRenderer.invoke('hull:addAdditionalCondition', title, text, defaultSelected, hullClauseIds),
   hullUpdateAdditionalCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateAdditionalCondition', id, updates),
   hullDeleteAdditionalCondition: (id: string) => ipcRenderer.invoke('hull:deleteAdditionalCondition', id),
   hullReorderAdditionalConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAdditionalConditions', ids),
 
   hullGetQuotationAgreedValueItems: (qId: string) => ipcRenderer.invoke('hull:getQuotationAgreedValueItems', qId),
   hullSetQuotationAgreedValueItems: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationAgreedValueItems', qId, items),
+  hullGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('hull:getQuotationAlternatives', qId),
+  hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label),
+  hullUpdateQuotationAlternative: (id: string, updates: any) => ipcRenderer.invoke('hull:updateQuotationAlternative', id, updates),
+  hullDeleteQuotationAlternative: (id: string) => ipcRenderer.invoke('hull:deleteQuotationAlternative', id),
+  hullReorderQuotationAlternatives: (ids: string[]) => ipcRenderer.invoke('hull:reorderQuotationAlternatives', ids),
   hullGetQuotationHullConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationHullConditions', qId),
   hullSetQuotationHullConditions: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationHullConditions', qId, items),
   hullGetQuotationHullAdditionalConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationHullAdditionalConditions', qId),
   hullSetQuotationHullAdditionalConditions: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationHullAdditionalConditions', qId, items),
+
+  warGetConditions: () => ipcRenderer.invoke('war:getConditions'),
+  warAddCondition: (text: string, defaultSelected: boolean) => ipcRenderer.invoke('war:addCondition', text, defaultSelected),
+  warUpdateCondition: (id: string, updates: any) => ipcRenderer.invoke('war:updateCondition', id, updates),
+  warDeleteCondition: (id: string) => ipcRenderer.invoke('war:deleteCondition', id),
+  warReorderConditions: (ids: string[]) => ipcRenderer.invoke('war:reorderConditions', ids),
+  warGetQuotationWarConditions: (qId: string) => ipcRenderer.invoke('war:getQuotationWarConditions', qId),
+  warSetQuotationWarConditions: (qId: string, items: any[]) => ipcRenderer.invoke('war:setQuotationWarConditions', qId, items),
+  warGetSettings: () => ipcRenderer.invoke('war:getSettings'),
+  warSetSettings: (settings: any) => ipcRenderer.invoke('war:setSettings', settings),
 
   piGetWarrantyTags: () => ipcRenderer.invoke('pi:getWarrantyTags'),
   piAddWarrantyTag: (name: string) => ipcRenderer.invoke('pi:addWarrantyTag', name),
@@ -308,6 +323,13 @@ const api = {
   piAddTradingExcludedCountry: (country: any) => ipcRenderer.invoke('pi:addTradingExcludedCountry', country),
   piUpdateTradingExcludedCountry: (id: string, updates: any) => ipcRenderer.invoke('pi:updateTradingExcludedCountry', id, updates),
   piDeleteTradingExcludedCountry: (id: string) => ipcRenderer.invoke('pi:deleteTradingExcludedCountry', id),
+
+  // Trading Warranty Templates
+  piGetTradingWarrantyTemplates: () => ipcRenderer.invoke('pi:getTradingWarrantyTemplates'),
+  piAddTradingWarrantyTemplate: (name: string, text: string) => ipcRenderer.invoke('pi:addTradingWarrantyTemplate', name, text),
+  piUpdateTradingWarrantyTemplate: (id: string, updates: any) => ipcRenderer.invoke('pi:updateTradingWarrantyTemplate', id, updates),
+  piDeleteTradingWarrantyTemplate: (id: string) => ipcRenderer.invoke('pi:deleteTradingWarrantyTemplate', id),
+  piReorderTradingWarrantyTemplates: (ids: string[]) => ipcRenderer.invoke('pi:reorderTradingWarrantyTemplates', ids),
 
   // P&I Section Texts
   piGetSectionTexts: () => ipcRenderer.invoke('pi:getSectionTexts'),

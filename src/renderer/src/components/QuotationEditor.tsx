@@ -1,14 +1,54 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList } from 'lucide-react'
-import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition } from '../../../shared/types'
+import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
-import { DEFAULT_SECTION_TEXTS, SECTION_LABELS, getDefaultSectionOrder } from './QuotationSettings'
+import { DEFAULT_SECTION_TEXTS, SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import RichTextEditor from './RichTextEditor'
 import VesselScopeChips from './VesselScopeChips'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+
+function PickerDropdown({ placeholder, options, onSelect, fontSize = '0.85rem' }: { placeholder: string; options: { value: string; label: string }[]; onSelect: (value: string) => void; fontSize?: string }) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+    const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
+    useEffect(() => {
+        if (!open) return
+        const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [open])
+    return (
+        <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+                onClick={() => setOpen(!open)}
+                style={{ padding: '8px 12px', borderRadius: '8px', fontSize, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-secondary)', cursor: 'pointer', textAlign: 'left', minWidth: '200px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}
+            >
+                {placeholder}
+                <ChevronDown size={14} style={{ opacity: 0.5, transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />
+            </button>
+            {open && options.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 9999, marginTop: '4px', minWidth: '100%', maxWidth: '420px', maxHeight: '260px', overflowY: 'auto', borderRadius: '8px', border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`, background: dropdownBg, boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)' }}>
+                    {options.map(o => (
+                        <div
+                            key={o.value}
+                            onClick={() => { onSelect(o.value); setOpen(false) }}
+                            style={{ padding: '8px 14px', fontSize, cursor: 'pointer', color: isLight ? '#1c1e21' : '#e8e8e8', borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                            {o.label}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
 
 const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
@@ -18,7 +58,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
 }
 
-type EditorTab = 'insured' | 'vessel' | 'liability' | 'conditions' | 'agreedValue' | 'hullConditions' | 'period' | 'trading' | 'warranties' | 'deductibles' | 'exclusions' | 'sanctions' | 'subjectivities' | 'premium' | 'information' | 'customSections' | 'notes'
+type EditorTab = 'insured' | 'vessel' | 'liability' | 'conditions' | 'agreedValue' | 'hullConditions' | 'sumInsured' | 'warConditions' | 'warTrading' | 'period' | 'trading' | 'warranties' | 'deductibles' | 'exclusions' | 'sanctions' | 'subjectivities' | 'premium' | 'information' | 'customSections' | 'notes'
 
 type TabDef = { key: EditorTab; label: string; icon: any; types?: string[] }
 
@@ -26,11 +66,14 @@ const allTabs: TabDef[] = [
     { key: 'vessel', label: 'Vessel', icon: Ship },
     { key: 'insured', label: 'Insured', icon: Users },
     { key: 'agreedValue', label: 'Agreed Value', icon: Shield, types: ['H'] },
+    { key: 'sumInsured', label: 'Sum Insured', icon: Shield, types: ['W'] },
     { key: 'liability', label: 'Limit of Liability', icon: Shield, types: ['P'] },
     { key: 'hullConditions', label: 'Conditions', icon: FileText, types: ['H'] },
+    { key: 'warConditions', label: 'Conditions', icon: FileText, types: ['W'] },
     { key: 'conditions', label: 'Conditions', icon: FileText, types: ['P'] },
     { key: 'period', label: 'Period', icon: Clock },
-    { key: 'trading', label: 'Trading', icon: Globe },
+    { key: 'trading', label: 'Trading', icon: Globe, types: ['P', 'H'] },
+    { key: 'warTrading', label: 'Trading Warranty', icon: Globe, types: ['W'] },
     { key: 'warranties', label: 'Warranties', icon: CheckSquare },
     { key: 'deductibles', label: 'Deductibles', icon: Scale, types: ['P'] },
     { key: 'exclusions', label: 'Exclusions', icon: Ban, types: ['P'] },
@@ -76,7 +119,15 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
             window.api.piGetSectionTexts(),
             window.api.piGetSanctionsVersions()
         ])
-        if (fullQ) setQ(fullQ)
+        if (fullQ) {
+            // Set war defaults on first load (non-refundable 25%)
+            if (fullQ.quotationTypeCode === 'W' && !fullQ.nonRefundableType && !fullQ.premiumAmount) {
+                fullQ.nonRefundableType = 'percentage'
+                fullQ.nonRefundablePercent = 25
+                await window.api.updateQuotation(fullQ.id, { nonRefundableType: 'percentage', nonRefundablePercent: 25 } as any)
+            }
+            setQ(fullQ)
+        }
         setPolicyTypes(Array.isArray(pt) ? pt : [])
         setVessels(Array.isArray(v) ? v : [])
         if (gt && Object.keys(gt).length > 0) setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
@@ -253,10 +304,13 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                 {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'agreedValue' && <AgreedValueTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} getEffectiveText={getEffectiveText} />}
-                {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'sumInsured' && <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />}
+                {activeTab === 'warConditions' && <WarConditionsTab quotation={q} showError={showError} />}
                 {activeTab === 'conditions' && <ConditionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'period' && <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'trading' && <TradingTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
+                {activeTab === 'warTrading' && <WarTradingTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'warranties' && <WarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'deductibles' && <DeductiblesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'exclusions' && <ExclusionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
@@ -1174,6 +1228,7 @@ function PeriodTab({ quotation, updateField, setQ }: { quotation: Quotation; upd
 
 function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [countries, setCountries] = useState<QuotationExcludedCountry[]>([])
+    const [templates, setTemplates] = useState<TradingWarrantyTemplate[]>([])
     const initRef = useRef(false)
     const [newCountryName, setNewCountryName] = useState('')
     const [newCountryType, setNewCountryType] = useState<'excluded' | 'ddq'>('excluded')
@@ -1181,10 +1236,12 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [qc, masterCountries] = await Promise.all([
+        const [qc, masterCountries, tpls] = await Promise.all([
             window.api.getQuotationExcludedCountries(quotation.id),
-            window.api.piGetTradingExcludedCountries()
+            window.api.piGetTradingExcludedCountries(),
+            window.api.piGetTradingWarrantyTemplates()
         ])
+        setTemplates(Array.isArray(tpls) ? tpls : [])
         // Deduplicate by name+listType (legacy data may have duplicates)
         const seen = new Set<string>()
         const deduped = qc.filter(c => {
@@ -1202,7 +1259,11 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
         setCountries(qc)
         if (qc.length === 0 && masterCountries.length > 0 && !initRef.current) {
             initRef.current = true
-            await window.api.setQuotationExcludedCountries(quotation.id, masterCountries.map(c => ({ name: c.name, listType: c.listType })))
+            // For Hull type, default excluded to Israel only but keep all DDQ countries
+            const countriesToSet = quotation.quotationTypeCode === 'H'
+                ? masterCountries.filter(c => c.listType === 'ddq' || c.name.toLowerCase() === 'israel')
+                : masterCountries
+            await window.api.setQuotationExcludedCountries(quotation.id, countriesToSet.map(c => ({ name: c.name, listType: c.listType })))
             const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
             setCountries(refreshed)
         }
@@ -1241,6 +1302,26 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
             {/* Section A: Trading Warranty Text (per-quotation) */}
             <div style={sectionStyle}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Trading Warranty Text</label>
+                {templates.length > 0 && (
+                    <div style={{ marginBottom: '10px' }}>
+                        <select
+                            value=""
+                            onChange={e => {
+                                const tpl = templates.find(t => t.id === e.target.value)
+                                if (tpl) {
+                                    setQ(p => ({ ...p, tradingWarrantyIntro: tpl.text }))
+                                    updateField('tradingWarrantyIntro', tpl.text)
+                                }
+                            }}
+                            style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
+                        >
+                            <option value="">Load from template...</option>
+                            {templates.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
                 <RichTextEditor
                     value={quotation.tradingWarrantyIntro || ''}
                     onChange={val => { setQ(p => ({ ...p, tradingWarrantyIntro: val })); updateField('tradingWarrantyIntro', val) }}
@@ -1522,7 +1603,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
     }
 
     // Filter warranties by quotation type scope
-    const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : 'pi'
+    const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
     const visibleWarranties = allWarranties.filter(w => !w.typeScope || w.typeScope === 'both' || w.typeScope === typeCode)
 
     const getTabWarranties = () => {
@@ -1891,14 +1972,11 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
 
             {/* Add from settings dropdown */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <select
-                    onChange={e => { if (e.target.value) { handleAddFromMaster(e.target.value); e.target.value = '' } }}
-                    value=""
-                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)', fontSize: '0.85rem' }}
-                >
-                    <option value="" style={{ color: '#000' }}>Add deductible from settings...</option>
-                    {masterDeductibles.map(d => <option key={d.id} value={d.id} style={{ color: '#000' }}>{d.title}{d.hasSecondary ? ' (multi-value)' : ''}</option>)}
-                </select>
+                <PickerDropdown
+                    placeholder="Add deductible from settings..."
+                    options={masterDeductibles.map(d => ({ value: d.id, label: d.title || d.description.slice(0, 80) || 'Untitled deductible' }))}
+                    onSelect={handleAddFromMaster}
+                />
             </div>
 
             {/* Deductibles list */}
@@ -1956,14 +2034,12 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <h4 style={{ fontSize: '0.9rem' }}>Text Deductibles</h4>
                 {masterTextDeds.length > 0 && (
-                    <select
-                        onChange={e => { if (e.target.value) { addTextFromMaster(e.target.value); e.target.value = '' } }}
-                        value=""
-                        style={{ padding: '4px 8px', borderRadius: '6px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)', fontSize: '0.8rem' }}
-                    >
-                        <option value="" style={{ color: '#000' }}>Add from settings...</option>
-                        {masterTextDeds.map(t => <option key={t.id} value={t.id} style={{ color: '#000' }}>{t.title || t.text.slice(0, 60)}{!t.title && t.text.length > 60 ? '...' : ''}</option>)}
-                    </select>
+                    <PickerDropdown
+                        placeholder="Add from settings..."
+                        fontSize="0.8rem"
+                        options={masterTextDeds.map(t => ({ value: t.id, label: t.title || (t.text.slice(0, 60) + (t.text.length > 60 ? '...' : '')) }))}
+                        onSelect={addTextFromMaster}
+                    />
                 )}
             </div>
             {textDeds.map((td, i) => (
@@ -2414,15 +2490,15 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
         const safeMasters = Array.isArray(masters) ? masters : []
         const safeDts = Array.isArray(dts) ? dts : []
         // Filter masters by quotation type scope
-        const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : 'pi'
+        const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
         const filteredMasters = safeMasters.filter(m => !m.typeScope || m.typeScope === 'both' || m.typeScope === typeCode)
         setItems(safeSubjs)
         setMasterList(filteredMasters)
         setDocTypes(safeDts)
         setQVessels(Array.isArray(qv) ? qv : [])
 
-        // Auto-populate on first load if no subjectivities yet
-        if (!autoPopulateRan.current && safeSubjs.length === 0 && filteredMasters.length > 0) {
+        // Auto-populate on first load if no subjectivities yet (skip for War — subjectivities not included by default)
+        if (!autoPopulateRan.current && safeSubjs.length === 0 && filteredMasters.length > 0 && quotation.quotationTypeCode !== 'W') {
             autoPopulateRan.current = true
             await autoPopulate(filteredMasters, safeDts)
         }
@@ -2650,14 +2726,29 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
     const [instalments, setInstalments] = useState<QuotationInstalment[]>([])
     const [instalmentDefaults, setInstalmentDefaults] = useState<InstalmentDefaults>({})
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [hullAlternatives, setHullAlternatives] = useState<QuotationHullAlternative[]>([])
+    const [hullClauses, setHullClauses] = useState<HullClause[]>([])
 
     useEffect(() => {
         loadInstalments()
         loadVessels()
         window.api.piGetInstalmentDefaults().then(d => setInstalmentDefaults(d || {}))
+        if (quotation.quotationTypeCode === 'H') {
+            window.api.hullGetQuotationAlternatives(quotation.id).then(a => setHullAlternatives(Array.isArray(a) ? a : []))
+            window.api.hullGetClauses().then(c => setHullClauses(Array.isArray(c) ? c : []))
+        }
     }, [])
     const loadInstalments = async () => { setInstalments(await window.api.getQuotationInstalments(quotation.id)) }
     const loadVessels = async () => { setQVessels(await window.api.getQuotationVessels(quotation.id)) }
+
+    const updateAlternativePremium = async (altId: string, amount: number | null) => {
+        await window.api.hullUpdateQuotationAlternative(altId, { premiumAmount: amount })
+        setHullAlternatives(prev => prev.map(a => a.id === altId ? { ...a, premiumAmount: amount || undefined } : a))
+        // Sync total to quotation
+        const newTotal = hullAlternatives.reduce((sum, a) => sum + (a.id === altId ? (amount || 0) : (a.premiumAmount || 0)), 0)
+        setQ(p => ({ ...p, premiumAmount: newTotal || undefined }))
+        updateField('premiumAmount', newTotal || null)
+    }
 
     const getDefaultDays = (count: number, index: number): number | undefined => {
         // 1: [0]  2: [0,180]  3: [0,120,240]  4: [0,90,180,270]  12: [0,30,60,...]
@@ -2726,16 +2817,54 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Premium</h3>
 
-            {/* Single vessel: simple premium input */}
+            {/* Single vessel: premium inputs */}
             {!isMultiVessel && (
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{premiumLabel}:</span>
-                        <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} style={{ width: '150px' }} />
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Instalments:</span>
+                <div style={{ marginBottom: '16px' }}>
+                    {/* Hull with multiple alternatives: per-alternative premium */}
+                    {quotation.quotationTypeCode === 'H' && hullAlternatives.length > 1 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                            {hullAlternatives.map((alt, idx) => {
+                                const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                                const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+                                const accentColor = altColors[idx % altColors.length]
+                                return (
+                                    <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
+                                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: accentColor, minWidth: '140px', whiteSpace: 'nowrap' }}>
+                                            Alt {idx + 1}{clause ? ` (${clause.code})` : ''}
+                                        </label>
+                                        <input type="number" value={alt.premiumAmount || ''} onChange={e => setHullAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updateAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                    </div>
+                                )
+                            })}
+                            {quotation.ivEnabled && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: '3px solid #ffb020' }}>
+                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffb020', minWidth: '140px' }}>Increased Value</label>
+                                    <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>
+                                    {quotation.quotationTypeCode === 'H' && quotation.ivEnabled ? 'Section A (H&M)' : quotation.quotationTypeCode === 'H' ? 'H&M' : premiumLabel}
+                                </label>
+                                <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                            </div>
+                            {quotation.quotationTypeCode === 'H' && quotation.ivEnabled && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: '3px solid #ffb020' }}>
+                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffb020', minWidth: '140px' }}>Section B (IV)</label>
+                                    <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
                         <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
                             onChange={e => {
                                 const v = parseInt(e.target.value) || 1
@@ -2743,7 +2872,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                 updateField('numInstalments', v)
                                 handleSaveInstalments(v)
                             }}
-                            style={{ width: '70px' }}
+                            style={{ width: '80px' }}
                         />
                     </div>
                 </div>
@@ -2784,8 +2913,8 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                             </tr>
                         </tbody>
                     </table>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Instalments:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
                         <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
                             onChange={e => {
                                 const v = parseInt(e.target.value) || 1
@@ -2793,21 +2922,55 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                 updateField('numInstalments', v)
                                 handleSaveInstalments(v)
                             }}
-                            style={{ width: '70px' }}
+                            style={{ width: '80px' }}
                         />
                     </div>
                 </div>
             )}
 
             {/* Payable Premium summary (single vessel only) */}
-            {!isMultiVessel && hasDiscount && technicalPremium > 0 && (
-                <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid rgba(0, 210, 255, 0.15)' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Payable Premium: {currency} {payablePremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
-                        ({quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : ''}{quotation.ncbEnabled && quotation.upccEnabled ? ' + ' : ''}{quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : ''})
-                    </span>
-                </div>
-            )}
+            {!isMultiVessel && hasDiscount && technicalPremium > 0 && (() => {
+                const computePayable = (tech: number) => {
+                    const nd = ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100
+                    const an = tech - nd
+                    const ud = upccType === 'amount' ? upccFixedAmt : an * upccPct / 100
+                    return an - ud
+                }
+                const discountLabel = (quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : '') + (quotation.ncbEnabled && quotation.upccEnabled ? ' + ' : '') + (quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '')
+                const hullMultiAlt = quotation.quotationTypeCode === 'H' && hullAlternatives.length > 1
+                const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+                const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                return (
+                    <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid rgba(0, 210, 255, 0.15)' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: hullMultiAlt ? '8px' : '0' }}>
+                            Payable Premium ({discountLabel})
+                        </div>
+                        {hullMultiAlt ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {hullAlternatives.map((alt, idx) => {
+                                    const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                                    return (
+                                        <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: altColors[idx % altColors.length], minWidth: '140px' }}>
+                                                Alt {idx + 1}{clause ? ` (${clause.code})` : ''}
+                                            </span>
+                                            <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(computePayable(alt.premiumAmount || 0))}</span>
+                                        </div>
+                                    )
+                                })}
+                                {quotation.ivEnabled && quotation.ivPremiumAmount != null && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffb020', minWidth: '140px' }}>Increased Value</span>
+                                        <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(computePayable(quotation.ivPremiumAmount || 0))}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(payablePremium)}</span>
+                        )}
+                    </div>
+                )
+            })()}
 
             {/* Discounts: NCB and UPCC */}
             <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginBottom: '20px' }}>
@@ -2906,11 +3069,28 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                         None
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
-                        <input type="radio" name="nonRefundable" checked={quotation.nonRefundableType === 'first_instalment'} onChange={() => { setQ(p => ({ ...p, nonRefundableType: 'first_instalment', nonRefundablePercent: undefined })); updateField('nonRefundableType', 'first_instalment'); updateField('nonRefundablePercent', null) }} style={{ accentColor: 'var(--accent-primary)' }} />
+                        <input type="radio" name="nonRefundable" checked={quotation.nonRefundableType === 'first_instalment'} onChange={() => {
+                            const defaultText = quotation.sectionTextsOverride?.nonRefundableFirstText ?? getEffectiveText('nonRefundableFirstText')
+                            setQ(p => ({ ...p, nonRefundableType: 'first_instalment', nonRefundablePercent: undefined, sectionTextsOverride: { ...(p.sectionTextsOverride || {}), nonRefundableFirstText: p.sectionTextsOverride?.nonRefundableFirstText || defaultText } }))
+                            updateField('nonRefundableType', 'first_instalment')
+                            updateField('nonRefundablePercent', null)
+                            if (!quotation.sectionTextsOverride?.nonRefundableFirstText) {
+                                const override = { ...(quotation.sectionTextsOverride || {}), nonRefundableFirstText: defaultText }
+                                updateField('sectionTextsOverride', override)
+                            }
+                        }} style={{ accentColor: 'var(--accent-primary)' }} />
                         1st instalment is non-refundable
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
-                        <input type="radio" name="nonRefundable" checked={quotation.nonRefundableType === 'percentage'} onChange={() => { setQ(p => ({ ...p, nonRefundableType: 'percentage' })); updateField('nonRefundableType', 'percentage') }} style={{ accentColor: 'var(--accent-primary)' }} />
+                        <input type="radio" name="nonRefundable" checked={quotation.nonRefundableType === 'percentage'} onChange={() => {
+                            const defaultText = quotation.sectionTextsOverride?.nonRefundablePercentText ?? getEffectiveText('nonRefundablePercentText')
+                            setQ(p => ({ ...p, nonRefundableType: 'percentage', sectionTextsOverride: { ...(p.sectionTextsOverride || {}), nonRefundablePercentText: p.sectionTextsOverride?.nonRefundablePercentText || defaultText } }))
+                            updateField('nonRefundableType', 'percentage')
+                            if (!quotation.sectionTextsOverride?.nonRefundablePercentText) {
+                                const override = { ...(quotation.sectionTextsOverride || {}), nonRefundablePercentText: defaultText }
+                                updateField('sectionTextsOverride', override)
+                            }
+                        }} style={{ accentColor: 'var(--accent-primary)' }} />
                         Percentage of premium
                     </label>
                     {quotation.nonRefundableType === 'percentage' && (
@@ -2920,6 +3100,31 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                         </div>
                     )}
                 </div>
+                {quotation.nonRefundableType && (
+                    <div style={{ marginTop: '10px' }}>
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Non-refundable sentence (appears in export after 1st instalment)</label>
+                        <textarea
+                            value={quotation.nonRefundableType === 'first_instalment'
+                                ? (quotation.sectionTextsOverride?.nonRefundableFirstText ?? getEffectiveText('nonRefundableFirstText'))
+                                : (quotation.sectionTextsOverride?.nonRefundablePercentText ?? getEffectiveText('nonRefundablePercentText')).replace(/\{percent\}/g, String(quotation.nonRefundablePercent || '___'))
+                            }
+                            onChange={e => {
+                                const key = quotation.nonRefundableType === 'first_instalment' ? 'nonRefundableFirstText' : 'nonRefundablePercentText'
+                                const override = { ...(quotation.sectionTextsOverride || {}), [key]: e.target.value }
+                                setQ(p => ({ ...p, sectionTextsOverride: override }))
+                            }}
+                            onBlur={e => {
+                                const key = quotation.nonRefundableType === 'first_instalment' ? 'nonRefundableFirstText' : 'nonRefundablePercentText'
+                                const override = { ...(quotation.sectionTextsOverride || {}), [key]: e.target.value }
+                                updateField('sectionTextsOverride', override)
+                            }}
+                            style={{ width: '100%', maxWidth: '600px', minHeight: '40px', resize: 'vertical', fontSize: '0.82rem', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                        />
+                        {quotation.nonRefundableType === 'percentage' && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>Use {'{percent}'} as placeholder for the percentage value</div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Instalment Schedule */}
@@ -3350,12 +3555,35 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
         setItems(safeItems)
         setQVessels(Array.isArray(qv) ? qv : [])
 
+        // Sync sections from master texts (fixes items saved before section was tracked)
+        if (safeItems.length > 0 && safeTexts.length > 0) {
+            const masterMap = new Map(safeTexts.map(t => [t.id, t.section || 'hm']))
+            let needsSave = false
+            const synced = safeItems.map(it => {
+                if (it.hullTextId && masterMap.has(it.hullTextId)) {
+                    const masterSec = masterMap.get(it.hullTextId)!
+                    if ((it.section || 'hm') !== masterSec) {
+                        needsSave = true
+                        return { ...it, section: masterSec }
+                    }
+                }
+                return it
+            })
+            if (needsSave) {
+                try {
+                    await window.api.hullSetQuotationAgreedValueItems(quotation.id, synced.map(it => ({ hullTextId: it.hullTextId, text: it.text, section: it.section || 'hm', vesselScope: it.vesselScope })))
+                    const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
+                    setItems(Array.isArray(fresh) ? fresh : [])
+                } catch {}
+            }
+        }
+
         // Auto-populate default texts on first load if no items exist
         if (!defaultsApplied.current && safeItems.length === 0 && safeTexts.length > 0) {
             defaultsApplied.current = true
             const defaults = safeTexts.filter(t => t.defaultSelected)
             if (defaults.length > 0) {
-                const newItems = defaults.map(t => ({ hullTextId: t.id, text: t.text }))
+                const newItems = defaults.map(t => ({ hullTextId: t.id, text: t.text, section: t.section || 'hm' }))
                 try {
                     await window.api.hullSetQuotationAgreedValueItems(quotation.id, newItems)
                     const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
@@ -3371,7 +3599,7 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
         try {
             await window.api.hullSetQuotationAgreedValueItems(
                 quotation.id,
-                updated.map(it => ({ hullTextId: it.hullTextId, text: it.text, vesselScope: it.vesselScope }))
+                updated.map(it => ({ hullTextId: it.hullTextId, text: it.text, section: it.section || 'hm', vesselScope: it.vesselScope }))
             )
             const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
             setItems(Array.isArray(fresh) ? fresh : [])
@@ -3383,13 +3611,13 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
     const addFromTemplate = async (tmpl: HullAgreedValueText) => {
         const already = items.some(it => it.hullTextId === tmpl.id)
         if (already) return
-        const updated = [...items, { id: '', quotationId: quotation.id, hullTextId: tmpl.id, text: tmpl.text, order: items.length }]
+        const updated = [...items, { id: '', quotationId: quotation.id, hullTextId: tmpl.id, text: tmpl.text, section: tmpl.section || 'hm', order: items.length }]
         await saveItems(updated)
     }
 
     const addCustomText = async () => {
         if (!newText.trim()) return
-        const updated = [...items, { id: '', quotationId: quotation.id, text: newText.trim(), order: items.length }]
+        const updated = [...items, { id: '', quotationId: quotation.id, text: newText.trim(), section: 'hm', order: items.length }]
         await saveItems(updated)
         setNewText('')
     }
@@ -3430,10 +3658,10 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
                 Set the agreed value and select/add text items for the Hull quotation.
             </p>
 
-            {/* Value + Currency */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+            {/* H&M Value + Currency */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
                 <div style={{ flex: 1, maxWidth: '250px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Agreed Value</label>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>H&M Value</label>
                     <input
                         type="number"
                         value={quotation.agreedValue ?? ''}
@@ -3454,6 +3682,39 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
                     />
                 </div>
             </div>
+
+            {/* IV toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: quotation.ivEnabled ? '12px' : '20px' }}>
+                <input type="checkbox" checked={!!quotation.ivEnabled} onChange={e => { setQ(p => ({ ...p, ivEnabled: e.target.checked })); updateField('ivEnabled', e.target.checked) }} />
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Include Increased Value (IV)</span>
+            </div>
+
+            {/* IV Value + Currency */}
+            {quotation.ivEnabled && (
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+                <div style={{ flex: 1, maxWidth: '250px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>IV Value</label>
+                    <input
+                        type="number"
+                        value={quotation.ivValue ?? ''}
+                        onChange={e => setQ(p => ({ ...p, ivValue: e.target.value ? Number(e.target.value) : undefined }))}
+                        onBlur={e => updateField('ivValue', e.target.value ? Number(e.target.value) : null)}
+                        placeholder="0.00"
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
+                    />
+                </div>
+                <div style={{ maxWidth: '120px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
+                    <input
+                        type="text"
+                        value={quotation.ivCurrency || 'USD'}
+                        onChange={e => setQ(p => ({ ...p, ivCurrency: e.target.value }))}
+                        onBlur={e => updateField('ivCurrency', e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
+                    />
+                </div>
+            </div>
+            )}
 
             {/* Template texts to add */}
             {unusedTexts.length > 0 && (
@@ -3502,7 +3763,12 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
                                     <VesselScopeChips vessels={qVessels} vesselScope={it.vesselScope} onChange={scope => updateScope(idx, scope)} />
                                 </div>
                             )}
-                            {!it.hullTextId && <span style={{ fontSize: '0.7rem', color: '#a064ff', marginLeft: '28px' }}>(Custom)</span>}
+                            <div style={{ marginLeft: '28px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                {!it.hullTextId && <span style={{ fontSize: '0.7rem', color: '#a064ff' }}>(Custom)</span>}
+                                {quotation.ivEnabled && (
+                                    <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', fontWeight: 600, background: it.section === 'iv' ? '#6464ff22' : '#ff64c822', color: it.section === 'iv' ? '#6464ff' : '#ff64c8', border: `1px solid ${it.section === 'iv' ? '#6464ff44' : '#ff64c844'}` }}>{it.section === 'iv' ? 'IV' : 'Hull'}</span>
+                                )}
+                            </div>
                         </div>
                     ))
                 )}
@@ -3528,17 +3794,640 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
     )
 }
 
+// ==================== Hull Clause Dropdown ====================
+
+function HullClauseDropdown({ clauses, selectedId, onChange, description }: {
+    clauses: HullClause[]
+    selectedId: string
+    onChange: (id: string) => void
+    description?: string
+}) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+    const bg = isLight ? '#ffffff' : '#1a1d28'
+    const selected = clauses.find(c => c.id === selectedId)
+
+    useEffect(() => {
+        if (!open) return
+        const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [open])
+
+    return (
+        <div style={{ marginBottom: '20px' }} ref={ref}>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Hull Clause</label>
+            <div style={{ position: 'relative' }}>
+                <button
+                    type="button"
+                    onClick={() => setOpen(!open)}
+                    style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--input-border)',
+                        background: bg,
+                        color: isLight ? '#1c1e21' : '#e8e8e8',
+                        cursor: 'pointer',
+                        fontSize: '0.88rem',
+                        fontWeight: 600,
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }}
+                >
+                    <span>{selected ? `${selected.code} — ${selected.name}` : 'Select a hull clause...'}</span>
+                    <ChevronDown size={16} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
+                </button>
+                {open && clauses.length > 0 && (
+                    <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        borderRadius: '8px',
+                        border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+                        background: bg,
+                        zIndex: 999,
+                        boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
+                    }}>
+                        {clauses.map(hc => {
+                            const active = hc.id === selectedId
+                            return (
+                                <div
+                                    key={hc.id}
+                                    onClick={() => { onChange(hc.id); setOpen(false) }}
+                                    style={{
+                                        padding: '10px 14px',
+                                        cursor: 'pointer',
+                                        color: active ? 'var(--accent-primary)' : (isLight ? '#1c1e21' : '#e8e8e8'),
+                                        fontWeight: active ? 600 : 400,
+                                        fontSize: '0.86rem',
+                                        background: active ? 'rgba(0, 170, 200, 0.08)' : 'transparent',
+                                        borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`
+                                    }}
+                                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)' }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = active ? 'rgba(0, 170, 200, 0.08)' : 'transparent' }}
+                                >
+                                    <span style={{ fontWeight: 600 }}>{hc.code}</span> — {hc.name}
+                                    {hc.description && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{hc.description}</div>}
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+            {description && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '8px 0 0', fontStyle: 'italic' }}>
+                    {description}
+                </p>
+            )}
+        </div>
+    )
+}
+
+// ==================== Hull Condition Picker (shared) ====================
+
+function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, onOverrideChange, onOverrideBlur, scopes, onScopeChange, vessels, emptyText, amounts, onAmountChange, onAmountBlur, allConditions: _allConds }: {
+    label: string
+    items: { id: string; label: string; text: string; hasAmount?: boolean; amountPlaceholder?: string }[]
+    selectedIds: Set<string>
+    onToggle: (id: string) => void
+    overrides: Record<string, string>
+    onOverrideChange: (id: string, text: string) => void
+    onOverrideBlur: () => void
+    scopes: Record<string, string[] | null>
+    onScopeChange: (id: string, scope: string[] | null) => void
+    vessels: QuotationVessel[]
+    emptyText: string
+    amounts?: Record<string, number | undefined>
+    onAmountChange?: (id: string, amount: number | undefined) => void
+    onAmountBlur?: () => void
+    allConditions?: HullClauseCondition[]
+}) {
+    const [dropdownOpen, setDropdownOpen] = useState(false)
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+    const bg = isLight ? '#ffffff' : '#1a1d28'
+    const selectedItems = items.filter(i => selectedIds.has(i.id))
+    const selectedCount = selectedItems.length
+
+    return (
+        <div style={{ marginBottom: '24px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                {label}
+            </label>
+
+            {items.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
+                    {emptyText}
+                </div>
+            ) : (
+                <>
+                    {/* Dropdown selector */}
+                    <div style={{ position: 'relative', marginBottom: selectedCount > 0 ? '12px' : 0 }}>
+                        <button
+                            type="button"
+                            onClick={() => setDropdownOpen(!dropdownOpen)}
+                            style={{
+                                width: '100%',
+                                padding: '9px 14px',
+                                borderRadius: '8px',
+                                border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+                                background: bg,
+                                color: isLight ? '#1c1e21' : '#e8e8e8',
+                                cursor: 'pointer',
+                                fontSize: '0.84rem',
+                                textAlign: 'left',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                            }}
+                        >
+                            <span>{selectedCount} of {items.length} selected</span>
+                            <ChevronDown size={16} style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
+                        </button>
+                        {dropdownOpen && (
+                            <>
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setDropdownOpen(false)} />
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    marginTop: '4px',
+                                    maxHeight: '320px',
+                                    overflowY: 'auto',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+                                    background: bg,
+                                    zIndex: 999,
+                                    boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
+                                }}>
+                                    {/* Select all / deselect all */}
+                                    <div style={{
+                                        padding: '8px 12px',
+                                        borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                                        display: 'flex',
+                                        gap: '8px',
+                                        position: 'sticky',
+                                        top: 0,
+                                        background: bg,
+                                        zIndex: 1
+                                    }}>
+                                        <button type="button" onClick={() => { items.forEach(i => { if (!selectedIds.has(i.id)) onToggle(i.id) }) }}
+                                            style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--accent-primary)', background: 'rgba(0,170,200,0.08)', color: 'var(--accent-primary)', cursor: 'pointer' }}
+                                        >Select All</button>
+                                        <button type="button" onClick={() => { items.forEach(i => { if (selectedIds.has(i.id)) onToggle(i.id) }) }}
+                                            style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--table-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                                        >Deselect All</button>
+                                    </div>
+                                    {items.map(item => {
+                                        const checked = selectedIds.has(item.id)
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                onClick={() => onToggle(item.id)}
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    gap: '10px',
+                                                    alignItems: 'flex-start',
+                                                    borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                                    background: checked ? 'rgba(0, 170, 200, 0.06)' : 'transparent'
+                                                }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    readOnly
+                                                    style={{ marginTop: '2px', width: '15px', height: '15px', accentColor: 'var(--accent-primary)', pointerEvents: 'none' }}
+                                                />
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    {item.label && <span style={{ fontWeight: 600, fontSize: '0.82rem', marginRight: '6px' }}>{item.label}</span>}
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.text.length > 120 ? item.text.slice(0, 120) + '...' : item.text}</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Selected items with overrides */}
+                    {selectedItems.map(item => (
+                        <div key={item.id} style={{
+                            marginBottom: '6px',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(0, 170, 200, 0.25)',
+                            background: 'rgba(0, 170, 200, 0.04)'
+                        }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                <button type="button" onClick={() => onToggle(item.id)} title="Remove"
+                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', marginTop: '1px' }}
+                                ><X size={14} /></button>
+                                <div style={{ flex: 1 }}>
+                                    {item.label && <span style={{ fontWeight: 600, fontSize: '0.85rem', marginRight: '8px' }}>{item.label}</span>}
+                                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{item.text}</span>
+                                    <div style={{ marginTop: '8px' }}>
+                                        <textarea
+                                            value={overrides[item.id] || ''}
+                                            onChange={e => onOverrideChange(item.id, e.target.value)}
+                                            onBlur={onOverrideBlur}
+                                            placeholder="Override text (optional)..."
+                                            rows={2}
+                                            style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem', resize: 'vertical', fontFamily: 'inherit' }}
+                                        />
+                                        {item.hasAmount && amounts && onAmountChange && onAmountBlur && (
+                                            <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{item.amountPlaceholder || 'Amount'}:</span>
+                                                <input
+                                                    type="number"
+                                                    value={amounts[item.id] ?? ''}
+                                                    onChange={e => onAmountChange(item.id, e.target.value ? Number(e.target.value) : undefined)}
+                                                    onBlur={onAmountBlur}
+                                                    placeholder="0.00"
+                                                    style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem' }}
+                                                />
+                                            </div>
+                                        )}
+                                        {vessels.length > 1 && (
+                                            <div style={{ marginTop: '4px' }}>
+                                                <VesselScopeChips
+                                                    vessels={vessels}
+                                                    vesselScope={scopes[item.id]}
+                                                    onChange={scope => onScopeChange(item.id, scope)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </>
+            )}
+        </div>
+    )
+}
+
+// ==================== Sum Insured Tab (War) ====================
+
+function SumInsuredTab({ quotation, updateField, setQ }: {
+    quotation: Quotation
+    updateField: (field: string, value: any) => void
+    setQ: (fn: (q: Quotation) => Quotation) => void
+}) {
+    const [warSettings, setWarSettings] = useState<WarSettings | null>(null)
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const s = await window.api.warGetSettings()
+                if (s && !(s as any).error) setWarSettings(s)
+            } catch {}
+        })()
+    }, [])
+
+    const autoCalcPremium = (sumInsured: number | undefined) => {
+        if (!sumInsured || !warSettings?.defaultRate) return
+        const premium = Math.round(sumInsured * warSettings.defaultRate / 1000 * 100) / 100
+        if (!quotation.premiumAmount) {
+            setQ(q => ({ ...q, premiumAmount: premium }))
+            updateField('premiumAmount', premium)
+        }
+    }
+
+    return (
+        <div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Sum Insured</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
+                The sum insured for this War Risk quotation.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                <div style={{ flex: 1, maxWidth: '260px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Amount</label>
+                    <input
+                        type="number"
+                        value={quotation.agreedValue || ''}
+                        onChange={e => {
+                            const val = e.target.value ? parseFloat(e.target.value) : undefined
+                            setQ(q => ({ ...q, agreedValue: val }))
+                            updateField('agreedValue', val ?? null)
+                            autoCalcPremium(val)
+                        }}
+                        placeholder="e.g., 800000"
+                        style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
+                    />
+                </div>
+                <div style={{ width: '100px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
+                    <input
+                        value={quotation.agreedValueCurrency || 'USD'}
+                        onChange={e => {
+                            setQ(q => ({ ...q, agreedValueCurrency: e.target.value }))
+                            updateField('agreedValueCurrency', e.target.value)
+                        }}
+                        placeholder="USD"
+                        style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
+                    />
+                </div>
+            </div>
+            {warSettings?.defaultRate && (
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                    Default rate: {warSettings.defaultRate}‰
+                    {quotation.agreedValue ? ` — Calculated premium: ${(Math.round(quotation.agreedValue * warSettings.defaultRate / 1000 * 100) / 100).toLocaleString()} ${quotation.agreedValueCurrency || 'USD'}` : ''}
+                </p>
+            )}
+        </div>
+    )
+}
+
+// ==================== War Conditions Tab ====================
+
+function WarConditionsTab({ quotation, showError }: {
+    quotation: Quotation
+    showError: (msg: string) => void
+}) {
+    const [allConditions, setAllConditions] = useState<WarCondition[]>([])
+    const [qConditions, setQConditions] = useState<QuotationWarCondition[]>([])
+    const [overrides, setOverrides] = useState<Record<string, string>>({})
+    const [warSettings, setWarSettings] = useState<WarSettings | null>(null)
+    const [vessels, setVessels] = useState<QuotationVessel[]>([])
+    const defaultsApplied = useRef(false)
+
+    useEffect(() => { loadData() }, [quotation.id])
+
+    const loadData = async () => {
+        const [conds, existing, settings, qvs] = await Promise.all([
+            window.api.warGetConditions(),
+            window.api.warGetQuotationWarConditions(quotation.id),
+            window.api.warGetSettings(),
+            window.api.getQuotationVessels(quotation.id)
+        ])
+        const safeConds = Array.isArray(conds) ? conds : []
+        const safeExisting = Array.isArray(existing) ? existing : []
+        setAllConditions(safeConds)
+        setQConditions(safeExisting)
+        if (settings && !(settings as any).error) setWarSettings(settings)
+        setVessels(Array.isArray(qvs) ? qvs : [])
+
+        // Build overrides from existing
+        const ov: Record<string, string> = {}
+        safeExisting.forEach(qc => { if (qc.textOverride) ov[qc.warConditionId] = qc.textOverride })
+        setOverrides(ov)
+
+        // Auto-apply defaults on first load
+        if (!defaultsApplied.current && safeExisting.length === 0 && safeConds.length > 0) {
+            defaultsApplied.current = true
+            const defaults = safeConds.filter(c => c.defaultSelected)
+            if (defaults.length > 0) {
+                try {
+                    await window.api.warSetQuotationWarConditions(
+                        quotation.id,
+                        defaults.map(c => ({ warConditionId: c.id }))
+                    )
+                    const fresh = await window.api.warGetQuotationWarConditions(quotation.id)
+                    setQConditions(Array.isArray(fresh) ? fresh : [])
+                } catch {}
+            }
+        } else {
+            defaultsApplied.current = true
+        }
+    }
+
+    const selectedIds = new Set(qConditions.map(qc => qc.warConditionId))
+
+    const resolveText = (text: string): string => {
+        if (!warSettings) return text
+        return text
+            .replace(/\{jwla_code\}/g, warSettings.jwlaCode)
+            .replace(/\{jwla_date\}/g, warSettings.jwlaDate)
+            .replace(/\{tc_text\}/g, warSettings.tcText)
+    }
+
+    const handleToggle = async (condId: string) => {
+        const newSelected = selectedIds.has(condId)
+            ? qConditions.filter(qc => qc.warConditionId !== condId)
+            : [...qConditions, { warConditionId: condId } as any]
+        try {
+            await window.api.warSetQuotationWarConditions(
+                quotation.id,
+                newSelected.map(qc => ({
+                    warConditionId: qc.warConditionId,
+                    textOverride: overrides[qc.warConditionId] || undefined,
+                    vesselScope: qc.vesselScope || undefined
+                }))
+            )
+            const fresh = await window.api.warGetQuotationWarConditions(quotation.id)
+            setQConditions(Array.isArray(fresh) ? fresh : [])
+        } catch { showError('Failed to update conditions') }
+    }
+
+    const handleOverrideChange = (condId: string, text: string) => {
+        setOverrides(prev => ({ ...prev, [condId]: text }))
+    }
+
+    const handleOverrideBlur = async () => {
+        try {
+            await window.api.warSetQuotationWarConditions(
+                quotation.id,
+                qConditions.map(qc => ({
+                    warConditionId: qc.warConditionId,
+                    textOverride: overrides[qc.warConditionId] || undefined,
+                    vesselScope: qc.vesselScope || undefined
+                }))
+            )
+        } catch {}
+    }
+
+    const handleScopeChange = async (condId: string, scope: string[] | null) => {
+        const updated = qConditions.map(qc => qc.warConditionId === condId ? { ...qc, vesselScope: scope } : qc)
+        try {
+            await window.api.warSetQuotationWarConditions(
+                quotation.id,
+                updated.map(qc => ({
+                    warConditionId: qc.warConditionId,
+                    textOverride: overrides[qc.warConditionId] || undefined,
+                    vesselScope: qc.vesselScope || undefined
+                }))
+            )
+            setQConditions(updated)
+        } catch {}
+    }
+
+    return (
+        <div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Conditions</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
+                Select conditions for this War Risk quotation. Placeholders (<code style={{ fontSize: '0.78rem' }}>{'{jwla_code}'}</code>, <code style={{ fontSize: '0.78rem' }}>{'{jwla_date}'}</code>, <code style={{ fontSize: '0.78rem' }}>{'{tc_text}'}</code>) are resolved from War Settings.
+            </p>
+
+            {warSettings && (
+                <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(0,170,200,0.06)', border: '1px solid rgba(0,170,200,0.15)', marginBottom: '14px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    JWLA: <strong>{warSettings.jwlaCode}</strong> dated <strong>{warSettings.jwlaDate}</strong> &middot; T&C: <strong>{warSettings.tcText}</strong>
+                </div>
+            )}
+
+            {allConditions.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
+                    No war conditions configured. Add conditions in Quotation Settings &gt; War &gt; Conditions.
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {allConditions.map(cond => {
+                        const isSelected = selectedIds.has(cond.id)
+                        const displayText = resolveText(overrides[cond.id] || cond.text)
+                        return (
+                            <div key={cond.id} style={{ padding: '10px 14px', borderRadius: '8px', border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--table-border)'}`, background: isSelected ? 'rgba(0,170,200,0.04)' : 'transparent' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => handleToggle(cond.id)}
+                                        style={{ marginTop: '3px', accentColor: 'var(--accent-primary)' }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <span style={{ fontSize: '0.84rem' }}>{displayText}</span>
+                                        {isSelected && (
+                                            <textarea
+                                                value={overrides[cond.id] || ''}
+                                                onChange={e => handleOverrideChange(cond.id, e.target.value)}
+                                                onBlur={handleOverrideBlur}
+                                                placeholder="Override text (leave empty to use default)..."
+                                                style={{ width: '100%', marginTop: '8px', minHeight: '40px', fontSize: '0.8rem', padding: '6px 8px', opacity: 0.85 }}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                                {isSelected && vessels.length >= 2 && (
+                                    <div style={{ marginTop: '6px', paddingLeft: '28px' }}>
+                                        <VesselScopeChips
+                                            vessels={vessels}
+                                            vesselScope={qConditions.find(qc => qc.warConditionId === cond.id)?.vesselScope || null}
+                                            onChange={scope => handleScopeChange(cond.id, scope)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* T&C line (from war settings) */}
+            {warSettings?.tcText && (
+                <div style={{ marginTop: '16px', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,140,50,0.2)', background: 'rgba(255,140,50,0.04)' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Terms &amp; Conditions</span>
+                    <p style={{ fontSize: '0.84rem', margin: '4px 0 0' }}>{warSettings.tcText}</p>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ==================== War Trading Tab ====================
+
+function WarTradingTab({ quotation, updateField, setQ }: {
+    quotation: Quotation
+    updateField: (field: string, value: any) => void
+    setQ: (fn: (q: Quotation) => Quotation) => void
+}) {
+    const [warSettings, setWarSettings] = useState<WarSettings | null>(null)
+    const [customText, setCustomText] = useState(quotation.tradingWarrantyIntro || '')
+    const [loaded, setLoaded] = useState(false)
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const settings = await window.api.warGetSettings()
+                if (settings && !(settings as any).error) {
+                    setWarSettings(settings)
+                    // Set default text from war settings if no custom override yet
+                    if (!quotation.tradingWarrantyIntro) {
+                        const resolved = settings.tradingWarrantyText
+                            .replace(/\{jwla_code\}/g, settings.jwlaCode)
+                            .replace(/\{jwla_date\}/g, settings.jwlaDate)
+                        setCustomText(resolved)
+                        updateField('tradingWarrantyIntro', resolved)
+                        setQ(q => ({ ...q, tradingWarrantyIntro: resolved }))
+                    }
+                }
+            } catch {}
+            setLoaded(true)
+        })()
+    }, [])
+
+    const handleChange = (text: string) => {
+        setCustomText(text)
+        setQ(q => ({ ...q, tradingWarrantyIntro: text }))
+    }
+
+    const handleBlur = () => {
+        updateField('tradingWarrantyIntro', customText)
+    }
+
+    const handleResetToDefault = () => {
+        if (!warSettings) return
+        const resolved = warSettings.tradingWarrantyText
+            .replace(/\{jwla_code\}/g, warSettings.jwlaCode)
+            .replace(/\{jwla_date\}/g, warSettings.jwlaDate)
+        setCustomText(resolved)
+        setQ(q => ({ ...q, tradingWarrantyIntro: resolved }))
+        updateField('tradingWarrantyIntro', resolved)
+    }
+
+    if (!loaded) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+    return (
+        <div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Trading Warranty</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
+                Trading warranty text for this War Risk quotation. Defaults from War Settings.
+            </p>
+
+            <textarea
+                value={customText}
+                onChange={e => handleChange(e.target.value)}
+                onBlur={handleBlur}
+                style={{ width: '100%', minHeight: '100px', fontSize: '0.88rem', padding: '10px 12px', marginBottom: '10px' }}
+            />
+
+            {warSettings && (
+                <button
+                    onClick={handleResetToDefault}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                >
+                    Reset to Default
+                </button>
+            )}
+        </div>
+    )
+}
+
 // ==================== Hull Conditions Tab ====================
 
-function HullConditionsTab({ quotation, showError }: {
+function HullConditionsTab({ quotation, updateField, showError }: {
     quotation: Quotation
+    updateField: (f: string, v: any) => void
     showSuccess: (m: string) => void
     showError: (m: string) => void
 }) {
     const [hullClauses, setHullClauses] = useState<HullClause[]>([])
     const [allConditions, setAllConditions] = useState<HullClauseCondition[]>([])
     const [allAdditional, setAllAdditional] = useState<HullAdditionalCondition[]>([])
-    const [selectedClauseId, setSelectedClauseId] = useState<string>('')
+    const [alternatives, setAlternatives] = useState<QuotationHullAlternative[]>([])
+    const [selectedIvClauseId, setSelectedIvClauseId] = useState<string>('')
     const [qConditions, setQConditions] = useState<QuotationHullCondition[]>([])
     const [qAdditional, setQAdditional] = useState<QuotationHullAdditionalCondition[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
@@ -3548,19 +4437,21 @@ function HullConditionsTab({ quotation, showError }: {
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [clauses, conditions, additional, existCond, existAdd, qv] = await Promise.all([
+        const [clauses, conditions, additional, existCond, existAdd, qv, alts] = await Promise.all([
             window.api.hullGetClauses(),
             window.api.hullGetClauseConditions(),
             window.api.hullGetAdditionalConditions(),
             window.api.hullGetQuotationHullConditions(quotation.id),
             window.api.hullGetQuotationHullAdditionalConditions(quotation.id),
-            window.api.getQuotationVessels(quotation.id)
+            window.api.getQuotationVessels(quotation.id),
+            window.api.hullGetQuotationAlternatives(quotation.id)
         ])
         const safeClauses = Array.isArray(clauses) ? clauses : []
         const safeConds = Array.isArray(conditions) ? conditions : []
         const safeAdd = Array.isArray(additional) ? additional : []
         const safeExistCond = Array.isArray(existCond) ? existCond : []
         const safeExistAdd = Array.isArray(existAdd) ? existAdd : []
+        const safeAlts = Array.isArray(alts) ? alts : []
         setHullClauses(safeClauses)
         setAllConditions(safeConds)
         setAllAdditional(safeAdd)
@@ -3568,11 +4459,37 @@ function HullConditionsTab({ quotation, showError }: {
         setQAdditional(safeExistAdd)
         setQVessels(Array.isArray(qv) ? qv : [])
 
-        // Auto-select default clause if quotation has one stored
-        if (quotation.hullClauseId && safeClauses.some(c => c.id === quotation.hullClauseId)) {
-            setSelectedClauseId(quotation.hullClauseId)
-        } else if (safeClauses.length > 0) {
-            setSelectedClauseId(safeClauses[0].id)
+        // If no alternatives exist yet, create one from the quotation's hullClauseId or first H&M clause
+        const hmClauses = safeClauses.filter(c => c.conditionSection !== 'iv')
+        if (safeAlts.length === 0 && hmClauses.length > 0) {
+            const defaultClauseId = quotation.hullClauseId && safeClauses.some(c => c.id === quotation.hullClauseId)
+                ? quotation.hullClauseId
+                : hmClauses[0].id
+            try {
+                const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, defaultClauseId)
+                if (newAlt && !(newAlt as any).error) {
+                    setAlternatives([newAlt])
+                    // Sync hullClauseId
+                    try { updateField('hullClauseId', defaultClauseId) } catch {}
+                }
+            } catch {}
+        } else {
+            setAlternatives(safeAlts)
+            // Sync hullClauseId from first alternative
+            if (safeAlts.length === 1 && safeAlts[0].hullClauseId !== quotation.hullClauseId) {
+                try { updateField('hullClauseId', safeAlts[0].hullClauseId) } catch {}
+            } else if (safeAlts.length > 1 && quotation.hullClauseId) {
+                try { updateField('hullClauseId', null) } catch {}
+            }
+        }
+
+        // Auto-select IV clause
+        const ivClauses = safeClauses.filter(c => c.conditionSection === 'iv')
+        if (quotation.ivClauseId && safeClauses.some(c => c.id === quotation.ivClauseId)) {
+            setSelectedIvClauseId(quotation.ivClauseId)
+        } else if (ivClauses.length > 0 && quotation.ivEnabled) {
+            setSelectedIvClauseId(ivClauses[0].id)
+            try { updateField('ivClauseId', ivClauses[0].id) } catch {}
         }
 
         // Auto-apply default conditions on first load
@@ -3580,10 +4497,21 @@ function HullConditionsTab({ quotation, showError }: {
             condDefaultsApplied.current = true
             const defaults = safeConds.filter(c => c.defaultSelected)
             if (defaults.length > 0) {
+                // Determine the first alternative ID for H&M conditions
+                const firstAltId = safeAlts.length > 0 ? safeAlts[0].id : undefined
+                const firstAltClauseId = safeAlts.length > 0 ? safeAlts[0].hullClauseId : quotation.hullClauseId
                 try {
                     await window.api.hullSetQuotationHullConditions(
                         quotation.id,
-                        defaults.map(c => ({ hullConditionId: c.id }))
+                        defaults.map(c => {
+                            // Determine which alternative this condition belongs to
+                            const belongsToAlt = firstAltClauseId && c.hullClauseId === firstAltClauseId
+                            return {
+                                hullConditionId: c.id,
+                                conditionSection: c.conditionSection || 'both',
+                                alternativeId: belongsToAlt ? firstAltId : null
+                            }
+                        })
                     )
                     const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
                     setQConditions(Array.isArray(fresh) ? fresh : [])
@@ -3612,39 +4540,109 @@ function HullConditionsTab({ quotation, showError }: {
         }
     }
 
-    // Hull clause selection (stored on quotation)
-    const handleClauseChange = async (clauseId: string) => {
-        setSelectedClauseId(clauseId)
+    // Alternative management
+    const addAlternative = async () => {
+        const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
+        if (hmClauses.length === 0) return
+        // Pick first clause not already used by an alternative
+        const usedIds = new Set(alternatives.map(a => a.hullClauseId))
+        const available = hmClauses.find(c => !usedIds.has(c.id)) || hmClauses[0]
         try {
-            await window.api.updateQuotation(quotation.id, { hullClauseId: clauseId } as any)
+            const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, available.id)
+            if (newAlt && !(newAlt as any).error) {
+                const updated = [...alternatives, newAlt]
+                setAlternatives(updated)
+                // Clear hullClauseId when we have multiple alternatives
+                if (updated.length > 1) {
+                    try { updateField('hullClauseId', null) } catch {}
+                }
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to add alternative')
+        }
+    }
+
+    const removeAlternative = async (altId: string) => {
+        if (alternatives.length <= 1) return
+        try {
+            await window.api.hullDeleteQuotationAlternative(altId)
+            const updated = alternatives.filter(a => a.id !== altId)
+            setAlternatives(updated)
+            // Refresh conditions (some may have been deleted)
+            const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
+            setQConditions(Array.isArray(fresh) ? fresh : [])
+            const freshAdd = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+            setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
+            // If back to single alternative, sync hullClauseId
+            if (updated.length === 1) {
+                try { updateField('hullClauseId', updated[0].hullClauseId) } catch {}
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to remove alternative')
+        }
+    }
+
+    const changeAlternativeClause = async (altId: string, clauseId: string) => {
+        try {
+            await window.api.hullUpdateQuotationAlternative(altId, { hullClauseId: clauseId })
+            setAlternatives(prev => prev.map(a => a.id === altId ? { ...a, hullClauseId: clauseId } : a))
+            // If single alternative, sync to quotation
+            if (alternatives.length === 1) {
+                try { updateField('hullClauseId', clauseId) } catch {}
+            }
         } catch {}
     }
 
-    // Clause conditions toggle
-    const selectedCondIds = new Set(qConditions.map(c => c.hullConditionId))
-    const conditionScopes: Record<string, string[] | null> = {}
-    const conditionOverrides: Record<string, string> = {}
-    qConditions.forEach(c => {
-        if (c.vesselScope) conditionScopes[c.hullConditionId] = c.vesselScope
-        if (c.textOverride) conditionOverrides[c.hullConditionId] = c.textOverride
+    const handleIvClauseChange = async (clauseId: string) => {
+        setSelectedIvClauseId(clauseId)
+        try { updateField('ivClauseId', clauseId) } catch {}
+    }
+
+    // Clause conditions toggle — include amount and alternativeId in save
+    const getCondSection = (condId: string) => allConditions.find(c => c.id === condId)?.conditionSection || 'both'
+
+    // Per-alternative helpers for selectedIds, overrides, amounts, scopes
+    const getAltConditions = (altId: string | null) => qConditions.filter(c => c.alternativeId === altId)
+    const getAltSelectedIds = (altId: string | null) => new Set(getAltConditions(altId).map(c => c.hullConditionId))
+    const getAltOverrides = (altId: string | null) => {
+        const m: Record<string, string> = {}
+        getAltConditions(altId).forEach(c => { if (c.textOverride) m[c.hullConditionId] = c.textOverride })
+        return m
+    }
+    const getAltAmounts = (altId: string | null) => {
+        const m: Record<string, number | undefined> = {}
+        getAltConditions(altId).forEach(c => { if (c.amount != null) m[c.hullConditionId] = c.amount })
+        return m
+    }
+    const getAltScopes = (altId: string | null) => {
+        const m: Record<string, string[] | null> = {}
+        getAltConditions(altId).forEach(c => { if (c.vesselScope) m[c.hullConditionId] = c.vesselScope })
+        return m
+    }
+
+    const mapCondForSave = (c: QuotationHullCondition) => ({
+        hullConditionId: c.hullConditionId,
+        textOverride: c.textOverride,
+        conditionSection: c.conditionSection || getCondSection(c.hullConditionId),
+        amount: c.amount,
+        vesselScope: c.vesselScope,
+        alternativeId: c.alternativeId
     })
 
-    const toggleCondition = async (condId: string) => {
-        let updated: { hullConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]
-        if (selectedCondIds.has(condId)) {
-            updated = qConditions.filter(c => c.hullConditionId !== condId).map(c => ({
-                hullConditionId: c.hullConditionId,
-                textOverride: c.textOverride,
-                vesselScope: c.vesselScope
-            }))
+    const toggleCondition = async (condId: string, alternativeId?: string | null) => {
+        const altId = alternativeId || null
+        const existing = qConditions.find(c => c.hullConditionId === condId && c.alternativeId === altId)
+        let updated: typeof qConditions
+        if (existing) {
+            updated = qConditions.filter(c => !(c.hullConditionId === condId && c.alternativeId === altId))
         } else {
             updated = [
-                ...qConditions.map(c => ({ hullConditionId: c.hullConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope })),
-                { hullConditionId: condId }
+                ...qConditions,
+                { id: '', quotationId: quotation.id, hullConditionId: condId, order: qConditions.length, conditionSection: getCondSection(condId), alternativeId: altId } as QuotationHullCondition
             ]
         }
         try {
-            await window.api.hullSetQuotationHullConditions(quotation.id, updated)
+            await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
             const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
             setQConditions(Array.isArray(fresh) ? fresh : [])
         } catch (err: any) {
@@ -3656,22 +4654,20 @@ function HullConditionsTab({ quotation, showError }: {
         setQConditions(prev => prev.map(c => c.hullConditionId === condId ? { ...c, textOverride: text || undefined } : c))
     }
 
+    const updateConditionAmount = (condId: string, amount: number | undefined) => {
+        setQConditions(prev => prev.map(c => c.hullConditionId === condId ? { ...c, amount } : c))
+    }
+
     const saveConditionOverrides = async () => {
         try {
-            await window.api.hullSetQuotationHullConditions(
-                quotation.id,
-                qConditions.map(c => ({ hullConditionId: c.hullConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope }))
-            )
+            await window.api.hullSetQuotationHullConditions(quotation.id, qConditions.map(mapCondForSave))
         } catch {}
     }
 
     const updateConditionScope = async (condId: string, scope: string[] | null) => {
         const updated = qConditions.map(c => c.hullConditionId === condId ? { ...c, vesselScope: scope } : c)
         try {
-            await window.api.hullSetQuotationHullConditions(
-                quotation.id,
-                updated.map(c => ({ hullConditionId: c.hullConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope }))
-            )
+            await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
             const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
             setQConditions(Array.isArray(fresh) ? fresh : [])
         } catch {}
@@ -3686,22 +4682,25 @@ function HullConditionsTab({ quotation, showError }: {
         if (c.textOverride) additionalOverrides[c.hullAdditionalConditionId] = c.textOverride
     })
 
+    const mapAddForSave = (c: QuotationHullAdditionalCondition) => ({
+        hullAdditionalConditionId: c.hullAdditionalConditionId,
+        textOverride: c.textOverride,
+        vesselScope: c.vesselScope,
+        alternativeId: c.alternativeId
+    })
+
     const toggleAdditional = async (addId: string) => {
-        let updated: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]
+        let updated: QuotationHullAdditionalCondition[]
         if (selectedAddIds.has(addId)) {
-            updated = qAdditional.filter(c => c.hullAdditionalConditionId !== addId).map(c => ({
-                hullAdditionalConditionId: c.hullAdditionalConditionId,
-                textOverride: c.textOverride,
-                vesselScope: c.vesselScope
-            }))
+            updated = qAdditional.filter(c => c.hullAdditionalConditionId !== addId)
         } else {
             updated = [
-                ...qAdditional.map(c => ({ hullAdditionalConditionId: c.hullAdditionalConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope })),
-                { hullAdditionalConditionId: addId }
+                ...qAdditional,
+                { id: '', quotationId: quotation.id, hullAdditionalConditionId: addId, order: qAdditional.length, alternativeId: null } as QuotationHullAdditionalCondition
             ]
         }
         try {
-            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated)
+            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave))
             const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
             setQAdditional(Array.isArray(fresh) ? fresh : [])
         } catch (err: any) {
@@ -3715,193 +4714,187 @@ function HullConditionsTab({ quotation, showError }: {
 
     const saveAdditionalOverrides = async () => {
         try {
-            await window.api.hullSetQuotationHullAdditionalConditions(
-                quotation.id,
-                qAdditional.map(c => ({ hullAdditionalConditionId: c.hullAdditionalConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope }))
-            )
+            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, qAdditional.map(mapAddForSave))
         } catch {}
     }
 
     const updateAdditionalScope = async (addId: string, scope: string[] | null) => {
         const updated = qAdditional.map(c => c.hullAdditionalConditionId === addId ? { ...c, vesselScope: scope } : c)
         try {
-            await window.api.hullSetQuotationHullAdditionalConditions(
-                quotation.id,
-                updated.map(c => ({ hullAdditionalConditionId: c.hullAdditionalConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope }))
-            )
+            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave))
             const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
             setQAdditional(Array.isArray(fresh) ? fresh : [])
         } catch {}
     }
 
-    // Get conditions for selected clause
-    const clauseConditions = allConditions.filter(c => c.hullClauseId === selectedClauseId)
-    const selectedClause = hullClauses.find(c => c.id === selectedClauseId)
+    // Derived data
+    const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
+    const ivClauses = hullClauses.filter(c => c.conditionSection === 'iv')
+    const selectedIvClause = hullClauses.find(c => c.id === selectedIvClauseId)
+    const multiAlt = alternatives.length > 1
+
+    // Build condition items with amount inputs
+    const buildCondItems = (conds: HullClauseCondition[]) => conds.map(c => ({
+        id: c.id,
+        label: `Cl. ${c.conditionNumber}`,
+        text: c.text,
+        hasAmount: c.hasAmount,
+        amountPlaceholder: c.amountPlaceholder
+    }))
+
+    // Get all alternative clause IDs + IV for filtering additional conditions
+    const allAltClauseIds = alternatives.map(a => a.hullClauseId)
+    const allRelevantClauseIds = [...allAltClauseIds, ...(quotation.ivEnabled && selectedIvClauseId ? [selectedIvClauseId] : [])]
+    const filteredAdditional = allAdditional.filter(ac =>
+        !ac.hullClauseIds || ac.hullClauseIds.length === 0 ||
+        ac.hullClauseIds.some(id => allRelevantClauseIds.includes(id))
+    )
 
     return (
         <div>
             <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Hull Conditions</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
-                Select hull clause, configure clause conditions, and additional conditions.
+                Select hull clause{multiAlt ? ' alternatives' : ''}, configure clause conditions, and additional conditions.
             </p>
 
-            {/* Hull Clause Selector */}
-            <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Hull Clause</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {hullClauses.map(hc => {
-                        const active = hc.id === selectedClauseId
-                        return (
-                            <button
-                                key={hc.id}
-                                onClick={() => handleClauseChange(hc.id)}
-                                style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
-                                    border: active ? '2px solid var(--accent-primary)' : '1px solid var(--table-border)',
-                                    background: active ? 'rgba(0, 170, 200, 0.1)' : 'transparent',
-                                    color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                    cursor: 'pointer',
-                                    fontWeight: active ? 600 : 400,
-                                    fontSize: '0.88rem',
-                                    transition: 'all 0.15s'
-                                }}
-                            >
-                                {hc.code} — {hc.name}
-                            </button>
-                        )
-                    })}
-                </div>
-                {selectedClause?.description && (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '8px 0 0', fontStyle: 'italic' }}>
-                        {selectedClause.description}
-                    </p>
-                )}
-            </div>
+            {/* Alternatives */}
+            {alternatives.map((alt, idx) => {
+                const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                const clauseConditions = allConditions.filter(c => c.hullClauseId === alt.hullClauseId)
+                const altLabel = multiAlt ? `Alternative ${idx + 1}` : (quotation.ivEnabled ? 'Section A — Hull and Machinery' : 'Hull Clause')
+                const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+                const accentColor = multiAlt ? altColors[idx % altColors.length] : 'transparent'
 
-            {/* Clause Conditions */}
-            {selectedClauseId && (
-                <div style={{ marginBottom: '24px' }}>
-                    <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
-                        Clause Conditions ({clauseConditions.length})
-                    </label>
-                    {clauseConditions.length === 0 ? (
-                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
-                            No conditions defined for this clause. Add them in Quotation Settings → Hull Clauses.
+                return (
+                    <div key={alt.id} style={{
+                        marginBottom: multiAlt ? '16px' : '0',
+                        borderLeft: multiAlt ? `3px solid ${accentColor}` : 'none',
+                        paddingLeft: multiAlt ? '16px' : '0',
+                        borderRadius: multiAlt ? '2px' : '0'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                            <div style={{
+                                fontSize: multiAlt ? '0.88rem' : '0.78rem',
+                                color: multiAlt ? accentColor : 'var(--text-secondary)',
+                                fontWeight: 600
+                            }}>{altLabel}</div>
+                            {multiAlt && clause && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                    {clause.code || clause.name}
+                                </span>
+                            )}
+                            <div style={{ flex: 1 }} />
+                            {multiAlt && (
+                                <button
+                                    onClick={() => removeAlternative(alt.id)}
+                                    style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                    title="Remove alternative"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            )}
                         </div>
-                    ) : (
-                        clauseConditions.map(cond => {
-                            const isSelected = selectedCondIds.has(cond.id)
-                            return (
-                                <div key={cond.id} style={{
-                                    marginBottom: '6px',
-                                    padding: '10px 12px',
-                                    borderRadius: '8px',
-                                    border: `1px solid ${isSelected ? 'rgba(0, 170, 200, 0.3)' : 'var(--table-border)'}`,
-                                    background: isSelected ? 'rgba(0, 170, 200, 0.04)' : 'transparent'
-                                }}>
-                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => toggleCondition(cond.id)}
-                                            style={{ marginTop: '3px', width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
-                                        />
-                                        <div style={{ flex: 1 }}>
-                                            <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Cl. {cond.conditionNumber}</span>
-                                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                                {cond.text}
-                                            </div>
-                                            {isSelected && (
-                                                <div style={{ marginTop: '8px' }}>
-                                                    <textarea
-                                                        value={qConditions.find(c => c.hullConditionId === cond.id)?.textOverride || ''}
-                                                        onChange={e => updateConditionOverride(cond.id, e.target.value)}
-                                                        onBlur={saveConditionOverrides}
-                                                        placeholder="Override text (optional)..."
-                                                        rows={2}
-                                                        style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem', resize: 'vertical', fontFamily: 'inherit' }}
-                                                    />
-                                                    {qVessels.length > 1 && (
-                                                        <div style={{ marginTop: '4px' }}>
-                                                            <VesselScopeChips
-                                                                vessels={qVessels}
-                                                                vesselScope={conditionScopes[cond.id]}
-                                                                onChange={scope => updateConditionScope(cond.id, scope)}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        })
-                    )}
-                </div>
+                        <HullClauseDropdown
+                            clauses={quotation.ivEnabled ? hmClauses : hullClauses}
+                            selectedId={alt.hullClauseId}
+                            onChange={(clauseId) => changeAlternativeClause(alt.id, clauseId)}
+                            description={clause?.description}
+                        />
+
+                        {alt.hullClauseId && (
+                            <HullConditionPicker
+                                label={multiAlt ? `Alternative ${idx + 1} Conditions` : (quotation.ivEnabled ? 'Section A Conditions' : 'Clause Conditions')}
+                                items={buildCondItems(clauseConditions)}
+                                selectedIds={getAltSelectedIds(alt.id)}
+                                onToggle={(condId) => toggleCondition(condId, alt.id)}
+                                overrides={getAltOverrides(alt.id)}
+                                onOverrideChange={updateConditionOverride}
+                                onOverrideBlur={saveConditionOverrides}
+                                scopes={getAltScopes(alt.id)}
+                                onScopeChange={updateConditionScope}
+                                vessels={qVessels}
+                                emptyText="No conditions defined for this clause. Add them in Quotation Settings → Hull Clauses."
+                                amounts={getAltAmounts(alt.id)}
+                                onAmountChange={updateConditionAmount}
+                                onAmountBlur={saveConditionOverrides}
+                                allConditions={allConditions}
+                            />
+                        )}
+                    </div>
+                )
+            })}
+
+            {/* Add Alternative button */}
+            <button
+                onClick={addAlternative}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    background: 'none', border: '1px dashed var(--input-border)',
+                    borderRadius: '6px', padding: '6px 12px', cursor: 'pointer',
+                    color: 'var(--accent)', fontSize: '0.8rem', marginBottom: '16px'
+                }}
+            >
+                <Plus size={14} /> Add Alternative
+            </button>
+
+            {/* IV Clause Selector (only when IV enabled) */}
+            {quotation.ivEnabled && ivClauses.length > 0 && (
+                <>
+                    {multiAlt && <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />}
+                    <div style={{
+                        borderLeft: quotation.ivEnabled ? '3px solid #ffb020' : 'none',
+                        paddingLeft: quotation.ivEnabled ? '16px' : '0'
+                    }}>
+                        <div style={{ marginBottom: '6px', fontSize: multiAlt ? '0.88rem' : '0.78rem', color: multiAlt ? '#ffb020' : 'var(--text-secondary)', fontWeight: 600 }}>
+                            {multiAlt ? 'Increased Value' : 'Section B — Increased Value'}
+                        </div>
+                        <HullClauseDropdown
+                            clauses={ivClauses}
+                            selectedId={selectedIvClauseId}
+                            onChange={handleIvClauseChange}
+                            description={selectedIvClause?.description}
+                        />
+
+                        {selectedIvClauseId && (
+                            <HullConditionPicker
+                                label={multiAlt ? 'IV Conditions' : 'Section B Conditions'}
+                                items={buildCondItems(allConditions.filter(c => c.hullClauseId === selectedIvClauseId))}
+                                selectedIds={getAltSelectedIds(null)}
+                                onToggle={(condId) => toggleCondition(condId, null)}
+                                overrides={getAltOverrides(null)}
+                                onOverrideChange={updateConditionOverride}
+                                onOverrideBlur={saveConditionOverrides}
+                                scopes={getAltScopes(null)}
+                                onScopeChange={updateConditionScope}
+                                vessels={qVessels}
+                                emptyText="No conditions defined for this clause. Add them in Quotation Settings → Hull Clauses."
+                                amounts={getAltAmounts(null)}
+                                onAmountChange={updateConditionAmount}
+                                onAmountBlur={saveConditionOverrides}
+                                allConditions={allConditions}
+                            />
+                        )}
+                    </div>
+                </>
             )}
 
+            {/* Divider before additional conditions */}
+            <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />
+
             {/* Additional Conditions */}
-            <div>
-                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
-                    Additional Conditions ({allAdditional.length})
-                </label>
-                {allAdditional.length === 0 ? (
-                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
-                        No additional conditions defined. Add them in Quotation Settings → Hull Additional Conditions.
-                    </div>
-                ) : (
-                    allAdditional.map(ac => {
-                        const isSelected = selectedAddIds.has(ac.id)
-                        return (
-                            <div key={ac.id} style={{
-                                marginBottom: '6px',
-                                padding: '10px 12px',
-                                borderRadius: '8px',
-                                border: `1px solid ${isSelected ? 'rgba(0, 170, 200, 0.3)' : 'var(--table-border)'}`,
-                                background: isSelected ? 'rgba(0, 170, 200, 0.04)' : 'transparent'
-                            }}>
-                                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => toggleAdditional(ac.id)}
-                                        style={{ marginTop: '3px', width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
-                                    />
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '0.85rem' }}>
-                                            {ac.title && <span style={{ fontWeight: 600, marginRight: '8px' }}>{ac.title}</span>}
-                                            {ac.text}
-                                        </div>
-                                        {isSelected && (
-                                            <div style={{ marginTop: '8px' }}>
-                                                <textarea
-                                                    value={qAdditional.find(c => c.hullAdditionalConditionId === ac.id)?.textOverride || ''}
-                                                    onChange={e => updateAdditionalOverride(ac.id, e.target.value)}
-                                                    onBlur={saveAdditionalOverrides}
-                                                    placeholder="Override text (optional)..."
-                                                    rows={2}
-                                                    style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem', resize: 'vertical', fontFamily: 'inherit' }}
-                                                />
-                                                {qVessels.length > 1 && (
-                                                    <div style={{ marginTop: '4px' }}>
-                                                        <VesselScopeChips
-                                                            vessels={qVessels}
-                                                            vesselScope={additionalScopes[ac.id]}
-                                                            onChange={scope => updateAdditionalScope(ac.id, scope)}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })
-                )}
-            </div>
+            <HullConditionPicker
+                label="Additional Conditions"
+                items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text }))}
+                selectedIds={selectedAddIds}
+                onToggle={toggleAdditional}
+                overrides={additionalOverrides}
+                onOverrideChange={updateAdditionalOverride}
+                onOverrideBlur={saveAdditionalOverrides}
+                scopes={additionalScopes}
+                onScopeChange={updateAdditionalScope}
+                vessels={qVessels}
+                emptyText="No additional conditions for the selected clause. Add them in Quotation Settings → Hull Additional Conditions."
+            />
         </div>
     )
 }

@@ -421,7 +421,7 @@ export interface PIWarrantyTag {
   order: number
 }
 
-export type QuotationTypeScope = 'pi' | 'hull' | 'both'
+export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'both'
 
 export interface PIWarranty {
   id: string
@@ -547,12 +547,20 @@ export interface TradingExcludedCountry {
   listType: 'excluded' | 'ddq'
 }
 
+export interface TradingWarrantyTemplate {
+  id: string
+  name: string
+  text: string
+  order: number
+}
+
 // ==================== Hull Quotation Settings ====================
 
 export interface HullAgreedValueText {
   id: string
   text: string
   defaultSelected: boolean
+  section?: string
   order: number
 }
 
@@ -561,8 +569,11 @@ export interface HullClause {
   name: string
   code: string
   description?: string
+  conditionSection?: HullConditionSection
   order: number
 }
+
+export type HullConditionSection = 'hm' | 'iv' | 'both'
 
 export interface HullClauseCondition {
   id: string
@@ -571,6 +582,9 @@ export interface HullClauseCondition {
   text: string
   defaultSelected: boolean
   order: number
+  conditionSection: HullConditionSection
+  hasAmount?: boolean
+  amountPlaceholder?: string
 }
 
 export interface HullAdditionalCondition {
@@ -579,6 +593,7 @@ export interface HullAdditionalCondition {
   text: string
   defaultSelected: boolean
   order: number
+  hullClauseIds?: string[]
 }
 
 export interface QuotationAgreedValueItem {
@@ -586,8 +601,18 @@ export interface QuotationAgreedValueItem {
   quotationId: string
   hullTextId?: string
   text: string
+  section?: string
   order: number
   vesselScope?: string[] | null
+}
+
+export interface QuotationHullAlternative {
+  id: string
+  quotationId: string
+  hullClauseId: string
+  label?: string
+  premiumAmount?: number
+  order: number
 }
 
 export interface QuotationHullCondition {
@@ -597,6 +622,9 @@ export interface QuotationHullCondition {
   textOverride?: string
   order: number
   vesselScope?: string[] | null
+  conditionSection?: HullConditionSection
+  amount?: number
+  alternativeId?: string | null
 }
 
 export interface QuotationHullAdditionalCondition {
@@ -606,6 +634,33 @@ export interface QuotationHullAdditionalCondition {
   textOverride?: string
   order: number
   vesselScope?: string[] | null
+  alternativeId?: string | null
+}
+
+// ==================== War Risk ====================
+
+export interface WarCondition {
+  id: string
+  text: string
+  defaultSelected: boolean
+  order: number
+}
+
+export interface QuotationWarCondition {
+  id: string
+  quotationId: string
+  warConditionId: string
+  textOverride?: string
+  order: number
+  vesselScope?: string[] | null
+}
+
+export interface WarSettings {
+  jwlaCode: string
+  jwlaDate: string
+  tcText: string
+  tradingWarrantyText: string
+  defaultRate?: number
 }
 
 // ==================== Quotation ====================
@@ -665,7 +720,12 @@ export interface Quotation {
   nonRefundablePercent?: number
   agreedValue?: number
   agreedValueCurrency?: string
+  ivEnabled?: boolean
+  ivValue?: number
+  ivCurrency?: string
+  ivPremiumAmount?: number
   hullClauseId?: string
+  ivClauseId?: string
   coName?: string
   title?: string
   sectionTextsOverride?: PISectionTexts
@@ -806,11 +866,14 @@ export interface PISectionTexts {
   subjectivitiesIntro?: string
   subjectivitiesNote?: string
   premiumPaymentIntro?: string
+  premiumPaymentIntroSingle?: string
   premiumCondition?: string
   premiumEarned?: string
   ncbDefaultText?: string
   upccDefaultText?: string
   continuationPiClubText?: string
+  nonRefundableFirstText?: string
+  nonRefundablePercentText?: string
   informationNote?: string
   importantNotice?: string
 }

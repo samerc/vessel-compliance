@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -1618,6 +1618,13 @@ export class MySQLAdapter {
                 if ((hacTitleCol as any[]).length === 0) {
                     await this.pool.query('ALTER TABLE hull_additional_conditions ADD COLUMN title VARCHAR(255) NULL AFTER id')
                 }
+
+                // Migration: junction table for additional condition ↔ hull clause (many-to-many)
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS hull_additional_condition_clauses (
+                    additional_condition_id VARCHAR(36) NOT NULL,
+                    hull_clause_id VARCHAR(36) NOT NULL,
+                    PRIMARY KEY (additional_condition_id, hull_clause_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
             // Migration: add type_scope to warranties and subjectivities
@@ -1630,6 +1637,152 @@ export class MySQLAdapter {
                 if ((ssCol as any[]).length === 0) {
                     await this.pool.query("ALTER TABLE pi_subjectivities ADD COLUMN type_scope VARCHAR(10) DEFAULT 'both'")
                 }
+            }
+
+            // Migration: Hull IV extension — condition_section, iv_value, iv_currency, iv_premium_amount
+            {
+                const [cs1] = await this.pool.query("SHOW COLUMNS FROM hull_clause_conditions LIKE 'condition_section'") as any[]
+                if ((cs1 as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE hull_clause_conditions ADD COLUMN condition_section VARCHAR(10) DEFAULT 'both'")
+                }
+                const [cs2] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_conditions LIKE 'condition_section'") as any[]
+                if ((cs2 as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_hull_conditions ADD COLUMN condition_section VARCHAR(10) DEFAULT 'both'")
+                }
+                const [ivv] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'iv_value'") as any[]
+                if ((ivv as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN iv_value DECIMAL(15,2) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN iv_currency VARCHAR(10) DEFAULT 'USD'")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN iv_premium_amount DECIMAL(15,2) DEFAULT NULL")
+                }
+                const [ive] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'iv_enabled'") as any[]
+                if ((ive as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN iv_enabled BOOLEAN DEFAULT FALSE")
+                }
+                const [ivc] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'iv_clause_id'") as any[]
+                if ((ivc as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN iv_clause_id VARCHAR(36) DEFAULT NULL")
+                }
+            }
+
+            // Migration: Hull clause-level section, condition amounts, agreed value sections
+            {
+                const [hcs] = await this.pool.query("SHOW COLUMNS FROM hull_clauses LIKE 'condition_section'") as any[]
+                if ((hcs as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE hull_clauses ADD COLUMN condition_section VARCHAR(10) DEFAULT 'hm'")
+                }
+                const [ham] = await this.pool.query("SHOW COLUMNS FROM hull_clause_conditions LIKE 'has_amount'") as any[]
+                if ((ham as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE hull_clause_conditions ADD COLUMN has_amount BOOLEAN DEFAULT FALSE")
+                    await this.pool.query("ALTER TABLE hull_clause_conditions ADD COLUMN amount_placeholder VARCHAR(100) DEFAULT NULL")
+                }
+                const [qca] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_conditions LIKE 'amount'") as any[]
+                if ((qca as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_hull_conditions ADD COLUMN amount DECIMAL(15,2) DEFAULT NULL")
+                }
+                const [avs] = await this.pool.query("SHOW COLUMNS FROM hull_agreed_value_texts LIKE 'section'") as any[]
+                if ((avs as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE hull_agreed_value_texts ADD COLUMN section VARCHAR(10) DEFAULT 'hm'")
+                }
+                const [qas] = await this.pool.query("SHOW COLUMNS FROM quotation_agreed_value_items LIKE 'section'") as any[]
+                if ((qas as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_agreed_value_items ADD COLUMN section VARCHAR(10) DEFAULT 'hm'")
+                }
+            }
+
+            // Migration: Hull alternatives table + alternative_id columns
+            {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                try {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_hull_alternatives (
+                        id VARCHAR(36) PRIMARY KEY,
+                        quotation_id VARCHAR(36) NOT NULL,
+                        hull_clause_id VARCHAR(36) NOT NULL,
+                        label VARCHAR(100) DEFAULT NULL,
+                        premium_amount DECIMAL(15,2) DEFAULT NULL,
+                        order_index INT DEFAULT 0,
+                        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                } finally {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+                const [altCol1] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_conditions LIKE 'alternative_id'") as any[]
+                if ((altCol1 as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_hull_conditions ADD COLUMN alternative_id VARCHAR(36) DEFAULT NULL")
+                }
+                const [altCol2] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_additional_conditions LIKE 'alternative_id'") as any[]
+                if ((altCol2 as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_hull_additional_conditions ADD COLUMN alternative_id VARCHAR(36) DEFAULT NULL")
+                }
+                // Migrate existing hull quotations: create a single alternative from hull_clause_id
+                const [existingHull] = await this.pool.query(`
+                    SELECT q.id, q.hull_clause_id, q.premium_amount
+                    FROM quotations q
+                    LEFT JOIN quotation_hull_alternatives qha ON qha.quotation_id = q.id
+                    WHERE q.hull_clause_id IS NOT NULL AND qha.id IS NULL
+                `) as any[]
+                if ((existingHull as any[]).length > 0) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    try {
+                for (const q of existingHull as any[]) {
+                    const altId = uuidv4()
+                    await this.pool.execute(
+                        'INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, premium_amount, order_index) VALUES (?, ?, ?, ?, 0)',
+                        [altId, q.id, q.hull_clause_id, q.premium_amount ?? null]
+                    )
+                    // Link existing H&M conditions to this alternative
+                    await this.pool.execute(
+                        `UPDATE quotation_hull_conditions qhc
+                         SET qhc.alternative_id = ?
+                         WHERE qhc.quotation_id = ?
+                           AND qhc.alternative_id IS NULL
+                           AND EXISTS (
+                             SELECT 1 FROM hull_clause_conditions hcc
+                             WHERE hcc.id = qhc.hull_condition_id AND hcc.hull_clause_id = ?
+                           )`,
+                        [altId, q.id, q.hull_clause_id]
+                    )
+                    // Link existing additional conditions to this alternative where applicable
+                    await this.pool.execute(
+                        `UPDATE quotation_hull_additional_conditions qhac
+                         SET qhac.alternative_id = ?
+                         WHERE qhac.quotation_id = ?
+                           AND qhac.alternative_id IS NULL
+                           AND EXISTS (
+                             SELECT 1 FROM hull_additional_condition_clauses hacc
+                             WHERE hacc.additional_condition_id = qhac.hull_additional_condition_id
+                               AND hacc.hull_clause_id = ?
+                           )`,
+                        [altId, q.id, q.hull_clause_id]
+                    )
+                }
+                    } finally {
+                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    }
+                }
+            }
+
+            // Migration: War Risk tables
+          {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS war_conditions (
+                    id VARCHAR(36) PRIMARY KEY,
+                    text TEXT NOT NULL,
+                    default_selected BOOLEAN DEFAULT FALSE,
+                    order_index INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_war_conditions (
+                    id VARCHAR(36) PRIMARY KEY,
+                    quotation_id VARCHAR(36) NOT NULL,
+                    war_condition_id VARCHAR(36) NOT NULL,
+                    text_override TEXT DEFAULT NULL,
+                    order_index INT DEFAULT 0,
+                    vessel_scope TEXT DEFAULT NULL,
+                    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             }
 
         } catch (error) {
@@ -4520,6 +4673,49 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM trading_excluded_countries WHERE id = ?', [id])
     }
 
+    // ==================== Trading Warranty Templates ====================
+
+    async getTradingWarrantyTemplates(): Promise<TradingWarrantyTemplate[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, text, order_index AS `order` FROM trading_warranty_templates ORDER BY order_index ASC')
+        return rows as TradingWarrantyTemplate[]
+    }
+
+    async addTradingWarrantyTemplate(name: string, text: string): Promise<TradingWarrantyTemplate> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM trading_warranty_templates')
+        const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+        await this.pool.execute(
+            'INSERT INTO trading_warranty_templates (id, name, text, order_index) VALUES (?, ?, ?, ?)',
+            [id, name, text, nextOrder]
+        )
+        return { id, name, text, order: nextOrder }
+    }
+
+    async updateTradingWarrantyTemplate(id: string, updates: Partial<{ name: string; text: string }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE trading_warranty_templates SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteTradingWarrantyTemplate(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM trading_warranty_templates WHERE id = ?', [id])
+    }
+
+    async reorderTradingWarrantyTemplates(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE trading_warranty_templates SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
     // ==================== Quotation Types ====================
 
     async getQuotationTypes(): Promise<QuotationType[]> {
@@ -4622,7 +4818,9 @@ export class MySQLAdapter {
                 q.ncb_enabled as ncbEnabled, q.ncb_discount_type as ncbDiscountType, q.ncb_discount_percent as ncbDiscountPercent, q.ncb_discount_amount as ncbDiscountAmount, q.ncb_text as ncbText,
                 q.cpc_enabled as upccEnabled, q.cpc_discount_type as upccDiscountType, q.cpc_discount_percent as upccDiscountPercent, q.cpc_discount_amount as upccDiscountAmount, q.cpc_text as upccText,
                 q.non_refundable_type as nonRefundableType, q.non_refundable_percent as nonRefundablePercent,
-                q.agreed_value as agreedValue, q.agreed_value_currency as agreedValueCurrency, q.hull_clause_id as hullClauseId,
+                q.agreed_value as agreedValue, q.agreed_value_currency as agreedValueCurrency,
+                q.iv_enabled as ivEnabled, q.iv_value as ivValue, q.iv_currency as ivCurrency, q.iv_premium_amount as ivPremiumAmount,
+                q.hull_clause_id as hullClauseId, q.iv_clause_id as ivClauseId,
                 q.co_name as coName, q.title as title,
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride, q.section_order as sectionOrderRaw,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
@@ -4653,6 +4851,10 @@ export class MySQLAdapter {
             upccDiscountAmount: r.upccDiscountAmount ? Number(r.upccDiscountAmount) : undefined,
             agreedValue: r.agreedValue ? Number(r.agreedValue) : undefined,
             agreedValueCurrency: r.agreedValueCurrency || 'USD',
+            ivEnabled: Boolean(r.ivEnabled),
+            ivValue: r.ivValue ? Number(r.ivValue) : undefined,
+            ivCurrency: r.ivCurrency || 'USD',
+            ivPremiumAmount: r.ivPremiumAmount ? Number(r.ivPremiumAmount) : undefined,
             validityDays: r.validityDays ? Number(r.validityDays) : 14,
             sectionTextsOverride: r.sectionTextsOverrideRaw ? (() => { try { return JSON.parse(r.sectionTextsOverrideRaw) } catch { return undefined } })() : undefined,
             sectionTextsOverrideRaw: undefined,
@@ -4700,7 +4902,9 @@ export class MySQLAdapter {
             ncbEnabled: 'ncb_enabled', ncbDiscountType: 'ncb_discount_type', ncbDiscountPercent: 'ncb_discount_percent', ncbDiscountAmount: 'ncb_discount_amount', ncbText: 'ncb_text',
             upccEnabled: 'cpc_enabled', upccDiscountType: 'cpc_discount_type', upccDiscountPercent: 'cpc_discount_percent', upccDiscountAmount: 'cpc_discount_amount', upccText: 'cpc_text',
             nonRefundableType: 'non_refundable_type', nonRefundablePercent: 'non_refundable_percent',
-            agreedValue: 'agreed_value', agreedValueCurrency: 'agreed_value_currency', hullClauseId: 'hull_clause_id',
+            agreedValue: 'agreed_value', agreedValueCurrency: 'agreed_value_currency',
+            ivEnabled: 'iv_enabled', ivValue: 'iv_value', ivCurrency: 'iv_currency', ivPremiumAmount: 'iv_premium_amount',
+            hullClauseId: 'hull_clause_id', ivClauseId: 'iv_clause_id',
             coName: 'co_name', title: 'title',
             sanctionsTextOverride: 'sanctions_text_override'
         }
@@ -6117,25 +6321,27 @@ export class MySQLAdapter {
 
     async getHullAgreedValueTexts(): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, text, default_selected as defaultSelected, order_index as `order` FROM hull_agreed_value_texts ORDER BY order_index ASC')
-        return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected) }))
+        const [rows] = await this.pool.query('SELECT id, text, default_selected as defaultSelected, section, order_index as `order` FROM hull_agreed_value_texts ORDER BY order_index ASC')
+        return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected), section: r.section || 'hm' }))
     }
 
-    async addHullAgreedValueText(text: string, defaultSelected: boolean): Promise<any> {
+    async addHullAgreedValueText(text: string, defaultSelected: boolean, section?: string): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
+        const sec = section || 'hm'
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_agreed_value_texts')
         const order = (maxRow as any[])[0]?.nextOrder || 0
-        await this.pool.execute('INSERT INTO hull_agreed_value_texts (id, text, default_selected, order_index) VALUES (?, ?, ?, ?)', [id, text, defaultSelected, order])
-        return { id, text, defaultSelected, order }
+        await this.pool.execute('INSERT INTO hull_agreed_value_texts (id, text, default_selected, section, order_index) VALUES (?, ?, ?, ?, ?)', [id, text, defaultSelected, sec, order])
+        return { id, text, defaultSelected, section: sec, order }
     }
 
-    async updateHullAgreedValueText(id: string, updates: { text?: string; defaultSelected?: boolean }): Promise<void> {
+    async updateHullAgreedValueText(id: string, updates: { text?: string; defaultSelected?: boolean; section?: string }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
         if (updates.defaultSelected !== undefined) { fields.push('default_selected = ?'); values.push(updates.defaultSelected) }
+        if (updates.section !== undefined) { fields.push('section = ?'); values.push(updates.section) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE hull_agreed_value_texts SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -6157,26 +6363,28 @@ export class MySQLAdapter {
 
     async getHullClauses(): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, code, description, order_index as `order` FROM hull_clauses ORDER BY order_index ASC')
-        return rows as any[]
+        const [rows] = await this.pool.query('SELECT id, name, code, description, condition_section as conditionSection, order_index as `order` FROM hull_clauses ORDER BY order_index ASC')
+        return (rows as any[]).map(r => ({ ...r, conditionSection: r.conditionSection || 'hm' }))
     }
 
-    async addHullClause(name: string, code: string, description?: string): Promise<any> {
+    async addHullClause(name: string, code: string, description?: string, conditionSection?: string): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
+        const sec = conditionSection || 'hm'
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_clauses')
         const order = (maxRow as any[])[0]?.nextOrder || 0
-        await this.pool.execute('INSERT INTO hull_clauses (id, name, code, description, order_index) VALUES (?, ?, ?, ?, ?)', [id, name, code, description || null, order])
-        return { id, name, code, description, order }
+        await this.pool.execute('INSERT INTO hull_clauses (id, name, code, description, condition_section, order_index) VALUES (?, ?, ?, ?, ?, ?)', [id, name, code, description || null, sec, order])
+        return { id, name, code, description, conditionSection: sec, order }
     }
 
-    async updateHullClause(id: string, updates: { name?: string; code?: string; description?: string }): Promise<void> {
+    async updateHullClause(id: string, updates: { name?: string; code?: string; description?: string; conditionSection?: string }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.code !== undefined) { fields.push('code = ?'); values.push(updates.code) }
         if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
+        if (updates.conditionSection !== undefined) { fields.push('condition_section = ?'); values.push(updates.conditionSection) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE hull_clauses SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -6199,29 +6407,32 @@ export class MySQLAdapter {
     async getHullClauseConditions(hullClauseId?: string): Promise<any[]> {
         if (!this.pool) return []
         if (hullClauseId) {
-            const [rows] = await this.pool.query('SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, order_index as `order` FROM hull_clause_conditions WHERE hull_clause_id = ? ORDER BY order_index ASC', [hullClauseId])
-            return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected) }))
+            const [rows] = await this.pool.query('SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order` FROM hull_clause_conditions WHERE hull_clause_id = ? ORDER BY order_index ASC', [hullClauseId])
+            return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected), hasAmount: Boolean(r.hasAmount), conditionSection: r.conditionSection || 'both' }))
         }
-        const [rows] = await this.pool.query('SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, order_index as `order` FROM hull_clause_conditions ORDER BY order_index ASC')
-        return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected) }))
+        const [rows] = await this.pool.query('SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order` FROM hull_clause_conditions ORDER BY order_index ASC')
+        return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected), hasAmount: Boolean(r.hasAmount), conditionSection: r.conditionSection || 'both' }))
     }
 
-    async addHullClauseCondition(hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean): Promise<any> {
+    async addHullClauseCondition(hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean, conditionSection: string = 'both', hasAmount: boolean = false, amountPlaceholder?: string): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_clause_conditions WHERE hull_clause_id = ?', [hullClauseId])
         const order = (maxRow as any[])[0]?.nextOrder || 0
-        await this.pool.execute('INSERT INTO hull_clause_conditions (id, hull_clause_id, condition_number, text, default_selected, order_index) VALUES (?, ?, ?, ?, ?, ?)', [id, hullClauseId, conditionNumber, text, defaultSelected, order])
-        return { id, hullClauseId, conditionNumber, text, defaultSelected, order }
+        await this.pool.execute('INSERT INTO hull_clause_conditions (id, hull_clause_id, condition_number, text, default_selected, condition_section, has_amount, amount_placeholder, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [id, hullClauseId, conditionNumber, text, defaultSelected, conditionSection, hasAmount, amountPlaceholder || null, order])
+        return { id, hullClauseId, conditionNumber, text, defaultSelected, conditionSection, hasAmount, amountPlaceholder, order }
     }
 
-    async updateHullClauseCondition(id: string, updates: { conditionNumber?: string; text?: string; defaultSelected?: boolean }): Promise<void> {
+    async updateHullClauseCondition(id: string, updates: { conditionNumber?: string; text?: string; defaultSelected?: boolean; conditionSection?: string; hasAmount?: boolean; amountPlaceholder?: string }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.conditionNumber !== undefined) { fields.push('condition_number = ?'); values.push(updates.conditionNumber) }
         if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
         if (updates.defaultSelected !== undefined) { fields.push('default_selected = ?'); values.push(updates.defaultSelected) }
+        if (updates.conditionSection !== undefined) { fields.push('condition_section = ?'); values.push(updates.conditionSection) }
+        if (updates.hasAmount !== undefined) { fields.push('has_amount = ?'); values.push(updates.hasAmount) }
+        if (updates.amountPlaceholder !== undefined) { fields.push('amount_placeholder = ?'); values.push(updates.amountPlaceholder || null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE hull_clause_conditions SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -6244,32 +6455,51 @@ export class MySQLAdapter {
     async getHullAdditionalConditions(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, title, text, default_selected as defaultSelected, order_index as `order` FROM hull_additional_conditions ORDER BY order_index ASC')
-        return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected) }))
+        const [links] = await this.pool.query('SELECT additional_condition_id, hull_clause_id FROM hull_additional_condition_clauses')
+        const linkMap: Record<string, string[]> = {}
+        for (const l of links as any[]) {
+            if (!linkMap[l.additional_condition_id]) linkMap[l.additional_condition_id] = []
+            linkMap[l.additional_condition_id].push(l.hull_clause_id)
+        }
+        return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected), hullClauseIds: linkMap[r.id] || [] }))
     }
 
-    async addHullAdditionalCondition(title: string | null, text: string, defaultSelected: boolean): Promise<any> {
+    async addHullAdditionalCondition(title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[]): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_additional_conditions')
         const order = (maxRow as any[])[0]?.nextOrder || 0
         await this.pool.execute('INSERT INTO hull_additional_conditions (id, title, text, default_selected, order_index) VALUES (?, ?, ?, ?, ?)', [id, title || null, text, defaultSelected, order])
-        return { id, title: title || undefined, text, defaultSelected, order }
+        if (hullClauseIds && hullClauseIds.length > 0) {
+            for (const cid of hullClauseIds) {
+                await this.pool.execute('INSERT INTO hull_additional_condition_clauses (additional_condition_id, hull_clause_id) VALUES (?, ?)', [id, cid])
+            }
+        }
+        return { id, title: title || undefined, text, defaultSelected, order, hullClauseIds: hullClauseIds || [] }
     }
 
-    async updateHullAdditionalCondition(id: string, updates: { title?: string | null; text?: string; defaultSelected?: boolean }): Promise<void> {
+    async updateHullAdditionalCondition(id: string, updates: { title?: string | null; text?: string; defaultSelected?: boolean; hullClauseIds?: string[] }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title || null) }
         if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
         if (updates.defaultSelected !== undefined) { fields.push('default_selected = ?'); values.push(updates.defaultSelected) }
-        if (fields.length === 0) return
-        values.push(id)
-        await this.pool.execute(`UPDATE hull_additional_conditions SET ${fields.join(', ')} WHERE id = ?`, values)
+        if (fields.length > 0) {
+            values.push(id)
+            await this.pool.execute(`UPDATE hull_additional_conditions SET ${fields.join(', ')} WHERE id = ?`, values)
+        }
+        if (updates.hullClauseIds !== undefined) {
+            await this.pool.execute('DELETE FROM hull_additional_condition_clauses WHERE additional_condition_id = ?', [id])
+            for (const cid of updates.hullClauseIds) {
+                await this.pool.execute('INSERT INTO hull_additional_condition_clauses (additional_condition_id, hull_clause_id) VALUES (?, ?)', [id, cid])
+            }
+        }
     }
 
     async deleteHullAdditionalCondition(id: string): Promise<void> {
         if (!this.pool) return
+        await this.pool.execute('DELETE FROM hull_additional_condition_clauses WHERE additional_condition_id = ?', [id])
         await this.pool.execute('DELETE FROM hull_additional_conditions WHERE id = ?', [id])
     }
 
@@ -6284,11 +6514,11 @@ export class MySQLAdapter {
 
     async getQuotationAgreedValueItems(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_text_id as hullTextId, text, order_index as `order`, vessel_scope as vesselScope FROM quotation_agreed_value_items WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_text_id as hullTextId, text, section, order_index as `order`, vessel_scope as vesselScope FROM quotation_agreed_value_items WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, section: r.section || 'hm', vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
     }
 
-    async setQuotationAgreedValueItems(quotationId: string, items: { hullTextId?: string; text: string; vesselScope?: string[] | null }[]): Promise<void> {
+    async setQuotationAgreedValueItems(quotationId: string, items: { hullTextId?: string; text: string; section?: string; vesselScope?: string[] | null }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -6296,8 +6526,8 @@ export class MySQLAdapter {
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
                 await this.pool.execute(
-                    'INSERT INTO quotation_agreed_value_items (id, quotation_id, hull_text_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
-                    [uuidv4(), quotationId, item.hullTextId || null, item.text, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null]
+                    'INSERT INTO quotation_agreed_value_items (id, quotation_id, hull_text_id, text, section, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [uuidv4(), quotationId, item.hullTextId || null, item.text, item.section || 'hm', i, item.vesselScope ? JSON.stringify(item.vesselScope) : null]
                 )
             }
         } finally {
@@ -6305,15 +6535,70 @@ export class MySQLAdapter {
         }
     }
 
+    // ==================== Quotation Hull Alternatives ====================
+
+    async getQuotationHullAlternatives(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, quotation_id as quotationId, hull_clause_id as hullClauseId, label, premium_amount as premiumAmount, order_index as `order` FROM quotation_hull_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined }))
+    }
+
+    async addQuotationHullAlternative(quotationId: string, hullClauseId: string, label?: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_hull_alternatives WHERE quotation_id = ?', [quotationId])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute(
+                'INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, label, order_index) VALUES (?, ?, ?, ?, ?)',
+                [id, quotationId, hullClauseId, label || null, order]
+            )
+        } finally {
+            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
+        return { id, quotationId, hullClauseId, label: label || undefined, premiumAmount: undefined, order }
+    }
+
+    async updateQuotationHullAlternative(id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.hullClauseId !== undefined) { fields.push('hull_clause_id = ?'); values.push(updates.hullClauseId) }
+        if (updates.label !== undefined) { fields.push('label = ?'); values.push(updates.label || null) }
+        if (updates.premiumAmount !== undefined) { fields.push('premium_amount = ?'); values.push(updates.premiumAmount ?? null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_hull_alternatives SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationHullAlternative(id: string): Promise<void> {
+        if (!this.pool) return
+        // Also clean up conditions and additional conditions linked to this alternative
+        await this.pool.execute('DELETE FROM quotation_hull_conditions WHERE alternative_id = ?', [id])
+        await this.pool.execute('DELETE FROM quotation_hull_additional_conditions WHERE alternative_id = ?', [id])
+        await this.pool.execute('DELETE FROM quotation_hull_alternatives WHERE id = ?', [id])
+    }
+
+    async reorderQuotationHullAlternatives(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_hull_alternatives SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
     // ==================== Quotation Hull Conditions ====================
 
     async getQuotationHullConditions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_condition_id as hullConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope FROM quotation_hull_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_condition_id as hullConditionId, text_override as textOverride, condition_section as conditionSection, amount, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, amount: r.amount ? Number(r.amount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, conditionSection: r.conditionSection || 'both', alternativeId: r.alternativeId || null }))
     }
 
-    async setQuotationHullConditions(quotationId: string, items: { hullConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]): Promise<void> {
+    async setQuotationHullConditions(quotationId: string, items: { hullConditionId: string; textOverride?: string; conditionSection?: string; amount?: number; vesselScope?: string[] | null; alternativeId?: string | null }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -6321,8 +6606,8 @@ export class MySQLAdapter {
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
                 await this.pool.execute(
-                    'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
-                    [uuidv4(), quotationId, item.hullConditionId, item.textOverride || null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null]
+                    'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, condition_section, amount, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [uuidv4(), quotationId, item.hullConditionId, item.textOverride || null, item.conditionSection || 'both', item.amount ?? null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null]
                 )
             }
         } finally {
@@ -6334,11 +6619,11 @@ export class MySQLAdapter {
 
     async getQuotationHullAdditionalConditions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_additional_condition_id as hullAdditionalConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope FROM quotation_hull_additional_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_additional_condition_id as hullAdditionalConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_additional_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
-    async setQuotationHullAdditionalConditions(quotationId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]): Promise<void> {
+    async setQuotationHullAdditionalConditions(quotationId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -6346,13 +6631,94 @@ export class MySQLAdapter {
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
                 await this.pool.execute(
-                    'INSERT INTO quotation_hull_additional_conditions (id, quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
-                    [uuidv4(), quotationId, item.hullAdditionalConditionId, item.textOverride || null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null]
+                    'INSERT INTO quotation_hull_additional_conditions (id, quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [uuidv4(), quotationId, item.hullAdditionalConditionId, item.textOverride || null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null]
                 )
             }
         } finally {
             await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
         }
+    }
+
+    // ==================== War Risk Conditions ====================
+
+    async getWarConditions(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, text, default_selected as defaultSelected, order_index as `order` FROM war_conditions ORDER BY order_index ASC')
+        return (rows as any[]).map(r => ({ ...r, defaultSelected: Boolean(r.defaultSelected) }))
+    }
+
+    async addWarCondition(text: string, defaultSelected: boolean): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM war_conditions')
+        const order = (maxRow as any[])[0]?.nextOrder || 0
+        await this.pool.execute('INSERT INTO war_conditions (id, text, default_selected, order_index) VALUES (?, ?, ?, ?)', [id, text, defaultSelected, order])
+        return { id, text, defaultSelected, order }
+    }
+
+    async updateWarCondition(id: string, updates: { text?: string; defaultSelected?: boolean }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.defaultSelected !== undefined) { fields.push('default_selected = ?'); values.push(updates.defaultSelected) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE war_conditions SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteWarCondition(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM war_conditions WHERE id = ?', [id])
+    }
+
+    async reorderWarConditions(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE war_conditions SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // ==================== Quotation War Conditions ====================
+
+    async getQuotationWarConditions(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, war_condition_id as warConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope FROM quotation_war_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+    }
+
+    async setQuotationWarConditions(quotationId: string, items: { warConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute('DELETE FROM quotation_war_conditions WHERE quotation_id = ?', [quotationId])
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i]
+                await this.pool.execute(
+                    'INSERT INTO quotation_war_conditions (id, quotation_id, war_condition_id, text_override, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
+                    [uuidv4(), quotationId, item.warConditionId, item.textOverride || null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null]
+                )
+            }
+        } finally {
+            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
+    }
+
+    // ==================== War Risk Settings ====================
+
+    async getWarSettings(): Promise<any> {
+        if (!this.pool) return { jwlaCode: 'JWLA032', jwlaDate: 'December 18, 2023', tcText: 'Al-Bahriah Hull War Terms & Conditions 01 January 2025', tradingWarrantyText: 'Worldwide, subject to JWC Hull War, Piracy, Terrorism and Related Perils Listed Areas {jwla_date} {jwla_code}.' }
+        const [rows] = await this.pool.query("SELECT setting_value FROM app_settings WHERE setting_key = 'war_settings'")
+        const arr = rows as any[]
+        if (arr.length > 0) return JSON.parse(arr[0].setting_value)
+        return { jwlaCode: 'JWLA032', jwlaDate: 'December 18, 2023', tcText: 'Al-Bahriah Hull War Terms & Conditions 01 January 2025', tradingWarrantyText: 'Worldwide, subject to JWC Hull War, Piracy, Terrorism and Related Perils Listed Areas {jwla_date} {jwla_code}.' }
+    }
+
+    async setWarSettings(settings: any): Promise<void> {
+        if (!this.pool) return
+        const json = JSON.stringify(settings)
+        await this.pool.execute("INSERT INTO app_settings (setting_key, setting_value) VALUES ('war_settings', ?) ON DUPLICATE KEY UPDATE setting_value = ?", [json, json])
     }
 }
 

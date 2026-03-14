@@ -459,7 +459,7 @@ Premium management with per-vessel amounts, sequential discounts, and non-refund
 - **Sequential discount calculation**: `Payable = Technical × (1 - NCB%) × (1 - UPCC%)` — discounts applied multiplicatively, not additively
 - **Non-refundable**: Quotation-level choice via `nonRefundableType` ('first_instalment' | 'percentage' | null) + `nonRefundablePercent`. Replaces old per-instalment non-refundable fields
 - **Instalments**: Number + days from inception only (description field removed). Default days: 1→`[0]`, 2→`[0,180]`, 3→`[0,120,240]`, 4→`[0,90,180,270]`, 12→`[0,30,60...330]`; admin `InstalmentDefaults` settings take priority when configured
-- **Export premium table**: Multi-vessel quotations render a vessel/premium/payable table in both PDF (formatted text) and DOCX (sub-table with right-aligned amounts)
+- **Export premium table**: Premium section rendered as tables in PDF/DOCX for all cases except single plain premium. Multi-vessel, multi-alternative, and discount scenarios all use tabular format with label/amount columns. PDF uses autoTable with `didParseCell` for bold styling; DOCX uses `premCell`/`premRow`/`premTable` helpers for 2-column Table layout.
 
 ### Quotation Warranties System
 
@@ -489,14 +489,31 @@ Section text templates stored in `pi_section_texts` (global defaults) with per-q
 
 ### Hull Quotation System
 
-H&M quotation type with agreed value, hull clauses, and additional conditions:
+H&M quotation type with agreed value, hull clauses, hull alternatives, and additional conditions:
 
 - **Agreed Value Tab** (`AgreedValueTab` in QuotationEditor): Amount + currency, template texts from `hull_agreed_value_texts`, custom texts, reorder, vessel scope. Stored in `quotation_agreed_value_items`.
-- **Hull Conditions Tab** (`HullConditionsTab` in QuotationEditor): Hull clause selector (from `hull_clauses`), clause conditions checkboxes (from `hull_clause_conditions`) with defaults auto-applied, text overrides, additional conditions (from `hull_additional_conditions`), vessel scope.
+- **Hull Conditions Tab** (`HullConditionsTab` in QuotationEditor): Hull clause selector (from `hull_clauses`), clause conditions checkboxes (from `hull_clause_conditions`) with defaults auto-applied, text overrides, additional conditions (from `hull_additional_conditions`), vessel scope. Supports multiple alternatives.
 - **Hull tables**: `hull_clauses` (name, code), `hull_clause_conditions` (condition_number, text, default_selected), `hull_additional_conditions` (title, text, default_selected), `hull_agreed_value_texts` (text)
 - **Per-quotation tables**: `quotation_hull_conditions`, `quotation_hull_additional_conditions`, `quotation_agreed_value_items` — all FK to `quotations(id)` with vessel_scope support
 - **Export**: PDF and DOCX include agreed value section (amount + text items) and hull conditions section (clause + conditions + additional conditions)
 - **Additional condition/clause titles**: `title VARCHAR(255) NULL` on both `pi_additional_clauses` and `hull_additional_conditions`. Shown bold before code/text in settings, editor, and exports.
+
+### Hull Alternatives
+
+Multiple clause alternatives per hull quotation, each with its own conditions and premium:
+
+- **Table**: `quotation_hull_alternatives` (id, quotation_id, hull_clause_id, label, premium_amount, order_index)
+- **Per-alternative conditions**: `alternative_id VARCHAR(36) DEFAULT NULL` on `quotation_hull_conditions` and `quotation_hull_additional_conditions`. NULL = applies to all alternatives.
+- **Condition helpers**: `getAltConditions(altId)`, `getAltSelectedIds(altId)`, `getAltOverrides(altId)`, `getAltAmounts(altId)`, `getAltScopes(altId)` — filter conditions by `alternativeId` match
+- **`toggleCondition(condId, alternativeId)`**: Checks by `condId + alternativeId` pair, not flat global set
+- **Visual separation**: Each alternative gets a colored left accent border (3px). Colors cycle: `['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']`. IV gets amber `#ffb020` accent. Horizontal dividers between alternatives.
+- **Single alternative**: UI identical to current (no "Alternative 1" label). When 2+: show labeled sections per alternative.
+- **IV unchanged**: IV clause remains separate, shared across all alternatives
+- **Premium per alternative**: Multi-alt hull shows per-alternative premium inputs in PremiumTab with colored card rows. Payable premium calculated per alternative with `computePayable(alt.premiumAmount)`.
+- **Export (conditions)**: Each alternative rendered as "Alternative N — [clause wording]" with its scoped conditions. "Applicable to all alternatives" section for `alternativeId = null` conditions. IV section separate.
+- **Export (premium)**: Per-alternative premium lines in table format: "Alternative N (code): amount per annum"
+- **IPC**: `hull:getQuotationAlternatives`, `hull:addQuotationAlternative`, `hull:updateQuotationAlternative`, `hull:deleteQuotationAlternative`, `hull:reorderQuotationAlternatives`
+- **Backward compat**: `hull_clause_id` on quotations kept; synced from `alternatives[0].hullClauseId` when single alternative
 
 ### Quotation Type Scope
 
@@ -506,6 +523,15 @@ Warranty and subjectivity filtering by quotation type:
 - **`type_scope`** column on `pi_warranties` and `pi_subjectivities` — default `'both'` for backward compatibility
 - **Admin UI**: Scope selector (P&I / Hull / Both) in QuotationSettings Warranties and Subjectivities tabs, with colored badge per item
 - **Editor filtering**: `visibleWarranties` / `visibleSubjectivities` filtered by `typeScope === 'both' || typeScope === typeCode`
+
+### Trading Warranty Templates
+
+Admin-managed reusable text templates for the trading warranty intro section:
+
+- **Table**: `trading_warranty_templates` (id, name, text, order_index, created_at)
+- **Settings UI**: `TradingWarrantyTemplatesTab` in QuotationSettings (General category) with add/edit/delete/reorder, RichTextEditor for template text, name input
+- **Editor**: Template selector dropdown above the trading warranty RichTextEditor. Selecting a template populates the text; users can modify or write new text freely.
+- **IPC**: `pi:getTradingWarrantyTemplates`, `pi:addTradingWarrantyTemplate`, `pi:updateTradingWarrantyTemplate`, `pi:deleteTradingWarrantyTemplate`, `pi:reorderTradingWarrantyTemplates`
 
 ### Quotation Section Order
 
@@ -653,6 +679,8 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - `hull_clauses`, `hull_clause_conditions` - Hull clause definitions and their conditions
 - `hull_additional_conditions` - Hull additional conditions with title field
 - `hull_agreed_value_texts` - Hull agreed value template texts
-- `quotation_agreed_value_items`, `quotation_hull_conditions`, `quotation_hull_additional_conditions` - Per-quotation hull item selections
+- `quotation_hull_alternatives` - Per-quotation hull clause alternatives with premium
+- `quotation_agreed_value_items`, `quotation_hull_conditions`, `quotation_hull_additional_conditions` - Per-quotation hull item selections (conditions support alternative_id)
+- `trading_warranty_templates` - Reusable trading warranty intro text templates
 - `renewal_status_types` - Custom renewal status labels for policies
 - `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, section_order_defaults_{typeCode}, etc.)

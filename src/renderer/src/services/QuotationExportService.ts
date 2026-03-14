@@ -24,9 +24,10 @@ import {
   PIClause, PIWarranty, PIExclusion, PIAdditionalClause, PISectionTexts,
   PISanctionsVersion, QuotationVessel, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, QuotationSubjectivity,
   HullClause, HullClauseCondition, HullAdditionalCondition,
-  QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition
+  QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative,
+  WarCondition, QuotationWarCondition, WarSettings
 } from '../../../shared/types'
-import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/QuotationSettings'
+import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
 
@@ -70,6 +71,11 @@ interface QuotationData {
   allHullConditions: HullClauseCondition[]
   hullAdditionalConditions: QuotationHullAdditionalCondition[]
   allHullAdditionalConditions: HullAdditionalCondition[]
+  hullAlternatives: QuotationHullAlternative[]
+  // War-specific data
+  warConditions: QuotationWarCondition[]
+  allWarConditions: WarCondition[]
+  warSettings: WarSettings | null
 }
 
 async function gatherData(quotation: Quotation): Promise<QuotationData> {
@@ -82,7 +88,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     excludedCountries, subjectivities, instalments, information, notes,
     sectionTexts, sanctionsVersions, clauseOverridesArr, logoPath,
     hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
-    hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw
+    hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw,
+    warConditionsRaw, allWarConditionsRaw, warSettingsRaw
   ] = await Promise.all([
     window.api.getQuotationVessels(quotation.id),
     window.api.getVessels(),
@@ -116,7 +123,12 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     window.api.hullGetQuotationHullConditions(quotation.id),
     window.api.hullGetClauseConditions(),
     window.api.hullGetQuotationHullAdditionalConditions(quotation.id),
-    window.api.hullGetAdditionalConditions()
+    window.api.hullGetAdditionalConditions(),
+    window.api.hullGetQuotationAlternatives(quotation.id),
+    // War-specific data
+    window.api.warGetQuotationWarConditions(quotation.id),
+    window.api.warGetConditions(),
+    window.api.warGetSettings()
   ])
 
   // Extract IDs and vessel scope maps from new object return format
@@ -177,7 +189,11 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     hullConditions: Array.isArray(hullConditionsRaw) ? hullConditionsRaw : [],
     allHullConditions: Array.isArray(allHullConditionsRaw) ? allHullConditionsRaw : [],
     hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
-    allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw) ? allHullAdditionalConditionsRaw : []
+    allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw) ? allHullAdditionalConditionsRaw : [],
+    hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
+    warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
+    allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
+    warSettings: warSettingsRaw && !(warSettingsRaw as any).error ? warSettingsRaw : null
   }
 }
 
@@ -195,6 +211,11 @@ function vesselScopeSuffix(vesselScope: string[] | null | undefined, quotationVe
     .filter(Boolean)
     .map(v => (v!.name || v!.vesselLabel).toUpperCase())
   return names.length > 0 ? ` (${names.join(', ')})` : ''
+}
+
+function fmtPct(val: number | string): string {
+  const n = typeof val === 'string' ? parseFloat(val) : val
+  return n % 1 === 0 ? String(Math.round(n)) : String(n)
 }
 
 function formatCurrency(amount: number | undefined, currency: string | undefined): string {
@@ -326,7 +347,8 @@ async function resolveSectionOrder(data: QuotationData): Promise<string[]> {
 }
 
 function st(data: QuotationData, key: keyof PISectionTexts): string {
-  return String(data.sectionTexts[key] || '')
+  const raw = String(data.sectionTexts[key] || '')
+  return raw.replace(/\{quotation_type\}/g, data.quotation.quotationTypeName || 'P&I')
 }
 
 function getSanctionsText(data: QuotationData): string {
@@ -439,7 +461,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(0, 0, 0)
-  const typeLabel = data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : 'PROTECTION AND INDEMNITY'
+  const typeLabel = data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'
   doc.text(`${typeLabel} QUOTATION FOR ${docTitle}`, pageWidth / 2, startY, { align: 'center' })
   doc.setFontSize(11)
   doc.setFont('helvetica', 'normal')
@@ -523,27 +545,48 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       condText += '\n'
       for (const ac of data.additionalClauses) {
         const def = data.allAdditionalClauses.find(a => a.id === ac.piAdditionalClauseId)
-        const title = def?.title || ''
         const code = def?.code || ''
         const text = ac.customText || def?.text || ''
         const acScope = vesselScopeSuffix(ac.vesselScope, data.quotationVessels)
-        if (text) condText += `- ${title ? title + ': ' : ''}${code ? code + ' ' : ''}${text}${acScope}\n`
+        if (text) condText += `- ${code ? code + ' ' : ''}${text}${acScope}\n`
       }
     }
     sectionMap.set('conditions', ['Conditions', condText.trim()])
   }
 
-  // Agreed Value (Hull)
-  {
+  // Agreed Value / Interest (Hull only — War uses sumInsured)
+  if (data.quotation.quotationTypeCode !== 'W') {
     const avItems = data.hullAgreedValueItems
-    if (avItems.length > 0 || data.quotation.agreedValue != null) {
+    const hasHm = data.quotation.agreedValue != null
+    const hasIv = data.quotation.ivEnabled && data.quotation.ivValue != null
+
+    if (hasIv) {
+      // Interest section — A) H&M text inline, B) IV text inline
+      const hmTextItems = avItems.filter(it => (it.section || 'hm') === 'hm')
+      const ivTextItems = avItems.filter(it => it.section === 'iv')
+      if (hmTextItems.length > 0 || ivTextItems.length > 0) {
+        let intText = ''
+        if (hmTextItems.length > 0) {
+          intText += 'A) ' + hmTextItems.map(it => it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels)).join('\n') + '\n'
+        }
+        if (ivTextItems.length > 0) {
+          intText += 'B) ' + ivTextItems.map(it => it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels)).join('\n') + '\n'
+        }
+        sectionMap.set('interest', ['Interest', intText.trim()])
+      }
+      // Agreed Insured Value — amounts only for IV
       let avText = ''
-      if (data.quotation.agreedValue != null) {
+      if (hasHm) avText += `Section A: ${formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')}\n`
+      avText += `Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}\n`
+      sectionMap.set('agreedValue', ['Agreed Insured Value', avText.trim()])
+    } else if (avItems.length > 0 || hasHm) {
+      // Standard agreed value — value not bold (body column), spacing between value and texts
+      let avText = ''
+      if (hasHm) {
         avText += formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD') + '\n\n'
       }
       for (const it of avItems) {
-        const scope = vesselScopeSuffix(it.vesselScope, data.quotationVessels)
-        avText += it.text + scope + '\n'
+        avText += it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels) + '\n'
       }
       sectionMap.set('agreedValue', ['Agreed Insured Value', avText.trim()])
     }
@@ -553,41 +596,186 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   {
     const hc = data.hullConditions
     const ha = data.hullAdditionalConditions
+    const alts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
       let hcText = ''
-      // Selected hull clause
-      const selectedClause = data.quotation.hullClauseId
-        ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId)
-        : null
-      if (selectedClause) {
-        hcText += `${selectedClause.code} — ${selectedClause.name}\n\n`
-      }
-      // Clause conditions
-      for (const qc of hc) {
+      const ivClauseId = data.quotation.ivClauseId
+      const selectedIvClause = ivClauseId ? data.hullClauses.find(c => c.id === ivClauseId) : null
+      const multiAlt = alts.length > 1
+
+      const getCondClauseId = (qc: typeof hc[0]) => {
         const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
-        if (!def) continue
-        const text = qc.textOverride || def.text
-        const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
-        hcText += `Cl. ${def.conditionNumber} – ${text}${scope}\n`
+        return def?.hullClauseId || ''
       }
-      // Additional conditions
-      if (ha.length > 0) {
-        hcText += '\n'
+
+      const renderConditions = (conds: typeof hc) => {
+        let text = ''
+        for (const qc of conds) {
+          const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
+          if (!def) continue
+          let t = qc.textOverride || def.text
+          if (def.hasAmount && def.amountPlaceholder && qc.amount != null) {
+            const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            t = t.replace(new RegExp(escaped, 'g'), formatCurrency(qc.amount, data.quotation.premiumCurrency || 'USD'))
+          }
+          const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+          text += `Cl. ${def.conditionNumber} – ${t}${scope}\n`
+        }
+        return text
+      }
+
+      // Determine where each additional condition belongs
+      const getAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } => {
+        const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+        if (!def) return { type: 'both' }
+        const ids = def.hullClauseIds || []
+        if (ids.length === 0) return { type: 'both' }
+        const matchedAlts = alts.filter(a => ids.includes(a.hullClauseId))
+        const matchesIv = ivClauseId && ids.includes(ivClauseId)
+        if (matchedAlts.length === alts.length && matchesIv) return { type: 'both' }
+        if (matchedAlts.length === alts.length && !matchesIv) return multiAlt ? { type: 'allAlts' } : { type: 'both' }
+        if (matchedAlts.length === 0 && matchesIv) return { type: 'iv' }
+        if (matchedAlts.length === 0 && !matchesIv) return { type: 'both' }
+        if (matchedAlts.length === 1) return { type: 'alt', altId: matchedAlts[0].id }
+        return { type: 'allAlts' }
+      }
+
+      const renderAddlForSection = (filterFn: (b: ReturnType<typeof getAddlBelonging>) => boolean) => {
+        let text = ''
         for (const qa of ha) {
+          const belonging = getAddlBelonging(qa)
+          if (!filterFn(belonging)) continue
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) continue
-          const title = def.title || ''
-          const text = qa.textOverride || def.text
+          const condText = qa.textOverride || def.text
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          hcText += `- ${title ? title + ': ' : ''}${text}${scope}\n`
+          text += `- ${condText}${scope}\n`
+        }
+        return text
+      }
+
+      const ivConds = hc.filter(qc => ivClauseId && getCondClauseId(qc) === ivClauseId)
+      const hasIvSection = data.quotation.ivEnabled && (ivConds.length > 0 || selectedIvClause)
+
+      if (multiAlt) {
+        // Multiple alternatives
+        for (let i = 0; i < alts.length; i++) {
+          const alt = alts[i]
+          const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+          const altConds = hc.filter(qc => qc.alternativeId === alt.id)
+          const label = `Alternative ${i + 1}`
+          hcText += `${label}\n\n`
+          if (clause) hcText += `${clause.description || clause.name}\n\n`
+          hcText += renderConditions(altConds)
+          const altAddl = renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id)
+          if (altAddl) hcText += '\n' + altAddl
+          hcText += '\n'
+        }
+
+        // Applicable to all alternatives
+        const allAltsAddl = renderAddlForSection(b => b.type === 'allAlts')
+        if (allAltsAddl) {
+          hcText += 'Applicable to all alternatives\n\n' + allAltsAddl + '\n'
+        }
+
+        // IV section
+        if (hasIvSection) {
+          if (selectedIvClause) hcText += `Increased Value\n\n${selectedIvClause.description || selectedIvClause.name}\n\n`
+          else hcText += 'Increased Value\n\n'
+          hcText += renderConditions(ivConds)
+          const ivAddl = renderAddlForSection(b => b.type === 'iv')
+          if (ivAddl) hcText += '\n' + ivAddl
+          hcText += '\n'
+        }
+
+        // Applicable to all sections (both = alternatives + IV)
+        const bothAddl = renderAddlForSection(b => b.type === 'both')
+        if (bothAddl) {
+          hcText += (hasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives') + '\n\n' + bothAddl
+        }
+      } else if (hasIvSection) {
+        // Single alternative with IV
+        const singleAlt = alts[0]
+        const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
+        const hmClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
+        const hmConds = hc.filter(qc => hmClauseId && getCondClauseId(qc) === hmClauseId)
+
+        if (selectedClause) hcText += `Hull and Machinery\n\n${selectedClause.description || selectedClause.name}\n\n`
+        else hcText += 'Hull and Machinery\n\n'
+        hcText += renderConditions(hmConds)
+        const hmAddl = renderAddlForSection(b => b.type === 'alt' || (b.type === 'allAlts'))
+        if (hmAddl) hcText += '\n' + hmAddl
+
+        if (selectedIvClause) hcText += `\nIncreased Value\n\n${selectedIvClause.description || selectedIvClause.name}\n\n`
+        else hcText += '\nIncreased Value\n\n'
+        hcText += renderConditions(ivConds)
+        const ivAddl = renderAddlForSection(b => b.type === 'iv')
+        if (ivAddl) hcText += '\n' + ivAddl
+
+        const bothAddl = renderAddlForSection(b => b.type === 'both')
+        if (bothAddl) {
+          hcText += '\nApplicable to both sections:\n\n' + bothAddl
+        }
+      } else {
+        // Single alternative, no IV — simple output
+        const singleAlt = alts[0]
+        const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
+        if (selectedClause) hcText += `${selectedClause.description || selectedClause.name}\n\n`
+        hcText += renderConditions(hc)
+        if (ha.length > 0) {
+          hcText += '\n'
+          for (const qa of ha) {
+            const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+            if (!def) continue
+            const condText = qa.textOverride || def.text
+            const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
+            hcText += `- ${condText}${scope}\n`
+          }
         }
       }
       sectionMap.set('hullConditions', ['Conditions', hcText.trim()])
     }
   }
 
-  // Trading Warranty
+  // Sum Insured (War)
+  if (data.quotation.quotationTypeCode === 'W' && data.quotation.agreedValue != null) {
+    sectionMap.set('sumInsured', ['Sum Insured', formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')])
+  }
+
+  // War Conditions
   {
+    const wc = data.warConditions
+    if (wc.length > 0) {
+      const resolveWarText = (text: string): string => {
+        if (!data.warSettings) return text
+        return text
+          .replace(/\{jwla_code\}/g, data.warSettings.jwlaCode)
+          .replace(/\{jwla_date\}/g, data.warSettings.jwlaDate)
+          .replace(/\{tc_text\}/g, data.warSettings.tcText)
+      }
+      let wcText = ''
+      for (const qc of wc) {
+        const def = data.allWarConditions.find(c => c.id === qc.warConditionId)
+        if (!def) continue
+        const text = resolveWarText(qc.textOverride || def.text)
+        const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+        wcText += `- ${text}${scope}\n`
+      }
+      // T&C line
+      if (data.warSettings?.tcText) {
+        wcText += '\n' + data.warSettings.tcText
+      }
+      sectionMap.set('warConditions', ['Conditions', wcText.trim()])
+    }
+  }
+
+  // War Trading Warranty
+  if (data.quotation.quotationTypeCode === 'W' && data.quotation.tradingWarrantyIntro) {
+    sectionMap.set('warTrading', ['Trading Warranty', data.quotation.tradingWarrantyIntro])
+  }
+
+  // Trading Warranty (not for War — War uses warTrading)
+  if (data.quotation.quotationTypeCode !== 'W') {
     const q = data.quotation
     let tradingText = ''
     const excCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
@@ -652,7 +840,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         }
       }
       if (st(data, 'warrantiesAdditionalText')) warText += '\n' + stripHtml(st(data, 'warrantiesAdditionalText')) + '\n'
-      if (st(data, 'warrantiesBreach')) warText += '\n' + stripHtml(st(data, 'warrantiesBreach'))
+      if (st(data, 'warrantiesBreach')) warText += '\n' + stripHtml(st(data, 'warrantiesBreach')) + '\n'
+      if (st(data, 'warrantiesNote')) warText += '\n' + stripHtml(st(data, 'warrantiesNote'))
       sectionMap.set('warranties', ['Warranties', warText.trim()])
     }
   }
@@ -724,49 +913,101 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const isMultiVessel = data.quotationVessels.length >= 2
     const hasVesselPremiums = isMultiVessel && data.quotationVessels.some(v => v.premiumAmount)
 
+    // Build premium line items
+    type PDFPremLine = { label: string; tech: number }
+    const pdfPremLines: PDFPremLine[] = []
+    const hullMultiAlt = data.hullAlternatives.length > 1
+
     if (hasVesselPremiums) {
-      const techLabel = hasDiscount ? 'Technical Premium' : 'Premium'
-      const premVesselLines = data.quotationVessels.map(v => {
-        const pvName = (v.name || v.vesselLabel).toUpperCase()
-        const vPrem = v.premiumAmount || 0
-        if (hasDiscount) {
-          const vPayable = computePayable(vPrem)
-          return `${pvName}:  ${techLabel}: ${formatCurrency(vPrem, q.premiumCurrency)}  |  Payable: ${formatCurrency(vPayable, q.premiumCurrency)}`
+      for (const v of data.quotationVessels) {
+        pdfPremLines.push({ label: (v.name || v.vesselLabel).toUpperCase(), tech: v.premiumAmount || 0 })
+      }
+    } else if (q.premiumAmount != null || hullMultiAlt) {
+      if (hullMultiAlt) {
+        for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
+          const alt = data.hullAlternatives[ai]
+          const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+          pdfPremLines.push({ label: `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`, tech: alt.premiumAmount || 0 })
         }
-        return `${pvName}:  ${formatCurrency(vPrem, q.premiumCurrency)}`
-      })
-      premText += premVesselLines.join('\n') + '\n'
-      const totalTech = data.quotationVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
-      if (hasDiscount) {
-        const totalPayable = computePayable(totalTech)
-        premText += `\nTotal ${techLabel}: ${formatCurrency(totalTech, q.premiumCurrency)} per annum\n`
-        premText += `Total Payable Premium: ${formatCurrency(totalPayable, q.premiumCurrency)} per annum\n`
+        if (q.ivEnabled && q.ivPremiumAmount != null) pdfPremLines.push({ label: 'IV', tech: q.ivPremiumAmount })
+      } else if (q.ivEnabled) {
+        pdfPremLines.push({ label: 'Section A', tech: q.premiumAmount || 0 })
+        if (q.ivPremiumAmount != null) pdfPremLines.push({ label: 'Section B', tech: q.ivPremiumAmount })
       } else {
-        premText += `\nTotal Premium: ${formatCurrency(totalTech, q.premiumCurrency)} per annum\n`
+        pdfPremLines.push({ label: '', tech: q.premiumAmount || 0 })
       }
-      premText += '\n'
-    } else if (q.premiumAmount != null) {
-      const techLabel = hasDiscount ? 'Technical Premium' : 'Premium'
-      premText += `${techLabel}: ${formatCurrency(q.premiumAmount, q.premiumCurrency)} per annum\n`
+    }
+
+    const useTable = pdfPremLines.length > 1 || (pdfPremLines.length === 1 && hasDiscount)
+    if (useTable) {
+      const fc = (n: number) => formatCurrency(n, q.premiumCurrency)
+      const pa = ' per annum'
       if (hasDiscount) {
-        const payable = computePayable(q.premiumAmount)
-        premText += `Payable Premium: ${formatCurrency(payable, q.premiumCurrency)} per annum\n`
+        if (pdfPremLines.length > 1) premText += 'Technical Premium\n'
+        for (const l of pdfPremLines) {
+          premText += `${l.label || 'Technical Premium'}:  ${fc(l.tech)}${pa}\n`
+        }
+        if (hasVesselPremiums) {
+          const totalTech = pdfPremLines.reduce((s, l) => s + l.tech, 0)
+          premText += `Total:  ${fc(totalTech)}${pa}\n`
+        }
+        premText += '\n'
+        if (pdfPremLines.length > 1) premText += 'Payable Premium\n'
+        for (const l of pdfPremLines) {
+          premText += `${l.label || 'Payable Premium'}:  ${fc(computePayable(l.tech))}${pa}\n`
+        }
+        if (hasVesselPremiums) {
+          const totalPayable = computePayable(pdfPremLines.reduce((s, l) => s + l.tech, 0))
+          premText += `Total:  ${fc(totalPayable)}${pa}\n`
+        }
+      } else {
+        for (const l of pdfPremLines) {
+          premText += `${l.label}:  ${fc(l.tech)}${pa}\n`
+        }
+        if (hasVesselPremiums) {
+          const totalTech = pdfPremLines.reduce((s, l) => s + l.tech, 0)
+          premText += `Total:  ${fc(totalTech)}${pa}\n`
+        }
       }
       premText += '\n'
+    } else if (pdfPremLines.length === 1) {
+      premText += `${formatCurrency(pdfPremLines[0].tech, q.premiumCurrency)} per annum\n\n`
     }
-    if (q.nonRefundableType === 'first_instalment') {
-      premText += 'First instalment is non-refundable.\n\n'
-    } else if (q.nonRefundableType === 'percentage' && q.nonRefundablePercent) {
-      premText += `${q.nonRefundablePercent}% of premium is non-refundable.\n\n`
+    const numInst = q.numInstalments || 1
+    const firstInstDays = data.instalments.length > 0 ? data.instalments[0].daysFromInception : 0
+    const singleTiming = firstInstDays === 0 ? 'at inception' : `within ${firstInstDays} days of inception`
+    if (numInst === 1 && st(data, 'premiumPaymentIntroSingle')) {
+      premText += stripHtml(st(data, 'premiumPaymentIntroSingle')).replace(/\{timing\}/g, singleTiming) + '\n\n'
+      // Non-refundable sentence right after for single instalment
+      if (q.nonRefundableType) {
+        let nrText = ''
+        if (q.nonRefundableType === 'first_instalment') {
+          nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+        } else if (q.nonRefundableType === 'percentage' && q.nonRefundablePercent) {
+          nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(q.nonRefundablePercent!))
+        }
+        if (nrText) premText += nrText + '\n\n'
+      }
+    } else {
+      if (st(data, 'premiumPaymentIntro')) {
+        premText += stripHtml(st(data, 'premiumPaymentIntro')).replace('{instalments}', String(numInst)) + '\n\n'
+      }
+      for (const inst of data.instalments) {
+        const timing = inst.daysFromInception === 0 ? 'prior inception' : `within ${inst.daysFromInception} days of inception`
+        let instLine = `${ordinal(inst.instalmentNumber)} Instalment ${timing}`
+        if (inst.instalmentNumber === 1 && q.nonRefundableType) {
+          let nrText = ''
+          if (q.nonRefundableType === 'first_instalment') {
+            nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+          } else if (q.nonRefundableType === 'percentage' && q.nonRefundablePercent) {
+            nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(q.nonRefundablePercent!))
+          }
+          if (nrText) instLine += ' \u2014 ' + nrText
+        }
+        premText += instLine + '\n'
+      }
+      if (data.instalments.length > 0) premText += '\n'
     }
-    if (st(data, 'premiumPaymentIntro')) {
-      premText += stripHtml(st(data, 'premiumPaymentIntro')).replace('{instalments}', String(q.numInstalments || 1)) + '\n\n'
-    }
-    for (const inst of data.instalments) {
-      const timing = inst.daysFromInception === 0 ? 'prior inception' : `within ${inst.daysFromInception} days of inception`
-      premText += `${ordinal(inst.instalmentNumber)} Instalment ${timing}\n`
-    }
-    if (data.instalments.length > 0) premText += '\n'
     if (st(data, 'premiumCondition')) premText += stripHtml(st(data, 'premiumCondition')) + '\n\n'
     if (st(data, 'premiumEarned')) premText += stripHtml(st(data, 'premiumEarned')) + '\n\n'
     if (q.premiumAdditionalText) premText += stripHtml(q.premiumAdditionalText)
@@ -778,8 +1019,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const ncbAmt = ncbType === 'amount' ? ncbFixedAmt : techPrem * ncbPct / 100
       const ncbAmtStr = formatCurrency(ncbAmt, q.premiumCurrency)
       const ncbPctStr = `${ncbPct}%`
+      const ncbDisplay = ncbType === 'amount' ? ncbAmtStr : ncbPctStr
       let ncbText = ''
-      if (q.ncbText) ncbText = stripHtml(q.ncbText).replace(/\{ncb_amount\}/g, ncbAmtStr).replace(/\{ncb_percent\}/g, ncbPctStr)
+      if (q.ncbText) ncbText = stripHtml(q.ncbText).replace(/\{ncb_amount\}/g, ncbDisplay).replace(/\{ncb_percent\}/g, ncbPctStr)
       sectionMap.set('ncb', ['No Claims Bonus\n(NCB)', ncbText.trim()])
     }
 
@@ -789,8 +1031,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const upccAmt = upccType === 'amount' ? upccFixedAmt : afterNcbPrem * upccPct / 100
       const upccAmtStr = formatCurrency(upccAmt, q.premiumCurrency)
       const upccPctStr = `${upccPct}%`
+      const upccDisplay = upccType === 'amount' ? upccAmtStr : upccPctStr
       let upccText = ''
-      if (q.upccText) upccText = stripHtml(q.upccText).replace(/\{upcc_amount\}/g, upccAmtStr).replace(/\{upcc_percent\}/g, upccPctStr)
+      if (q.upccText) upccText = stripHtml(q.upccText).replace(/\{upcc_amount\}/g, upccDisplay).replace(/\{upcc_percent\}/g, upccPctStr)
       sectionMap.set('upcc', ['Upfront Continuity\n(UPCC)', upccText.trim()])
     }
   }
@@ -822,6 +1065,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   }
 
   // Render main two-column table
+  const premiumRowIdx = sections.findIndex(s => s[0].startsWith('Premium'))
   autoTable(doc, {
     startY: startY + 26,
     body: sections,
@@ -831,7 +1075,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     },
     theme: 'grid',
     styles: { fontSize: 11, cellPadding: { top: 5, right: 5, bottom: 9, left: 5 }, lineColor: [0, 0, 0], lineWidth: 0.25, overflow: 'linebreak', textColor: [0, 0, 0], font: 'helvetica' },
-    margin: { left: margin, right: margin }
+    margin: { left: margin, right: margin },
+    didParseCell: (hookData: any) => {
+      if (hookData.section === 'body' && hookData.column.index === 1 && hookData.row.index === premiumRowIdx) {
+        hookData.cell.styles.fontStyle = 'bold'
+      }
+    }
   })
 
   let y = (doc as any).lastAutoTable.finalY + 8
@@ -1121,7 +1370,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       condContent.push(emptyP())
       for (const ac of data.additionalClauses) {
         const def = data.allAdditionalClauses.find(a => a.id === ac.piAdditionalClauseId)
-        const title = def?.title || ''
         const code = def?.code || ''
         const text = ac.customText || def?.text || ''
         const acScope = vesselScopeSuffix(ac.vesselScope, data.quotationVessels)
@@ -1129,7 +1377,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           numbering: { reference: 'dash-bullet', level: 0 },
           spacing: { after: 40 },
           children: [
-            ...(title ? [new TextRun({ text: title + ': ', bold: true, size: 22, font: 'Arial', color: '000000' })] : []),
             ...(code ? [new TextRun({ text: code + ' ', size: 22, font: 'Arial', color: '000000' })] : []),
             new TextRun({ text: text + acScope, size: 22, font: 'Arial', color: '000000' })
           ]
@@ -1139,17 +1386,42 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     rowMap.set('conditions', makeRow('Conditions', condContent))
   }
 
-  // ---- Agreed Value (Hull) ----
-  {
+  // ---- Agreed Value / Interest (Hull only — War uses sumInsured) ----
+  if (data.quotation.quotationTypeCode !== 'W') {
     const avItems = data.hullAgreedValueItems
-    if (avItems.length > 0 || data.quotation.agreedValue != null) {
+    const dHasHm = data.quotation.agreedValue != null
+    const dHasIv = data.quotation.ivEnabled && data.quotation.ivValue != null
+
+    if (dHasIv) {
+      // Interest section — A) H&M texts, B) IV texts (labels as bullets)
+      const dHmItems = avItems.filter(it => (it.section || 'hm') === 'hm')
+      const dIvItems = avItems.filter(it => it.section === 'iv')
+      if (dHmItems.length > 0 || dIvItems.length > 0) {
+        const intContent: Paragraph[] = []
+        if (dHmItems.length > 0) {
+          const hmText = dHmItems.map(it => it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels)).join('\n')
+          intContent.push(np('A) ' + hmText))
+        }
+        if (dIvItems.length > 0) {
+          const ivText = dIvItems.map(it => it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels)).join('\n')
+          intContent.push(np('B) ' + ivText))
+        }
+        rowMap.set('interest', makeRow('Interest', intContent))
+      }
+      // Agreed Insured Value — amounts only for IV
       const avContent: Paragraph[] = []
-      if (data.quotation.agreedValue != null) {
-        avContent.push(bp(formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')))
+      if (dHasHm) avContent.push(np(`Section A: ${formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')}`))
+      avContent.push(np(`Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}`))
+      rowMap.set('agreedValue', makeRow('Agreed Insured Value', avContent))
+    } else if (avItems.length > 0 || dHasHm) {
+      // Standard agreed value — value not bold, spacing between value and texts
+      const avContent: Paragraph[] = []
+      if (dHasHm) {
+        avContent.push(np(formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')))
+        avContent.push(emptyP())
       }
       for (const it of avItems) {
-        const scope = vesselScopeSuffix(it.vesselScope, data.quotationVessels)
-        avContent.push(np(it.text + scope))
+        avContent.push(np(it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels)))
       }
       rowMap.set('agreedValue', makeRow('Agreed Insured Value', avContent))
     }
@@ -1159,70 +1431,236 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   {
     const hc = data.hullConditions
     const ha = data.hullAdditionalConditions
+    const dAlts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
       const hcContent: (Paragraph | Table)[] = []
-      const selectedClause = data.quotation.hullClauseId
-        ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId)
-        : null
-      if (selectedClause) {
-        hcContent.push(bp(`${selectedClause.code} — ${selectedClause.name}`))
-        hcContent.push(emptyP())
+      const condRefW = Math.round(BODY_W * 0.15)
+      const condTextW = BODY_W - condRefW
+      const noBordersObj = () => ({ top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } })
+      const dIvClauseId = data.quotation.ivClauseId
+      const dSelectedIvClause = dIvClauseId ? data.hullClauses.find(c => c.id === dIvClauseId) : null
+      const dMultiAlt = dAlts.length > 1
+
+      const makeCondTable = (conds: typeof hc) => new Table({
+        width: { size: BODY_W, type: WidthType.DXA },
+        layout: TableLayoutType.FIXED,
+        rows: conds.map(qc => {
+          const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
+          if (!def) return null
+          let text = qc.textOverride || def.text
+          if (def.hasAmount && def.amountPlaceholder && qc.amount != null) {
+            const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            text = text.replace(new RegExp(escaped, 'g'), formatCurrency(qc.amount, data.quotation.premiumCurrency || 'USD'))
+          }
+          const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+          return new TableRow({
+            children: [
+              new TableCell({ width: { size: condRefW, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
+              new TableCell({ width: { size: condTextW, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: '000000' })] })] })
+            ]
+          })
+        }).filter(Boolean) as TableRow[]
+      })
+
+      const dGetCondClauseId = (qc: typeof hc[0]) => {
+        const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
+        return def?.hullClauseId || ''
       }
-      // Clause conditions as a two-column sub-table
-      if (hc.length > 0) {
-        const condRefW = Math.round(BODY_W * 0.15)
-        const condTextW = BODY_W - condRefW
-        const noBordersObj = () => ({ top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } })
-        hcContent.push(new Table({
-          width: { size: BODY_W, type: WidthType.DXA },
-          layout: TableLayoutType.FIXED,
-          rows: hc.map(qc => {
-            const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
-            if (!def) return null
-            const text = qc.textOverride || def.text
-            const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
-            return new TableRow({
-              children: [
-                new TableCell({
-                  width: { size: condRefW, type: WidthType.DXA },
-                  borders: noBordersObj(),
-                  children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: '000000' })] })]
-                }),
-                new TableCell({
-                  width: { size: condTextW, type: WidthType.DXA },
-                  borders: noBordersObj(),
-                  children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: '000000' })] })]
-                })
-              ]
-            })
-          }).filter(Boolean) as TableRow[]
-        }))
+
+      const dAddlBullet = (condText: string) => new Paragraph({
+        numbering: { reference: 'dash-bullet', level: 0 },
+        spacing: { after: 40 },
+        children: [new TextRun({ text: condText, size: 22, font: 'Arial', color: '000000' })]
+      })
+
+      // Determine where each additional condition belongs
+      const dGetAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } => {
+        const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+        if (!def) return { type: 'both' }
+        const ids = def.hullClauseIds || []
+        if (ids.length === 0) return { type: 'both' }
+        const matchedAlts = dAlts.filter(a => ids.includes(a.hullClauseId))
+        const matchesIv = dIvClauseId && ids.includes(dIvClauseId)
+        if (matchedAlts.length === dAlts.length && matchesIv) return { type: 'both' }
+        if (matchedAlts.length === dAlts.length && !matchesIv) return dMultiAlt ? { type: 'allAlts' } : { type: 'both' }
+        if (matchedAlts.length === 0 && matchesIv) return { type: 'iv' }
+        if (matchedAlts.length === 0 && !matchesIv) return { type: 'both' }
+        if (matchedAlts.length === 1) return { type: 'alt', altId: matchedAlts[0].id }
+        return { type: 'allAlts' }
       }
-      // Additional conditions
-      if (ha.length > 0) {
-        hcContent.push(emptyP())
+
+      const dRenderAddlForSection = (filterFn: (b: ReturnType<typeof dGetAddlBelonging>) => boolean) => {
+        const paras: Paragraph[] = []
         for (const qa of ha) {
+          const belonging = dGetAddlBelonging(qa)
+          if (!filterFn(belonging)) continue
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) continue
-          const title = def.title || ''
-          const text = qa.textOverride || def.text
+          const condText = qa.textOverride || def.text
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          hcContent.push(new Paragraph({
-            numbering: { reference: 'dash-bullet', level: 0 },
-            spacing: { after: 40 },
-            children: [
-              ...(title ? [new TextRun({ text: title + ': ', bold: true, size: 22, font: 'Arial', color: '000000' })] : []),
-              new TextRun({ text: text + scope, size: 22, font: 'Arial', color: '000000' })
-            ]
-          }))
+          paras.push(dAddlBullet(condText + scope))
+        }
+        return paras
+      }
+
+      const dIvConds = hc.filter(qc => dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
+      const dHasIvSection = data.quotation.ivEnabled && (dIvConds.length > 0 || dSelectedIvClause)
+
+      if (dMultiAlt) {
+        // Multiple alternatives
+        for (let i = 0; i < dAlts.length; i++) {
+          const alt = dAlts[i]
+          const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+          const altConds = hc.filter(qc => qc.alternativeId === alt.id)
+          hcContent.push(bp(`Alternative ${i + 1}`))
+          hcContent.push(emptyP())
+          if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
+          if (altConds.length > 0) hcContent.push(makeCondTable(altConds))
+          const altAddl = dRenderAddlForSection(b => b.type === 'alt' && b.altId === alt.id)
+          if (altAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...altAddl) }
+          hcContent.push(emptyP())
+        }
+
+        // Applicable to all alternatives
+        const allAltsAddl = dRenderAddlForSection(b => b.type === 'allAlts')
+        if (allAltsAddl.length > 0) {
+          hcContent.push(bp('Applicable to all alternatives'))
+          hcContent.push(emptyP())
+          hcContent.push(...allAltsAddl)
+          hcContent.push(emptyP())
+        }
+
+        // IV section
+        if (dHasIvSection) {
+          if (dSelectedIvClause) {
+            hcContent.push(bp('Increased Value'))
+            hcContent.push(emptyP())
+            hcContent.push(np(dSelectedIvClause.description || dSelectedIvClause.name))
+            hcContent.push(emptyP())
+          } else {
+            hcContent.push(bp('Increased Value'))
+            hcContent.push(emptyP())
+          }
+          if (dIvConds.length > 0) hcContent.push(makeCondTable(dIvConds))
+          const dIvAddl = dRenderAddlForSection(b => b.type === 'iv')
+          if (dIvAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...dIvAddl) }
+          hcContent.push(emptyP())
+        }
+
+        // Applicable to all sections
+        const dBothAddl = dRenderAddlForSection(b => b.type === 'both')
+        if (dBothAddl.length > 0) {
+          hcContent.push(bp(dHasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives'))
+          hcContent.push(emptyP())
+          hcContent.push(...dBothAddl)
+        }
+      } else if (dHasIvSection) {
+        // Single alternative with IV
+        const singleAlt = dAlts[0]
+        const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
+        const dHmClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
+        const dHmConds = hc.filter(qc => dHmClauseId && dGetCondClauseId(qc) === dHmClauseId)
+
+        if (selectedClause) {
+          hcContent.push(bp('Hull and Machinery'))
+          hcContent.push(emptyP())
+          hcContent.push(np(selectedClause.description || selectedClause.name))
+          hcContent.push(emptyP())
+        } else {
+          hcContent.push(bp('Hull and Machinery'))
+          hcContent.push(emptyP())
+        }
+        if (dHmConds.length > 0) hcContent.push(makeCondTable(dHmConds))
+        const dHmAddl = dRenderAddlForSection(b => b.type === 'alt' || b.type === 'allAlts')
+        if (dHmAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...dHmAddl) }
+
+        hcContent.push(emptyP())
+        if (dSelectedIvClause) {
+          hcContent.push(bp('Increased Value'))
+          hcContent.push(emptyP())
+          hcContent.push(np(dSelectedIvClause.description || dSelectedIvClause.name))
+          hcContent.push(emptyP())
+        } else {
+          hcContent.push(bp('Increased Value'))
+          hcContent.push(emptyP())
+        }
+        if (dIvConds.length > 0) hcContent.push(makeCondTable(dIvConds))
+        const dIvAddl = dRenderAddlForSection(b => b.type === 'iv')
+        if (dIvAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...dIvAddl) }
+
+        const dBothAddl = dRenderAddlForSection(b => b.type === 'both')
+        if (dBothAddl.length > 0) {
+          hcContent.push(emptyP())
+          hcContent.push(bp('Applicable to both sections:'))
+          hcContent.push(emptyP())
+          hcContent.push(...dBothAddl)
+        }
+      } else {
+        // Single alternative, no IV
+        const singleAlt = dAlts[0]
+        const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
+        if (selectedClause) {
+          hcContent.push(np(selectedClause.description || selectedClause.name))
+          hcContent.push(emptyP())
+        }
+        if (hc.length > 0) hcContent.push(makeCondTable(hc))
+        if (ha.length > 0) {
+          hcContent.push(emptyP())
+          for (const qa of ha) {
+            const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+            if (!def) continue
+            const condText = qa.textOverride || def.text
+            const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
+            hcContent.push(dAddlBullet(condText + scope))
+          }
         }
       }
       rowMap.set('hullConditions', makeRow('Conditions', hcContent))
     }
   }
 
-  // ---- Trading Warranty ----
+  // ---- Sum Insured (War) ----
+  if (data.quotation.quotationTypeCode === 'W' && data.quotation.agreedValue != null) {
+    rowMap.set('sumInsured', makeRow('Sum Insured', [
+      bp(formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD'))
+    ]))
+  }
+
+  // ---- War Conditions ----
   {
+    const wc = data.warConditions
+    if (wc.length > 0) {
+      const resolveWarText = (text: string): string => {
+        if (!data.warSettings) return text
+        return text
+          .replace(/\{jwla_code\}/g, data.warSettings.jwlaCode)
+          .replace(/\{jwla_date\}/g, data.warSettings.jwlaDate)
+          .replace(/\{tc_text\}/g, data.warSettings.tcText)
+      }
+      const wcContent: Paragraph[] = []
+      for (const qc of wc) {
+        const def = data.allWarConditions.find(c => c.id === qc.warConditionId)
+        if (!def) continue
+        const text = resolveWarText(qc.textOverride || def.text)
+        const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+        wcContent.push(bulletP(text + scope))
+      }
+      // T&C line
+      if (data.warSettings?.tcText) {
+        wcContent.push(emptyP())
+        wcContent.push(np(data.warSettings.tcText))
+      }
+      rowMap.set('warConditions', makeRow('Conditions', wcContent))
+    }
+  }
+
+  // ---- War Trading Warranty ----
+  if (data.quotation.quotationTypeCode === 'W' && data.quotation.tradingWarrantyIntro) {
+    rowMap.set('warTrading', makeRow('Trading Warranty', [np(data.quotation.tradingWarrantyIntro)]))
+  }
+
+  // ---- Trading Warranty (not for War — War uses warTrading) ----
+  if (data.quotation.quotationTypeCode !== 'W') {
     const wq = data.quotation
     const tradContent: (Paragraph | Table)[] = []
     const wExcCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
@@ -1300,6 +1738,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (st(data, 'warrantiesBreach')) {
       warContent.push(emptyP())
       warContent.push(...mp(st(data, 'warrantiesBreach')))
+    }
+    if (st(data, 'warrantiesNote')) {
+      warContent.push(emptyP())
+      warContent.push(...mp(st(data, 'warrantiesNote')))
     }
     if (warContent.length > 0) rowMap.set('warranties', makeRow('Warranties', warContent))
   }
@@ -1442,34 +1884,117 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       premTableRows.push(new TableRow({ children: totalCells }))
       premContent.push(new Table({ rows: premTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }))
       premContent.push(np('per annum'))
-    } else if (wq.premiumAmount != null) {
-      const techLabel = wHasDiscount ? 'Technical Premium' : 'Premium'
-      premContent.push(bp(`${techLabel}: ${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`))
-      if (wHasDiscount) {
-        const payable = wComputePayable(wq.premiumAmount)
-        premContent.push(bp(`Payable Premium: ${formatCurrency(payable, wq.premiumCurrency)} per annum`))
+      premContent.push(emptyP())
+    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1) {
+      const wMultiAlt = data.hullAlternatives.length > 1
+      const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT) => new TableCell({
+        borders: noBorders(),
+        children: [new Paragraph({ alignment: align, children: [new TextRun({ text, size: 22, font: 'Arial', bold, color: '000000' })] })]
+      })
+      const premRow = (label: string, amount: string, boldLabel = false) => new TableRow({
+        children: [
+          premCell(label, boldLabel, undefined),
+          premCell(amount, true, AlignmentType.RIGHT)
+        ]
+      })
+      const premTable = (rows: TableRow[]) => new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows
+      })
+
+      // Build premium line items: { label, tech, payable? }
+      type PremLine = { label: string; tech: number }
+      const lines: PremLine[] = []
+      if (wMultiAlt) {
+        for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
+          const alt = data.hullAlternatives[ai]
+          const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+          lines.push({ label: `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`, tech: alt.premiumAmount || 0 })
+        }
+        if (wq.ivEnabled && wq.ivPremiumAmount != null) lines.push({ label: 'IV', tech: wq.ivPremiumAmount })
+      } else if (wq.ivEnabled) {
+        lines.push({ label: 'Section A', tech: wq.premiumAmount || 0 })
+        if (wq.ivPremiumAmount != null) lines.push({ label: 'Section B', tech: wq.ivPremiumAmount })
+      } else {
+        lines.push({ label: '', tech: wq.premiumAmount || 0 })
+      }
+
+      const useTable = lines.length > 1 || wHasDiscount
+      if (useTable) {
+        if (wHasDiscount) {
+          // Two-section table: Technical then Payable
+          const rows: TableRow[] = []
+          rows.push(premRow(lines.length > 1 ? 'Technical Premium' : '', '', true))
+          for (const l of lines) {
+            rows.push(premRow(l.label || 'Technical Premium', `${formatCurrency(l.tech, wq.premiumCurrency)} per annum`))
+          }
+          rows.push(premRow('', '')) // spacer
+          rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', '', true))
+          for (const l of lines) {
+            rows.push(premRow(l.label || 'Payable Premium', `${formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)} per annum`))
+          }
+          premContent.push(premTable(rows))
+        } else {
+          // Simple table: just amounts
+          const rows: TableRow[] = []
+          for (const l of lines) {
+            rows.push(premRow(l.label, `${formatCurrency(l.tech, wq.premiumCurrency)} per annum`))
+          }
+          premContent.push(premTable(rows))
+        }
+        premContent.push(emptyP())
+      } else {
+        // Single premium, no discount — plain bold text
+        premContent.push(bp(`${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`))
+        premContent.push(emptyP())
       }
     }
-    if (wq.nonRefundableType === 'first_instalment') {
-      premContent.push(np('First instalment is non-refundable.'))
-    } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
-      premContent.push(np(`${wq.nonRefundablePercent}% of premium is non-refundable.`))
-    }
-    if (st(data, 'premiumPaymentIntro')) {
-      const introText = st(data, 'premiumPaymentIntro').replace('{instalments}', String(wq.numInstalments || 1))
+    const wNumInst = wq.numInstalments || 1
+    const wFirstInstDays = data.instalments.length > 0 ? data.instalments[0].daysFromInception : 0
+    const wSingleTiming = wFirstInstDays === 0 ? 'at inception' : `within ${wFirstInstDays} days of inception`
+    if (wNumInst === 1 && st(data, 'premiumPaymentIntroSingle')) {
+      const introText = st(data, 'premiumPaymentIntroSingle').replace(/\{timing\}/g, wSingleTiming)
       premContent.push(...mp(introText))
-    }
-    if (data.instalments.length > 0) {
-      for (const inst of data.instalments) {
-        const timing = inst.daysFromInception === 0 ? 'prior inception' : `within ${inst.daysFromInception} days of inception`
-        premContent.push(new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-          children: [new TextRun({ text: `${ordinal(inst.instalmentNumber)} Instalment ${timing}`, size: 22, font: 'Arial', color: '000000' })]
-        }))
+      premContent.push(emptyP())
+      // Non-refundable sentence right after for single instalment
+      if (wq.nonRefundableType) {
+        let nrText = ''
+        if (wq.nonRefundableType === 'first_instalment') {
+          nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+        } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
+          nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(wq.nonRefundablePercent!))
+        }
+        if (nrText) { premContent.push(np(nrText)); premContent.push(emptyP()) }
+      }
+    } else {
+      if (st(data, 'premiumPaymentIntro')) {
+        const introText = st(data, 'premiumPaymentIntro').replace('{instalments}', String(wNumInst))
+        premContent.push(...mp(introText))
+        premContent.push(emptyP())
+      }
+      if (data.instalments.length > 0) {
+        for (const inst of data.instalments) {
+          const timing = inst.daysFromInception === 0 ? 'prior inception' : `within ${inst.daysFromInception} days of inception`
+          let instText = `${ordinal(inst.instalmentNumber)} Instalment ${timing}`
+          if (inst.instalmentNumber === 1 && wq.nonRefundableType) {
+            let nrText = ''
+            if (wq.nonRefundableType === 'first_instalment') {
+              nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+            } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
+              nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(wq.nonRefundablePercent!))
+            }
+            if (nrText) instText += ' \u2014 ' + nrText
+          }
+          premContent.push(new Paragraph({
+            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            children: [new TextRun({ text: instText, size: 22, font: 'Arial', color: '000000' })]
+          }))
+        }
+        premContent.push(emptyP())
       }
     }
-    if (st(data, 'premiumCondition')) premContent.push(...mp(st(data, 'premiumCondition')))
-    if (st(data, 'premiumEarned')) premContent.push(...mp(st(data, 'premiumEarned')))
+    if (st(data, 'premiumCondition')) { premContent.push(...mp(st(data, 'premiumCondition'))); premContent.push(emptyP()) }
+    if (st(data, 'premiumEarned')) { premContent.push(...mp(st(data, 'premiumEarned'))); premContent.push(emptyP()) }
     if (wq.premiumAdditionalText) premContent.push(...mp(wq.premiumAdditionalText))
     rowMap.set('premium', makeRow('Premium Payment Condition Precedent', premContent.length > 0 ? premContent : [emptyP()]))
 
@@ -1480,8 +2005,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const wNcbAmt = wNcbType === 'amount' ? wNcbFixedAmt : wTechPrem * wNcbPct / 100
       const wNcbAmtStr = formatCurrency(wNcbAmt, wq.premiumCurrency)
       const wNcbPctStr = `${wNcbPct}%`
+      const wNcbDisplay = wNcbType === 'amount' ? wNcbAmtStr : wNcbPctStr
       if (wq.ncbText) {
-        const resolved = wq.ncbText.replace(/\{ncb_amount\}/g, wNcbAmtStr).replace(/\{ncb_percent\}/g, wNcbPctStr)
+        const resolved = wq.ncbText.replace(/\{ncb_amount\}/g, wNcbDisplay).replace(/\{ncb_percent\}/g, wNcbPctStr)
         ncbContent.push(...mp(resolved))
       }
       rowMap.set('ncb', makeRow('No Claims Bonus (NCB)', ncbContent))
@@ -1494,8 +2020,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const wUpccAmt = wUpccType === 'amount' ? wUpccFixedAmt : wAfterNcbPrem * wUpccPct / 100
       const wUpccAmtStr = formatCurrency(wUpccAmt, wq.premiumCurrency)
       const wUpccPctStr = `${wUpccPct}%`
+      const wUpccDisplay = wUpccType === 'amount' ? wUpccAmtStr : wUpccPctStr
       if (wq.upccText) {
-        const resolved = wq.upccText.replace(/\{upcc_amount\}/g, wUpccAmtStr).replace(/\{upcc_percent\}/g, wUpccPctStr)
+        const resolved = wq.upccText.replace(/\{upcc_amount\}/g, wUpccDisplay).replace(/\{upcc_percent\}/g, wUpccPctStr)
         upccContent.push(...mp(resolved))
       }
       rowMap.set('upcc', makeRow('Upfront Continuity (UPCC)', upccContent))
@@ -1602,7 +2129,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       alignment: AlignmentType.CENTER,
       spacing: { after: 100 },
       children: [
-        new TextRun({ text: `${data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`, bold: true, size: 26, font: 'Arial', color: '000000' })
+        new TextRun({ text: `${data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`, bold: true, size: 26, font: 'Arial', color: '000000' })
       ]
     }),
     new Paragraph({

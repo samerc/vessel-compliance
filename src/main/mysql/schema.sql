@@ -234,6 +234,14 @@ CREATE TABLE IF NOT EXISTS trading_excluded_countries (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS trading_warranty_templates (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Quotation Tables
 
 CREATE TABLE IF NOT EXISTS quotation_types (
@@ -285,7 +293,12 @@ CREATE TABLE IF NOT EXISTS quotations (
   non_refundable_percent DECIMAL(5,2) DEFAULT NULL,
   agreed_value DECIMAL(15,2) DEFAULT NULL,
   agreed_value_currency VARCHAR(10) DEFAULT 'USD',
+  iv_enabled BOOLEAN DEFAULT FALSE,
+  iv_value DECIMAL(15,2) DEFAULT NULL,
+  iv_currency VARCHAR(10) DEFAULT 'USD',
+  iv_premium_amount DECIMAL(15,2) DEFAULT NULL,
   hull_clause_id VARCHAR(36) DEFAULT NULL,
+  iv_clause_id VARCHAR(36) DEFAULT NULL,
   section_order TEXT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -498,6 +511,7 @@ CREATE TABLE IF NOT EXISTS hull_agreed_value_texts (
   id VARCHAR(36) PRIMARY KEY,
   text TEXT NOT NULL,
   default_selected BOOLEAN DEFAULT FALSE,
+  section VARCHAR(10) DEFAULT 'hm',
   order_index INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -508,6 +522,7 @@ CREATE TABLE IF NOT EXISTS quotation_agreed_value_items (
   quotation_id VARCHAR(36) NOT NULL,
   hull_text_id VARCHAR(36) DEFAULT NULL,
   text TEXT NOT NULL,
+  section VARCHAR(10) DEFAULT 'hm',
   order_index INT DEFAULT 0,
   vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
@@ -519,6 +534,7 @@ CREATE TABLE IF NOT EXISTS hull_clauses (
   name VARCHAR(255) NOT NULL,
   code VARCHAR(50) NOT NULL,
   description TEXT,
+  condition_section VARCHAR(10) DEFAULT 'hm',
   order_index INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -530,6 +546,9 @@ CREATE TABLE IF NOT EXISTS hull_clause_conditions (
   condition_number VARCHAR(20) NOT NULL,
   text TEXT NOT NULL,
   default_selected BOOLEAN DEFAULT FALSE,
+  condition_section VARCHAR(10) DEFAULT 'both',
+  has_amount BOOLEAN DEFAULT FALSE,
+  amount_placeholder VARCHAR(100) DEFAULT NULL,
   order_index INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (hull_clause_id) REFERENCES hull_clauses(id) ON DELETE CASCADE
@@ -545,14 +564,35 @@ CREATE TABLE IF NOT EXISTS hull_additional_conditions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Many-to-many: additional conditions linked to hull clauses
+CREATE TABLE IF NOT EXISTS hull_additional_condition_clauses (
+  additional_condition_id VARCHAR(36) NOT NULL,
+  hull_clause_id VARCHAR(36) NOT NULL,
+  PRIMARY KEY (additional_condition_id, hull_clause_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Hull quotation alternatives (multiple ITC clause options)
+CREATE TABLE IF NOT EXISTS quotation_hull_alternatives (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  hull_clause_id VARCHAR(36) NOT NULL,
+  label VARCHAR(100) DEFAULT NULL,
+  premium_amount DECIMAL(15,2) DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Per-quotation: selected hull clause conditions
 CREATE TABLE IF NOT EXISTS quotation_hull_conditions (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
   hull_condition_id VARCHAR(36) NOT NULL,
   text_override TEXT DEFAULT NULL,
+  condition_section VARCHAR(10) DEFAULT 'both',
+  amount DECIMAL(15,2) DEFAULT NULL,
   order_index INT DEFAULT 0,
   vessel_scope TEXT DEFAULT NULL,
+  alternative_id VARCHAR(36) DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -561,6 +601,27 @@ CREATE TABLE IF NOT EXISTS quotation_hull_additional_conditions (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
   hull_additional_condition_id VARCHAR(36) NOT NULL,
+  text_override TEXT DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL,
+  alternative_id VARCHAR(36) DEFAULT NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- War Risk conditions (admin-managed)
+CREATE TABLE IF NOT EXISTS war_conditions (
+  id VARCHAR(36) PRIMARY KEY,
+  text TEXT NOT NULL,
+  default_selected BOOLEAN DEFAULT FALSE,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Per-quotation: selected war conditions
+CREATE TABLE IF NOT EXISTS quotation_war_conditions (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  war_condition_id VARCHAR(36) NOT NULL,
   text_override TEXT DEFAULT NULL,
   order_index INT DEFAULT 0,
   vessel_scope TEXT DEFAULT NULL,

@@ -1419,28 +1419,28 @@ app.whenReady().then(() => {
 
   // Hull Agreed Value Texts
   safeHandle('hull:getAgreedValueTexts', (event) => { requireSession(event); return db.getHullAgreedValueTexts() })
-  safeHandle('hull:addAgreedValueText', (event, text, defaultSelected) => { requireAdmin(event); return db.addHullAgreedValueText(text, defaultSelected) })
+  safeHandle('hull:addAgreedValueText', (event, text, defaultSelected, section) => { requireAdmin(event); return db.addHullAgreedValueText(text, defaultSelected, section) })
   safeHandle('hull:updateAgreedValueText', (event, id, updates) => { requireAdmin(event); return db.updateHullAgreedValueText(id, updates) })
   safeHandle('hull:deleteAgreedValueText', (event, id) => { requireAdmin(event); return db.deleteHullAgreedValueText(id) })
   safeHandle('hull:reorderAgreedValueTexts', (event, ids) => { requireAdmin(event); return db.reorderHullAgreedValueTexts(ids) })
 
   // Hull Clauses
   safeHandle('hull:getClauses', (event) => { requireSession(event); return db.getHullClauses() })
-  safeHandle('hull:addClause', (event, name, code, description) => { requireAdmin(event); return db.addHullClause(name, code, description) })
+  safeHandle('hull:addClause', (event, name, code, description, conditionSection) => { requireAdmin(event); return db.addHullClause(name, code, description, conditionSection) })
   safeHandle('hull:updateClause', (event, id, updates) => { requireAdmin(event); return db.updateHullClause(id, updates) })
   safeHandle('hull:deleteClause', (event, id) => { requireAdmin(event); return db.deleteHullClause(id) })
   safeHandle('hull:reorderClauses', (event, ids) => { requireAdmin(event); return db.reorderHullClauses(ids) })
 
   // Hull Clause Conditions
   safeHandle('hull:getClauseConditions', (event, hullClauseId) => { requireSession(event); return db.getHullClauseConditions(hullClauseId) })
-  safeHandle('hull:addClauseCondition', (event, hullClauseId, conditionNumber, text, defaultSelected) => { requireAdmin(event); return db.addHullClauseCondition(hullClauseId, conditionNumber, text, defaultSelected) })
+  safeHandle('hull:addClauseCondition', (event, hullClauseId, conditionNumber, text, defaultSelected, conditionSection, hasAmount, amountPlaceholder) => { requireAdmin(event); return db.addHullClauseCondition(hullClauseId, conditionNumber, text, defaultSelected, conditionSection, hasAmount, amountPlaceholder) })
   safeHandle('hull:updateClauseCondition', (event, id, updates) => { requireAdmin(event); return db.updateHullClauseCondition(id, updates) })
   safeHandle('hull:deleteClauseCondition', (event, id) => { requireAdmin(event); return db.deleteHullClauseCondition(id) })
   safeHandle('hull:reorderClauseConditions', (event, ids) => { requireAdmin(event); return db.reorderHullClauseConditions(ids) })
 
   // Hull Additional Conditions
   safeHandle('hull:getAdditionalConditions', (event) => { requireSession(event); return db.getHullAdditionalConditions() })
-  safeHandle('hull:addAdditionalCondition', (event, title, text, defaultSelected) => { requireAdmin(event); return db.addHullAdditionalCondition(title, text, defaultSelected) })
+  safeHandle('hull:addAdditionalCondition', (event, title, text, defaultSelected, hullClauseIds) => { requireAdmin(event); return db.addHullAdditionalCondition(title, text, defaultSelected, hullClauseIds) })
   safeHandle('hull:updateAdditionalCondition', (event, id, updates) => { requireAdmin(event); return db.updateHullAdditionalCondition(id, updates) })
   safeHandle('hull:deleteAdditionalCondition', (event, id) => { requireAdmin(event); return db.deleteHullAdditionalCondition(id) })
   safeHandle('hull:reorderAdditionalConditions', (event, ids) => { requireAdmin(event); return db.reorderHullAdditionalConditions(ids) })
@@ -1448,10 +1448,28 @@ app.whenReady().then(() => {
   // Quotation Hull Data
   safeHandle('hull:getQuotationAgreedValueItems', (event, qId) => { requireSession(event); return db.getQuotationAgreedValueItems(qId) })
   safeHandle('hull:setQuotationAgreedValueItems', (event, qId, items) => { requireSession(event); return db.setQuotationAgreedValueItems(qId, items) })
+  safeHandle('hull:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationHullAlternatives(qId) })
+  safeHandle('hull:addQuotationAlternative', (event, qId, hullClauseId, label) => { requireSession(event); return db.addQuotationHullAlternative(qId, hullClauseId, label) })
+  safeHandle('hull:updateQuotationAlternative', (event, id, updates) => { requireSession(event); return db.updateQuotationHullAlternative(id, updates) })
+  safeHandle('hull:deleteQuotationAlternative', (event, id) => { requireSession(event); return db.deleteQuotationHullAlternative(id) })
+  safeHandle('hull:reorderQuotationAlternatives', (event, ids) => { requireSession(event); return db.reorderQuotationHullAlternatives(ids) })
   safeHandle('hull:getQuotationHullConditions', (event, qId) => { requireSession(event); return db.getQuotationHullConditions(qId) })
   safeHandle('hull:setQuotationHullConditions', (event, qId, items) => { requireSession(event); return db.setQuotationHullConditions(qId, items) })
   safeHandle('hull:getQuotationHullAdditionalConditions', (event, qId) => { requireSession(event); return db.getQuotationHullAdditionalConditions(qId) })
   safeHandle('hull:setQuotationHullAdditionalConditions', (event, qId, items) => { requireSession(event); return db.setQuotationHullAdditionalConditions(qId, items) })
+
+  // War Risk Conditions
+  safeHandle('war:getConditions', (event) => { requireSession(event); return db.getWarConditions() })
+  safeHandle('war:addCondition', (event, text, defaultSelected) => { requireAdmin(event); return db.addWarCondition(text, defaultSelected) })
+  safeHandle('war:updateCondition', (event, id, updates) => { requireAdmin(event); return db.updateWarCondition(id, updates) })
+  safeHandle('war:deleteCondition', (event, id) => { requireAdmin(event); return db.deleteWarCondition(id) })
+  safeHandle('war:reorderConditions', (event, ids) => { requireAdmin(event); return db.reorderWarConditions(ids) })
+  safeHandle('war:getQuotationWarConditions', (event, qId) => { requireSession(event); return db.getQuotationWarConditions(qId) })
+  safeHandle('war:setQuotationWarConditions', (event, qId, items) => { requireSession(event); return db.setQuotationWarConditions(qId, items) })
+
+  // War Risk Settings
+  safeHandle('war:getSettings', (event) => { requireSession(event); return db.getWarSettings() })
+  safeHandle('war:setSettings', (event, settings) => { requireAdmin(event); return db.setWarSettings(settings) })
 
   // P&I Warranty Tags
   safeHandle('pi:getWarrantyTags', (event) => { requireSession(event); return db.getPIWarrantyTags() })
@@ -1525,6 +1543,13 @@ app.whenReady().then(() => {
   safeHandle('pi:addTradingExcludedCountry', (event, country) => { requireAdmin(event); return db.addTradingExcludedCountry(country) })
   safeHandle('pi:updateTradingExcludedCountry', (event, id, updates) => { requireAdmin(event); return db.updateTradingExcludedCountry(id, updates) })
   safeHandle('pi:deleteTradingExcludedCountry', (event, id) => { requireAdmin(event); return db.deleteTradingExcludedCountry(id) })
+
+  // Trading Warranty Templates
+  safeHandle('pi:getTradingWarrantyTemplates', (event) => { requireSession(event); return db.getTradingWarrantyTemplates() })
+  safeHandle('pi:addTradingWarrantyTemplate', (event, name, text) => { requireAdmin(event); return db.addTradingWarrantyTemplate(name, text) })
+  safeHandle('pi:updateTradingWarrantyTemplate', (event, id, updates) => { requireAdmin(event); return db.updateTradingWarrantyTemplate(id, updates) })
+  safeHandle('pi:deleteTradingWarrantyTemplate', (event, id) => { requireAdmin(event); return db.deleteTradingWarrantyTemplate(id) })
+  safeHandle('pi:reorderTradingWarrantyTemplates', (event, ids) => { requireAdmin(event); return db.reorderTradingWarrantyTemplates(ids) })
 
   // P&I Section Texts
   safeHandle('pi:getSectionTexts', (event) => { requireSession(event); return db.getPISectionTexts() })

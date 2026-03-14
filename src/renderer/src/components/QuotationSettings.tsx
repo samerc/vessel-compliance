@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Image, Calendar, Download, List } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition } from '../../../shared/types'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
@@ -8,14 +8,15 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'logo' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'logo' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
 
-type SettingsCategory = 'general' | 'pi' | 'hull'
+type SettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
 const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
     { id: 'general', label: 'General', color: 'var(--accent-primary)' },
     { id: 'pi', label: 'P&I', color: '#6464ff' },
     { id: 'hull', label: 'H&M', color: '#ff64c8' },
+    { id: 'war', label: 'War', color: '#ff8c32' },
 ]
 
 const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; icon: any }[]> = {
@@ -25,6 +26,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
         { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
+        { id: 'tradingWarrantyTemplates', label: 'Trading Templates', icon: <FileText size={15} /> },
         { id: 'sanctionsVersions', label: 'Sanctions Versions', icon: <Shield size={15} /> },
         { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
@@ -42,6 +44,10 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'hullAgreedValueTexts', label: 'Agreed Value', icon: <FileText size={15} /> },
         { id: 'hullClauses', label: 'Clauses', icon: <BookOpen size={15} /> },
         { id: 'hullAdditionalConditions', label: 'Addl. Conditions', icon: <AlertTriangle size={15} /> },
+    ],
+    war: [
+        { id: 'warConditions', label: 'Conditions', icon: <BookOpen size={15} /> },
+        { id: 'warSettings', label: 'Settings', icon: <Shield size={15} /> },
     ],
 }
 
@@ -131,6 +137,7 @@ export default function QuotationSettings() {
             {activeTab === 'subjectivities' && <MasterSubjectivitiesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'tradingCountries' && <TradingCountriesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'tradingWarranty' && <TradingWarrantyTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'tradingWarrantyTemplates' && <TradingWarrantyTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'sanctionsVersions' && <SanctionsVersionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
@@ -139,6 +146,8 @@ export default function QuotationSettings() {
             {activeTab === 'hullAgreedValueTexts' && <HullAgreedValueTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'hullClauses' && <HullClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'hullAdditionalConditions' && <HullAdditionalConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'warConditions' && <WarConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'warSettings' && <WarSettingsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         </div>
     )
 }
@@ -620,13 +629,13 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     const [newDefaultSelected, setNewDefaultSelected] = useState(false)
     const [newCargoRelated, setNewCargoRelated] = useState(false)
     const [newTagIds, setNewTagIds] = useState<string[]>([])
-    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
+    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDefaultSelected, setEditDefaultSelected] = useState(false)
     const [editCargoRelated, setEditCargoRelated] = useState(false)
     const [editTagIds, setEditTagIds] = useState<string[]>([])
-    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
+    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
     // Tag management
     const [newTagName, setNewTagName] = useState('')
     const [editingTagId, setEditingTagId] = useState<string | null>(null)
@@ -895,6 +904,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                 <option value="both">Both</option>
                                 <option value="pi">P&I only</option>
                                 <option value="hull">Hull only</option>
+                                <option value="war">War only</option>
                             </select>
                         </div>
                         {tags.length > 0 && (
@@ -925,6 +935,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                         <option value="both">Both</option>
                                         <option value="pi">P&I</option>
                                         <option value="hull">Hull</option>
+                                        <option value="war">War</option>
                                     </select>
                                     {tags.length > 0 && tags.map(t => tagChip(t.id, editTagIds.includes(t.id), () => toggleTagId(t.id, editTagIds, setEditTagIds)))}
                                     <div style={{ flex: 1 }} />
@@ -1911,6 +1922,159 @@ function TradingWarrantyTab({ showSuccess }: TabProps) {
     )
 }
 
+// ==================== Trading Warranty Templates Tab ====================
+
+function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
+    const [templates, setTemplates] = useState<TradingWarrantyTemplate[]>([])
+    const [newName, setNewName] = useState('')
+    const [newText, setNewText] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editText, setEditText] = useState('')
+    const [showAdd, setShowAdd] = useState(false)
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+
+    useEffect(() => { loadData() }, [])
+
+    const loadData = async () => {
+        const res = await window.api.piGetTradingWarrantyTemplates()
+        setTemplates(Array.isArray(res) ? res : [])
+    }
+
+    const handleAdd = async () => {
+        if (!newName.trim()) return
+        try {
+            await window.api.piAddTradingWarrantyTemplate(newName.trim(), newText)
+            setNewName('')
+            setNewText('')
+            setShowAdd(false)
+            showSuccess('Template added')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add') }
+    }
+
+    const handleUpdate = async () => {
+        if (!editingId || !editName.trim()) return
+        try {
+            await window.api.piUpdateTradingWarrantyTemplate(editingId, { name: editName.trim(), text: editText })
+            setEditingId(null)
+            showSuccess('Template updated')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to update') }
+    }
+
+    const handleDelete = async (id: string) => {
+        try {
+            await window.api.piDeleteTradingWarrantyTemplate(id)
+            showSuccess('Template deleted')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to delete') }
+    }
+
+    const move = async (idx: number, dir: -1 | 1) => {
+        const newIdx = idx + dir
+        if (newIdx < 0 || newIdx >= templates.length) return
+        const reordered = [...templates]
+        ;[reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]]
+        setTemplates(reordered)
+        await window.api.piReorderTradingWarrantyTemplates(reordered.map(t => t.id))
+    }
+
+    const startEdit = (t: TradingWarrantyTemplate) => {
+        setEditingId(t.id)
+        setEditName(t.name)
+        setEditText(t.text)
+    }
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Trading Warranty Templates</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Reusable templates for the trading warranty intro text. Select one in a quotation or write a custom text.</p>
+                </div>
+                <button onClick={() => { setShowAdd(!showAdd); setEditingId(null) }} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                    <Plus size={14} /> Add Template
+                </button>
+            </div>
+
+            {showAdd && (
+                <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0,170,200,0.06)', marginBottom: '16px' }}>
+                    <input
+                        type="text"
+                        value={newName}
+                        onChange={e => setNewName(e.target.value)}
+                        placeholder="Template name (e.g. Standard P&I Trading)"
+                        style={{ width: '100%', marginBottom: '8px' }}
+                    />
+                    <RichTextEditor
+                        value={newText}
+                        onChange={setNewText}
+                        placeholder="Trading warranty text..."
+                        minHeight={80}
+                    />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                        <button onClick={handleAdd} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save</button>
+                        <button onClick={() => { setShowAdd(false); setNewName(''); setNewText('') }} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {templates.length === 0 && !showAdd && (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
+                    No templates yet. Add one to get started.
+                </div>
+            )}
+
+            {templates.map((t, idx) => (
+                <div key={t.id} style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: `1px solid ${editingId === t.id ? 'var(--accent-primary)' : 'var(--table-border)'}`,
+                    marginBottom: '8px',
+                    background: editingId === t.id ? (isLight ? '#f0faff' : 'rgba(0,170,200,0.06)') : 'transparent'
+                }}>
+                    {editingId === t.id ? (
+                        <>
+                            <input
+                                type="text"
+                                value={editName}
+                                onChange={e => setEditName(e.target.value)}
+                                style={{ width: '100%', marginBottom: '8px' }}
+                            />
+                            <RichTextEditor
+                                value={editText}
+                                onChange={setEditText}
+                                minHeight={80}
+                            />
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                                <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save</button>
+                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{t.name}</div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
+                                    {t.text.replace(/<[^>]*>/g, '').substring(0, 120) || '(empty)'}
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                <button onClick={() => move(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronUp size={14} /></button>
+                                <button onClick={() => move(idx, 1)} disabled={idx === templates.length - 1} style={{ background: 'none', border: 'none', cursor: idx === templates.length - 1 ? 'default' : 'pointer', opacity: idx === templates.length - 1 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronDown size={14} /></button>
+                                <button onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}><Pencil size={14} /></button>
+                                <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ))}
+        </section>
+    )
+}
+
 // ==================== Master Subjectivities Tab ====================
 
 function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
@@ -1918,11 +2082,11 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newText, setNewText] = useState('')
     const [newDocTypeIds, setNewDocTypeIds] = useState<string[]>([])
-    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
+    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
-    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'both'>('both')
+    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
@@ -2002,6 +2166,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                             <option value="both">Both</option>
                             <option value="pi">P&I only</option>
                             <option value="hull">Hull only</option>
+                                <option value="war">War only</option>
                         </select>
                     </div>
                     <button onClick={handleAdd} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}><Plus size={14} /> Add Subjectivity</button>
@@ -2029,6 +2194,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                         <option value="both">Both</option>
                                         <option value="pi">P&I only</option>
                                         <option value="hull">Hull only</option>
+                                <option value="war">War only</option>
                                     </select>
                                 </div>
                                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -2207,110 +2373,37 @@ function SanctionsVersionsTab({ showSuccess, showError, isLight }: TabProps) {
 
 // ==================== Standard Texts Tab ====================
 
-export const DEFAULT_SECTION_ORDER: string[] = [
-    'insured', 'vessel', 'agreedValue', 'liability', 'period', 'conditions', 'hullConditions',
-    'trading', 'warranties', 'deductibles', 'exclusions',
-    'sanctions', 'subjectivities', 'premium', 'ncb', 'upcc', 'information'
-]
-
-// Type-specific default section orders
-export const PI_SECTION_ORDER: string[] = [
-    'insured', 'vessel', 'liability', 'period', 'conditions',
-    'trading', 'warranties', 'deductibles', 'exclusions',
-    'sanctions', 'subjectivities', 'premium', 'ncb', 'upcc', 'information'
-]
-
-export const HULL_SECTION_ORDER: string[] = [
-    'insured', 'vessel', 'agreedValue', 'period', 'hullConditions',
-    'trading', 'warranties',
-    'sanctions', 'subjectivities', 'premium', 'ncb', 'upcc', 'information'
-]
-
-export function getDefaultSectionOrder(typeCode?: string): string[] {
-    if (typeCode === 'H') return [...HULL_SECTION_ORDER]
-    if (typeCode === 'P') return [...PI_SECTION_ORDER]
-    return [...DEFAULT_SECTION_ORDER]
-}
-
-export const SECTION_LABELS: Record<string, string> = {
-    insured: 'Insured',
-    vessel: 'Insured Vessel',
-    liability: 'Limit of Liability',
-    period: 'Period',
-    conditions: 'Conditions (P&I)',
-    agreedValue: 'Agreed Insured Value',
-    hullConditions: 'Conditions (Hull)',
-    trading: 'Trading Warranty',
-    warranties: 'Warranties',
-    deductibles: 'Deductibles',
-    exclusions: 'Exclusions',
-    sanctions: 'Sanctions Clause',
-    subjectivities: 'Subjectivities',
-    premium: 'Premium',
-    ncb: 'No Claims Bonus (NCB)',
-    upcc: 'Upfront Continuity (UPCC)',
-    information: 'Information'
-}
-
-export const DEFAULT_SECTION_TEXTS: PISectionTexts = {
-    docHeader: '<p style="text-align: center"><strong>Al Bahriah Insurance &amp; Reinsurance SAL</strong></p>',
-    docHeaderSpacing: 1,
-    docFooter: '<p style="text-align: center">Al Bahriah Insurance &amp; Reinsurance SAL — Confidential</p>',
-    docFooterSpacing: 1,
-    insuredFooter: 'For their respective rights and interests and/or respectively for accounts of whom it may concern.',
-    limitOfLiabilityDefaultText: 'The limit of liability of the Insurer under this Policy shall not exceed {amount} {currency} any one vessel any one accident or occurrence and in the aggregate during the policy period, except where otherwise specifically provided.',
-    conditionsIntro: 'Al-Bahriah Protection & Indemnity Wording 01.01.2025 covering the following Risks Insured:',
-    tradingIntro: 'Subject to Paragraph 2 below, any trade of whatsoever nature with the following countries is excluded.',
-    tradingConditionA: 'Trade with the countries set out in paragraph 1 above is however permitted subject to and provided always that the following express conditions are fully complied with in every respect.',
-    tradingConditionB: 'No cargoes to be carried by the vessel are sanctioned cargoes, the insured to provide all such documentary evidence as we may reasonably require to evidence the same including but not limited to Mates\' receipts, Bills of Lading etc',
-    tradingConditionC: 'No individual or entity listed by any of the US, UK or EU sanctions regimes in respect of the country in question is involved in any way with the vessel, intended trade or cargoes to be carried.',
-    tradingConditionD: 'The Insured is to provide a Compliance Screening Questionnaire to us not less than 3 working days in advance of the vessel\'s entry into the territorial waters of the sanctioned country.',
-    tradingConditionE: 'The Insured to provide such further information as we may reasonably require about the intended trade in or with the sanctioned country.',
-    tradingConditionF: 'The Insurer may decide in our sole and absolute discretion whether or not the Insurer is prepared to offer cover for the trade with the sanctioned country and, if so, on what terms and conditions.',
-    tradingConditionG: 'Cover under this Paragraph 2 to be expressly subject, in any event, to the Sanction Limitation and Exclusion clause contained elsewhere in the Policy, which shall remain paramount.',
-    tradingIsrael: 'Warranted no Israeli trading, involvement, cargo, counterparts whatsoever. A breach of this warranty will automatically void the cover, and discharge Insurer\'s from any liability howsoever arising as from inception of the policy.',
-    ddqCountriesIntro: 'Due Diligence Questionnaire required for trading with the following countries:',
-    warrantiesBreach: `In the event of any breach of the above warranties the Insurer shall be discharged from all liability from the date of the breach whether or not the breach is material to or in any way connected with the risk or any loss or claim and whether or not the breach is remedied before loss but without prejudice to any liability incurred by the Insurer before that date.
-
-The Insurer may in its sole discretion, but shall not be obliged to:
-
-Cancel cover provided under this Policy by notice in writing to the Insured. Such cancellation shall take effect from the date of such notice, or
-
-Continue the Policy on such terms and conditions as it may determine.`,
-    warrantiesNote: 'NOTE: The Insured\'s attention is drawn to the provisions of the P&I Terms and Conditions, which also include Warranties.',
-    deductiblesAggregate: 'When one incident gives rise to a claim of a different nature, the aggregate of all claims shall be subject to the highest deductible applicable to anyone such claim.',
-    subjectivitiesIntro: 'The following documents to be provided within 7 days prior inception:',
-    subjectivitiesNote: 'NOTE: Failure to supply satisfactory information on any subjectivity may result in this quote being withdrawn and/or cover being cancelled and/or claims being excluded.',
-    ncbDefaultText: 'Subject to {ncb_amount}, which is repayable to the insurer in case of claim.',
-    upccDefaultText: '',
-    continuationPiClubText: '',
-    premiumPaymentIntro: 'Premium shall be payable in {instalments} Instalments on the following dates, at Noon Lebanon LST, time being of the essence:',
-    premiumCondition: 'Compliance with this clause shall be a condition precedent to coverage and/or the Insurer\'s liability under this policy. Any failure to comply shall entitle the Insurer to reject claims whether arising before or after the breach and demand payment of the full premium including all unpaid instalments.',
-    premiumEarned: 'Premium deemed earned in full on inception of risk and shall be payable in full notwithstanding any breach by the Insured or any warranty or other provision of the Policy which discharges the Insurer from liability.',
-    informationNote: 'Note: Failure to supply information or provide satisfactory information on any subjectivity (above) may result in this quote being withdrawn and / or cover being cancelled at the sole discretion of Underwriters.',
-    importantNotice: 'IMPORTANT NOTICE\n\nAttention is drawn to Clause 4 of the Al-Bahriah P&I Terms and Conditions applicable to this Policy which contains terms contracting out of certain provisions of the English Insurance Act 2015 as respects the fair presentation of the risk, the effect of warranties and other terms, the making of fraudulent claims, the duty of good faith and damages for late payment of claims.'
-}
+import { getDefaultSectionOrder, SECTION_LABELS, DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
 
 // Fields remaining in Standard Texts tab (trading, conditions, LoL, subjectivities moved to their own tabs)
 const SECTION_TEXT_FIELDS: { key: keyof PISectionTexts; label: string; section: string; rows?: number }[] = [
     { key: 'insuredFooter', label: 'Insured Footer', section: 'Insured', rows: 2 },
-    { key: 'warrantiesBreach', label: 'Breach of Warranties', section: 'Warranties', rows: 8 },
+    { key: 'warrantiesBreach', label: 'Breach of Warranties ({quotation_type} = type name)', section: 'Warranties', rows: 8 },
+    { key: 'warrantiesNote', label: 'Warranties Note ({quotation_type} = type name)', section: 'Warranties', rows: 2 },
     { key: 'warrantiesAdditionalText', label: 'Warranties Additional Text', section: 'Warranties', rows: 3 },
     { key: 'deductiblesAggregate', label: 'Deductibles Aggregate', section: 'Deductibles', rows: 3 },
     { key: 'deductiblesAdditionalText', label: 'Deductibles Additional Text', section: 'Deductibles', rows: 3 },
     { key: 'ncbDefaultText', label: 'NCB Default Text ({ncb_amount}, {ncb_percent} placeholders)', section: 'NCB', rows: 2 },
     { key: 'upccDefaultText', label: 'UPCC Default Text ({upcc_amount}, {upcc_percent} placeholders)', section: 'UPCC', rows: 2 },
     { key: 'continuationPiClubText', label: 'Upfront Continuity Credit (UPCC) Additional Text', section: 'UPCC', rows: 3 },
-    { key: 'premiumPaymentIntro', label: 'Payment Intro ({instalments} = number)', section: 'Premium', rows: 2 },
+    { key: 'nonRefundableFirstText', label: 'Non-Refundable (1st Instalment)', section: 'Premium', rows: 1 },
+    { key: 'nonRefundablePercentText', label: 'Non-Refundable (Percentage) — {percent} placeholder', section: 'Premium', rows: 1 },
+    { key: 'premiumPaymentIntro', label: 'Payment Intro — Multiple Instalments ({instalments} = number)', section: 'Premium', rows: 2 },
+    { key: 'premiumPaymentIntroSingle', label: 'Payment Intro — Single Instalment ({timing} = "at inception" or "within X days")', section: 'Premium', rows: 2 },
     { key: 'premiumCondition', label: 'Payment Condition Precedent', section: 'Premium', rows: 4 },
     { key: 'premiumEarned', label: 'Premium Earned Clause', section: 'Premium', rows: 3 },
     { key: 'informationNote', label: 'Information Note', section: 'Information', rows: 2 },
     { key: 'importantNotice', label: 'Important Notice', section: 'Important Notice', rows: 5 }
 ]
 
+const STANDARD_TEXT_SECTIONS = ['Document Header & Footer', ...Array.from(new Set(SECTION_TEXT_FIELDS.map(f => f.section)))]
+
 function StandardTextsTab({ showSuccess }: TabProps) {
     const [texts, setTexts] = useState<PISectionTexts>({})
     const [loaded, setLoaded] = useState(false)
+    const [activeSection, setActiveSection] = useState(STANDARD_TEXT_SECTIONS[0])
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     useEffect(() => { loadData() }, [])
 
@@ -2335,7 +2428,7 @@ function StandardTextsTab({ showSuccess }: TabProps) {
 
     if (!loaded) return <div style={{ color: 'var(--text-secondary)', padding: '20px' }}>Loading...</div>
 
-    let currentSection = ''
+    const filteredFields = SECTION_TEXT_FIELDS.filter(f => f.section === activeSection)
 
     return (
         <section className="glass-card" style={{ padding: '20px' }}>
@@ -2350,91 +2443,106 @@ function StandardTextsTab({ showSuccess }: TabProps) {
                 </div>
             </div>
 
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: '8px', borderBottom: '1px solid var(--table-border)', paddingBottom: '4px' }}>
-                Document Header &amp; Footer
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                Rich text for the Word document header and footer. Supports different font sizes, alignment, bold/italic, and Arabic text.
-            </p>
-            <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Document Header</label>
-                <RichTextEditor
-                    value={texts.docHeader || ''}
-                    onChange={val => setTexts(prev => ({ ...prev, docHeader: val }))}
-                    minHeight={60}
-                    showFontSize
-                    showAlignment
-                    showLineSpacing
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Default line spacing:</label>
-                    <select
-                        value={texts.docHeaderSpacing ?? 1}
-                        onChange={e => setTexts(prev => ({ ...prev, docHeaderSpacing: parseFloat(e.target.value) }))}
-                        style={{ fontSize: '0.78rem', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', width: '70px' }}
-                    >
-                        <option value={1}>1.0</option>
-                        <option value={1.15}>1.15</option>
-                        <option value={1.5}>1.5</option>
-                        <option value={2}>2.0</option>
-                        <option value={2.5}>2.5</option>
-                        <option value={3}>3.0</option>
-                    </select>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>(applied when no per-line spacing is set)</span>
-                </div>
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Document Footer</label>
-                <RichTextEditor
-                    value={texts.docFooter || ''}
-                    onChange={val => setTexts(prev => ({ ...prev, docFooter: val }))}
-                    minHeight={60}
-                    showFontSize
-                    showAlignment
-                    showLineSpacing
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Default line spacing:</label>
-                    <select
-                        value={texts.docFooterSpacing ?? 1}
-                        onChange={e => setTexts(prev => ({ ...prev, docFooterSpacing: parseFloat(e.target.value) }))}
-                        style={{ fontSize: '0.78rem', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', width: '70px' }}
-                    >
-                        <option value={1}>1.0</option>
-                        <option value={1.15}>1.15</option>
-                        <option value={1.5}>1.5</option>
-                        <option value={2}>2.0</option>
-                        <option value={2.5}>2.5</option>
-                        <option value={3}>3.0</option>
-                    </select>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>(applied when no per-line spacing is set)</span>
-                </div>
+            {/* Section dropdown */}
+            <div style={{ marginBottom: '20px' }}>
+                <select
+                    value={activeSection}
+                    onChange={e => setActiveSection(e.target.value)}
+                    style={{
+                        fontSize: '0.88rem',
+                        fontWeight: 600,
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        border: `2px solid ${isLight ? 'rgba(0,210,255,0.3)' : 'rgba(0,210,255,0.2)'}`,
+                        background: isLight ? '#f0f8ff' : 'rgba(0,210,255,0.06)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        minWidth: '220px'
+                    }}
+                >
+                    {STANDARD_TEXT_SECTIONS.map(s => (
+                        <option key={s} value={s}>{s} ({s === 'Document Header & Footer' ? 2 : SECTION_TEXT_FIELDS.filter(f => f.section === s).length})</option>
+                    ))}
+                </select>
             </div>
 
-            {SECTION_TEXT_FIELDS.map(field => {
-                const showHeader = field.section !== currentSection
-                currentSection = field.section
-                return (
-                    <div key={field.key}>
-                        {showHeader && (
-                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '16px', marginBottom: '8px', borderBottom: '1px solid var(--table-border)', paddingBottom: '4px' }}>
-                                {field.section}
-                            </div>
-                        )}
-                        <div style={{ marginBottom: '12px' }}>
-                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{field.label}</label>
-                            <RichTextEditor
-                                value={String(texts[field.key] || '')}
-                                onChange={val => setTexts(prev => ({ ...prev, [field.key]: val }))}
-                                minHeight={Math.max(60, (field.rows || 3) * 22)}
-                                showFontSize
-                                showAlignment
-                                showLineSpacing
-                            />
+            {/* Document Header & Footer section */}
+            {activeSection === 'Document Header & Footer' && (
+                <>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                        Rich text for the Word document header and footer. Supports different font sizes, alignment, bold/italic, and Arabic text.
+                    </p>
+                    <div style={{ marginBottom: '12px' }}>
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Document Header</label>
+                        <RichTextEditor
+                            value={texts.docHeader || ''}
+                            onChange={val => setTexts(prev => ({ ...prev, docHeader: val }))}
+                            minHeight={60}
+                            showFontSize
+                            showAlignment
+                            showLineSpacing
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Default line spacing:</label>
+                            <select
+                                value={texts.docHeaderSpacing ?? 1}
+                                onChange={e => setTexts(prev => ({ ...prev, docHeaderSpacing: parseFloat(e.target.value) }))}
+                                style={{ fontSize: '0.78rem', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', width: '70px' }}
+                            >
+                                <option value={1}>1.0</option>
+                                <option value={1.15}>1.15</option>
+                                <option value={1.5}>1.5</option>
+                                <option value={2}>2.0</option>
+                                <option value={2.5}>2.5</option>
+                                <option value={3}>3.0</option>
+                            </select>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>(applied when no per-line spacing is set)</span>
                         </div>
                     </div>
-                )
-            })}
+                    <div style={{ marginBottom: '16px' }}>
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Document Footer</label>
+                        <RichTextEditor
+                            value={texts.docFooter || ''}
+                            onChange={val => setTexts(prev => ({ ...prev, docFooter: val }))}
+                            minHeight={60}
+                            showFontSize
+                            showAlignment
+                            showLineSpacing
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Default line spacing:</label>
+                            <select
+                                value={texts.docFooterSpacing ?? 1}
+                                onChange={e => setTexts(prev => ({ ...prev, docFooterSpacing: parseFloat(e.target.value) }))}
+                                style={{ fontSize: '0.78rem', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', width: '70px' }}
+                            >
+                                <option value={1}>1.0</option>
+                                <option value={1.15}>1.15</option>
+                                <option value={1.5}>1.5</option>
+                                <option value={2}>2.0</option>
+                                <option value={2.5}>2.5</option>
+                                <option value={3}>3.0</option>
+                            </select>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>(applied when no per-line spacing is set)</span>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Dynamic section fields */}
+            {activeSection !== 'Document Header & Footer' && filteredFields.map(field => (
+                <div key={field.key} style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{field.label}</label>
+                    <RichTextEditor
+                        value={String(texts[field.key] || '')}
+                        onChange={val => setTexts(prev => ({ ...prev, [field.key]: val }))}
+                        minHeight={Math.max(60, (field.rows || 3) * 22)}
+                        showFontSize
+                        showAlignment
+                        showLineSpacing
+                    />
+                </div>
+            ))}
         </section>
     )
 }
@@ -2605,7 +2713,7 @@ function SectionOrderTab({ showSuccess }: TabProps) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <h3 style={{ fontSize: '1rem', margin: 0 }}>Default Section Order</h3>
                     <div style={{ display: 'flex', gap: '4px' }}>
-                        {[{ code: 'P', label: 'P&I' }, { code: 'H', label: 'Hull' }].map(t => (
+                        {[{ code: 'P', label: 'P&I' }, { code: 'H', label: 'Hull' }, { code: 'W', label: 'War' }].map(t => (
                             <button key={t.code} onClick={() => setSelectedType(t.code)} style={{
                                 padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: selectedType === t.code ? 600 : 400,
                                 border: selectedType === t.code ? '2px solid var(--accent-primary)' : '1px solid var(--table-border)',
@@ -2621,7 +2729,7 @@ function SectionOrderTab({ showSuccess }: TabProps) {
                 </div>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                Set the default order of sections for {selectedType === 'H' ? 'Hull' : 'P&I'} quotation exports. Each quotation can override this order individually.
+                Set the default order of sections for {selectedType === 'H' ? 'Hull' : selectedType === 'W' ? 'War' : 'P&I'} quotation exports. Each quotation can override this order individually.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {order.map((key, i) => (
@@ -2645,8 +2753,10 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
     const [texts, setTexts] = useState<HullAgreedValueText[]>([])
     const [newText, setNewText] = useState('')
     const [newDefault, setNewDefault] = useState(false)
+    const [newSection, setNewSection] = useState('hm')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
+    const [editSection, setEditSection] = useState('hm')
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
@@ -2657,14 +2767,14 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newText.trim()) return
-        await window.api.hullAddAgreedValueText(newText.trim(), newDefault)
-        setNewText(''); setNewDefault(false)
+        await window.api.hullAddAgreedValueText(newText.trim(), newDefault, newSection)
+        setNewText(''); setNewDefault(false); setNewSection('hm')
         showSuccess('Agreed value text added')
         loadData()
     }
 
     const handleSaveEdit = async (id: string) => {
-        await window.api.hullUpdateAgreedValueText(id, { text: editText.trim() })
+        await window.api.hullUpdateAgreedValueText(id, { text: editText.trim(), section: editSection })
         setEditingId(null)
         showSuccess('Text updated')
         loadData()
@@ -2697,6 +2807,10 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
 
             <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start' }}>
                 <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="e.g., on Hull and Machinery, Gear and Equipment and everything connected therewith, nothing excluded." style={{ flex: 1, minHeight: '60px', fontSize: '0.85rem', padding: '8px' }} />
+                <select value={newSection} onChange={e => setNewSection(e.target.value)} style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}>
+                    <option value="hm">Hull</option>
+                    <option value="iv">IV</option>
+                </select>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     <input type="checkbox" checked={newDefault} onChange={e => setNewDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                 </label>
@@ -2713,17 +2827,22 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
                         {editingId === t.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                                 <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minHeight: '50px', fontSize: '0.82rem', padding: '6px' }} />
-                                <button onClick={() => handleSaveEdit(t.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                <select value={editSection} onChange={e => setEditSection(e.target.value)} style={{ width: '70px', fontSize: '0.78rem', padding: '4px 6px' }}>
+                                    <option value="hm">Hull</option>
+                                    <option value="iv">IV</option>
+                                </select>
+                                <button onClick={() => { handleSaveEdit(t.id) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
                                 <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
                             </div>
                         ) : (
                             <span style={{ fontSize: '0.82rem' }}>{t.text}</span>
                         )}
                     </div>
+                    <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', background: t.section === 'iv' ? '#6464ff22' : '#ff64c822', color: t.section === 'iv' ? '#6464ff' : '#ff64c8', border: `1px solid ${t.section === 'iv' ? '#6464ff44' : '#ff64c844'}` }}>{t.section === 'iv' ? 'IV' : 'Hull'}</span>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input type="checkbox" checked={t.defaultSelected} onChange={() => handleToggleDefault(t.id, t.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                     </label>
-                    <button onClick={() => { setEditingId(t.id); setEditText(t.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                    <button onClick={() => { setEditingId(t.id); setEditText(t.text); setEditSection(t.section || 'hm') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                     <button onClick={() => handleDelete(t.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                 </div>
             ))}
@@ -2742,22 +2861,28 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
     const [newName, setNewName] = useState('')
     const [newCode, setNewCode] = useState('')
     const [newDesc, setNewDesc] = useState('')
+    const [newClauseSection, setNewClauseSection] = useState<HullConditionSection>('hm')
 
     // Edit clause
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
     const [editCode, setEditCode] = useState('')
     const [editDesc, setEditDesc] = useState('')
+    const [editClauseSection, setEditClauseSection] = useState<HullConditionSection>('hm')
 
     // Add condition form
     const [newCondNum, setNewCondNum] = useState('')
     const [newCondText, setNewCondText] = useState('')
     const [newCondDefault, setNewCondDefault] = useState(false)
+    const [newCondHasAmount, setNewCondHasAmount] = useState(false)
+    const [newCondPlaceholder, setNewCondPlaceholder] = useState('')
 
     // Edit condition
     const [editCondId, setEditCondId] = useState<string | null>(null)
     const [editCondNum, setEditCondNum] = useState('')
     const [editCondText, setEditCondText] = useState('')
+    const [editCondHasAmount, setEditCondHasAmount] = useState(false)
+    const [editCondPlaceholder, setEditCondPlaceholder] = useState('')
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
@@ -2776,9 +2901,9 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
         e.preventDefault()
         if (!newName.trim() || !newCode.trim()) return
         try {
-            const result = await window.api.hullAddClause(newName.trim(), newCode.trim(), newDesc.trim() || undefined) as any
+            const result = await window.api.hullAddClause(newName.trim(), newCode.trim(), newDesc.trim() || undefined, newClauseSection) as any
             if (result?.error) { showError(result.message || 'Failed to add clause'); return }
-            setNewName(''); setNewCode(''); setNewDesc('')
+            setNewName(''); setNewCode(''); setNewDesc(''); setNewClauseSection('hm')
             showSuccess('Hull clause added')
             loadData()
         } catch (err: any) { showError(err.message || 'Failed to add clause') }
@@ -2786,7 +2911,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
 
     const handleSaveClause = async () => {
         if (!editingId) return
-        try { await window.api.hullUpdateClause(editingId, { name: editName.trim(), code: editCode.trim(), description: editDesc.trim() }) } catch {}
+        try { await window.api.hullUpdateClause(editingId, { name: editName.trim(), code: editCode.trim(), description: editDesc.trim(), conditionSection: editClauseSection }) } catch {}
         setEditingId(null)
         showSuccess('Clause updated')
         loadData()
@@ -2812,15 +2937,15 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
     const handleAddCondition = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedClauseId || !newCondNum.trim() || !newCondText.trim()) return
-        await window.api.hullAddClauseCondition(selectedClauseId, newCondNum.trim(), newCondText.trim(), newCondDefault)
-        setNewCondNum(''); setNewCondText(''); setNewCondDefault(false)
+        await window.api.hullAddClauseCondition(selectedClauseId, newCondNum.trim(), newCondText.trim(), newCondDefault, 'both', newCondHasAmount, newCondPlaceholder.trim() || undefined)
+        setNewCondNum(''); setNewCondText(''); setNewCondDefault(false); setNewCondHasAmount(false); setNewCondPlaceholder('')
         showSuccess('Condition added')
         loadConditions(selectedClauseId)
     }
 
     const handleSaveCondition = async () => {
         if (!editCondId || !selectedClauseId) return
-        await window.api.hullUpdateClauseCondition(editCondId, { conditionNumber: editCondNum.trim(), text: editCondText.trim() })
+        await window.api.hullUpdateClauseCondition(editCondId, { conditionNumber: editCondNum.trim(), text: editCondText.trim(), hasAmount: editCondHasAmount, amountPlaceholder: editCondPlaceholder.trim() || undefined })
         setEditCondId(null)
         showSuccess('Condition updated')
         loadConditions(selectedClauseId)
@@ -2857,11 +2982,17 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                 <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Hull Clauses</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Main clause types (e.g., CL.280, CL.280 FPA, CL.284). Each clause has its own set of conditions.</p>
 
-                <form onSubmit={handleAddClause} style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                    <input type="text" value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (e.g., 280)" style={{ width: '100px' }} required />
-                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name (e.g., Institute Time Clauses – Hulls CL.280)" style={{ flex: 1, minWidth: '250px' }} required />
-                    <input type="text" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Description (optional)" style={{ flex: 1, minWidth: '200px' }} />
-                    <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                <form onSubmit={handleAddClause} style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
+                        <input type="text" value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (e.g., 280)" style={{ width: '100px' }} required />
+                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name (e.g., Institute Time Clauses – Hulls CL.280)" style={{ flex: 1, minWidth: '250px' }} required />
+                        <select value={newClauseSection} onChange={e => setNewClauseSection(e.target.value as HullConditionSection)} style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}>
+                            <option value="hm">Hull</option>
+                            <option value="iv">IV</option>
+                        </select>
+                        <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                    </div>
+                    <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Wording of the condition" rows={2} style={{ width: '100%', fontSize: '0.82rem', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', resize: 'vertical' }} required />
                 </form>
 
                 {clauses.map((c, i) => (
@@ -2876,23 +3007,32 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                             <button onClick={() => handleMoveClause(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                         </div>
                         {editingId === c.id ? (
-                            <div style={{ flex: 1, display: 'flex', gap: '8px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                                <input type="text" value={editCode} onChange={e => setEditCode(e.target.value)} style={{ width: '80px', fontSize: '0.82rem', padding: '4px 8px' }} />
-                                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ flex: 1, minWidth: '200px', fontSize: '0.82rem', padding: '4px 8px' }} />
-                                <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Description" style={{ flex: 1, minWidth: '150px', fontSize: '0.82rem', padding: '4px 8px' }} />
-                                <button onClick={handleSaveClause} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
-                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                            <div style={{ flex: 1 }} onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '6px' }}>
+                                    <input type="text" value={editCode} onChange={e => setEditCode(e.target.value)} style={{ width: '80px', fontSize: '0.82rem', padding: '4px 8px' }} />
+                                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ flex: 1, minWidth: '200px', fontSize: '0.82rem', padding: '4px 8px' }} />
+                                    <select value={editClauseSection} onChange={e => setEditClauseSection(e.target.value as HullConditionSection)} style={{ width: '80px', fontSize: '0.78rem', padding: '4px 6px' }}>
+                                        <option value="hm">Hull</option>
+                                        <option value="iv">IV</option>
+                                    </select>
+                                    <button onClick={handleSaveClause} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                                </div>
+                                <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Wording" rows={2} style={{ width: '100%', fontSize: '0.82rem', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', resize: 'vertical' }} />
                             </div>
                         ) : (
-                            <>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '60px', color: 'var(--accent-primary)' }}>CL.{c.code}</span>
-                                <span style={{ fontSize: '0.82rem', flex: 1 }}>{c.name}</span>
-                                {c.description && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description}</span>}
-                                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '4px' }}>
-                                    <button onClick={() => { setEditingId(c.id); setEditCode(c.code); setEditName(c.name); setEditDesc(c.description || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                    <button onClick={() => handleDeleteClause(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '60px', color: 'var(--accent-primary)' }}>CL.{c.code}</span>
+                                    <span style={{ fontSize: '0.82rem', flex: 1 }}>{c.name}</span>
+                                    <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', background: c.conditionSection === 'iv' ? '#6464ff22' : '#ff64c822', color: c.conditionSection === 'iv' ? '#6464ff' : '#ff64c8', border: `1px solid ${c.conditionSection === 'iv' ? '#6464ff44' : '#ff64c844'}` }}>{c.conditionSection === 'iv' ? 'IV' : 'Hull'}</span>
+                                    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '4px' }}>
+                                        <button onClick={() => { setEditingId(c.id); setEditCode(c.code); setEditName(c.name); setEditDesc(c.description || ''); setEditClauseSection(c.conditionSection || 'hm') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                        <button onClick={() => handleDeleteClause(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                    </div>
                                 </div>
-                            </>
+                                {c.description && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>{c.description}</p>}
+                            </div>
                         )}
                     </div>
                 ))}
@@ -2904,12 +3044,16 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                     <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Conditions for CL.{selectedClause.code}</h3>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>{selectedClause.name}</p>
 
-                    <form onSubmit={handleAddCondition} style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    <form onSubmit={handleAddCondition} style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <input type="text" value={newCondNum} onChange={e => setNewCondNum(e.target.value)} placeholder="Cl. #" style={{ width: '70px' }} required />
                         <input type="text" value={newCondText} onChange={e => setNewCondText(e.target.value)} placeholder="Condition text (e.g., Collision Liability deleted.)" style={{ flex: 1, minWidth: '250px' }} required />
                         <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             <input type="checkbox" checked={newCondDefault} onChange={e => setNewCondDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                         </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={newCondHasAmount} onChange={e => setNewCondHasAmount(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Amount
+                        </label>
+                        {newCondHasAmount && <input type="text" value={newCondPlaceholder} onChange={e => setNewCondPlaceholder(e.target.value)} placeholder="Placeholder e.g. {deductible}" style={{ width: '160px', fontSize: '0.8rem' }} />}
                         <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
                     </form>
 
@@ -2920,9 +3064,13 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                                 <button onClick={() => handleMoveCondition(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
                             </div>
                             {editCondId === cond.id ? (
-                                <div style={{ flex: 1, display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <input type="text" value={editCondNum} onChange={e => setEditCondNum(e.target.value)} style={{ width: '60px', fontSize: '0.82rem', padding: '4px 6px' }} />
-                                    <input type="text" value={editCondText} onChange={e => setEditCondText(e.target.value)} style={{ flex: 1, fontSize: '0.82rem', padding: '4px 6px' }} />
+                                    <input type="text" value={editCondText} onChange={e => setEditCondText(e.target.value)} style={{ flex: 1, fontSize: '0.82rem', padding: '4px 6px', minWidth: '200px' }} />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                        <input type="checkbox" checked={editCondHasAmount} onChange={e => setEditCondHasAmount(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Amount
+                                    </label>
+                                    {editCondHasAmount && <input type="text" value={editCondPlaceholder} onChange={e => setEditCondPlaceholder(e.target.value)} placeholder="{placeholder}" style={{ width: '130px', fontSize: '0.78rem', padding: '4px 6px' }} />}
                                     <button onClick={handleSaveCondition} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
                                     <button onClick={() => setEditCondId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
                                 </div>
@@ -2930,10 +3078,11 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                                 <>
                                     <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '50px', color: 'var(--accent-primary)' }}>Cl.{cond.conditionNumber}</span>
                                     <span style={{ fontSize: '0.82rem', flex: 1 }}>{cond.text}</span>
+                                    {cond.hasAmount && <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', background: '#f59e0b22', color: '#f59e0b', border: '1px solid #f59e0b44' }}>{cond.amountPlaceholder || 'AMT'}</span>}
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                         <input type="checkbox" checked={cond.defaultSelected} onChange={() => handleToggleCondDefault(cond.id, cond.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                                     </label>
-                                    <button onClick={() => { setEditCondId(cond.id); setEditCondNum(cond.conditionNumber); setEditCondText(cond.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={() => { setEditCondId(cond.id); setEditCondNum(cond.conditionNumber); setEditCondText(cond.text); setEditCondHasAmount(!!cond.hasAmount); setEditCondPlaceholder(cond.amountPlaceholder || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                     <button onClick={() => handleDeleteCondition(cond.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </>
                             )}
@@ -2950,25 +3099,31 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
 
 function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
     const [conditions, setConditions] = useState<HullAdditionalCondition[]>([])
+    const [hullClauses, setHullClauses] = useState<{ id: string; name: string; code: string }[]>([])
     const [newTitle, setNewTitle] = useState('')
     const [newText, setNewText] = useState('')
     const [newDefault, setNewDefault] = useState(false)
+    const [newClauseIds, setNewClauseIds] = useState<string[]>([])
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editTitle, setEditTitle] = useState('')
     const [editText, setEditText] = useState('')
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
-        const result = await window.api.hullGetAdditionalConditions()
+        const [result, clauses] = await Promise.all([
+            window.api.hullGetAdditionalConditions(),
+            window.api.hullGetClauses()
+        ])
         if (Array.isArray(result)) setConditions(result)
+        if (Array.isArray(clauses)) setHullClauses(clauses)
     }
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newText.trim()) return
-        const result = await window.api.hullAddAdditionalCondition(newTitle.trim() || null, newText.trim(), newDefault) as any
+        const result = await window.api.hullAddAdditionalCondition(newTitle.trim() || null, newText.trim(), newDefault, newClauseIds) as any
         if (result?.error) { showError(result.message || 'Failed to add condition'); return }
-        setNewTitle(''); setNewText(''); setNewDefault(false)
+        setNewTitle(''); setNewText(''); setNewDefault(false); setNewClauseIds([])
         showSuccess('Condition added')
         loadData()
     }
@@ -2977,6 +3132,15 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
         await window.api.hullUpdateAdditionalCondition(id, { title: editTitle.trim() || null, text: editText.trim() })
         setEditingId(null)
         showSuccess('Condition updated')
+        loadData()
+    }
+
+    const toggleClauseLink = async (conditionId: string, clauseId: string) => {
+        const cond = conditions.find(c => c.id === conditionId)
+        if (!cond) return
+        const current = cond.hullClauseIds || []
+        const updated = current.includes(clauseId) ? current.filter(id => id !== clauseId) : [...current, clauseId]
+        await window.api.hullUpdateAdditionalCondition(conditionId, { hullClauseIds: updated })
         loadData()
     }
 
@@ -3005,13 +3169,185 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Hull Additional Conditions</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Standalone condition paragraphs (exclusions, terms references, etc.) that can be added to Hull quotations. Default items are auto-added.</p>
 
-            <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. War Exclusion)" style={{ width: '200px', flexShrink: 0 }} />
-                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Condition text (e.g., Excluding all claims of whatsoever nature...)" style={{ flex: 1, minHeight: '60px', minWidth: '200px', fontSize: '0.85rem', padding: '8px' }} />
+            <form onSubmit={handleAdd} style={{ marginBottom: '16px', padding: '14px', borderRadius: '8px', border: '1px dashed var(--table-border)' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '10px' }}>
+                    <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. War Exclusion)" style={{ width: '200px', flexShrink: 0 }} />
+                    <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Condition text (e.g., Excluding all claims of whatsoever nature...)" style={{ flex: 1, minHeight: '100px', minWidth: '200px', fontSize: '0.85rem', padding: '8px' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {hullClauses.length > 0 && (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginRight: '2px' }}>Clauses:</span>
+                            <button type="button" onClick={() => setNewClauseIds(prev => prev.length === hullClauses.length ? [] : hullClauses.map(hc => hc.id))}
+                                style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                            >All</button>
+                            {hullClauses.map(hc => (
+                                <button key={hc.id} type="button" onClick={() => setNewClauseIds(prev => prev.includes(hc.id) ? prev.filter(id => id !== hc.id) : [...prev, hc.id])}
+                                    style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: newClauseIds.includes(hc.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newClauseIds.includes(hc.id) ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: newClauseIds.includes(hc.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                                >{hc.code}</button>
+                            ))}
+                        </div>
+                    )}
+                    <div style={{ flex: 1 }} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input type="checkbox" checked={newDefault} onChange={e => setNewDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                    </label>
+                    <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                </div>
+            </form>
+
+            {conditions.map((c, i) => (
+                <div key={c.id} style={{ borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', marginBottom: '10px', overflow: 'hidden' }}>
+                    {/* Header: title + actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display: 'flex', gap: '2px', marginRight: '2px' }}>
+                            <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                            <button onClick={() => handleMove(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                        </div>
+                        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)' }}>{c.title || 'Untitled Condition'}</span>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={c.defaultSelected} onChange={() => handleToggleDefault(c.id, c.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
+                        </label>
+                        <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                        <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                    </div>
+                    {/* Body: text or edit form */}
+                    <div style={{ padding: '10px 14px 10px 42px' }}>
+                        {editingId === c.id ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '240px' }} />
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ width: '100%', minHeight: '100px', fontSize: '0.82rem', padding: '8px', resize: 'vertical' }} />
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '5px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Save size={12} /> Save</button>
+                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '5px 12px', fontSize: '0.78rem' }}>Cancel</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{c.text}</div>
+                        )}
+                    </div>
+                    {/* Footer: clause pills */}
+                    {hullClauses.length > 0 && (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', padding: '8px 14px 10px 42px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginRight: '2px' }}>Clauses:</span>
+                            <button type="button" onClick={() => {
+                                const allIds = hullClauses.map(hc => hc.id)
+                                const current = c.hullClauseIds || []
+                                const updated = current.length === allIds.length ? [] : allIds
+                                window.api.hullUpdateAdditionalCondition(c.id, { hullClauseIds: updated }).then(() => loadData())
+                            }}
+                                style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.18)', background: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                            >All</button>
+                            {hullClauses.map(hc => {
+                                const linked = (c.hullClauseIds || []).includes(hc.id)
+                                return (
+                                    <button key={hc.id} type="button" onClick={() => toggleClauseLink(c.id, hc.id)}
+                                        style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: linked ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.18)', background: linked ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: linked ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                                    >{hc.code}</button>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+            ))}
+            {conditions.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No additional conditions yet.</p>}
+        </section>
+    )
+}
+
+// ==================== War Conditions Tab ====================
+
+function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
+    const [conditions, setConditions] = useState<WarCondition[]>([])
+    const [newText, setNewText] = useState('')
+    const [newDefault, setNewDefault] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editText, setEditText] = useState('')
+    const [showImport, setShowImport] = useState(false)
+    const [importText, setImportText] = useState('')
+    const [importParsed, setImportParsed] = useState<string[]>([])
+    const [importAsDefault, setImportAsDefault] = useState(true)
+
+    useEffect(() => { loadData() }, [])
+    const loadData = async () => {
+        const result = await window.api.warGetConditions()
+        if (Array.isArray(result)) setConditions(result)
+    }
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newText.trim()) return
+        try {
+            await window.api.warAddCondition(newText.trim(), newDefault)
+            setNewText(''); setNewDefault(false)
+            showSuccess('War condition added')
+            loadData()
+        } catch { showError('Failed to add condition') }
+    }
+
+    const parseImportText = (raw: string) => {
+        const lines = raw.split('\n')
+            .map(l => l.replace(/^[\s\-\u2022\u2013\u2014*•·\d.)\]]+\s*/, '').trim())
+            .filter(l => l.length > 0)
+        setImportParsed(lines)
+    }
+
+    const handleBulkImport = async () => {
+        if (importParsed.length === 0) return
+        try {
+            for (const text of importParsed) {
+                await window.api.warAddCondition(text, importAsDefault)
+            }
+            showSuccess(`${importParsed.length} conditions imported`)
+            setShowImport(false)
+            setImportText('')
+            setImportParsed([])
+            loadData()
+        } catch { showError('Failed to import conditions') }
+    }
+
+    const handleSaveEdit = async (id: string) => {
+        await window.api.warUpdateCondition(id, { text: editText.trim() })
+        setEditingId(null)
+        showSuccess('Condition updated')
+        loadData()
+    }
+
+    const handleToggleDefault = async (id: string, current: boolean) => {
+        await window.api.warUpdateCondition(id, { defaultSelected: !current })
+        loadData()
+    }
+
+    const handleDelete = async (id: string) => {
+        await window.api.warDeleteCondition(id)
+        showSuccess('Condition deleted')
+        loadData()
+    }
+
+    const handleMove = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...conditions]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setConditions(newOrder)
+        await window.api.warReorderConditions(newOrder.map(c => c.id))
+    }
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>War Risk Conditions</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                Manage conditions for War Risk quotations. Default conditions are auto-selected for new quotations.
+                Use <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{jwla_code}'}</code> and <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{jwla_date}'}</code> placeholders for JWLA references, and <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{tc_text}'}</code> for the Terms &amp; Conditions line.
+            </p>
+
+            <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start' }}>
+                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="e.g., Institute War and Strikes Clause CL. 281 dated 1/10/83..." style={{ flex: 1, minHeight: '60px', fontSize: '0.85rem', padding: '8px' }} />
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     <input type="checkbox" checked={newDefault} onChange={e => setNewDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                 </label>
                 <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                <button type="button" onClick={() => setShowImport(true)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Download size={14} /> Bulk Import</button>
             </form>
 
             {conditions.map((c, i) => (
@@ -3022,27 +3358,170 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                     </div>
                     <div style={{ flex: 1 }}>
                         {editingId === c.id ? (
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                                <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '180px' }} />
-                                <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minWidth: '200px', minHeight: '50px', fontSize: '0.82rem', padding: '6px' }} />
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minHeight: '50px', fontSize: '0.82rem', padding: '6px' }} />
                                 <button onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
                                 <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
                             </div>
                         ) : (
-                            <div style={{ fontSize: '0.82rem' }}>
-                                {c.title && <span style={{ fontWeight: 600, marginRight: '8px', color: 'var(--text-primary)' }}>{c.title}</span>}
-                                <span style={{ whiteSpace: 'pre-wrap' }}>{c.text}</span>
-                            </div>
+                            <span style={{ fontSize: '0.82rem' }}>{c.text}</span>
                         )}
                     </div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input type="checkbox" checked={c.defaultSelected} onChange={() => handleToggleDefault(c.id, c.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                     </label>
-                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                    <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                    <button onClick={() => { setEditingId(c.id); setEditText(c.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
+                    <button onClick={() => handleDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                 </div>
             ))}
-            {conditions.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No additional conditions yet.</p>}
+            {conditions.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No war conditions yet.</p>}
+
+            {/* Bulk Import Modal */}
+            {showImport && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowImport(false)}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', width: '600px', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 8px', fontSize: '1rem' }}>Bulk Import War Conditions</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+                            Paste conditions below, one per line. Bullets, dashes, and numbering are automatically stripped.
+                        </p>
+                        <textarea
+                            value={importText}
+                            onChange={e => { setImportText(e.target.value); parseImportText(e.target.value) }}
+                            placeholder="- Institute War and Strikes Clause CL. 281 dated 1/10/83&#10;- Violent Theft, Piracy and Barratry Extension Clause JW 2005-002&#10;- ..."
+                            style={{ width: '100%', minHeight: '160px', fontSize: '0.84rem', padding: '10px', marginBottom: '10px' }}
+                        />
+                        {importParsed.length > 0 && (
+                            <div style={{ marginBottom: '12px' }}>
+                                <p style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '6px' }}>{importParsed.length} condition{importParsed.length !== 1 ? 's' : ''} parsed:</p>
+                                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--table-border)', borderRadius: '6px', padding: '8px' }}>
+                                    {importParsed.map((t, i) => (
+                                        <div key={i} style={{ fontSize: '0.78rem', padding: '4px 0', borderBottom: i < importParsed.length - 1 ? '1px solid var(--table-border)' : 'none', color: 'var(--text-primary)' }}>
+                                            <span style={{ color: 'var(--text-secondary)', marginRight: '6px' }}>{i + 1}.</span>{t}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={importAsDefault} onChange={e => setImportAsDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Set all as default
+                            </label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => { setShowImport(false); setImportText(''); setImportParsed([]) }} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                                <button onClick={handleBulkImport} className="btn-primary" disabled={importParsed.length === 0} style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Plus size={14} /> Import {importParsed.length > 0 ? `${importParsed.length} Conditions` : ''}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </section>
+    )
+}
+
+// ==================== War Settings Tab ====================
+
+function WarSettingsTab({ showSuccess, showError }: TabProps) {
+    const [settings, setSettings] = useState<WarSettings>({
+        jwlaCode: 'JWLA032',
+        jwlaDate: 'December 18, 2023',
+        tcText: 'Al-Bahriah Hull War Terms & Conditions 01 January 2025',
+        tradingWarrantyText: 'Worldwide, subject to JWC Hull War, Piracy, Terrorism and Related Perils Listed Areas {jwla_date} {jwla_code}.',
+        defaultRate: undefined
+    })
+    const [loaded, setLoaded] = useState(false)
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const result = await window.api.warGetSettings()
+                if (result && !(result as any).error) setSettings(result)
+            } catch {}
+            setLoaded(true)
+        })()
+    }, [])
+
+    const handleSave = async () => {
+        try {
+            await window.api.warSetSettings(settings)
+            showSuccess('War settings saved')
+        } catch { showError('Failed to save war settings') }
+    }
+
+    if (!loaded) return <p style={{ padding: '20px', color: 'var(--text-secondary)' }}>Loading...</p>
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>War Risk Settings</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Configure JWLA reference, Terms &amp; Conditions text, and trading warranty default text for War Risk quotations.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+                <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>JWLA Code</label>
+                    <input
+                        value={settings.jwlaCode}
+                        onChange={e => setSettings({ ...settings, jwlaCode: e.target.value })}
+                        placeholder="e.g., JWLA032"
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
+                    />
+                </div>
+                <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>JWLA Date</label>
+                    <input
+                        value={settings.jwlaDate}
+                        onChange={e => setSettings({ ...settings, jwlaDate: e.target.value })}
+                        placeholder="e.g., December 18, 2023"
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
+                    />
+                </div>
+                <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Default Rate (per mille ‰)</label>
+                    <input
+                        type="number"
+                        step="0.001"
+                        value={settings.defaultRate ?? ''}
+                        onChange={e => setSettings({ ...settings, defaultRate: e.target.value ? parseFloat(e.target.value) : undefined })}
+                        placeholder="e.g., 0.30"
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
+                    />
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Premium = Sum Insured &times; Rate / 1000
+                    </p>
+                </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Terms &amp; Conditions Text</label>
+                <input
+                    value={settings.tcText}
+                    onChange={e => setSettings({ ...settings, tcText: e.target.value })}
+                    placeholder="e.g., Al-Bahriah Hull War Terms & Conditions 01 January 2025"
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
+                />
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    This text is rendered as a standalone line in the Conditions section. Use <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{tc_text}'}</code> placeholder in conditions to reference it.
+                </p>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Trading Warranty Text</label>
+                <textarea
+                    value={settings.tradingWarrantyText}
+                    onChange={e => setSettings({ ...settings, tradingWarrantyText: e.target.value })}
+                    placeholder="Trading warranty text with {jwla_code} and {jwla_date} placeholders..."
+                    style={{ width: '100%', minHeight: '80px', fontSize: '0.85rem', padding: '8px 10px' }}
+                />
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Placeholders: <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{jwla_code}'}</code>, <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{jwla_date}'}</code>
+                </p>
+            </div>
+
+            <button onClick={handleSave} className="btn-primary" style={{ padding: '8px 20px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Save size={14} /> Save Settings
+            </button>
         </section>
     )
 }

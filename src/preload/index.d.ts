@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -203,35 +203,50 @@ export interface Api {
 
   // Hull settings
   hullGetAgreedValueTexts: () => Promise<HullAgreedValueText[]>
-  hullAddAgreedValueText: (text: string, defaultSelected: boolean) => Promise<HullAgreedValueText>
+  hullAddAgreedValueText: (text: string, defaultSelected: boolean, section?: string) => Promise<HullAgreedValueText>
   hullUpdateAgreedValueText: (id: string, updates: Partial<HullAgreedValueText>) => Promise<void>
   hullDeleteAgreedValueText: (id: string) => Promise<void>
   hullReorderAgreedValueTexts: (ids: string[]) => Promise<void>
 
   hullGetClauses: () => Promise<HullClause[]>
-  hullAddClause: (name: string, code: string, description?: string) => Promise<HullClause>
+  hullAddClause: (name: string, code: string, description?: string, conditionSection?: string) => Promise<HullClause>
   hullUpdateClause: (id: string, updates: Partial<HullClause>) => Promise<void>
   hullDeleteClause: (id: string) => Promise<void>
   hullReorderClauses: (ids: string[]) => Promise<void>
 
   hullGetClauseConditions: (hullClauseId?: string) => Promise<HullClauseCondition[]>
-  hullAddClauseCondition: (hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean) => Promise<HullClauseCondition>
+  hullAddClauseCondition: (hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean, conditionSection?: string, hasAmount?: boolean, amountPlaceholder?: string) => Promise<HullClauseCondition>
   hullUpdateClauseCondition: (id: string, updates: Partial<HullClauseCondition>) => Promise<void>
   hullDeleteClauseCondition: (id: string) => Promise<void>
   hullReorderClauseConditions: (ids: string[]) => Promise<void>
 
   hullGetAdditionalConditions: () => Promise<HullAdditionalCondition[]>
-  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean) => Promise<HullAdditionalCondition>
-  hullUpdateAdditionalCondition: (id: string, updates: { title?: string | null; text?: string; defaultSelected?: boolean }) => Promise<void>
+  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[]) => Promise<HullAdditionalCondition>
+  hullUpdateAdditionalCondition: (id: string, updates: { title?: string | null; text?: string; defaultSelected?: boolean; hullClauseIds?: string[] }) => Promise<void>
   hullDeleteAdditionalCondition: (id: string) => Promise<void>
   hullReorderAdditionalConditions: (ids: string[]) => Promise<void>
 
   hullGetQuotationAgreedValueItems: (qId: string) => Promise<QuotationAgreedValueItem[]>
   hullSetQuotationAgreedValueItems: (qId: string, items: { hullTextId?: string; text: string; vesselScope?: string[] | null }[]) => Promise<void>
+  hullGetQuotationAlternatives: (qId: string) => Promise<QuotationHullAlternative[]>
+  hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string) => Promise<QuotationHullAlternative>
+  hullUpdateQuotationAlternative: (id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null }) => Promise<void>
+  hullDeleteQuotationAlternative: (id: string) => Promise<void>
+  hullReorderQuotationAlternatives: (ids: string[]) => Promise<void>
   hullGetQuotationHullConditions: (qId: string) => Promise<QuotationHullCondition[]>
-  hullSetQuotationHullConditions: (qId: string, items: { hullConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]) => Promise<void>
+  hullSetQuotationHullConditions: (qId: string, items: { hullConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
   hullGetQuotationHullAdditionalConditions: (qId: string) => Promise<QuotationHullAdditionalCondition[]>
-  hullSetQuotationHullAdditionalConditions: (qId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]) => Promise<void>
+  hullSetQuotationHullAdditionalConditions: (qId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
+
+  warGetConditions: () => Promise<WarCondition[]>
+  warAddCondition: (text: string, defaultSelected: boolean) => Promise<WarCondition>
+  warUpdateCondition: (id: string, updates: Partial<WarCondition>) => Promise<void>
+  warDeleteCondition: (id: string) => Promise<void>
+  warReorderConditions: (ids: string[]) => Promise<void>
+  warGetQuotationWarConditions: (qId: string) => Promise<QuotationWarCondition[]>
+  warSetQuotationWarConditions: (qId: string, items: { warConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]) => Promise<void>
+  warGetSettings: () => Promise<WarSettings>
+  warSetSettings: (settings: WarSettings) => Promise<void>
 
   piGetWarrantyTags: () => Promise<PIWarrantyTag[]>
   piAddWarrantyTag: (name: string) => Promise<PIWarrantyTag>
@@ -295,6 +310,13 @@ export interface Api {
   piAddTradingExcludedCountry: (country: Omit<TradingExcludedCountry, 'id'>) => Promise<TradingExcludedCountry>
   piUpdateTradingExcludedCountry: (id: string, updates: Partial<TradingExcludedCountry>) => Promise<void>
   piDeleteTradingExcludedCountry: (id: string) => Promise<void>
+
+  // Trading Warranty Templates
+  piGetTradingWarrantyTemplates: () => Promise<TradingWarrantyTemplate[]>
+  piAddTradingWarrantyTemplate: (name: string, text: string) => Promise<TradingWarrantyTemplate>
+  piUpdateTradingWarrantyTemplate: (id: string, updates: Partial<{ name: string; text: string }>) => Promise<void>
+  piDeleteTradingWarrantyTemplate: (id: string) => Promise<void>
+  piReorderTradingWarrantyTemplates: (ids: string[]) => Promise<void>
 
   // P&I Section Texts
   piGetSectionTexts: () => Promise<PISectionTexts>
