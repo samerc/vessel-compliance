@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Upload, FolderOpen } from 'lucide-react'
-import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
+import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Upload, FolderOpen, Plus } from 'lucide-react'
+import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -36,6 +36,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
     const [selectedUBOId, setSelectedUBOId] = useState<string | null>(null)
+
+    // Address state
+    const [allAddresses, setAllAddresses] = useState<EntityAddress[]>([])
+    const [showAddAddressFor, setShowAddAddressFor] = useState<string | null>(null) // vesselAssured id
+    const [addrForm, setAddrForm] = useState({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
 
     // Editing state for assured roles
     const [editingVesselAssuredId, setEditingVesselAssuredId] = useState<string | null>(null)
@@ -76,16 +81,18 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const loadData = async () => {
         try {
-            const [e, r, va, eu] = await Promise.all([
+            const [e, r, va, eu, addrs] = await Promise.all([
                 window.api.getEntities(),
                 window.api.getAssuredRoles(),
                 window.api.getVesselAssureds(vessel.id),
-                window.api.getEntityUBOs()
+                window.api.getEntityUBOs(),
+                window.api.getAllEntityAddresses()
             ])
             setEntities(Array.isArray(e) ? e : [])
             setRoles(Array.isArray(r) ? r : [])
             setVesselAssureds(Array.isArray(va) ? va : [])
             setEntityUBOs(Array.isArray(eu) ? eu : [])
+            setAllAddresses(Array.isArray(addrs) ? addrs : [])
         } catch (error) {
             console.error('Failed to load assured data:', error)
         }
@@ -246,6 +253,35 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         } finally {
             setIsSavingName(false)
         }
+    }
+
+    const handleChangeAddress = async (vesselAssuredId: string, addressId: string | null) => {
+        try {
+            await window.api.updateVesselAssuredAddress(vesselAssuredId, addressId)
+            setVesselAssureds(prev => prev.map(va => va.id === vesselAssuredId ? { ...va, addressId } : va))
+        } catch (e: any) { showError(e.message || 'Failed to update address') }
+    }
+
+    const handleAddNewAddress = async (vesselAssuredId: string, entityId: string) => {
+        if (!addrForm.label.trim() || !addrForm.addressLine1.trim()) return
+        try {
+            const newAddr = await window.api.addEntityAddress({
+                entityId,
+                label: addrForm.label.trim(),
+                addressLine1: addrForm.addressLine1.trim(),
+                addressLine2: addrForm.addressLine2.trim() || undefined,
+                city: addrForm.city.trim() || undefined,
+                country: addrForm.country.trim() || undefined,
+                postalCode: addrForm.postalCode.trim() || undefined
+            })
+            if (newAddr && newAddr.id) {
+                setAllAddresses(prev => [...prev, newAddr])
+                await handleChangeAddress(vesselAssuredId, newAddr.id)
+                showSuccess('Address added and assigned')
+            }
+            setShowAddAddressFor(null)
+            setAddrForm({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
+        } catch (e: any) { showError(e.message || 'Failed to add address') }
     }
 
     const handleDeleteAssured = async (id: string) => {
@@ -764,6 +800,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                         <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                             <th style={{ padding: '16px' }}>Assured Name</th>
                             <th style={{ padding: '16px' }}>Role</th>
+                            <th style={{ padding: '16px' }}>Address</th>
                             <th style={{ padding: '16px' }}>UBOs</th>
                             <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                         </tr>
@@ -852,6 +889,63 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                             )}
                                         </td>
                                         <td style={{ padding: '16px' }}>
+                                            {(() => {
+                                                const entityAddrs = allAddresses.filter(a => a.entityId === va.entityId)
+                                                const currentAddr = entityAddrs.find(a => a.id === va.addressId)
+                                                return (
+                                                    <div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <select
+                                                                value={va.addressId || ''}
+                                                                onChange={e => handleChangeAddress(va.id, e.target.value || null)}
+                                                                style={{ padding: '4px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', maxWidth: '180px' }}
+                                                            >
+                                                                <option value="">— No address —</option>
+                                                                {entityAddrs.map(a => (
+                                                                    <option key={a.id} value={a.id}>{a.label}</option>
+                                                                ))}
+                                                            </select>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setShowAddAddressFor(showAddAddressFor === va.id ? null : va.id)
+                                                                    setAddrForm({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
+                                                                }}
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }}
+                                                                title="Add new address"
+                                                            >
+                                                                <Plus size={14} />
+                                                            </button>
+                                                        </div>
+                                                        {currentAddr && (
+                                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.3 }}>
+                                                                {currentAddr.addressLine1}
+                                                                {currentAddr.city && `, ${currentAddr.city}`}
+                                                                {currentAddr.country && `, ${currentAddr.country}`}
+                                                            </div>
+                                                        )}
+                                                        {showAddAddressFor === va.id && (
+                                                            <div style={{ marginTop: '8px', background: isLight ? '#f0f4f8' : 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '10px', border: '1px solid var(--table-border)' }}>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                    <input placeholder="Label *" value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
+                                                                    <input placeholder="Address Line 1 *" value={addrForm.addressLine1} onChange={e => setAddrForm(p => ({ ...p, addressLine1: e.target.value }))} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
+                                                                    <input placeholder="Address Line 2" value={addrForm.addressLine2} onChange={e => setAddrForm(p => ({ ...p, addressLine2: e.target.value }))} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
+                                                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                                                        <input placeholder="City" value={addrForm.city} onChange={e => setAddrForm(p => ({ ...p, city: e.target.value }))} style={{ flex: 1, padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
+                                                                        <input placeholder="Postal Code" value={addrForm.postalCode} onChange={e => setAddrForm(p => ({ ...p, postalCode: e.target.value }))} style={{ width: '80px', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
+                                                                    </div>
+                                                                    <input placeholder="Country" value={addrForm.country} onChange={e => setAddrForm(p => ({ ...p, country: e.target.value }))} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
+                                                                    <div style={{ display: 'flex', gap: '5px', marginTop: '3px' }}>
+                                                                        <button onClick={() => handleAddNewAddress(va.id, va.entityId)} disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>Save & Assign</button>
+                                                                        <button onClick={() => setShowAddAddressFor(null)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>Cancel</button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })()}
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
                                             <button
                                                 onClick={() => setExpandedAssuredId(isExpanded ? null : va.id)}
                                                 style={{ background: 'transparent', color: 'var(--accent-primary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -904,7 +998,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                     </tr>
                                     {isExpanded && (
                                         <tr style={{ background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)', borderBottom: '1px solid var(--table-border)' }}>
-                                            <td colSpan={4} style={{ padding: '16px 32px' }}>
+                                            <td colSpan={5} style={{ padding: '16px 32px' }}>
                                                 <div style={{ padding: '16px', borderLeft: '2px solid var(--accent-primary)', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
                                                     {entity && (entity.email || entity.phone) && (
                                                         <div style={{ marginBottom: '16px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>

@@ -82,6 +82,19 @@ CREATE TABLE IF NOT EXISTS entity_ubos (
   FOREIGN KEY (ubo_entity_id) REFERENCES entities(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS entity_addresses (
+  id VARCHAR(36) PRIMARY KEY,
+  entity_id VARCHAR(36) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  address_line1 VARCHAR(500) NOT NULL,
+  address_line2 VARCHAR(500),
+  city VARCHAR(255),
+  country VARCHAR(255),
+  postal_code VARCHAR(50),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS app_settings (
   setting_key VARCHAR(100) PRIMARY KEY,
   setting_value TEXT NOT NULL,

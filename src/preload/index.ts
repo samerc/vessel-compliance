@@ -52,6 +52,15 @@ const api = {
   getEntityUBOs: (assuredEntityId) => ipcRenderer.invoke('db:getEntityUBOs', assuredEntityId),
   addEntityUBO: (ubo) => ipcRenderer.invoke('db:addEntityUBO', ubo),
   deleteEntityUBO: (ubo) => ipcRenderer.invoke('db:deleteEntityUBO', ubo),
+
+  // Entity Addresses
+  getEntityAddresses: (entityId) => ipcRenderer.invoke('entityAddress:getByEntity', entityId),
+  getAllEntityAddresses: () => ipcRenderer.invoke('entityAddress:getAll'),
+  addEntityAddress: (addr) => ipcRenderer.invoke('entityAddress:add', addr),
+  updateEntityAddress: (id, updates) => ipcRenderer.invoke('entityAddress:update', id, updates),
+  deleteEntityAddress: (id) => ipcRenderer.invoke('entityAddress:delete', id),
+  updateVesselAssuredAddress: (id, addressId) => ipcRenderer.invoke('vesselAssured:updateAddress', id, addressId),
+
   maintenanceSyncSettings: () => ipcRenderer.invoke('maintenance:syncSettings'),
 
 

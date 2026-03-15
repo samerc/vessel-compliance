@@ -82,6 +82,18 @@ export interface VesselAssured {
   vesselId: string
   entityId: string
   role: string
+  addressId?: string | null
+}
+
+export interface EntityAddress {
+  id: string
+  entityId: string
+  label: string
+  addressLine1: string
+  addressLine2?: string
+  city?: string
+  country?: string
+  postalCode?: string
 }
 
 export interface EntityUBO {

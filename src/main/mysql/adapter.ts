@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -1838,6 +1838,18 @@ export class MySQLAdapter {
                 }
             }
 
+            // --- Entity Addresses + vessel_assureds.address_id ---
+            {
+                const [addrCols] = await this.pool.query(
+                    "SHOW COLUMNS FROM vessel_assureds LIKE 'address_id'"
+                )
+                if ((addrCols as any[]).length === 0) {
+                    await this.pool.query(
+                        'ALTER TABLE vessel_assureds ADD COLUMN address_id VARCHAR(36) DEFAULT NULL'
+                    )
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -2719,7 +2731,7 @@ export class MySQLAdapter {
     // --- Vessel Assureds ---
     async getVesselAssureds(vesselId?: string): Promise<VesselAssured[]> {
         if (!this.pool) return []
-        let sql = 'SELECT id, vessel_id as vesselId, entity_id as entityId, role FROM vessel_assureds'
+        let sql = 'SELECT id, vessel_id as vesselId, entity_id as entityId, role, address_id as addressId FROM vessel_assureds'
         const params: any[] = []
         if (vesselId) {
             sql += ' WHERE vessel_id = ?'
@@ -2747,6 +2759,108 @@ export class MySQLAdapter {
     async updateVesselAssuredRole(id: string, role: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('UPDATE vessel_assureds SET role = ? WHERE id = ?', [role, id])
+    }
+
+    // --- Entity Addresses ---
+    async getEntityAddresses(entityId?: string): Promise<EntityAddress[]> {
+        if (!this.pool) return []
+        const q = entityId
+            ? 'SELECT * FROM entity_addresses WHERE entity_id = ? ORDER BY created_at'
+            : 'SELECT * FROM entity_addresses ORDER BY created_at'
+        const params = entityId ? [entityId] : []
+        const [rows] = await this.pool.query(q, params)
+        return (rows as any[]).map((r) => ({
+            id: r.id,
+            entityId: r.entity_id,
+            label: r.label,
+            addressLine1: r.address_line1,
+            addressLine2: r.address_line2 || undefined,
+            city: r.city || undefined,
+            country: r.country || undefined,
+            postalCode: r.postal_code || undefined
+        }))
+    }
+
+    async addEntityAddress(
+        addr: Omit<EntityAddress, 'id'>
+    ): Promise<EntityAddress> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO entity_addresses (id, entity_id, label, address_line1, address_line2, city, country, postal_code)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                addr.entityId,
+                addr.label,
+                addr.addressLine1,
+                addr.addressLine2 || null,
+                addr.city || null,
+                addr.country || null,
+                addr.postalCode || null
+            ]
+        )
+        return { id, ...addr }
+    }
+
+    async updateEntityAddress(
+        id: string,
+        updates: Partial<Omit<EntityAddress, 'id' | 'entityId'>>
+    ): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const vals: any[] = []
+        if (updates.label !== undefined) {
+            fields.push('label = ?')
+            vals.push(updates.label)
+        }
+        if (updates.addressLine1 !== undefined) {
+            fields.push('address_line1 = ?')
+            vals.push(updates.addressLine1)
+        }
+        if (updates.addressLine2 !== undefined) {
+            fields.push('address_line2 = ?')
+            vals.push(updates.addressLine2 || null)
+        }
+        if (updates.city !== undefined) {
+            fields.push('city = ?')
+            vals.push(updates.city || null)
+        }
+        if (updates.country !== undefined) {
+            fields.push('country = ?')
+            vals.push(updates.country || null)
+        }
+        if (updates.postalCode !== undefined) {
+            fields.push('postal_code = ?')
+            vals.push(updates.postalCode || null)
+        }
+        if (fields.length === 0) return
+        vals.push(id)
+        await this.pool.execute(
+            `UPDATE entity_addresses SET ${fields.join(', ')} WHERE id = ?`,
+            vals
+        )
+    }
+
+    async deleteEntityAddress(id: string): Promise<void> {
+        if (!this.pool) return
+        // Clear references from vessel_assureds first
+        await this.pool.execute(
+            'UPDATE vessel_assureds SET address_id = NULL WHERE address_id = ?',
+            [id]
+        )
+        await this.pool.execute('DELETE FROM entity_addresses WHERE id = ?', [id])
+    }
+
+    async updateVesselAssuredAddress(
+        id: string,
+        addressId: string | null
+    ): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE vessel_assureds SET address_id = ? WHERE id = ?',
+            [addressId, id]
+        )
     }
 
     // --- Entity UBOs ---

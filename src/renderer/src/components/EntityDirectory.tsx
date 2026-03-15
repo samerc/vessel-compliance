@@ -3,9 +3,9 @@ import {
   Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X,
   Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload, Merge, Link2,
-  ScanSearch
+  ScanSearch, MapPin
 } from 'lucide-react'
-import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch } from '../../../shared/types'
+import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress } from '../../../shared/types'
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -69,6 +69,10 @@ export default function EntityDirectory() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [viewingVessel, setViewingVessel] = useState<Vessel | null>(null)
+  const [entityAddresses, setEntityAddresses] = useState<EntityAddress[]>([])
+  const [showAddAddress, setShowAddAddress] = useState(false)
+  const [editingAddress, setEditingAddress] = useState<EntityAddress | null>(null)
+  const [addrForm, setAddrForm] = useState({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const isLight = theme === 'light'
@@ -586,6 +590,75 @@ export default function EntityDirectory() {
   }
 
   // ── Color helpers ────────────────────────────────────────────────────────────
+  // Load addresses when entity is selected
+  useEffect(() => {
+    if (selectedEntity) {
+      window.api.getEntityAddresses(selectedEntity.id).then(addrs => {
+        setEntityAddresses(Array.isArray(addrs) ? addrs : [])
+      })
+      setShowAddAddress(false)
+      setEditingAddress(null)
+    } else {
+      setEntityAddresses([])
+    }
+  }, [selectedEntity?.id])
+
+  const resetAddrForm = () => setAddrForm({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
+
+  const handleSaveAddress = async () => {
+    if (!selectedEntity || !addrForm.label.trim() || !addrForm.addressLine1.trim()) return
+    try {
+      if (editingAddress) {
+        await window.api.updateEntityAddress(editingAddress.id, {
+          label: addrForm.label.trim(),
+          addressLine1: addrForm.addressLine1.trim(),
+          addressLine2: addrForm.addressLine2.trim() || undefined,
+          city: addrForm.city.trim() || undefined,
+          country: addrForm.country.trim() || undefined,
+          postalCode: addrForm.postalCode.trim() || undefined
+        })
+        showSuccess('Address updated')
+      } else {
+        await window.api.addEntityAddress({
+          entityId: selectedEntity.id,
+          label: addrForm.label.trim(),
+          addressLine1: addrForm.addressLine1.trim(),
+          addressLine2: addrForm.addressLine2.trim() || undefined,
+          city: addrForm.city.trim() || undefined,
+          country: addrForm.country.trim() || undefined,
+          postalCode: addrForm.postalCode.trim() || undefined
+        })
+        showSuccess('Address added')
+      }
+      const addrs = await window.api.getEntityAddresses(selectedEntity.id)
+      setEntityAddresses(Array.isArray(addrs) ? addrs : [])
+      setShowAddAddress(false)
+      setEditingAddress(null)
+      resetAddrForm()
+    } catch (e: any) { showError(e.message || 'Failed to save address') }
+  }
+
+  const handleDeleteAddress = async (addrId: string) => {
+    try {
+      await window.api.deleteEntityAddress(addrId)
+      setEntityAddresses(prev => prev.filter(a => a.id !== addrId))
+      showSuccess('Address deleted')
+    } catch (e: any) { showError(e.message || 'Failed to delete address') }
+  }
+
+  const startEditAddress = (addr: EntityAddress) => {
+    setEditingAddress(addr)
+    setAddrForm({
+      label: addr.label,
+      addressLine1: addr.addressLine1,
+      addressLine2: addr.addressLine2 || '',
+      city: addr.city || '',
+      country: addr.country || '',
+      postalCode: addr.postalCode || ''
+    })
+    setShowAddAddress(true)
+  }
+
   const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'
   const companyColor = 'var(--accent-primary)'
   const personColor = isLight ? '#9c27b0' : '#ba68c8'
@@ -917,6 +990,69 @@ export default function EntityDirectory() {
                   </>
                 )}
               </div>
+            </div>
+
+            {/* Addresses section */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  Addresses
+                  {entityAddresses.length > 0 && (
+                    <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '8px', background: accentBg, color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.65rem' }}>{entityAddresses.length}</span>
+                  )}
+                </div>
+                <button onClick={() => { resetAddrForm(); setEditingAddress(null); setShowAddAddress(!showAddAddress) }} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+
+              {(showAddAddress) && (
+                <div style={{ background: isLight ? '#f0f4f8' : 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '12px', marginBottom: '10px', border: '1px solid var(--table-border)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input placeholder="Label (e.g. Registered Office)" value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                    <input placeholder="Address Line 1 *" value={addrForm.addressLine1} onChange={e => setAddrForm(p => ({ ...p, addressLine1: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                    <input placeholder="Address Line 2" value={addrForm.addressLine2} onChange={e => setAddrForm(p => ({ ...p, addressLine2: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input placeholder="City" value={addrForm.city} onChange={e => setAddrForm(p => ({ ...p, city: e.target.value }))} style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                      <input placeholder="Postal Code" value={addrForm.postalCode} onChange={e => setAddrForm(p => ({ ...p, postalCode: e.target.value }))} style={{ width: '90px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                    </div>
+                    <input placeholder="Country" value={addrForm.country} onChange={e => setAddrForm(p => ({ ...p, country: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                      <button onClick={handleSaveAddress} disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()} className="btn-primary" style={{ padding: '5px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Save size={12} /> {editingAddress ? 'Update' : 'Save'}
+                      </button>
+                      <button onClick={() => { setShowAddAddress(false); setEditingAddress(null); resetAddrForm() }} className="btn-secondary" style={{ padding: '5px 14px', fontSize: '0.78rem' }}>Cancel</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {entityAddresses.length === 0 && !showAddAddress ? (
+                <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-secondary)', fontSize: '0.8rem', opacity: 0.6 }}>
+                  <MapPin size={20} style={{ opacity: 0.3, display: 'block', margin: '0 auto 4px' }} />
+                  No addresses
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {entityAddresses.map(addr => (
+                    <div key={addr.id} style={{ padding: '8px 10px', borderRadius: '8px', background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)', fontSize: '0.8rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--accent-primary)', fontSize: '0.75rem' }}>{addr.label}</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button onClick={() => startEditAddress(addr)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
+                          <button onClick={() => handleDeleteAddress(addr.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={12} /></button>
+                        </div>
+                      </div>
+                      <div style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                        {addr.addressLine1}
+                        {addr.addressLine2 && <><br />{addr.addressLine2}</>}
+                        {(addr.city || addr.postalCode) && <><br />{[addr.city, addr.postalCode].filter(Boolean).join(' ')}</>}
+                        {addr.country && <><br />{addr.country}</>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Vessels section */}

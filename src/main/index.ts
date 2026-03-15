@@ -960,6 +960,14 @@ app.whenReady().then(() => {
   safeHandle('db:addEntityUBO', (event, ubo) => { requireSession(event); return db.addEntityUBO(ubo) })
   safeHandle('db:deleteEntityUBO', (event, ubo) => { requireSession(event); return db.deleteEntityUBO(ubo) })
 
+  // Entity Addresses
+  safeHandle('entityAddress:getByEntity', (event, entityId) => { requireSession(event); return db.getEntityAddresses(entityId) })
+  safeHandle('entityAddress:getAll', (event) => { requireSession(event); return db.getEntityAddresses() })
+  safeHandle('entityAddress:add', (event, addr) => { requireSession(event); return db.addEntityAddress(addr) })
+  safeHandle('entityAddress:update', (event, id, updates) => { requireSession(event); return db.updateEntityAddress(id, updates) })
+  safeHandle('entityAddress:delete', (event, id) => { requireSession(event); return db.deleteEntityAddress(id) })
+  safeHandle('vesselAssured:updateAddress', (event, id, addressId) => { requireSession(event); return db.updateVesselAssuredAddress(id, addressId) })
+
   // Surveyors
   safeHandle('db:getSurveyors', (event) => { requireSession(event); return db.getSurveyors() })
   safeHandle('db:getSurveyorsPaginated', (event, params) => { requireSession(event); return db.getSurveyorsPaginated(params) })
