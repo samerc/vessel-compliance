@@ -2632,22 +2632,21 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
     })
 
     const toggle = async (id: string) => {
-        const newSet = new Set(selectedIds)
-        const wasSelected = newSet.has(id)
-        if (wasSelected) {
-            newSet.delete(id)
-            // Delete only this specific exclusion row
-            const row = selectedRows.find((r: any) => r.piExclusionId === id)
-            if (row) await window.api.deleteQuotationExclusion(row.id)
+        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+        // Find the row matching this exclusion + current alternative
+        const row = selectedRows.find((r: any) =>
+            r.piExclusionId === id && (altId ? r.alternativeId === altId : true)
+        ) || selectedRows.find((r: any) => r.piExclusionId === id)
+        if (row) {
+            // Deselect — delete this specific row
+            await window.api.deleteQuotationExclusion(row.id)
         } else {
-            newSet.add(id)
-            // Add with current alternative scope
-            const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+            // Select — add with current alternative scope
             await window.api.addQuotationExclusion(quotation.id, id, altId)
         }
-        setSelectedIds(newSet)
         const qe = await window.api.getQuotationExclusions(quotation.id)
         setSelectedRows(Array.isArray(qe) ? qe : [])
+        setSelectedIds(new Set((Array.isArray(qe) ? qe : []).map((r: any) => r.piExclusionId)))
     }
 
     const updateExclusionScope = async (id: string, scope: string[] | null) => {
