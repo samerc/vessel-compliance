@@ -1349,7 +1349,10 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
         if (piAlternatives.length < 2 || !selectedPIAltId) return clauseId
         return `${clauseId}::${selectedPIAltId}`
     }
-    const getOverride = (clauseId: string) => descOverrides[overrideKey(clauseId)] ?? descOverrides[clauseId]
+    const getOverride = (clauseId: string) => {
+        if (piAlternatives.length >= 2 && selectedPIAltId) return descOverrides[`${clauseId}::${selectedPIAltId}`]
+        return descOverrides[clauseId]
+    }
 
     const updateDescOverride = async (clauseId: string, desc: string) => {
         const clause = allClauses.find(c => c.id === clauseId)
