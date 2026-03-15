@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList } from 'lucide-react'
 import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -2549,8 +2549,14 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
         return { borderLeft: `3px dashed ${ALT_COLORS[otherIdx >= 0 ? otherIdx % ALT_COLORS.length : 0]}40` }
     }
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [selectedRows, setSelectedRows] = useState<any[]>([])
+    const selectedIds = useMemo(() => {
+        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+        const filtered = altId
+            ? selectedRows.filter((r: any) => r.alternativeId === altId || !r.alternativeId)
+            : selectedRows
+        return new Set(filtered.filter((r: any) => r.piExclusionId).map((r: any) => r.piExclusionId))
+    }, [selectedRows, piAlternatives, selectedPIAltId])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [customExclusions, setCustomExclusions] = useState<QuotationCustomExclusion[]>([])
     const [newCustomText, setNewCustomText] = useState('')
@@ -2579,9 +2585,8 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
         const safeAll = Array.isArray(all) ? all : []
         setAllExclusions(safeAll)
         const safeQe = Array.isArray(qe) ? qe : []
-        const currentIds = new Set(safeQe.filter((e: any) => e.piExclusionId).map((e: any) => e.piExclusionId))
-        setSelectedIds(currentIds)
         setSelectedRows(safeQe)
+        const currentIds = new Set(safeQe.filter((e: any) => e.piExclusionId).map((e: any) => e.piExclusionId as string))
         const safeQv = Array.isArray(qv) ? qv : []
         setQVessels(safeQv)
         setCustomExclusions(Array.isArray(ce) ? ce : [])
@@ -2610,10 +2615,9 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                     (ex.vesselTypeIds || []).some((vtId: string) => vtIds.has(vtId))
                 )
                 if (toAutoSelect.length > 0) {
-                    const newIds = new Set(currentIds)
-                    for (const ex of toAutoSelect) newIds.add(ex.id)
-                    setSelectedIds(newIds)
-                    await window.api.setQuotationExclusions(quotation.id, Array.from(newIds).map(eid => ({ piExclusionId: eid })))
+                    for (const ex of toAutoSelect) {
+                        await window.api.addQuotationExclusion(quotation.id, ex.id, null)
+                    }
                     const freshQe = await window.api.getQuotationExclusions(quotation.id)
                     setSelectedRows(Array.isArray(freshQe) ? freshQe : [])
                     showSuccess(`Auto-selected ${toAutoSelect.length} vessel-type exclusion${toAutoSelect.length > 1 ? 's' : ''}`)
@@ -2646,7 +2650,6 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
         }
         const qe = await window.api.getQuotationExclusions(quotation.id)
         setSelectedRows(Array.isArray(qe) ? qe : [])
-        setSelectedIds(new Set((Array.isArray(qe) ? qe : []).map((r: any) => r.piExclusionId)))
     }
 
     const updateExclusionScope = async (id: string, scope: string[] | null) => {
