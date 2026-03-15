@@ -244,6 +244,7 @@ const api = {
   // P&I Alternatives
   piGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('pi:getQuotationAlternatives', qId),
   piAddQuotationAlternative: (qId: string, label?: string) => ipcRenderer.invoke('pi:addQuotationAlternative', qId, label),
+  piMigrateSharedToAlternative: (qId: string, altId: string) => ipcRenderer.invoke('pi:migrateSharedToAlternative', qId, altId),
   piUpdateQuotationAlternative: (id: string, updates: any) => ipcRenderer.invoke('pi:updateQuotationAlternative', id, updates),
   piDeleteQuotationAlternative: (id: string) => ipcRenderer.invoke('pi:deleteQuotationAlternative', id),
   piReorderQuotationAlternatives: (ids: string[]) => ipcRenderer.invoke('pi:reorderQuotationAlternatives', ids),

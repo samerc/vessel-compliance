@@ -236,6 +236,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
             const a1 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 1')
             const a2 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 2')
             if ((a1 as any)?.error || (a2 as any)?.error) { showError('Failed to create alternatives'); return }
+            // Migrate existing shared items (alternative_id = NULL) to Alt 1
+            await window.api.piMigrateSharedToAlternative(q.id, a1.id)
             setPiAlternatives([a1, a2])
             setSelectedPIAltId(a1.id)
             showSuccess('Alternatives created')

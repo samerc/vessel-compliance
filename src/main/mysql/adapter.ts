@@ -5479,6 +5479,26 @@ export class MySQLAdapter {
         }
     }
 
+    async piMigrateSharedToAlternative(quotationId: string, alternativeId: string): Promise<void> {
+        if (!this.pool) return
+        // Migrate all shared (NULL alternative_id) items to the given alternative
+        const tables = [
+            'quotation_clauses',
+            'quotation_warranties',
+            'quotation_deductibles',
+            'quotation_text_deductibles',
+            'quotation_exclusions',
+            'quotation_custom_exclusions',
+            'quotation_custom_warranties',
+            'quotation_additional_clauses'
+        ]
+        for (const table of tables) {
+            try {
+                await this.pool.execute(`UPDATE ${table} SET alternative_id = ? WHERE quotation_id = ? AND alternative_id IS NULL`, [alternativeId, quotationId])
+            } catch { /* table may not have alternative_id column */ }
+        }
+    }
+
     // -- Quotation Additional Clauses --
     async getQuotationAdditionalClauses(quotationId: string): Promise<any[]> {
         if (!this.pool) return []

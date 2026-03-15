@@ -231,6 +231,7 @@ export interface Api {
   // P&I Alternatives
   piGetQuotationAlternatives: (qId: string) => Promise<QuotationPIAlternative[]>
   piAddQuotationAlternative: (qId: string, label?: string) => Promise<QuotationPIAlternative>
+  piMigrateSharedToAlternative: (qId: string, altId: string) => Promise<void>
   piUpdateQuotationAlternative: (id: string, updates: { label?: string; premiumAmount?: number | null }) => Promise<void>
   piDeleteQuotationAlternative: (id: string) => Promise<void>
   piReorderQuotationAlternatives: (ids: string[]) => Promise<void>

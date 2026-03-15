@@ -1451,6 +1451,7 @@ app.whenReady().then(() => {
   // P&I Alternatives
   safeHandle('pi:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationPIAlternatives(qId) })
   safeHandle('pi:addQuotationAlternative', (event, qId, label) => { requireSession(event); return db.addQuotationPIAlternative(qId, label) })
+  safeHandle('pi:migrateSharedToAlternative', (event, qId, altId) => { requireSession(event); return db.piMigrateSharedToAlternative(qId, altId) })
   safeHandle('pi:updateQuotationAlternative', (event, id, updates) => { requireSession(event); return db.updateQuotationPIAlternative(id, updates) })
   safeHandle('pi:deleteQuotationAlternative', (event, id) => { requireSession(event); return db.deleteQuotationPIAlternative(id) })
   safeHandle('pi:reorderQuotationAlternatives', (event, ids) => { requireSession(event); return db.reorderQuotationPIAlternatives(ids) })
