@@ -59,7 +59,7 @@ interface QuotationData {
   subLimits: QuotationSubLimit[]
   selectedClauseIds: string[]
   clauseVesselScopes: Record<string, string[] | null>
-  clauseAltIds: Record<string, string | null>
+  clauseAltIds: Record<string, (string | null)[]>
   allClauses: PIClause[]
   additionalClauses: { id: string; piAdditionalClauseId?: string; customText?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   allAdditionalClauses: PIAdditionalClause[]
@@ -156,10 +156,11 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const safeClauseRows = Array.isArray(clauseRows) ? clauseRows : []
   const selectedClauseIds = safeClauseRows.map((r: any) => r.piClauseId)
   const clauseVesselScopes: Record<string, string[] | null> = {}
-  const clauseAltIds: Record<string, string | null> = {}
+  const clauseAltIds: Record<string, (string | null)[]> = {}
   for (const r of safeClauseRows) {
     if (r.vesselScope) clauseVesselScopes[r.piClauseId] = r.vesselScope
-    clauseAltIds[r.piClauseId] = r.alternativeId || null
+    if (!clauseAltIds[r.piClauseId]) clauseAltIds[r.piClauseId] = []
+    clauseAltIds[r.piClauseId].push(r.alternativeId || null)
   }
 
   const safeWarrantyRows = Array.isArray(warrantyRows) ? warrantyRows : []
@@ -653,11 +654,11 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
     if (piMultiAlt) {
       // Group clauses by alternative — shared clauses appear under each alternative
-      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      const sharedClauseIds = selectedClauses.filter(c => (data.clauseAltIds[c.id] || []).includes(null)).map(c => c.id)
       for (const alt of data.piAlternatives) {
         const altIdx = data.piAlternatives.indexOf(alt)
-        const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
-        const combinedIds = [...altClauseIds, ...sharedClauseIds]
+        const altClauseIds = selectedClauses.filter(c => (data.clauseAltIds[c.id] || []).includes(alt.id)).map(c => c.id)
+        const combinedIds = [...new Set([...altClauseIds, ...sharedClauseIds])]
         if (combinedIds.length > 0) {
           condText += `Alternative ${altIdx + 1}:\n`
           condText += renderClauseList(combinedIds)
@@ -677,6 +678,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         }
       }
       if (sharedAddls.length > 0) {
+        condText += `Applicable to both alternatives:\n`
         condText += renderAddlList(sharedAddls)
       }
     } else {
@@ -1704,11 +1706,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     if (dPiMultiAlt) {
       // Per-alternative clauses — shared clauses appear under each alternative
-      const dSharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      const dSharedClauseIds = selectedClauses.filter(c => (data.clauseAltIds[c.id] || []).includes(null)).map(c => c.id)
       for (const alt of data.piAlternatives) {
         const altIdx = data.piAlternatives.indexOf(alt)
-        const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
-        const combinedIds = [...altClauseIds, ...dSharedClauseIds]
+        const altClauseIds = selectedClauses.filter(c => (data.clauseAltIds[c.id] || []).includes(alt.id)).map(c => c.id)
+        const combinedIds = [...new Set([...altClauseIds, ...dSharedClauseIds])]
         const combinedClauses = combinedIds.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
         if (combinedClauses.length > 0) {
           condContent.push(bup(`Alternative ${altIdx + 1}:`))
@@ -1730,6 +1732,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
       }
       if (dSharedAddls.length > 0) {
+        condContent.push(bup('Applicable to both alternatives:'))
         condContent.push(...makeAddlBullets(dSharedAddls))
       }
     } else {
@@ -2341,19 +2344,22 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.piAlternatives.length > 1) {
       const wMultiAlt = data.hullAlternatives.length > 1
       const wPiMultiAlt = data.piAlternatives.length > 1
-      const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT, widthPct?: number) => new TableCell({
+      const premLabelW = Math.round(BODY_W * 0.30)
+      const premAmtW = BODY_W - premLabelW
+      const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT, w?: number) => new TableCell({
         borders: noBorders(),
-        width: widthPct ? { size: widthPct, type: WidthType.PERCENTAGE } : undefined,
+        width: w ? { size: w, type: WidthType.DXA } : undefined,
         children: [new Paragraph({ alignment: align, children: [new TextRun({ text, size: 22, font: 'Arial', bold, color: '000000' })] })]
       })
       const premRow = (label: string, amount: string, boldLabel = false) => new TableRow({
         children: [
-          premCell(label, boldLabel, undefined, 30),
-          premCell(amount, true, AlignmentType.RIGHT, 70)
+          premCell(label, boldLabel, undefined, premLabelW),
+          premCell(amount, true, AlignmentType.RIGHT, premAmtW)
         ]
       })
       const premTable = (rows: TableRow[]) => new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: BODY_W, type: WidthType.DXA },
+        columnWidths: [premLabelW, premAmtW],
         layout: TableLayoutType.FIXED,
         rows
       })
