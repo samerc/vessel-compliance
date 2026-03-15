@@ -1322,11 +1322,32 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
     const applySet = async (setId: string) => {
         const cs = clauseSets.find(s => s.id === setId)
         if (!cs?.clauseIds) return
-        setSelectedIds(new Set(cs.clauseIds))
-        const mergedOverrides = { ...descOverrides, ...cs.descriptionOverrides }
-        setDescOverrides(mergedOverrides)
-        await window.api.setQuotationClauses(quotation.id, cs.clauseIds, mergedOverrides)
-        showSuccess(`Applied "${cs.name}" clause set`)
+        const hasPIAlts = piAlternatives.length >= 2
+        const altId = hasPIAlts ? selectedPIAltId : null
+
+        if (hasPIAlts && altId) {
+            // Per-alternative: add clauses for this alternative without touching others
+            for (const cid of cs.clauseIds) {
+                const exists = clauseRows.some(r => r.piClauseId === cid && r.alternativeId === altId)
+                if (!exists) {
+                    await window.api.addQuotationClause(quotation.id, cid, altId)
+                }
+            }
+            // Apply description overrides
+            if (cs.descriptionOverrides) {
+                for (const [cid, desc] of Object.entries(cs.descriptionOverrides)) {
+                    if (desc) await window.api.updateQuotationClauseOverride(quotation.id, cid, desc)
+                }
+            }
+            showSuccess(`Applied "${cs.name}" to ${piAlternatives.find(a => a.id === altId)?.label || 'alternative'}`)
+        } else {
+            // Bulk set (no alternatives or viewing "All")
+            const mergedOverrides = { ...descOverrides, ...cs.descriptionOverrides }
+            setDescOverrides(mergedOverrides)
+            await window.api.setQuotationClauses(quotation.id, cs.clauseIds, mergedOverrides)
+            showSuccess(`Applied "${cs.name}" clause set`)
+        }
+        loadData()
     }
 
     const updateDescOverride = async (clauseId: string, desc: string) => {
