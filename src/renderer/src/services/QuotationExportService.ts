@@ -653,19 +653,26 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
     if (piMultiAlt) {
       // Group clauses by alternative
-      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      // Per-alternative clauses
       for (const alt of data.piAlternatives) {
+        const altIdx = data.piAlternatives.indexOf(alt)
         const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
-        const combined = [...altClauseIds, ...sharedClauseIds]
-        if (combined.length > 0 || altClauseIds.length > 0) {
-          condText += `Alternative ${data.piAlternatives.indexOf(alt) + 1}:\n`
-          condText += renderClauseList(combined)
+        if (altClauseIds.length > 0) {
+          condText += `Alternative ${altIdx + 1}:\n`
+          condText += renderClauseList(altClauseIds)
           condText += '\n'
         }
       }
-      // Shared additional clauses
-      const sharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
+      // Shared clauses
+      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      if (sharedClauseIds.length > 0) {
+        condText += `Applicable to both alternatives:\n`
+        condText += renderClauseList(sharedClauseIds)
+        condText += '\n'
+      }
+      // Additional clauses grouped by alternative
       const scopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
+      const sharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
       if (scopedAddls.length > 0) {
         for (const alt of data.piAlternatives) {
           const altAddls = scopedAddls.filter(ac => ac.alternativeId === alt.id)
@@ -676,7 +683,6 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         }
       }
       if (sharedAddls.length > 0) {
-        condText += `Applicable to both alternatives:\n`
         condText += renderAddlList(sharedAddls)
       }
     } else {
@@ -1696,22 +1702,31 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dPiMultiAlt = data.piAlternatives.length > 1
 
     if (dPiMultiAlt) {
-      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      // Per-alternative clauses
       for (const alt of data.piAlternatives) {
         const altIdx = data.piAlternatives.indexOf(alt)
         const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
-        const combined = [...altClauseIds, ...sharedClauseIds]
-        const combinedClauses = combined.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
-        condContent.push(bup(`Alternative ${altIdx + 1}:`))
-        if (combinedClauses.length > 0) condContent.push(makeClauseTable(combinedClauses))
+        const altClauses = altClauseIds.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
+        if (altClauses.length > 0) {
+          condContent.push(bup(`Alternative ${altIdx + 1}:`))
+          condContent.push(makeClauseTable(altClauses))
+          condContent.push(emptyP())
+        }
+      }
+      // Shared clauses
+      const dSharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      const dSharedClauses = dSharedClauseIds.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
+      if (dSharedClauses.length > 0) {
+        condContent.push(bup('Applicable to both alternatives:'))
+        condContent.push(makeClauseTable(dSharedClauses))
         condContent.push(emptyP())
       }
       // Additional clauses grouped by alternative
-      const sharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
-      const scopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
-      if (scopedAddls.length > 0) {
+      const dScopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
+      const dSharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
+      if (dScopedAddls.length > 0) {
         for (const alt of data.piAlternatives) {
-          const altAddls = scopedAddls.filter(ac => ac.alternativeId === alt.id)
+          const altAddls = dScopedAddls.filter(ac => ac.alternativeId === alt.id)
           if (altAddls.length > 0) {
             condContent.push(bup(`Applicable to Alternative ${data.piAlternatives.indexOf(alt) + 1}:`))
             condContent.push(...makeAddlBullets(altAddls))
@@ -1719,9 +1734,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           }
         }
       }
-      if (sharedAddls.length > 0) {
-        condContent.push(bup('Applicable to both alternatives:'))
-        condContent.push(...makeAddlBullets(sharedAddls))
+      if (dSharedAddls.length > 0) {
+        condContent.push(...makeAddlBullets(dSharedAddls))
       }
     } else {
       if (selectedClauses.length > 0) condContent.push(makeClauseTable(selectedClauses))
