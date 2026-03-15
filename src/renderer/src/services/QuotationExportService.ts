@@ -25,7 +25,7 @@ import {
   PISanctionsVersion, QuotationVessel, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, QuotationSubjectivity,
   HullClause, HullClauseCondition, HullAdditionalCondition,
   QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative,
-  WarCondition, QuotationWarCondition, WarSettings
+  QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings
 } from '../../../shared/types'
 import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
@@ -59,18 +59,21 @@ interface QuotationData {
   subLimits: QuotationSubLimit[]
   selectedClauseIds: string[]
   clauseVesselScopes: Record<string, string[] | null>
+  clauseAltIds: Record<string, string | null>
   allClauses: PIClause[]
-  additionalClauses: { id: string; piAdditionalClauseId?: string; customText?: string; order: number; vesselScope?: string[] | null }[]
+  additionalClauses: { id: string; piAdditionalClauseId?: string; customText?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   allAdditionalClauses: PIAdditionalClause[]
   selectedWarrantyIds: string[]
   warrantyVesselScopes: Record<string, string[] | null>
+  warrantyAltIds: Record<string, string | null>
   allWarranties: PIWarranty[]
   customWarranties: QuotationCustomWarranty[]
   deductibles: QuotationDeductible[]
   textDeductibles: QuotationTextDeductible[]
-  selectedExclusions: { id: string; piExclusionId?: string; customText?: string; vesselScope?: string[] | null }[]
+  selectedExclusions: { id: string; piExclusionId?: string; customText?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]
   allExclusions: PIExclusion[]
   customExclusions: QuotationCustomExclusion[]
+  piAlternatives: QuotationPIAlternative[]
   customSections: QuotationCustomSection[]
   excludedCountries: QuotationExcludedCountry[]
   subjectivities: QuotationSubjectivity[]
@@ -149,16 +152,29 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     window.api.warGetSettings()
   ])
 
-  // Extract IDs and vessel scope maps from new object return format
+  // Extract IDs and vessel scope / alternative maps from new object return format
   const safeClauseRows = Array.isArray(clauseRows) ? clauseRows : []
   const selectedClauseIds = safeClauseRows.map((r: any) => r.piClauseId)
   const clauseVesselScopes: Record<string, string[] | null> = {}
-  for (const r of safeClauseRows) { if (r.vesselScope) clauseVesselScopes[r.piClauseId] = r.vesselScope }
+  const clauseAltIds: Record<string, string | null> = {}
+  for (const r of safeClauseRows) {
+    if (r.vesselScope) clauseVesselScopes[r.piClauseId] = r.vesselScope
+    clauseAltIds[r.piClauseId] = r.alternativeId || null
+  }
 
   const safeWarrantyRows = Array.isArray(warrantyRows) ? warrantyRows : []
   const selectedWarrantyIds = safeWarrantyRows.map((r: any) => r.piWarrantyId)
   const warrantyVesselScopes: Record<string, string[] | null> = {}
-  for (const r of safeWarrantyRows) { if (r.vesselScope) warrantyVesselScopes[r.piWarrantyId] = r.vesselScope }
+  const warrantyAltIds: Record<string, string | null> = {}
+  for (const r of safeWarrantyRows) {
+    if (r.vesselScope) warrantyVesselScopes[r.piWarrantyId] = r.vesselScope
+    warrantyAltIds[r.piWarrantyId] = r.alternativeId || null
+  }
+
+  // Fetch PI alternatives
+  const piAlternativesRaw = quotation.quotationTypeCode === 'P'
+    ? await window.api.piGetQuotationAlternatives(quotation.id)
+    : []
 
   // Check for existing export snapshot
   let snapshot: ExportSnapshot | null = null
@@ -230,12 +246,13 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
 
   return {
     quotation, quotationVessels, allVessels, assureds, subLimits,
-    selectedClauseIds, clauseVesselScopes,
+    selectedClauseIds, clauseVesselScopes, clauseAltIds,
     allClauses: resolvedAllClauses,
     additionalClauses,
     allAdditionalClauses: resolvedAllAdditionalClauses,
-    selectedWarrantyIds, warrantyVesselScopes,
+    selectedWarrantyIds, warrantyVesselScopes, warrantyAltIds,
     allWarranties: resolvedAllWarranties,
+    piAlternatives: Array.isArray(piAlternativesRaw) ? piAlternativesRaw : [],
     customWarranties,
     deductibles, textDeductibles,
     selectedExclusions,
@@ -259,6 +276,13 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     allWarConditions: resolvedAllWarConditions,
     warSettings: resolvedWarSettings
   }
+}
+
+// ==================== P&I Alternative Helpers ====================
+
+/** Check if any items are scoped to a specific alternative */
+function hasAltScoping<T extends { alternativeId?: string | null }>(items: T[]): boolean {
+  return items.some(i => i.alternativeId)
 }
 
 // ==================== Helpers ====================
@@ -598,21 +622,67 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   if (selectedClauses.length > 0 || data.additionalClauses.length > 0) {
     let condText = ''
     if (st(data, 'conditionsIntro')) condText += stripHtml(st(data, 'conditionsIntro')) + '\n\n'
-    for (const c of selectedClauses) {
-      const desc = data.clauseOverrides[c.id] || c.description
-      const clauseDesc = desc ? ` \u2013 ${desc}` : ''
-      const displayName = stripClauseRef(c.name || '')
-      const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
-      condText += `Section B Cl.${c.clauseNumber}${displayName ? ` \u2013 ${displayName}` : ''}${clauseDesc}${cScope}\n`
+
+    const piMultiAlt = data.piAlternatives.length > 1
+
+    const renderClauseList = (clauseIds: string[]) => {
+      let t = ''
+      for (const cid of clauseIds) {
+        const c = data.allClauses.find(cl => cl.id === cid)
+        if (!c) continue
+        const desc = data.clauseOverrides[c.id] || c.description
+        const clauseDesc = desc ? ` \u2013 ${desc}` : ''
+        const displayName = stripClauseRef(c.name || '')
+        const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
+        t += `Section B Cl.${c.clauseNumber}${displayName ? ` \u2013 ${displayName}` : ''}${clauseDesc}${cScope}\n`
+      }
+      return t
     }
-    if (data.additionalClauses.length > 0) {
-      condText += '\n'
-      for (const ac of data.additionalClauses) {
+
+    const renderAddlList = (addls: typeof data.additionalClauses) => {
+      let t = ''
+      for (const ac of addls) {
         const def = data.allAdditionalClauses.find(a => a.id === ac.piAdditionalClauseId)
         const code = def?.code || ''
         const text = ac.customText || def?.text || ''
         const acScope = vesselScopeSuffix(ac.vesselScope, data.quotationVessels)
-        if (text) condText += `- ${code ? code + ' ' : ''}${text}${acScope}\n`
+        if (text) t += `- ${code ? code + ' ' : ''}${text}${acScope}\n`
+      }
+      return t
+    }
+
+    if (piMultiAlt) {
+      // Group clauses by alternative
+      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      for (const alt of data.piAlternatives) {
+        const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
+        const combined = [...altClauseIds, ...sharedClauseIds]
+        if (combined.length > 0 || altClauseIds.length > 0) {
+          condText += `Alternative ${data.piAlternatives.indexOf(alt) + 1}:\n`
+          condText += renderClauseList(combined)
+          condText += '\n'
+        }
+      }
+      // Shared additional clauses
+      const sharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
+      const scopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
+      if (scopedAddls.length > 0) {
+        for (const alt of data.piAlternatives) {
+          const altAddls = scopedAddls.filter(ac => ac.alternativeId === alt.id)
+          if (altAddls.length > 0) {
+            condText += `Applicable to Alternative ${data.piAlternatives.indexOf(alt) + 1}:\n`
+            condText += renderAddlList(altAddls) + '\n'
+          }
+        }
+      }
+      if (sharedAddls.length > 0) {
+        condText += `Applicable to both alternatives:\n`
+        condText += renderAddlList(sharedAddls)
+      }
+    } else {
+      condText += renderClauseList(selectedClauses.map(c => c.id))
+      if (data.additionalClauses.length > 0) {
+        condText += '\n' + renderAddlList(data.additionalClauses)
       }
     }
     sectionMap.set('conditions', ['Conditions', condText.trim()])
@@ -898,18 +968,44 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const sortedCustom = [...data.customWarranties].sort((a, b) => a.order - b.order)
     if (orderedWarranties.length > 0 || sortedCustom.length > 0) {
       let warText = ''
-      for (let wi = 0; wi < orderedWarranties.length; wi++) {
-        const w = orderedWarranties[wi]!
-        const wVesselScope = data.warrantyVesselScopes[data.selectedWarrantyIds[wi]]
-        for (const entry of resolveIacsWarranty(w.text, wVesselScope, data)) {
-          warText += `- ${entry.text}${vesselScopeSuffix(entry.vesselScope, data.quotationVessels)}\n`
+      const piMultiAltW = data.piAlternatives.length > 1
+
+      const renderWarrantyList = (warIds: string[], customs: QuotationCustomWarranty[]) => {
+        let t = ''
+        for (const wid of warIds) {
+          const w = data.allWarranties.find(ww => ww.id === wid)
+          if (!w) continue
+          const wVesselScope = data.warrantyVesselScopes[wid]
+          for (const entry of resolveIacsWarranty(w.text, wVesselScope, data)) {
+            t += `- ${entry.text}${vesselScopeSuffix(entry.vesselScope, data.quotationVessels)}\n`
+          }
         }
-      }
-      for (const cw of sortedCustom) {
-        for (const entry of resolveIacsWarranty(cw.text, cw.vesselScope, data)) {
-          warText += `- ${entry.text}${vesselScopeSuffix(entry.vesselScope, data.quotationVessels)}\n`
+        for (const cw of customs) {
+          for (const entry of resolveIacsWarranty(cw.text, cw.vesselScope, data)) {
+            t += `- ${entry.text}${vesselScopeSuffix(entry.vesselScope, data.quotationVessels)}\n`
+          }
         }
+        return t
       }
+
+      if (piMultiAltW) {
+        // Shared warranties first
+        const sharedWarIds = data.selectedWarrantyIds.filter(id => !data.warrantyAltIds[id])
+        const sharedCustom = sortedCustom.filter(cw => !cw.alternativeId)
+        warText += renderWarrantyList(sharedWarIds, sharedCustom)
+        // Per-alternative warranties
+        for (const alt of data.piAlternatives) {
+          const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
+          const altCustom = sortedCustom.filter(cw => cw.alternativeId === alt.id)
+          if (altWarIds.length > 0 || altCustom.length > 0) {
+            warText += `\nAdditional Warranties Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
+            warText += renderWarrantyList(altWarIds, altCustom)
+          }
+        }
+      } else {
+        warText += renderWarrantyList(data.selectedWarrantyIds, sortedCustom)
+      }
+
       if (st(data, 'warrantiesAdditionalText')) warText += '\n' + stripHtml(st(data, 'warrantiesAdditionalText')) + '\n'
       if (st(data, 'warrantiesBreach')) warText += '\n' + stripHtml(st(data, 'warrantiesBreach')) + '\n'
       if (st(data, 'warrantiesNote')) warText += '\n' + stripHtml(st(data, 'warrantiesNote'))
@@ -920,30 +1016,95 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   // Deductibles
   if (data.deductibles.length > 0 || data.textDeductibles.length > 0) {
     let dedText = ''
-    for (const d of data.deductibles) {
-      const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
-      const mainDesc = d.description
-        .replace(/\{currency\}/g, d.currency)
-        .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
-      dedText += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}${dScope}\n`
-      if (d.secondaryDescription) {
-        const secDesc = d.secondaryDescription
+    const piMultiAltD = data.piAlternatives.length > 1
+
+    const renderDedList = (deds: QuotationDeductible[]) => {
+      let t = ''
+      for (const d of deds) {
+        const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
+        const mainDesc = d.description
           .replace(/\{currency\}/g, d.currency)
           .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
-        dedText += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc}\n`
+        t += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}${dScope}\n`
+        if (d.secondaryDescription) {
+          const secDesc = d.secondaryDescription
+            .replace(/\{currency\}/g, d.currency)
+            .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+          t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc}\n`
+        }
       }
+      return t
     }
+
+    if (piMultiAltD && hasAltScoping(data.deductibles)) {
+      const sharedDeds = data.deductibles.filter(d => !d.alternativeId)
+      dedText += renderDedList(sharedDeds)
+      for (const alt of data.piAlternatives) {
+        const altDeds = data.deductibles.filter(d => d.alternativeId === alt.id)
+        if (altDeds.length > 0) {
+          dedText += `\nDeductibles applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
+          dedText += renderDedList(altDeds)
+        }
+      }
+    } else {
+      dedText += renderDedList(data.deductibles)
+    }
+
     dedText += '\n'
     if (data.quotation.deductibleAggregateEnabled && data.quotation.deductibleAggregateText) dedText += '\n' + data.quotation.deductibleAggregateText + '\n\n'
     else if (data.quotation.deductibleAggregateEnabled && st(data, 'deductiblesAggregate')) dedText += '\n' + stripHtml(st(data, 'deductiblesAggregate')) + '\n\n'
-    for (const td of data.textDeductibles) { const tdScope = vesselScopeSuffix(td.vesselScope, data.quotationVessels); dedText += '\n' + td.text + tdScope + '\n\n' }
+
+    if (piMultiAltD && hasAltScoping(data.textDeductibles)) {
+      const sharedTds = data.textDeductibles.filter(td => !td.alternativeId)
+      for (const td of sharedTds) { const tdScope = vesselScopeSuffix(td.vesselScope, data.quotationVessels); dedText += '\n' + td.text + tdScope + '\n\n' }
+      for (const alt of data.piAlternatives) {
+        const altTds = data.textDeductibles.filter(td => td.alternativeId === alt.id)
+        if (altTds.length > 0) {
+          dedText += `Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
+          for (const td of altTds) { const tdScope = vesselScopeSuffix(td.vesselScope, data.quotationVessels); dedText += td.text + tdScope + '\n\n' }
+        }
+      }
+    } else {
+      for (const td of data.textDeductibles) { const tdScope = vesselScopeSuffix(td.vesselScope, data.quotationVessels); dedText += '\n' + td.text + tdScope + '\n\n' }
+    }
+
     if (st(data, 'deductiblesAdditionalText')) dedText += '\n' + stripHtml(st(data, 'deductiblesAdditionalText')) + '\n\n'
     sectionMap.set('deductibles', ['Deductibles', dedText.trim()])
   }
 
   // Exclusions
   if (exclusionTexts.length > 0) {
-    sectionMap.set('exclusions', ['Exclusions', exclusionTexts.map(t => `- ${t}`).join('\n')])
+    const piMultiAltE = data.piAlternatives.length > 1
+    const hasExclAltScoping = piMultiAltE && (data.selectedExclusions.some(e => e.alternativeId) || data.customExclusions.some(e => e.alternativeId))
+
+    if (hasExclAltScoping) {
+      let exclText = ''
+      // Build text per exclusion item with alternativeId
+      const allExclItems: { text: string; altId: string | null }[] = []
+      for (const se of data.selectedExclusions) {
+        const eScope = vesselScopeSuffix(se.vesselScope, data.quotationVessels)
+        const t = se.customText ? se.customText + eScope : (se.piExclusionId ? ((data.allExclusions.find(e => e.id === se.piExclusionId)?.text || '') + eScope) : '')
+        if (t) allExclItems.push({ text: t, altId: se.alternativeId || null })
+      }
+      for (const ce of data.customExclusions) {
+        const ceScope = vesselScopeSuffix(ce.vesselScope, data.quotationVessels)
+        allExclItems.push({ text: ce.text + ceScope, altId: ce.alternativeId || null })
+      }
+
+      const shared = allExclItems.filter(e => !e.altId)
+      exclText += shared.map(e => `- ${e.text}`).join('\n')
+
+      for (const alt of data.piAlternatives) {
+        const altItems = allExclItems.filter(e => e.altId === alt.id)
+        if (altItems.length > 0) {
+          exclText += `\n\nApplicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
+          exclText += altItems.map(e => `- ${e.text}`).join('\n')
+        }
+      }
+      sectionMap.set('exclusions', ['Exclusions', exclText.trim()])
+    } else {
+      sectionMap.set('exclusions', ['Exclusions', exclusionTexts.map(t => `- ${t}`).join('\n')])
+    }
   }
 
   // Sanctions
@@ -988,10 +1149,16 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     type PDFPremLine = { label: string; tech: number }
     const pdfPremLines: PDFPremLine[] = []
     const hullMultiAlt = data.hullAlternatives.length > 1
+    const piMultiAltPrem = data.piAlternatives.length > 1
 
     if (hasVesselPremiums) {
       for (const v of data.quotationVessels) {
         pdfPremLines.push({ label: (v.name || v.vesselLabel).toUpperCase(), tech: v.premiumAmount || 0 })
+      }
+    } else if (piMultiAltPrem) {
+      for (let ai = 0; ai < data.piAlternatives.length; ai++) {
+        const alt = data.piAlternatives[ai]
+        pdfPremLines.push({ label: alt.label || `Alternative ${ai + 1}`, tech: alt.premiumAmount || 0 })
       }
     } else if (q.premiumAmount != null || hullMultiAlt) {
       if (hullMultiAlt) {
@@ -1289,7 +1456,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   const data = await gatherData(quotation)
   const vName = vesselName(data)
   const selectedClauses = data.allClauses.filter(c => data.selectedClauseIds.includes(c.id))
-  const orderedWordWarranties = data.selectedWarrantyIds.map(id => data.allWarranties.find(w => w.id === id)).filter(Boolean) as PIWarranty[]
+  void data.selectedWarrantyIds // warranties resolved in renderWarBullets
   const sortedWordCustom = [...data.customWarranties].sort((a, b) => a.order - b.order)
   const ddqCountries = data.excludedCountries.filter(c => c.listType === 'ddq')
   const exclusionTexts = getExclusionTexts(data)
@@ -1485,51 +1652,82 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   if (selectedClauses.length > 0 || data.additionalClauses.length > 0) {
     const condContent: (Paragraph | Table)[] = []
     if (st(data, 'conditionsIntro')) condContent.push(...mp(st(data, 'conditionsIntro')))
-    if (selectedClauses.length > 0) {
-      const clauseRefW = Math.round(BODY_W * 0.32)
-      const clauseDescW = BODY_W - clauseRefW
-      condContent.push(new Table({
-        width: { size: BODY_W, type: WidthType.DXA },
-        columnWidths: [clauseRefW, clauseDescW],
-        layout: TableLayoutType.FIXED,
-        rows: selectedClauses.map(c => {
-          const desc = data.clauseOverrides[c.id] || c.description
-          const clauseDesc = desc ? ` \u2013 ${desc}` : ''
-          const displayName = stripClauseRef(c.name || '')
-          const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
-          const rightText = (displayName ? `${displayName}${clauseDesc}` : (desc || '')) + cScope
-          return new TableRow({
-            children: [
-              new TableCell({
-                width: { size: clauseRefW, type: WidthType.DXA },
-                borders: noBorders(),
-                children: [new Paragraph({ children: [new TextRun({ text: `Section B Cl.${c.clauseNumber}`, size: 22, font: 'Arial', color: '000000' })] })]
-              }),
-              new TableCell({
-                width: { size: clauseDescW, type: WidthType.DXA },
-                borders: noBorders(),
-                children: [new Paragraph({ children: [new TextRun({ text: rightText, size: 22, font: 'Arial', color: '000000' })] })]
-              })
-            ]
-          })
+
+    const clauseRefW = Math.round(BODY_W * 0.32)
+    const clauseDescW = BODY_W - clauseRefW
+
+    const makeClauseTable = (clauses: PIClause[]) => new Table({
+      width: { size: BODY_W, type: WidthType.DXA },
+      columnWidths: [clauseRefW, clauseDescW],
+      layout: TableLayoutType.FIXED,
+      rows: clauses.map(c => {
+        const desc = data.clauseOverrides[c.id] || c.description
+        const clauseDesc = desc ? ` \u2013 ${desc}` : ''
+        const displayName = stripClauseRef(c.name || '')
+        const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
+        const rightText = (displayName ? `${displayName}${clauseDesc}` : (desc || '')) + cScope
+        return new TableRow({
+          children: [
+            new TableCell({ width: { size: clauseRefW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Section B Cl.${c.clauseNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: clauseDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: rightText, size: 22, font: 'Arial', color: '000000' })] })] })
+          ]
         })
-      }))
-    }
-    if (data.additionalClauses.length > 0) {
-      condContent.push(emptyP())
-      for (const ac of data.additionalClauses) {
+      })
+    })
+
+    const makeAddlBullets = (addls: typeof data.additionalClauses): Paragraph[] => {
+      return addls.map(ac => {
         const def = data.allAdditionalClauses.find(a => a.id === ac.piAdditionalClauseId)
         const code = def?.code || ''
         const text = ac.customText || def?.text || ''
         const acScope = vesselScopeSuffix(ac.vesselScope, data.quotationVessels)
-        if (text) condContent.push(new Paragraph({
+        if (!text) return null
+        return new Paragraph({
           numbering: { reference: 'dash-bullet', level: 0 },
           spacing: { after: 40 },
           children: [
             ...(code ? [new TextRun({ text: code + ' ', size: 22, font: 'Arial', color: '000000' })] : []),
             new TextRun({ text: text + acScope, size: 22, font: 'Arial', color: '000000' })
           ]
-        }))
+        })
+      }).filter(Boolean) as Paragraph[]
+    }
+
+    const dPiMultiAlt = data.piAlternatives.length > 1
+
+    if (dPiMultiAlt) {
+      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
+      for (const alt of data.piAlternatives) {
+        const altIdx = data.piAlternatives.indexOf(alt)
+        const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
+        const combined = [...altClauseIds, ...sharedClauseIds]
+        const combinedClauses = combined.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
+        condContent.push(bup(`Alternative ${altIdx + 1}:`))
+        if (combinedClauses.length > 0) condContent.push(makeClauseTable(combinedClauses))
+        condContent.push(emptyP())
+      }
+      // Additional clauses grouped by alternative
+      const sharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
+      const scopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
+      if (scopedAddls.length > 0) {
+        for (const alt of data.piAlternatives) {
+          const altAddls = scopedAddls.filter(ac => ac.alternativeId === alt.id)
+          if (altAddls.length > 0) {
+            condContent.push(bup(`Applicable to Alternative ${data.piAlternatives.indexOf(alt) + 1}:`))
+            condContent.push(...makeAddlBullets(altAddls))
+            condContent.push(emptyP())
+          }
+        }
+      }
+      if (sharedAddls.length > 0) {
+        condContent.push(bup('Applicable to both alternatives:'))
+        condContent.push(...makeAddlBullets(sharedAddls))
+      }
+    } else {
+      if (selectedClauses.length > 0) condContent.push(makeClauseTable(selectedClauses))
+      if (data.additionalClauses.length > 0) {
+        condContent.push(emptyP())
+        condContent.push(...makeAddlBullets(data.additionalClauses))
       }
     }
     rowMap.set('conditions', makeRow('Conditions', condContent))
@@ -1898,18 +2096,43 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Warranties ----
   {
     const warContent: (Paragraph | Table)[] = []
-    for (let wi = 0; wi < orderedWordWarranties.length; wi++) {
-      const w = orderedWordWarranties[wi]
-      const wVesselScope = data.warrantyVesselScopes[data.selectedWarrantyIds[wi]]
-      for (const entry of resolveIacsWarranty(w.text, wVesselScope, data)) {
-        warContent.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels)))
+    const dPiMultiAltW = data.piAlternatives.length > 1
+
+    const renderWarBullets = (warIds: string[], customs: QuotationCustomWarranty[]) => {
+      const paras: Paragraph[] = []
+      for (const wid of warIds) {
+        const w = data.allWarranties.find(ww => ww.id === wid)
+        if (!w) continue
+        const wVesselScope = data.warrantyVesselScopes[wid]
+        for (const entry of resolveIacsWarranty(w.text, wVesselScope, data)) {
+          paras.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels)))
+        }
       }
-    }
-    for (const cw of sortedWordCustom) {
-      for (const entry of resolveIacsWarranty(cw.text, cw.vesselScope, data)) {
-        warContent.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels)))
+      for (const cw of customs) {
+        for (const entry of resolveIacsWarranty(cw.text, cw.vesselScope, data)) {
+          paras.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels)))
+        }
       }
+      return paras
     }
+
+    if (dPiMultiAltW) {
+      const sharedWarIds = data.selectedWarrantyIds.filter(id => !data.warrantyAltIds[id])
+      const sharedCustom = sortedWordCustom.filter(cw => !cw.alternativeId)
+      warContent.push(...renderWarBullets(sharedWarIds, sharedCustom))
+      for (const alt of data.piAlternatives) {
+        const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
+        const altCustom = sortedWordCustom.filter(cw => cw.alternativeId === alt.id)
+        if (altWarIds.length > 0 || altCustom.length > 0) {
+          warContent.push(emptyP())
+          warContent.push(bup(`Additional Warranties Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
+          warContent.push(...renderWarBullets(altWarIds, altCustom))
+        }
+      }
+    } else {
+      warContent.push(...renderWarBullets(data.selectedWarrantyIds, sortedWordCustom))
+    }
+
     if (st(data, 'warrantiesAdditionalText')) {
       warContent.push(emptyP())
       warContent.push(...mp(st(data, 'warrantiesAdditionalText')))
@@ -1928,64 +2151,103 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Deductibles ----
   if (data.deductibles.length > 0 || data.textDeductibles.length > 0) {
     const dedContent: (Paragraph | Table)[] = []
-    if (data.deductibles.length > 0) {
-      const dedAmtW = Math.round(BODY_W * 0.20)
-      const dedDescW = BODY_W - dedAmtW
+    const dedAmtW = Math.round(BODY_W * 0.20)
+    const dedDescW = BODY_W - dedAmtW
+
+    const makeDedTable = (deds: QuotationDeductible[]) => {
       const dedRows: TableRow[] = []
-      for (const d of data.deductibles) {
+      for (const d of deds) {
         const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
         dedRows.push(new TableRow({
           children: [
-            new TableCell({
-              width: { size: dedAmtW, type: WidthType.DXA },
-              borders: noBorders(),
-              children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: '000000' })] })]
-            }),
-            new TableCell({
-              width: { size: dedDescW, type: WidthType.DXA },
-              borders: noBorders(),
-              children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___') + dScope, size: 22, font: 'Arial', color: '000000' })] })]
-            })
+            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___') + dScope, size: 22, font: 'Arial', color: '000000' })] })] })
           ]
         }))
         if (d.secondaryDescription) {
-          const secDesc = d.secondaryDescription
-            .replace(/\{currency\}/g, d.currency)
-            .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+          const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
           dedRows.push(new TableRow({
             children: [
-              new TableCell({
-                width: { size: dedAmtW, type: WidthType.DXA },
-                borders: noBorders(),
-                children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: '000000' })] })]
-              }),
-              new TableCell({
-                width: { size: dedDescW, type: WidthType.DXA },
-                borders: noBorders(),
-                children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: '000000' })] })]
-              })
+              new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: '000000' })] })] }),
+              new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: '000000' })] })] })
             ]
           }))
         }
       }
-      dedContent.push(new Table({
-        width: { size: BODY_W, type: WidthType.DXA },
-        columnWidths: [dedAmtW, dedDescW],
-        layout: TableLayoutType.FIXED,
-        rows: dedRows
-      }))
+      return new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [dedAmtW, dedDescW], layout: TableLayoutType.FIXED, rows: dedRows })
+    }
+
+    const dPiMultiAltD = data.piAlternatives.length > 1 && hasAltScoping(data.deductibles)
+
+    if (dPiMultiAltD) {
+      const sharedDeds = data.deductibles.filter(d => !d.alternativeId)
+      if (sharedDeds.length > 0) { dedContent.push(makeDedTable(sharedDeds)); dedContent.push(emptyP()) }
+      for (const alt of data.piAlternatives) {
+        const altDeds = data.deductibles.filter(d => d.alternativeId === alt.id)
+        if (altDeds.length > 0) {
+          dedContent.push(bup(`Deductibles applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
+          dedContent.push(makeDedTable(altDeds))
+          dedContent.push(emptyP())
+        }
+      }
+    } else if (data.deductibles.length > 0) {
+      dedContent.push(makeDedTable(data.deductibles))
       dedContent.push(emptyP())
     }
+
     if (data.quotation.deductibleAggregateEnabled && data.quotation.deductibleAggregateText) { dedContent.push(...mp(data.quotation.deductibleAggregateText)); dedContent.push(emptyP()) }
     else if (data.quotation.deductibleAggregateEnabled && st(data, 'deductiblesAggregate')) { dedContent.push(...mp(st(data, 'deductiblesAggregate'))); dedContent.push(emptyP()) }
-    for (const td of data.textDeductibles) { dedContent.push(emptyP()); dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+
+    const dPiMultiAltTD = data.piAlternatives.length > 1 && hasAltScoping(data.textDeductibles)
+    if (dPiMultiAltTD) {
+      const sharedTds = data.textDeductibles.filter(td => !td.alternativeId)
+      for (const td of sharedTds) { dedContent.push(emptyP()); dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+      for (const alt of data.piAlternatives) {
+        const altTds = data.textDeductibles.filter(td => td.alternativeId === alt.id)
+        if (altTds.length > 0) {
+          dedContent.push(emptyP())
+          dedContent.push(bup(`Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
+          for (const td of altTds) { dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+        }
+      }
+    } else {
+      for (const td of data.textDeductibles) { dedContent.push(emptyP()); dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+    }
     if (st(data, 'deductiblesAdditionalText')) { dedContent.push(emptyP()); dedContent.push(...mp(st(data, 'deductiblesAdditionalText'))) }
     rowMap.set('deductibles', makeRow('Deductibles', dedContent))
   }
 
   // ---- Exclusions ----
   if (exclusionTexts.length > 0) {
-    rowMap.set('exclusions', makeRow('Exclusions', exclusionTexts.map(t => bulletP(t))))
+    const dPiMultiAltEx = data.piAlternatives.length > 1
+    const dHasExclAltScoping = dPiMultiAltEx && (data.selectedExclusions.some(e => e.alternativeId) || data.customExclusions.some(e => e.alternativeId))
+
+    if (dHasExclAltScoping) {
+      const exclContent: (Paragraph | Table)[] = []
+      const allExclItems: { text: string; altId: string | null }[] = []
+      for (const se of data.selectedExclusions) {
+        const eScope = vesselScopeSuffix(se.vesselScope, data.quotationVessels)
+        const t = se.customText ? se.customText + eScope : (se.piExclusionId ? ((data.allExclusions.find(e => e.id === se.piExclusionId)?.text || '') + eScope) : '')
+        if (t) allExclItems.push({ text: t, altId: se.alternativeId || null })
+      }
+      for (const ce of data.customExclusions) {
+        const ceScope = vesselScopeSuffix(ce.vesselScope, data.quotationVessels)
+        allExclItems.push({ text: ce.text + ceScope, altId: ce.alternativeId || null })
+      }
+      const shared = allExclItems.filter(e => !e.altId)
+      exclContent.push(...shared.map(e => bulletP(e.text)))
+      for (const alt of data.piAlternatives) {
+        const altItems = allExclItems.filter(e => e.altId === alt.id)
+        if (altItems.length > 0) {
+          exclContent.push(emptyP())
+          exclContent.push(bup(`Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
+          exclContent.push(...altItems.map(e => bulletP(e.text)))
+        }
+      }
+      rowMap.set('exclusions', makeRow('Exclusions', exclContent))
+    } else {
+      rowMap.set('exclusions', makeRow('Exclusions', exclusionTexts.map(t => bulletP(t))))
+    }
   }
 
   // ---- Sanctions ----
@@ -2064,8 +2326,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       premContent.push(new Table({ rows: premTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }))
       premContent.push(np('per annum'))
       premContent.push(emptyP())
-    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1) {
+    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.piAlternatives.length > 1) {
       const wMultiAlt = data.hullAlternatives.length > 1
+      const wPiMultiAlt = data.piAlternatives.length > 1
       const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT) => new TableCell({
         borders: noBorders(),
         children: [new Paragraph({ alignment: align, children: [new TextRun({ text, size: 22, font: 'Arial', bold, color: '000000' })] })]
@@ -2084,7 +2347,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       // Build premium line items: { label, tech, payable? }
       type PremLine = { label: string; tech: number }
       const lines: PremLine[] = []
-      if (wMultiAlt) {
+      if (wPiMultiAlt) {
+        for (let ai = 0; ai < data.piAlternatives.length; ai++) {
+          const alt = data.piAlternatives[ai]
+          lines.push({ label: alt.label || `Alternative ${ai + 1}`, tech: alt.premiumAmount || 0 })
+        }
+      } else if (wMultiAlt) {
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
           const alt = data.hullAlternatives[ai]
           const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
