@@ -455,6 +455,8 @@ export interface Api {
 
   getQuotationClauses: (qId: string) => Promise<{ id: string; piClauseId: string; vesselScope?: string[] | null; alternativeId?: string | null }[]>
   setQuotationClauses: (qId: string, ids: string[], overrides?: Record<string, string>) => Promise<void>
+  addQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) => Promise<any>
+  deleteQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) => Promise<void>
   getQuotationClauseOverrides: (qId: string) => Promise<Record<string, string>>
   updateQuotationClauseOverride: (qId: string, clauseId: string, override: string | null) => Promise<void>
 

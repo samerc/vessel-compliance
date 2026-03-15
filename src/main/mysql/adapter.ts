@@ -5443,6 +5443,25 @@ export class MySQLAdapter {
         }
     }
 
+    async addQuotationClause(quotationId: string, piClauseId: string, alternativeId?: string | null): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO quotation_clauses (id, quotation_id, pi_clause_id, alternative_id) VALUES (?, ?, ?, ?)',
+            [id, quotationId, piClauseId, alternativeId || null]
+        )
+        return { id, quotationId, piClauseId, alternativeId: alternativeId || null }
+    }
+
+    async deleteQuotationClause(quotationId: string, piClauseId: string, alternativeId?: string | null): Promise<void> {
+        if (!this.pool) return
+        if (alternativeId) {
+            await this.pool.execute('DELETE FROM quotation_clauses WHERE quotation_id = ? AND pi_clause_id = ? AND alternative_id = ?', [quotationId, piClauseId, alternativeId])
+        } else {
+            await this.pool.execute('DELETE FROM quotation_clauses WHERE quotation_id = ? AND pi_clause_id = ? AND (alternative_id IS NULL)', [quotationId, piClauseId])
+        }
+    }
+
     async updateQuotationClauseOverride(quotationId: string, clauseId: string, descriptionOverride: string | null): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('UPDATE quotation_clauses SET description_override = ? WHERE quotation_id = ? AND pi_clause_id = ?', [descriptionOverride, quotationId, clauseId])

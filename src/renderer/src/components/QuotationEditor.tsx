@@ -1199,6 +1199,7 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
     const [allClauses, setAllClauses] = useState<PIClause[]>([])
     const [clauseSets, setClauseSets] = useState<PIClauseSet[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [clauseRows, setClauseRows] = useState<{ id: string; piClauseId: string; alternativeId: string | null }[]>([])
     const [clauseVesselScopes, setClauseVesselScopes] = useState<Record<string, string[] | null>>({})
     const [clauseAltIds, setClauseAltIds] = useState<Record<string, string | null>>({})
     const [descOverrides, setDescOverrides] = useState<Record<string, string>>({})
@@ -1225,6 +1226,7 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
         setClauseSets(sets)
         const safeSelected = Array.isArray(selected) ? selected : []
         setSelectedIds(new Set(safeSelected.map((r: any) => r.piClauseId)))
+        setClauseRows(safeSelected.map((r: any) => ({ id: r.id, piClauseId: r.piClauseId, alternativeId: r.alternativeId || null })))
         setClauseVesselScopes(safeSelected.reduce((m: Record<string, string[] | null>, r: any) => { if (r.vesselScope) m[r.piClauseId] = r.vesselScope; return m }, {}))
         setClauseAltIds(safeSelected.reduce((m: Record<string, string | null>, r: any) => { m[r.piClauseId] = r.alternativeId || null; return m }, {}))
         setDescOverrides(overrides)
@@ -1252,43 +1254,68 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
     }
 
     const toggleClause = async (clauseId: string) => {
-        const newSet = new Set(selectedIds)
-        const isDeselecting = newSet.has(clauseId)
-        if (isDeselecting) newSet.delete(clauseId)
-        else newSet.add(clauseId)
-        setSelectedIds(newSet)
-        try {
-            await window.api.setQuotationClauses(quotation.id, Array.from(newSet), descOverrides)
-            // When deselecting a cargo-related clause, auto-deselect cargo warranties
-            const clause = allClauses.find(c => c.id === clauseId)
-            if (isDeselecting && clause?.isCargoRelated) {
-                const remainingCargoClauseSelected = allClauses.some(c => c.isCargoRelated && c.id !== clauseId && newSet.has(c.id))
-                if (!remainingCargoClauseSelected) {
-                    const [allWarranties, currentWarrantyRows, allExclusions, currentExclusionRows] = await Promise.all([
-                        window.api.piGetWarranties(),
-                        window.api.getQuotationWarranties(quotation.id),
-                        window.api.piGetExclusions(),
-                        window.api.getQuotationExclusions(quotation.id)
-                    ])
-                    const currentWarrantyIds = (Array.isArray(currentWarrantyRows) ? currentWarrantyRows : []).map((r: any) => r.piWarrantyId)
-                    const cargoWarrantyIds = new Set(allWarranties.filter((w: PIWarranty) => w.isCargoRelated).map((w: PIWarranty) => w.id))
-                    const filteredWarranties = currentWarrantyIds.filter((id: string) => !cargoWarrantyIds.has(id))
-                    if (filteredWarranties.length < currentWarrantyIds.length) {
-                        await window.api.setQuotationWarranties(quotation.id, filteredWarranties)
-                        showSuccess('Cargo warranties auto-removed (no cargo clauses selected)')
-                    }
-                    // Also auto-remove cargo-related exclusions
-                    const safeExRows = Array.isArray(currentExclusionRows) ? currentExclusionRows : []
-                    const cargoExclusionIds = new Set((Array.isArray(allExclusions) ? allExclusions : []).filter((ex: PIExclusion) => ex.isCargoRelated).map((ex: PIExclusion) => ex.id))
-                    const filteredExclusions = safeExRows.filter((r: any) => !r.piExclusionId || !cargoExclusionIds.has(r.piExclusionId))
-                    if (filteredExclusions.length < safeExRows.length) {
-                        await window.api.setQuotationExclusions(quotation.id, filteredExclusions.map((r: any) => ({ piExclusionId: r.piExclusionId, customText: r.customText })))
-                        showSuccess('Cargo exclusions auto-removed (no cargo clauses selected)')
+        const hasPIAlts = piAlternatives.length >= 2
+        const altId = hasPIAlts ? selectedPIAltId : null
+
+        if (hasPIAlts && altId) {
+            // Per-alternative toggle: add/remove clause row for this specific alternative
+            const existingRow = clauseRows.find(r => r.piClauseId === clauseId && r.alternativeId === altId)
+            try {
+                if (existingRow) {
+                    await window.api.deleteQuotationClause(quotation.id, clauseId, altId)
+                    setClauseRows(prev => prev.filter(r => !(r.piClauseId === clauseId && r.alternativeId === altId)))
+                } else {
+                    const result = await window.api.addQuotationClause(quotation.id, clauseId, altId)
+                    if (result && !(result as any).error) {
+                        setClauseRows(prev => [...prev, { id: result.id, piClauseId: clauseId, alternativeId: altId }])
                     }
                 }
+                // Refresh selectedIds from all rows
+                const fresh = await window.api.getQuotationClauses(quotation.id)
+                const safeFresh = Array.isArray(fresh) ? fresh : []
+                setSelectedIds(new Set(safeFresh.map((r: any) => r.piClauseId)))
+                setClauseRows(safeFresh.map((r: any) => ({ id: r.id, piClauseId: r.piClauseId, alternativeId: r.alternativeId || null })))
+                setClauseAltIds(safeFresh.reduce((m: Record<string, string | null>, r: any) => { m[r.piClauseId] = r.alternativeId || null; return m }, {}))
+            } catch (err: any) { showError(err.message || 'Failed') }
+        } else {
+            // Original bulk toggle (no alternatives or viewing "All")
+            const newSet = new Set(selectedIds)
+            const isDeselecting = newSet.has(clauseId)
+            if (isDeselecting) newSet.delete(clauseId)
+            else newSet.add(clauseId)
+            setSelectedIds(newSet)
+            try {
+                await window.api.setQuotationClauses(quotation.id, Array.from(newSet), descOverrides)
+                // When deselecting a cargo-related clause, auto-deselect cargo warranties
+                const clause = allClauses.find(c => c.id === clauseId)
+                if (isDeselecting && clause?.isCargoRelated) {
+                    const remainingCargoClauseSelected = allClauses.some(c => c.isCargoRelated && c.id !== clauseId && newSet.has(c.id))
+                    if (!remainingCargoClauseSelected) {
+                        const [allWarranties, currentWarrantyRows, allExclusions, currentExclusionRows] = await Promise.all([
+                            window.api.piGetWarranties(),
+                            window.api.getQuotationWarranties(quotation.id),
+                            window.api.piGetExclusions(),
+                            window.api.getQuotationExclusions(quotation.id)
+                        ])
+                        const currentWarrantyIds = (Array.isArray(currentWarrantyRows) ? currentWarrantyRows : []).map((r: any) => r.piWarrantyId)
+                        const cargoWarrantyIds = new Set(allWarranties.filter((w: PIWarranty) => w.isCargoRelated).map((w: PIWarranty) => w.id))
+                        const filteredWarranties = currentWarrantyIds.filter((id: string) => !cargoWarrantyIds.has(id))
+                        if (filteredWarranties.length < currentWarrantyIds.length) {
+                            await window.api.setQuotationWarranties(quotation.id, filteredWarranties)
+                            showSuccess('Cargo warranties auto-removed (no cargo clauses selected)')
+                        }
+                        const safeExRows = Array.isArray(currentExclusionRows) ? currentExclusionRows : []
+                        const cargoExclusionIds = new Set((Array.isArray(allExclusions) ? allExclusions : []).filter((ex: PIExclusion) => ex.isCargoRelated).map((ex: PIExclusion) => ex.id))
+                        const filteredExclusions = safeExRows.filter((r: any) => !r.piExclusionId || !cargoExclusionIds.has(r.piExclusionId))
+                        if (filteredExclusions.length < safeExRows.length) {
+                            await window.api.setQuotationExclusions(quotation.id, filteredExclusions.map((r: any) => ({ piExclusionId: r.piExclusionId, customText: r.customText })))
+                            showSuccess('Cargo exclusions auto-removed (no cargo clauses selected)')
+                        }
+                    }
+                }
+            } catch (err: any) {
+                showError(err.message || 'Failed to save clause selection')
             }
-        } catch (err: any) {
-            showError(err.message || 'Failed to save clause selection')
         }
     }
 
@@ -1328,10 +1355,12 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
         }
     }
 
-    // Filter clauses by selected alternative
-    const filteredClauseIds = piAlternatives.length >= 2 && selectedPIAltId
-        ? new Set(allClauses.filter(c => selectedIds.has(c.id) && (clauseAltIds[c.id] === selectedPIAltId || !clauseAltIds[c.id])).map(c => c.id))
-        : null
+    // For per-alternative view: determine which clauses are checked for the viewed alternative
+    const isClauseCheckedForAlt = (clauseId: string): boolean => {
+        if (!selectedPIAltId || piAlternatives.length < 2) return selectedIds.has(clauseId)
+        // Checked if there's a row for this alt specifically, OR a shared row (null)
+        return clauseRows.some(r => r.piClauseId === clauseId && (r.alternativeId === selectedPIAltId || !r.alternativeId))
+    }
 
     const updateAdditionalClauseScope = async (id: string, scope: string[] | null) => {
         setAdditionalClauses(prev => prev.map(c => c.id === id ? { ...c, vesselScope: scope } : c))
@@ -1370,16 +1399,18 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
                 </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
-                {allClauses.filter(c => !filteredClauseIds || filteredClauseIds.has(c.id) || !selectedIds.has(c.id)).map(c => (
-                    <div key={c.id} style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(c.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
+                {allClauses.map(c => {
+                    const checked = isClauseCheckedForAlt(c.id)
+                    return (
+                    <div key={c.id} style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)', background: checked ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                            <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleClause(c.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+                            <input type="checkbox" checked={checked} onChange={() => toggleClause(c.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
                             <span style={{ fontWeight: 600, fontSize: '0.85rem', minWidth: '60px' }}>Cl. {c.clauseNumber}</span>
                             <span style={{ fontSize: '0.85rem' }}>{c.name}</span>
                             {c.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
                             {descOverrides[c.id] && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)' }}>(edited)</span>}
                         </label>
-                        {selectedIds.has(c.id) && (c.description || descOverrides[c.id]) && (
+                        {checked && (c.description || descOverrides[c.id]) && (
                             <div style={{ marginTop: '6px', marginLeft: '32px' }}>
                                 <input
                                     type="text"
@@ -1391,14 +1422,14 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
                                 />
                             </div>
                         )}
-                        {selectedIds.has(c.id) && (
+                        {checked && !selectedPIAltId && (
                             <div style={{ paddingLeft: '30px' }}>
                                 <VesselScopeChips vessels={qVessels} vesselScope={clauseVesselScopes[c.id]} onChange={scope => updateClauseScope(c.id, scope)} />
                                 <AlternativeScopeChips alternatives={piAlternatives} currentAltId={clauseAltIds[c.id] || null} onChangeAltId={altId => updateClauseAltId(c.id, altId)} />
                             </div>
                         )}
                     </div>
-                ))}
+                )})}
             </div>
 
             <h4 style={{ fontSize: '0.9rem', marginBottom: '10px' }}>Additional Clauses</h4>
