@@ -2541,19 +2541,12 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
 // ==================== Exclusions Tab ====================
 
 function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
-    const altStyle = (altId: string | null | undefined): React.CSSProperties => {
-        if (piAlternatives.length < 2 || !selectedPIAltId) return {}
-        const matches = !altId || altId === selectedPIAltId
-        if (matches) return { borderLeft: `3px solid ${ALT_COLORS[piAlternatives.findIndex(a => a.id === selectedPIAltId) % ALT_COLORS.length]}` }
-        const otherIdx = piAlternatives.findIndex(a => a.id === altId)
-        return { borderLeft: `3px dashed ${ALT_COLORS[otherIdx >= 0 ? otherIdx % ALT_COLORS.length : 0]}40` }
-    }
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
     const [selectedRows, setSelectedRows] = useState<any[]>([])
     const selectedIds = useMemo(() => {
         const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
         const filtered = altId
-            ? selectedRows.filter((r: any) => r.alternativeId === altId || !r.alternativeId)
+            ? selectedRows.filter((r: any) => r.alternativeId === altId)
             : selectedRows
         return new Set(filtered.filter((r: any) => r.piExclusionId).map((r: any) => r.piExclusionId))
     }, [selectedRows, piAlternatives, selectedPIAltId])
@@ -2657,20 +2650,15 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
         await window.api.updateQuotationItemVesselScope('quotation_exclusions', id, scope)
     }
 
-    const updateExclusionAltId = async (id: string, altId: string | null) => {
-        await window.api.updateQuotationItemAlternativeId('quotation_exclusions', id, altId)
-        setSelectedRows(prev => prev.map(e => e.id === id ? { ...e, alternativeId: altId } : e))
-    }
-
-    const updateCustomExclusionAltId = async (id: string, altId: string | null) => {
-        await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', id, altId)
-        setCustomExclusions(prev => prev.map(e => e.id === id ? { ...e, alternativeId: altId } : e))
-    }
-
     // Custom exclusion handlers
     const addCustom = async () => {
         if (!newCustomText.trim()) return
+        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
         const result = await window.api.addQuotationCustomExclusion({ quotationId: quotation.id, text: newCustomText.trim(), order: customExclusions.length })
+        if (altId && result && !(result as any).error) {
+            await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', result.id, altId)
+            result.alternativeId = altId
+        }
         if (result && !(result as any).error) {
             setCustomExclusions(prev => [...prev, result])
             setNewCustomText('')
@@ -2746,7 +2734,7 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                 {visibleExclusions.map(e => {
                     const row = selectedRows.find((r: any) => r.piExclusionId === e.id)
                     return (
-                        <div key={e.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(e.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent', ...(row ? altStyle(row.alternativeId) : {}) }}>
+                        <div key={e.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(e.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
                             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
                                 <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggle(e.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)', marginTop: '2px' }} />
                                 <div style={{ flex: 1 }}>
@@ -2760,7 +2748,6 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                             {row && qVessels.length > 1 && (
                                 <div style={{ paddingLeft: '30px' }}>
                                     <VesselScopeChips vessels={qVessels} vesselScope={row.vesselScope} onChange={scope => updateExclusionScope(row.id, scope)} />
-                                    <AlternativeScopeChips alternatives={piAlternatives} currentAltId={row.alternativeId || null} onChangeAltId={altId => updateExclusionAltId(row.id, altId)} />
                                 </div>
                             )}
                         </div>
@@ -2776,8 +2763,11 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                     <button onClick={() => setShowImportModal(true)} className="btn-secondary" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px' }}><Upload size={13} /> Import</button>
                 </div>
 
-                {customExclusions.map((ce, i) => (
-                    <div key={ce.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)', ...altStyle(ce.alternativeId) }}>
+                {customExclusions.filter(ce => {
+                    if (piAlternatives.length < 2 || !selectedPIAltId) return true
+                    return ce.alternativeId === selectedPIAltId
+                }).map((ce, i) => (
+                    <div key={ce.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)' }}>
                         {editingCustomId === ce.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                                 <textarea value={editCustomText} onChange={e => setEditCustomText(e.target.value)} style={{ flex: 1, minHeight: '40px', resize: 'none' }} />
@@ -2795,10 +2785,9 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                                 </div>
                             </div>
                         )}
-                        {editingCustomId !== ce.id && (qVessels.length > 1 || piAlternatives.length >= 2) && (
+                        {editingCustomId !== ce.id && qVessels.length > 1 && (
                             <div style={{ marginTop: '4px' }}>
-                                {qVessels.length > 1 && <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />}
-                                <AlternativeScopeChips alternatives={piAlternatives} currentAltId={ce.alternativeId || null} onChangeAltId={altId => updateCustomExclusionAltId(ce.id, altId)} />
+                                <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />
                             </div>
                         )}
                     </div>
