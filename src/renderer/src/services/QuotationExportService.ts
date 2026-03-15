@@ -31,6 +31,24 @@ import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quo
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
 
+// ==================== Export Snapshot ====================
+
+interface ExportSnapshot {
+  sectionTexts: PISectionTexts
+  allClauses: PIClause[]
+  allWarranties: PIWarranty[]
+  allExclusions: PIExclusion[]
+  allAdditionalClauses: PIAdditionalClause[]
+  sanctionsVersions: PISanctionsVersion[]
+  clauseOverrides: Record<string, string>
+  logoPath: string | null
+  allHullConditions: HullClauseCondition[]
+  allHullAdditionalConditions: HullAdditionalCondition[]
+  hullClauses: HullClause[]
+  allWarConditions: WarCondition[]
+  warSettings: WarSettings | null
+}
+
 // ==================== Data Gathering ====================
 
 interface QuotationData {
@@ -142,17 +160,36 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const warrantyVesselScopes: Record<string, string[] | null> = {}
   for (const r of safeWarrantyRows) { if (r.vesselScope) warrantyVesselScopes[r.piWarrantyId] = r.vesselScope }
 
-  // Three-layer merge: defaults -> global settings -> per-quotation overrides
-  const mergedTexts: PISectionTexts = {
-    ...DEFAULT_SECTION_TEXTS,
-    ...(sectionTexts || {}),
-    ...(quotation.sectionTextsOverride || {})
+  // Check for existing export snapshot
+  let snapshot: ExportSnapshot | null = null
+  if (quotation.exportSnapshot) {
+    try { snapshot = JSON.parse(quotation.exportSnapshot) } catch { /* ignore */ }
   }
 
+  // Three-layer merge: defaults -> global settings -> per-quotation overrides
+  const mergedTexts: PISectionTexts = snapshot
+    ? snapshot.sectionTexts
+    : { ...DEFAULT_SECTION_TEXTS, ...(sectionTexts || {}), ...(quotation.sectionTextsOverride || {}) }
+
   // Build clause overrides map: clauseId -> description override
-  const clauseOverrides: Record<string, string> = clauseOverridesArr && typeof clauseOverridesArr === 'object' && !Array.isArray(clauseOverridesArr)
-    ? clauseOverridesArr as Record<string, string>
-    : {}
+  const clauseOverrides: Record<string, string> = snapshot
+    ? snapshot.clauseOverrides
+    : (clauseOverridesArr && typeof clauseOverridesArr === 'object' && !Array.isArray(clauseOverridesArr)
+      ? clauseOverridesArr as Record<string, string>
+      : {})
+
+  // Resolve settings data from snapshot or live
+  const resolvedAllClauses = snapshot ? snapshot.allClauses : allClauses
+  const resolvedAllWarranties = snapshot ? snapshot.allWarranties : allWarranties
+  const resolvedAllExclusions = snapshot ? snapshot.allExclusions : allExclusions
+  const resolvedAllAdditionalClauses = snapshot ? snapshot.allAdditionalClauses : allAdditionalClauses
+  const resolvedSanctionsVersions = snapshot ? snapshot.sanctionsVersions : sanctionsVersions
+  const resolvedLogoPath = snapshot ? snapshot.logoPath : (logoPath || null)
+  const resolvedHullClauses = snapshot ? snapshot.hullClauses : (Array.isArray(hullClausesRaw) ? hullClausesRaw : [])
+  const resolvedAllHullConditions = snapshot ? snapshot.allHullConditions : (Array.isArray(allHullConditionsRaw) ? allHullConditionsRaw : [])
+  const resolvedAllHullAdditionalConditions = snapshot ? snapshot.allHullAdditionalConditions : (Array.isArray(allHullAdditionalConditionsRaw) ? allHullAdditionalConditionsRaw : [])
+  const resolvedAllWarConditions = snapshot ? snapshot.allWarConditions : (Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [])
+  const resolvedWarSettings = snapshot ? snapshot.warSettings : (warSettingsRaw && !(warSettingsRaw as any).error ? warSettingsRaw : null)
 
   // Determine IACS status per quotation vessel
   const vesselIacsMap: Record<string, boolean> = {}
@@ -171,29 +208,56 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     }
   }
 
+  // Save snapshot on first export (if not already saved)
+  if (!quotation.exportSnapshot) {
+    const newSnapshot: ExportSnapshot = {
+      sectionTexts: mergedTexts,
+      allClauses: resolvedAllClauses,
+      allWarranties: resolvedAllWarranties,
+      allExclusions: resolvedAllExclusions,
+      allAdditionalClauses: resolvedAllAdditionalClauses,
+      sanctionsVersions: resolvedSanctionsVersions,
+      clauseOverrides,
+      logoPath: resolvedLogoPath,
+      allHullConditions: resolvedAllHullConditions,
+      allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
+      hullClauses: resolvedHullClauses,
+      allWarConditions: resolvedAllWarConditions,
+      warSettings: resolvedWarSettings
+    }
+    try { await window.api.saveExportSnapshot(quotation.id, JSON.stringify(newSnapshot)) } catch { /* non-critical */ }
+  }
+
   return {
     quotation, quotationVessels, allVessels, assureds, subLimits,
-    selectedClauseIds, clauseVesselScopes, allClauses, additionalClauses, allAdditionalClauses,
-    selectedWarrantyIds, warrantyVesselScopes, allWarranties, customWarranties,
+    selectedClauseIds, clauseVesselScopes,
+    allClauses: resolvedAllClauses,
+    additionalClauses,
+    allAdditionalClauses: resolvedAllAdditionalClauses,
+    selectedWarrantyIds, warrantyVesselScopes,
+    allWarranties: resolvedAllWarranties,
+    customWarranties,
     deductibles, textDeductibles,
-    selectedExclusions, allExclusions, customExclusions,
+    selectedExclusions,
+    allExclusions: resolvedAllExclusions,
+    customExclusions,
     customSections: Array.isArray(customSections) ? customSections : [],
     excludedCountries, subjectivities, instalments, information, notes,
     sectionTexts: mergedTexts,
-    sanctionsVersions,
+    sanctionsVersions: resolvedSanctionsVersions,
     clauseOverrides,
-    logoPath: logoPath || null,
+    logoPath: resolvedLogoPath,
     vesselIacsMap,
     hullAgreedValueItems: Array.isArray(hullAgreedValueItems) ? hullAgreedValueItems : [],
-    hullClauses: Array.isArray(hullClausesRaw) ? hullClausesRaw : [],
+    hullClauses: resolvedHullClauses,
     hullConditions: Array.isArray(hullConditionsRaw) ? hullConditionsRaw : [],
-    allHullConditions: Array.isArray(allHullConditionsRaw) ? allHullConditionsRaw : [],
+    allHullConditions: resolvedAllHullConditions,
     hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
-    allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw) ? allHullAdditionalConditionsRaw : [],
+    allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
-    allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
-    warSettings: warSettingsRaw && !(warSettingsRaw as any).error ? warSettingsRaw : null
+    allWarConditions: resolvedAllWarConditions,
+    warSettings: resolvedWarSettings
   }
 }
 
@@ -598,7 +662,6 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const ha = data.hullAdditionalConditions
     const alts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
-      let hcText = ''
       const ivClauseId = data.quotation.ivClauseId
       const selectedIvClause = ivClauseId ? data.hullClauses.find(c => c.id === ivClauseId) : null
       const multiAlt = alts.length > 1
@@ -608,20 +671,29 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         return def?.hullClauseId || ''
       }
 
-      const renderConditions = (conds: typeof hc) => {
-        let text = ''
+      // Resolve amount: check the condition itself, then any sibling with the same conditionId
+      const resolveAmount = (qc: typeof hc[0]): number | null | undefined => {
+        if (qc.amount != null) return qc.amount
+        const sibling = hc.find(c => c.hullConditionId === qc.hullConditionId && c.id !== qc.id && c.amount != null)
+        return sibling?.amount
+      }
+
+      // Returns array of [ref, text] pairs for table-like rendering
+      const getCondPairs = (conds: typeof hc): [string, string][] => {
+        const pairs: [string, string][] = []
         for (const qc of conds) {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
           if (!def) continue
           let t = qc.textOverride || def.text
-          if (def.hasAmount && def.amountPlaceholder && qc.amount != null) {
+          const amount = resolveAmount(qc)
+          if (def.hasAmount && def.amountPlaceholder && amount != null) {
             const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            t = t.replace(new RegExp(escaped, 'g'), formatCurrency(qc.amount, data.quotation.premiumCurrency || 'USD'))
+            t = t.replace(new RegExp(escaped, 'g'), formatCurrency(amount, data.quotation.premiumCurrency || 'USD'))
           }
           const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
-          text += `Cl. ${def.conditionNumber} – ${t}${scope}\n`
+          pairs.push([`Cl. ${def.conditionNumber}`, `${t}${scope}`])
         }
-        return text
+        return pairs
       }
 
       // Determine where each additional condition belongs
@@ -657,82 +729,81 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const ivConds = hc.filter(qc => ivClauseId && getCondClauseId(qc) === ivClauseId)
       const hasIvSection = data.quotation.ivEnabled && (ivConds.length > 0 || selectedIvClause)
 
+      // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
+      const getAltCondsResolved = (alt: typeof alts[0]) => {
+        const ownConds = hc.filter(qc => qc.alternativeId === alt.id)
+        const nullConds = hc.filter(qc =>
+          !qc.alternativeId &&
+          getCondClauseId(qc) === alt.hullClauseId &&
+          !(ivClauseId && getCondClauseId(qc) === ivClauseId)
+        )
+        const merged = [...ownConds]
+        for (const nc of nullConds) {
+          if (!merged.some(c => c.hullConditionId === nc.hullConditionId)) merged.push(nc)
+        }
+        // Sort by condition number
+        merged.sort((a, b) => {
+          const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+          const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+          return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+        })
+        return merged
+      }
+
+      // Build structured hull conditions data for table rendering
+      type HcBlock = { title?: string; underline?: boolean; desc?: string; condPairs?: [string, string][]; addl?: string }
+      const hcBlocks: HcBlock[] = []
+
       if (multiAlt) {
-        // Multiple alternatives
         for (let i = 0; i < alts.length; i++) {
           const alt = alts[i]
           const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-          const altConds = hc.filter(qc => qc.alternativeId === alt.id)
-          const label = `Alternative ${i + 1}`
-          hcText += `${label}\n\n`
-          if (clause) hcText += `${clause.description || clause.name}\n\n`
-          hcText += renderConditions(altConds)
-          const altAddl = renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id)
-          if (altAddl) hcText += '\n' + altAddl
-          hcText += '\n'
+          const altConds = getAltCondsResolved(alt)
+          hcBlocks.push({ title: `Alternative ${i + 1}`, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
         }
-
-        // Applicable to all alternatives
         const allAltsAddl = renderAddlForSection(b => b.type === 'allAlts')
-        if (allAltsAddl) {
-          hcText += 'Applicable to all alternatives\n\n' + allAltsAddl + '\n'
-        }
-
-        // IV section
+        if (allAltsAddl) hcBlocks.push({ title: 'Applicable to all alternatives', underline: true, addl: allAltsAddl })
         if (hasIvSection) {
-          if (selectedIvClause) hcText += `Increased Value\n\n${selectedIvClause.description || selectedIvClause.name}\n\n`
-          else hcText += 'Increased Value\n\n'
-          hcText += renderConditions(ivConds)
-          const ivAddl = renderAddlForSection(b => b.type === 'iv')
-          if (ivAddl) hcText += '\n' + ivAddl
-          hcText += '\n'
+          hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         }
-
-        // Applicable to all sections (both = alternatives + IV)
         const bothAddl = renderAddlForSection(b => b.type === 'both')
-        if (bothAddl) {
-          hcText += (hasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives') + '\n\n' + bothAddl
-        }
+        if (bothAddl) hcBlocks.push({ title: hasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives', underline: true, addl: bothAddl })
       } else if (hasIvSection) {
-        // Single alternative with IV
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
         const hmClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
         const hmConds = hc.filter(qc => hmClauseId && getCondClauseId(qc) === hmClauseId)
-
-        if (selectedClause) hcText += `Hull and Machinery\n\n${selectedClause.description || selectedClause.name}\n\n`
-        else hcText += 'Hull and Machinery\n\n'
-        hcText += renderConditions(hmConds)
-        const hmAddl = renderAddlForSection(b => b.type === 'alt' || (b.type === 'allAlts'))
-        if (hmAddl) hcText += '\n' + hmAddl
-
-        if (selectedIvClause) hcText += `\nIncreased Value\n\n${selectedIvClause.description || selectedIvClause.name}\n\n`
-        else hcText += '\nIncreased Value\n\n'
-        hcText += renderConditions(ivConds)
-        const ivAddl = renderAddlForSection(b => b.type === 'iv')
-        if (ivAddl) hcText += '\n' + ivAddl
-
+        hcBlocks.push({ title: 'Hull and Machinery', underline: true, desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hmConds), addl: renderAddlForSection(b => b.type === 'alt' || b.type === 'allAlts') })
+        hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         const bothAddl = renderAddlForSection(b => b.type === 'both')
-        if (bothAddl) {
-          hcText += '\nApplicable to both sections:\n\n' + bothAddl
-        }
+        if (bothAddl) hcBlocks.push({ title: 'Applicable to both sections', underline: true, addl: bothAddl })
       } else {
-        // Single alternative, no IV — simple output
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
-        if (selectedClause) hcText += `${selectedClause.description || selectedClause.name}\n\n`
-        hcText += renderConditions(hc)
-        if (ha.length > 0) {
-          hcText += '\n'
-          for (const qa of ha) {
-            const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
-            if (!def) continue
-            const condText = qa.textOverride || def.text
-            const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-            hcText += `- ${condText}${scope}\n`
-          }
+        let addl = ''
+        for (const qa of ha) {
+          const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+          if (!def) continue
+          const condText = qa.textOverride || def.text
+          const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
+          addl += `- ${condText}${scope}\n`
         }
+        hcBlocks.push({ desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hc), addl })
       }
+
+      // Render as text for sectionMap — condition pairs as sub-table rendered inline
+      let hcText = ''
+      for (const blk of hcBlocks) {
+        if (blk.title) hcText += `${blk.title}\n\n`
+        if (blk.desc) hcText += `${blk.desc}\n\n`
+        if (blk.condPairs && blk.condPairs.length > 0) {
+          for (const [ref, txt] of blk.condPairs) hcText += `${ref}\t${txt}\n`
+          hcText += '\n'
+        }
+        if (blk.addl) hcText += blk.addl + '\n'
+      }
+      // Store blocks for PDF sub-table rendering
+      ;(data as any)._hullCondBlocks = hcBlocks
       sectionMap.set('hullConditions', ['Conditions', hcText.trim()])
     }
   }
@@ -1064,6 +1135,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     if (!sectionOrder.includes(key)) sections.push(entry)
   }
 
+  // Find hull conditions row for special rendering
+  const hullCondBlocks: any[] = (data as any)._hullCondBlocks || []
+  const hullCondRowIdx = sections.findIndex(s => s[0] === 'Conditions' && hullCondBlocks.length > 0)
+
   // Render main two-column table
   const premiumRowIdx = sections.findIndex(s => s[0].startsWith('Premium'))
   autoTable(doc, {
@@ -1079,6 +1154,76 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     didParseCell: (hookData: any) => {
       if (hookData.section === 'body' && hookData.column.index === 1 && hookData.row.index === premiumRowIdx) {
         hookData.cell.styles.fontStyle = 'bold'
+      }
+      // Bold + underline section titles in hull conditions cell
+      if (hookData.section === 'body' && hookData.column.index === 1 && hookData.row.index === hullCondRowIdx && hullCondBlocks.length > 0) {
+        // Will be handled by didDrawCell
+      }
+    },
+    didDrawCell: (hookData: any) => {
+      if (hookData.section !== 'body' || hookData.column.index !== 1 || hookData.row.index !== hullCondRowIdx || hullCondBlocks.length === 0) return
+      // Draw hull conditions with sub-tables over the cell content
+      const cellX = hookData.cell.x + hookData.cell.padding('left')
+      const cellW = hookData.cell.width - hookData.cell.padding('left') - hookData.cell.padding('right')
+      let cy = hookData.cell.y + hookData.cell.padding('top')
+      const col1W = cellW * 0.30
+      const col2W = cellW * 0.70
+
+      // Clear existing text by drawing a white rect
+      doc.setFillColor(255, 255, 255)
+      doc.rect(hookData.cell.x + 0.25, hookData.cell.y + 0.25, hookData.cell.width - 0.5, hookData.cell.height - 0.5, 'F')
+
+      doc.setTextColor(0, 0, 0)
+
+      for (const blk of hullCondBlocks) {
+        // Title (bold + underline)
+        if (blk.title) {
+          doc.setFontSize(11)
+          doc.setFont('helvetica', 'bold')
+          doc.text(blk.title, cellX, cy + 4)
+          // Underline
+          const tw = doc.getTextWidth(blk.title)
+          doc.setLineWidth(0.3)
+          doc.setDrawColor(0, 0, 0)
+          doc.line(cellX, cy + 5, cellX + tw, cy + 5)
+          cy += 9
+        }
+        // Description
+        if (blk.desc) {
+          doc.setFontSize(11)
+          doc.setFont('helvetica', 'normal')
+          const descLines = doc.splitTextToSize(blk.desc, cellW)
+          for (const dl of descLines) {
+            doc.text(dl, cellX, cy + 4)
+            cy += 5
+          }
+          cy += 3
+        }
+        // Condition pairs as mini table
+        if (blk.condPairs && blk.condPairs.length > 0) {
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'normal')
+          for (const [ref, txt] of blk.condPairs) {
+            const txtLines = doc.splitTextToSize(txt, col2W - 2)
+            doc.text(ref, cellX, cy + 4)
+            for (let li = 0; li < txtLines.length; li++) {
+              doc.text(txtLines[li], cellX + col1W, cy + 4 + li * 4.5)
+            }
+            cy += Math.max(1, txtLines.length) * 4.5 + 1
+          }
+          cy += 2
+        }
+        // Additional conditions
+        if (blk.addl) {
+          doc.setFontSize(11)
+          doc.setFont('helvetica', 'normal')
+          const addlLines = doc.splitTextToSize(blk.addl.trim(), cellW)
+          for (const al of addlLines) {
+            doc.text(al, cellX, cy + 4)
+            cy += 5
+          }
+          cy += 2
+        }
       }
     }
   })
@@ -1161,6 +1306,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   const bp = (text: string) => new Paragraph({
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true })]
+  })
+  const bup = (text: string) => new Paragraph({
+    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true, underline: {} })]
   })
 
   const bulletP = (text: string) => new Paragraph({
@@ -1434,29 +1583,39 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dAlts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
       const hcContent: (Paragraph | Table)[] = []
-      const condRefW = Math.round(BODY_W * 0.15)
-      const condTextW = BODY_W - condRefW
+      const condTableW = BODY_W
+      const condCol1W = Math.round(condTableW * 0.30)
+      const condCol2W = condTableW - condCol1W
       const noBordersObj = () => ({ top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } })
       const dIvClauseId = data.quotation.ivClauseId
       const dSelectedIvClause = dIvClauseId ? data.hullClauses.find(c => c.id === dIvClauseId) : null
       const dMultiAlt = dAlts.length > 1
 
+      // Resolve amount: check the condition itself, then any sibling with the same conditionId
+      const dResolveAmount = (qc: typeof hc[0]): number | null | undefined => {
+        if (qc.amount != null) return qc.amount
+        const sibling = hc.find(c => c.hullConditionId === qc.hullConditionId && c.id !== qc.id && c.amount != null)
+        return sibling?.amount
+      }
+
       const makeCondTable = (conds: typeof hc) => new Table({
-        width: { size: BODY_W, type: WidthType.DXA },
+        width: { size: condTableW, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
+        columnWidths: [condCol1W, condCol2W],
         rows: conds.map(qc => {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
           if (!def) return null
           let text = qc.textOverride || def.text
-          if (def.hasAmount && def.amountPlaceholder && qc.amount != null) {
+          const amount = dResolveAmount(qc)
+          if (def.hasAmount && def.amountPlaceholder && amount != null) {
             const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            text = text.replace(new RegExp(escaped, 'g'), formatCurrency(qc.amount, data.quotation.premiumCurrency || 'USD'))
+            text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, data.quotation.premiumCurrency || 'USD'))
           }
           const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
           return new TableRow({
             children: [
-              new TableCell({ width: { size: condRefW, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
-              new TableCell({ width: { size: condTextW, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: '000000' })] })] })
+              new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
+              new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: '000000' })] })] })
             ]
           })
         }).filter(Boolean) as TableRow[]
@@ -1506,13 +1665,33 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const dIvConds = hc.filter(qc => dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
       const dHasIvSection = data.quotation.ivEnabled && (dIvConds.length > 0 || dSelectedIvClause)
 
+      // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
+      const dGetAltCondsResolved = (alt: typeof dAlts[0]) => {
+        const ownConds = hc.filter(qc => qc.alternativeId === alt.id)
+        const nullConds = hc.filter(qc =>
+          !qc.alternativeId &&
+          dGetCondClauseId(qc) === alt.hullClauseId &&
+          !(dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
+        )
+        const merged = [...ownConds]
+        for (const nc of nullConds) {
+          if (!merged.some(c => c.hullConditionId === nc.hullConditionId)) merged.push(nc)
+        }
+        merged.sort((a, b) => {
+          const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+          const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+          return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+        })
+        return merged
+      }
+
       if (dMultiAlt) {
         // Multiple alternatives
         for (let i = 0; i < dAlts.length; i++) {
           const alt = dAlts[i]
           const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-          const altConds = hc.filter(qc => qc.alternativeId === alt.id)
-          hcContent.push(bp(`Alternative ${i + 1}`))
+          const altConds = dGetAltCondsResolved(alt)
+          hcContent.push(bup(`Alternative ${i + 1}`))
           hcContent.push(emptyP())
           if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
           if (altConds.length > 0) hcContent.push(makeCondTable(altConds))
@@ -1524,7 +1703,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Applicable to all alternatives
         const allAltsAddl = dRenderAddlForSection(b => b.type === 'allAlts')
         if (allAltsAddl.length > 0) {
-          hcContent.push(bp('Applicable to all alternatives'))
+          hcContent.push(bup('Applicable to all alternatives'))
           hcContent.push(emptyP())
           hcContent.push(...allAltsAddl)
           hcContent.push(emptyP())
@@ -1533,12 +1712,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // IV section
         if (dHasIvSection) {
           if (dSelectedIvClause) {
-            hcContent.push(bp('Increased Value'))
+            hcContent.push(bup('Increased Value'))
             hcContent.push(emptyP())
             hcContent.push(np(dSelectedIvClause.description || dSelectedIvClause.name))
             hcContent.push(emptyP())
           } else {
-            hcContent.push(bp('Increased Value'))
+            hcContent.push(bup('Increased Value'))
             hcContent.push(emptyP())
           }
           if (dIvConds.length > 0) hcContent.push(makeCondTable(dIvConds))
@@ -1550,7 +1729,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Applicable to all sections
         const dBothAddl = dRenderAddlForSection(b => b.type === 'both')
         if (dBothAddl.length > 0) {
-          hcContent.push(bp(dHasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives'))
+          hcContent.push(bup(dHasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives'))
           hcContent.push(emptyP())
           hcContent.push(...dBothAddl)
         }
@@ -1562,12 +1741,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const dHmConds = hc.filter(qc => dHmClauseId && dGetCondClauseId(qc) === dHmClauseId)
 
         if (selectedClause) {
-          hcContent.push(bp('Hull and Machinery'))
+          hcContent.push(bup('Hull and Machinery'))
           hcContent.push(emptyP())
           hcContent.push(np(selectedClause.description || selectedClause.name))
           hcContent.push(emptyP())
         } else {
-          hcContent.push(bp('Hull and Machinery'))
+          hcContent.push(bup('Hull and Machinery'))
           hcContent.push(emptyP())
         }
         if (dHmConds.length > 0) hcContent.push(makeCondTable(dHmConds))
@@ -1576,12 +1755,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
         hcContent.push(emptyP())
         if (dSelectedIvClause) {
-          hcContent.push(bp('Increased Value'))
+          hcContent.push(bup('Increased Value'))
           hcContent.push(emptyP())
           hcContent.push(np(dSelectedIvClause.description || dSelectedIvClause.name))
           hcContent.push(emptyP())
         } else {
-          hcContent.push(bp('Increased Value'))
+          hcContent.push(bup('Increased Value'))
           hcContent.push(emptyP())
         }
         if (dIvConds.length > 0) hcContent.push(makeCondTable(dIvConds))
@@ -1591,7 +1770,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const dBothAddl = dRenderAddlForSection(b => b.type === 'both')
         if (dBothAddl.length > 0) {
           hcContent.push(emptyP())
-          hcContent.push(bp('Applicable to both sections:'))
+          hcContent.push(bup('Applicable to both sections:'))
           hcContent.push(emptyP())
           hcContent.push(...dBothAddl)
         }

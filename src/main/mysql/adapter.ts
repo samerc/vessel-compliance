@@ -1785,6 +1785,59 @@ export class MySQLAdapter {
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             }
 
+            // Migration: P&I alternatives
+            {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                try {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_pi_alternatives (
+                        id VARCHAR(36) PRIMARY KEY,
+                        quotation_id VARCHAR(36) NOT NULL,
+                        label VARCHAR(255) DEFAULT NULL,
+                        premium_amount DECIMAL(15,2) DEFAULT NULL,
+                        order_index INT DEFAULT 0,
+                        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                } finally {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+
+                // Add alternative_id to P&I junction tables
+                const piAltTables = [
+                    'quotation_clauses', 'quotation_additional_clauses',
+                    'quotation_warranties', 'quotation_custom_warranties',
+                    'quotation_deductibles', 'quotation_text_deductibles',
+                    'quotation_exclusions', 'quotation_custom_exclusions'
+                ]
+                for (const tbl of piAltTables) {
+                    const [cols] = await this.pool.query(`SHOW COLUMNS FROM ${tbl} LIKE 'alternative_id'`) as any[]
+                    if ((cols as any[]).length === 0) {
+                        await this.pool.query(`ALTER TABLE ${tbl} ADD COLUMN alternative_id VARCHAR(36) DEFAULT NULL`)
+                    }
+                }
+
+                // Add alternative_scope to pi_warranty_sets
+                {
+                    const [wsCols] = await this.pool.query("SHOW COLUMNS FROM pi_warranty_sets LIKE 'alternative_scope'") as any[]
+                    if ((wsCols as any[]).length === 0) {
+                        await this.pool.query('ALTER TABLE pi_warranty_sets ADD COLUMN alternative_scope VARCHAR(20) DEFAULT NULL')
+                    }
+                }
+            }
+
+            // Migration: Quotation revision system
+            {
+                const [revCols] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'revision_number'") as any[]
+                if ((revCols as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN revision_number INT DEFAULT 0')
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN revision_group_id VARCHAR(36) DEFAULT NULL')
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN is_locked BOOLEAN DEFAULT FALSE')
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN export_snapshot MEDIUMTEXT DEFAULT NULL')
+                    // Backfill: set revision_group_id = id for all existing quotations
+                    await this.pool.query('UPDATE quotations SET revision_group_id = id WHERE revision_group_id IS NULL')
+                    await this.pool.query('CREATE INDEX idx_quotations_revision_group ON quotations(revision_group_id)')
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -4213,10 +4266,11 @@ export class MySQLAdapter {
 
     async getPIWarrantySets(): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, default_selected as defaultSelected FROM pi_warranty_sets ORDER BY name ASC')
+        const [rows] = await this.pool.query('SELECT id, name, default_selected as defaultSelected, alternative_scope as alternativeScope FROM pi_warranty_sets ORDER BY name ASC')
         const sets = rows as any[]
         for (const set of sets) {
             set.defaultSelected = !!set.defaultSelected
+            set.alternativeScope = set.alternativeScope || null
             const [items] = await this.pool.query('SELECT warranty_id FROM pi_warranty_set_items WHERE set_id = ?', [set.id])
             set.warrantyIds = (items as any[]).map(i => i.warranty_id)
         }
@@ -4775,17 +4829,27 @@ export class MySQLAdapter {
                 q.is_renewal as isRenewal, q.status,
                 q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
                 q.co_name as coName, q.title as title,
+                q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
+                (SELECT GROUP_CONCAT(pc.name ORDER BY pc.order_index SEPARATOR ', ') FROM quotation_clauses qc JOIN pi_clauses pc ON CONVERT(pc.id USING utf8mb4) = CONVERT(qc.pi_clause_id USING utf8mb4) WHERE qc.quotation_id = q.id) as piClauseNames,
+                (SELECT GROUP_CONCAT(DISTINCT hc.code ORDER BY qha.order_index SEPARATOR ', ') FROM quotation_hull_alternatives qha JOIN hull_clauses hc ON CONVERT(hc.id USING utf8mb4) = CONVERT(qha.hull_clause_id USING utf8mb4) WHERE qha.quotation_id = q.id) as hullClauseCodes,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
+            WHERE q.id = (
+                SELECT q2.id FROM quotations q2
+                WHERE q2.revision_group_id = q.revision_group_id
+                ORDER BY q2.revision_number DESC LIMIT 1
+            )
             ORDER BY q.created_at DESC
         `)
         return (rows as any[]).map(r => ({
             ...r,
             isRenewal: Boolean(r.isRenewal),
+            isLocked: Boolean(r.isLocked),
             premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
-            vesselCount: Number(r.vesselCount || 0)
+            vesselCount: Number(r.vesselCount || 0),
+            revisionNumber: Number(r.revisionNumber || 0)
         }))
     }
 
@@ -4823,6 +4887,7 @@ export class MySQLAdapter {
                 q.hull_clause_id as hullClauseId, q.iv_clause_id as ivClauseId,
                 q.co_name as coName, q.title as title,
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride, q.section_order as sectionOrderRaw,
+                q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked, q.export_snapshot as exportSnapshotRaw,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
@@ -4859,7 +4924,12 @@ export class MySQLAdapter {
             sectionTextsOverride: r.sectionTextsOverrideRaw ? (() => { try { return JSON.parse(r.sectionTextsOverrideRaw) } catch { return undefined } })() : undefined,
             sectionTextsOverrideRaw: undefined,
             sectionOrder: r.sectionOrderRaw ? (() => { try { return JSON.parse(r.sectionOrderRaw) } catch { return undefined } })() : undefined,
-            sectionOrderRaw: undefined
+            sectionOrderRaw: undefined,
+            revisionNumber: Number(r.revisionNumber || 0),
+            revisionGroupId: r.revisionGroupId || r.id,
+            isLocked: Boolean(r.isLocked),
+            exportSnapshot: r.exportSnapshotRaw || undefined,
+            exportSnapshotRaw: undefined
         } as Quotation
     }
 
@@ -4876,12 +4946,12 @@ export class MySQLAdapter {
             referenceNumber = `Q/${typeCode}/${seq}`
         }
         await this.pool.execute(`
-            INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         `, [
             id, referenceNumber, q.quotationTypeId || null, q.quotationDate || null, q.policyTypeId || null, q.vesselId || null,
             q.isRenewal || false, q.status || 'draft', q.periodText || null, q.validityDays || 14,
-            q.sanctionsClauseVersion || 'standard', q.vdrDeductibleEnabled !== false, q.createdBy || null
+            q.sanctionsClauseVersion || 'standard', q.vdrDeductibleEnabled !== false, q.createdBy || null, id
         ])
         return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || 'standard', vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: referenceNumber || '' } as Quotation
     }
@@ -4934,6 +5004,301 @@ export class MySQLAdapter {
     async deleteQuotation(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotations WHERE id = ?', [id])
+    }
+
+    // ==================== Quotation Revisions & Duplication ====================
+
+    /** Deep-clone all junction tables from sourceId to newId, remapping vessel/alternative IDs */
+    private async cloneQuotationJunctions(sourceId: string, newId: string): Promise<void> {
+        if (!this.pool) return
+
+        // Clone quotation_vessels first (need ID mapping for vessel_scope)
+        const vesselIdMap: Record<string, string> = {}
+        const [srcVessels] = await this.pool.query('SELECT * FROM quotation_vessels WHERE quotation_id = ?', [sourceId])
+        for (const v of srcVessels as any[]) {
+            const newVId = uuidv4()
+            vesselIdMap[v.id] = newVId
+            await this.pool.execute(
+                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount]
+            )
+        }
+
+        // Clone quotation_hull_alternatives (need ID mapping for alternative_id)
+        const altIdMap: Record<string, string> = {}
+        const [srcAlts] = await this.pool.query('SELECT * FROM quotation_hull_alternatives WHERE quotation_id = ?', [sourceId])
+        for (const a of srcAlts as any[]) {
+            const newAId = uuidv4()
+            altIdMap[a.id] = newAId
+            await this.pool.execute(
+                `INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, label, premium_amount, order_index) VALUES (?, ?, ?, ?, ?, ?)`,
+                [newAId, newId, a.hull_clause_id, a.label, a.premium_amount, a.order_index]
+            )
+        }
+
+        // Helper to remap vessel_scope JSON
+        const remapScope = (scope: string | null): string | null => {
+            if (!scope) return null
+            try {
+                const ids = JSON.parse(scope)
+                if (!Array.isArray(ids)) return scope
+                return JSON.stringify(ids.map((id: string) => vesselIdMap[id] || id))
+            } catch { return scope }
+        }
+
+        // Clone quotation_pi_alternatives (need ID mapping for alternative_id on P&I tables)
+        const piAltIdMap: Record<string, string> = {}
+        const [srcPIAlts] = await this.pool.query('SELECT * FROM quotation_pi_alternatives WHERE quotation_id = ?', [sourceId])
+        for (const a of srcPIAlts as any[]) {
+            const newAId = uuidv4()
+            piAltIdMap[a.id] = newAId
+            await this.pool.execute(
+                `INSERT INTO quotation_pi_alternatives (id, quotation_id, label, premium_amount, order_index) VALUES (?, ?, ?, ?, ?)`,
+                [newAId, newId, a.label, a.premium_amount, a.order_index]
+            )
+        }
+
+        // Helper to remap alternative_id (merged hull + PI maps)
+        const combinedAltMap = { ...altIdMap, ...piAltIdMap }
+        const remapAlt = (altId: string | null): string | null => {
+            if (!altId) return null
+            return combinedAltMap[altId] || altId
+        }
+
+        // Tables with vessel_scope only (no alternative_id)
+        const scopeTables = [
+            { table: 'quotation_subjectivities', cols: 'quotation_id, pi_subjectivity_id, text, is_custom, is_auto_populated, order_index, vessel_scope' },
+            { table: 'quotation_agreed_value_items', cols: 'quotation_id, hull_text_id, text, section, order_index, vessel_scope' },
+            { table: 'quotation_war_conditions', cols: 'quotation_id, war_condition_id, text_override, order_index, vessel_scope' },
+        ]
+
+        for (const { table, cols } of scopeTables) {
+            const colArr = cols.split(', ')
+            const [srcRows] = await this.pool.query(`SELECT * FROM ${table} WHERE quotation_id = ?`, [sourceId])
+            for (const row of srcRows as any[]) {
+                const newRowId = uuidv4()
+                const values = colArr.map(c => {
+                    if (c === 'quotation_id') return newId
+                    if (c === 'vessel_scope') return remapScope(row[c])
+                    return row[c]
+                })
+                await this.pool.execute(
+                    `INSERT INTO ${table} (id, ${cols}) VALUES (?, ${colArr.map(() => '?').join(', ')})`,
+                    [newRowId, ...values]
+                )
+            }
+        }
+
+        // Tables with alternative_id + vessel_scope (hull conditions + P&I tables)
+        const altScopeTables = [
+            { table: 'quotation_hull_conditions', cols: 'quotation_id, hull_condition_id, text_override, condition_section, amount, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_hull_additional_conditions', cols: 'quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_clauses', cols: 'quotation_id, pi_clause_id, description_override, vessel_scope, alternative_id' },
+            { table: 'quotation_additional_clauses', cols: 'quotation_id, pi_additional_clause_id, custom_text, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_warranties', cols: 'quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_custom_warranties', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_deductibles', cols: 'quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_text_deductibles', cols: 'quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_exclusions', cols: 'quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id' },
+            { table: 'quotation_custom_exclusions', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
+        ]
+
+        for (const { table, cols } of altScopeTables) {
+            const colArr = cols.split(', ')
+            const [srcRows] = await this.pool.query(`SELECT * FROM ${table} WHERE quotation_id = ?`, [sourceId])
+            for (const row of srcRows as any[]) {
+                const newRowId = uuidv4()
+                const values = colArr.map(c => {
+                    if (c === 'quotation_id') return newId
+                    if (c === 'vessel_scope') return remapScope(row[c])
+                    if (c === 'alternative_id') return remapAlt(row[c])
+                    return row[c]
+                })
+                await this.pool.execute(
+                    `INSERT INTO ${table} (id, ${cols}) VALUES (?, ${colArr.map(() => '?').join(', ')})`,
+                    [newRowId, ...values]
+                )
+            }
+        }
+
+        // Simple tables (no vessel_scope, no alternative_id)
+        const simpleTables = [
+            { table: 'quotation_assureds', cols: 'quotation_id, entity_id, name, role, vessel_label, order_index' },
+            { table: 'quotation_sub_limits', cols: 'quotation_id, text, amount, currency' },
+            { table: 'quotation_custom_sections', cols: 'quotation_id, title, text, order_index' },
+            { table: 'quotation_excluded_countries', cols: 'quotation_id, name, list_type' },
+            { table: 'quotation_instalments', cols: 'quotation_id, instalment_number, days_from_inception, description, non_refundable, non_refundable_percent' },
+            { table: 'quotation_information', cols: 'quotation_id, text, order_index' },
+            { table: 'quotation_notes', cols: 'quotation_id, title, content, order_index' },
+        ]
+
+        for (const { table, cols } of simpleTables) {
+            const colArr = cols.split(', ')
+            const [srcRows] = await this.pool.query(`SELECT * FROM ${table} WHERE quotation_id = ?`, [sourceId])
+            for (const row of srcRows as any[]) {
+                const newRowId = uuidv4()
+                const values = colArr.map(c => c === 'quotation_id' ? newId : row[c])
+                await this.pool.execute(
+                    `INSERT INTO ${table} (id, ${cols}) VALUES (?, ${colArr.map(() => '?').join(', ')})`,
+                    [newRowId, ...values]
+                )
+            }
+        }
+    }
+
+    async createQuotationRevision(sourceId: string): Promise<Quotation> {
+        if (!this.pool) throw new Error('DB not connected')
+
+        const source = await this.getQuotation(sourceId)
+        if (!source) throw new Error('Source quotation not found')
+        if (source.isLocked) throw new Error('Cannot revise a locked quotation')
+
+        const newId = uuidv4()
+        const revisionGroupId = source.revisionGroupId || source.id
+        const newRevisionNumber = (source.revisionNumber || 0) + 1
+
+        // Build revision reference: strip existing -RN suffix, append new one
+        const baseRef = (source.referenceNumber || '').replace(/-R\d+$/, '')
+        const newRef = `${baseRef}-R${newRevisionNumber}`
+
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            // Lock the source quotation
+            await this.pool.execute('UPDATE quotations SET is_locked = TRUE WHERE id = ?', [sourceId])
+
+            // Clone the main quotation row
+            await this.pool.execute(`
+                INSERT INTO quotations (
+                    id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
+                    is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
+                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
+                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
+                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
+                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
+                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
+                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
+                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
+                    hull_clause_id, iv_clause_id, co_name, title,
+                    section_texts_override, sanctions_text_override, section_order,
+                    revision_number, revision_group_id, is_locked, export_snapshot, created_by
+                )
+                SELECT
+                    ?, ?, quotation_type_id, quotation_date, policy_type_id, vessel_id,
+                    is_renewal, 'draft', period_text, limit_of_liability_amount, limit_of_liability_currency,
+                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
+                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
+                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
+                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
+                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
+                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
+                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
+                    hull_clause_id, iv_clause_id, co_name, title,
+                    section_texts_override, sanctions_text_override, section_order,
+                    ?, ?, FALSE, NULL, created_by
+                FROM quotations WHERE id = ?
+            `, [newId, newRef, newRevisionNumber, revisionGroupId, sourceId])
+
+            await this.cloneQuotationJunctions(sourceId, newId)
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+
+        return (await this.getQuotation(newId))!
+    }
+
+    async duplicateQuotation(sourceId: string): Promise<Quotation> {
+        if (!this.pool) throw new Error('DB not connected')
+
+        const source = await this.getQuotation(sourceId)
+        if (!source) throw new Error('Source quotation not found')
+
+        const newId = uuidv4()
+
+        // Auto-generate new reference number
+        let newRef: string | null = null
+        if (source.quotationTypeId) {
+            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [source.quotationTypeId]) as any[]
+            const typeCode = typeRow.length > 0 ? typeRow[0].code : '?'
+            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotations') as any[]
+            const seq = (countRow[0].cnt || 0) + 1
+            newRef = `Q/${typeCode}/${seq}`
+        }
+
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            // Clone the main quotation row — new revision group, revision 0, draft status
+            await this.pool.execute(`
+                INSERT INTO quotations (
+                    id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
+                    is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
+                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
+                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
+                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
+                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
+                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
+                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
+                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
+                    hull_clause_id, iv_clause_id, co_name, title,
+                    section_texts_override, sanctions_text_override, section_order,
+                    revision_number, revision_group_id, is_locked, export_snapshot, created_by
+                )
+                SELECT
+                    ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
+                    is_renewal, 'draft', period_text, limit_of_liability_amount, limit_of_liability_currency,
+                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
+                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
+                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
+                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
+                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
+                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
+                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
+                    hull_clause_id, iv_clause_id, co_name, NULL,
+                    section_texts_override, sanctions_text_override, section_order,
+                    0, ?, FALSE, NULL, created_by
+                FROM quotations WHERE id = ?
+            `, [newId, newRef, newId, sourceId])
+
+            await this.cloneQuotationJunctions(sourceId, newId)
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+
+        return (await this.getQuotation(newId))!
+    }
+
+    async getQuotationRevisions(revisionGroupId: string): Promise<Quotation[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT q.id, q.reference_number as referenceNumber,
+                q.quotation_type_id as quotationTypeId, qt.name as quotationTypeName, qt.code as quotationTypeCode,
+                q.quotation_date as quotationDate,
+                q.status, q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
+                q.created_at as createdAt
+            FROM quotations q
+            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            WHERE q.revision_group_id = ?
+            ORDER BY q.revision_number DESC
+        `, [revisionGroupId])
+        return (rows as any[]).map(r => ({
+            ...r,
+            isLocked: Boolean(r.isLocked),
+            revisionNumber: Number(r.revisionNumber || 0)
+        }))
+    }
+
+    async saveExportSnapshot(quotationId: string, snapshot: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE quotations SET export_snapshot = ? WHERE id = ?', [snapshot, quotationId])
+    }
+
+    async clearExportSnapshot(quotationId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE quotations SET export_snapshot = NULL WHERE id = ?', [quotationId])
     }
 
     // ==================== Quotation Sub-Tables ====================
@@ -5050,8 +5415,8 @@ export class MySQLAdapter {
     // -- Quotation Clauses --
     async getQuotationClauses(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT pi_clause_id as piClauseId, vessel_scope as vesselScope FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        const [rows] = await this.pool.query('SELECT id, pi_clause_id as piClauseId, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async getQuotationClauseOverrides(quotationId: string): Promise<Record<string, string>> {
@@ -5066,14 +5431,15 @@ export class MySQLAdapter {
 
     async setQuotationClauses(quotationId: string, clauseIds: string[], descriptionOverrides?: Record<string, string>): Promise<void> {
         if (!this.pool) return
-        // Preserve existing vessel_scope values before delete+re-insert
-        const [existing] = await this.pool.query('SELECT pi_clause_id, vessel_scope FROM quotation_clauses WHERE quotation_id = ?', [quotationId]) as any[]
-        const scopeMap: Record<string, string | null> = {}
-        for (const r of existing) { scopeMap[r.pi_clause_id] = r.vessel_scope }
+        // Preserve existing vessel_scope and alternative_id values before delete+re-insert
+        const [existing] = await this.pool.query('SELECT pi_clause_id, vessel_scope, alternative_id FROM quotation_clauses WHERE quotation_id = ?', [quotationId]) as any[]
+        const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
+        for (const r of existing) { scopeMap[r.pi_clause_id] = { vs: r.vessel_scope, alt: r.alternative_id } }
         await this.pool.execute('DELETE FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
         for (const cid of clauseIds) {
             const override = descriptionOverrides?.[cid] || null
-            await this.pool.execute('INSERT INTO quotation_clauses (id, quotation_id, pi_clause_id, description_override, vessel_scope) VALUES (?, ?, ?, ?, ?)', [uuidv4(), quotationId, cid, override, scopeMap[cid] || null])
+            const saved = scopeMap[cid]
+            await this.pool.execute('INSERT INTO quotation_clauses (id, quotation_id, pi_clause_id, description_override, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)', [uuidv4(), quotationId, cid, override, saved?.vs || null, saved?.alt || null])
         }
     }
 
@@ -5086,9 +5452,9 @@ export class MySQLAdapter {
     async getQuotationAdditionalClauses(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, pi_additional_clause_id as piAdditionalClauseId, custom_text as customText, order_index as 'order', vessel_scope as vesselScope
+            `SELECT id, quotation_id as quotationId, pi_additional_clause_id as piAdditionalClauseId, custom_text as customText, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId
              FROM quotation_additional_clauses WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationAdditionalClause(data: { quotationId: string; piAdditionalClauseId?: string; customText?: string; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -5108,8 +5474,8 @@ export class MySQLAdapter {
     // -- Quotation Warranties --
     async getQuotationWarranties(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, pi_warranty_id as piWarrantyId, order_index as `order`, vessel_scope as vesselScope FROM quotation_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        const [rows] = await this.pool.query('SELECT id, pi_warranty_id as piWarrantyId, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async updateQuotationWarrantyVesselScope(quotationId: string, piWarrantyId: string, vesselScope: string[] | null): Promise<void> {
@@ -5124,21 +5490,22 @@ export class MySQLAdapter {
 
     async setQuotationWarranties(quotationId: string, warrantyIds: string[]): Promise<void> {
         if (!this.pool) return
-        // Preserve existing vessel_scope values before delete+re-insert
-        const [existing] = await this.pool.query('SELECT pi_warranty_id, vessel_scope FROM quotation_warranties WHERE quotation_id = ?', [quotationId]) as any[]
-        const scopeMap: Record<string, string | null> = {}
-        for (const r of existing) { scopeMap[r.pi_warranty_id] = r.vessel_scope }
+        // Preserve existing vessel_scope and alternative_id values before delete+re-insert
+        const [existing] = await this.pool.query('SELECT pi_warranty_id, vessel_scope, alternative_id FROM quotation_warranties WHERE quotation_id = ?', [quotationId]) as any[]
+        const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
+        for (const r of existing) { scopeMap[r.pi_warranty_id] = { vs: r.vessel_scope, alt: r.alternative_id } }
         await this.pool.execute('DELETE FROM quotation_warranties WHERE quotation_id = ?', [quotationId])
         for (let i = 0; i < warrantyIds.length; i++) {
-            await this.pool.execute('INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)', [uuidv4(), quotationId, warrantyIds[i], i, scopeMap[warrantyIds[i]] || null])
+            const saved = scopeMap[warrantyIds[i]]
+            await this.pool.execute('INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)', [uuidv4(), quotationId, warrantyIds[i], i, saved?.vs || null, saved?.alt || null])
         }
     }
 
     // -- Quotation Custom Warranties --
     async getQuotationCustomWarranties(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope FROM quotation_custom_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_custom_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationCustomWarranty(data: { quotationId: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -5182,9 +5549,9 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_deductible_id as piDeductibleId, title, description, amount, currency,
-                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope
+                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId
              FROM quotation_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -5228,8 +5595,8 @@ export class MySQLAdapter {
     async getQuotationTextDeductibles(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, pi_text_deductible_id as piTextDeductibleId, title, text, order_index as 'order', vessel_scope as vesselScope FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+            `SELECT id, quotation_id as quotationId, pi_text_deductible_id as piTextDeductibleId, title, text, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationTextDeductible(data: { quotationId: string; piTextDeductibleId?: string; title?: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -5273,29 +5640,30 @@ export class MySQLAdapter {
     async getQuotationExclusions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText, vessel_scope as vesselScope
+            `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText, vessel_scope as vesselScope, alternative_id as alternativeId
              FROM quotation_exclusions WHERE quotation_id = ?`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async setQuotationExclusions(quotationId: string, items: { piExclusionId?: string; customText?: string }[]): Promise<void> {
         if (!this.pool) return
-        // Preserve existing vessel_scope values before delete+re-insert
-        const [existing] = await this.pool.query('SELECT pi_exclusion_id, vessel_scope FROM quotation_exclusions WHERE quotation_id = ?', [quotationId]) as any[]
-        const scopeMap: Record<string, string | null> = {}
-        for (const r of existing) { if (r.pi_exclusion_id) scopeMap[r.pi_exclusion_id] = r.vessel_scope }
+        // Preserve existing vessel_scope and alternative_id values before delete+re-insert
+        const [existing] = await this.pool.query('SELECT pi_exclusion_id, vessel_scope, alternative_id FROM quotation_exclusions WHERE quotation_id = ?', [quotationId]) as any[]
+        const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
+        for (const r of existing) { if (r.pi_exclusion_id) scopeMap[r.pi_exclusion_id] = { vs: r.vessel_scope, alt: r.alternative_id } }
         await this.pool.execute('DELETE FROM quotation_exclusions WHERE quotation_id = ?', [quotationId])
         for (const item of items) {
-            await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text, vessel_scope) VALUES (?, ?, ?, ?, ?)',
-                [uuidv4(), quotationId, item.piExclusionId || null, item.customText || null, (item.piExclusionId && scopeMap[item.piExclusionId]) || null])
+            const saved = item.piExclusionId ? scopeMap[item.piExclusionId] : undefined
+            await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)',
+                [uuidv4(), quotationId, item.piExclusionId || null, item.customText || null, saved?.vs || null, saved?.alt || null])
         }
     }
 
     // -- Quotation Custom Exclusions --
     async getQuotationCustomExclusions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope FROM quotation_custom_exclusions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_custom_exclusions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationCustomExclusion(data: { quotationId: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -6588,6 +6956,69 @@ export class MySQLAdapter {
         for (let i = 0; i < orderedIds.length; i++) {
             await this.pool.execute('UPDATE quotation_hull_alternatives SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
         }
+    }
+
+    // ==================== Quotation P&I Alternatives ====================
+
+    async getQuotationPIAlternatives(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, quotation_id as quotationId, label, premium_amount as premiumAmount, order_index as `order` FROM quotation_pi_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined }))
+    }
+
+    async addQuotationPIAlternative(quotationId: string, label?: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_pi_alternatives WHERE quotation_id = ?', [quotationId])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute(
+                'INSERT INTO quotation_pi_alternatives (id, quotation_id, label, order_index) VALUES (?, ?, ?, ?)',
+                [id, quotationId, label || null, order]
+            )
+        } finally {
+            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
+        return { id, quotationId, label: label || undefined, premiumAmount: undefined, order }
+    }
+
+    async updateQuotationPIAlternative(id: string, updates: { label?: string; premiumAmount?: number | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.label !== undefined) { fields.push('label = ?'); values.push(updates.label || null) }
+        if (updates.premiumAmount !== undefined) { fields.push('premium_amount = ?'); values.push(updates.premiumAmount ?? null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_pi_alternatives SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationPIAlternative(id: string): Promise<void> {
+        if (!this.pool) return
+        // Clean up alternative_id references on P&I junction tables
+        const piAltTables = ['quotation_clauses', 'quotation_additional_clauses', 'quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_exclusions', 'quotation_custom_exclusions']
+        for (const tbl of piAltTables) {
+            await this.pool.execute(`DELETE FROM ${tbl} WHERE alternative_id = ?`, [id])
+        }
+        await this.pool.execute('DELETE FROM quotation_pi_alternatives WHERE id = ?', [id])
+    }
+
+    async reorderQuotationPIAlternatives(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_pi_alternatives SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    async updateQuotationItemAlternativeId(table: string, id: string, alternativeId: string | null): Promise<void> {
+        if (!this.pool) return
+        const allowedTables = ['quotation_clauses', 'quotation_additional_clauses', 'quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_exclusions', 'quotation_custom_exclusions']
+        if (!allowedTables.includes(table)) throw new Error('Invalid table')
+        await this.pool.execute(`UPDATE ${table} SET alternative_id = ? WHERE id = ?`, [alternativeId, id])
     }
 
     // ==================== Quotation Hull Conditions ====================

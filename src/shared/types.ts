@@ -438,6 +438,7 @@ export interface PIWarrantySet {
   name: string
   warrantyIds?: string[]
   defaultSelected?: boolean
+  alternativeScope?: string | null
 }
 
 export interface QuotationCustomWarranty {
@@ -446,6 +447,7 @@ export interface QuotationCustomWarranty {
   text: string
   order: number
   vesselScope?: string[] | null
+  alternativeId?: string | null
 }
 
 export interface PIDeductible {
@@ -488,6 +490,7 @@ export interface QuotationCustomExclusion {
   text: string
   order: number
   vesselScope?: string[] | null
+  alternativeId?: string | null
 }
 
 export interface QuotationCustomSection {
@@ -615,6 +618,14 @@ export interface QuotationHullAlternative {
   order: number
 }
 
+export interface QuotationPIAlternative {
+  id: string
+  quotationId: string
+  label?: string
+  premiumAmount?: number
+  order: number
+}
+
 export interface QuotationHullCondition {
   id: string
   quotationId: string
@@ -731,6 +742,10 @@ export interface Quotation {
   sectionTextsOverride?: PISectionTexts
   sanctionsTextOverride?: string
   sectionOrder?: string[]
+  revisionNumber?: number
+  revisionGroupId?: string
+  isLocked?: boolean
+  exportSnapshot?: string
   createdAt?: string
   updatedAt?: string
   createdBy?: string
@@ -797,6 +812,7 @@ export interface QuotationDeductible {
   secondaryDescription?: string
   order: number
   vesselScope?: string[] | null
+  alternativeId?: string | null
 }
 
 export interface PITextDeductible {
@@ -815,6 +831,7 @@ export interface QuotationTextDeductible {
   text: string
   order: number
   vesselScope?: string[] | null
+  alternativeId?: string | null
 }
 
 export interface QuotationExcludedCountry {

@@ -1,14 +1,51 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList } from 'lucide-react'
-import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../../../shared/types'
+import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload, GitBranch, RefreshCw, Lock, History } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS, SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import RichTextEditor from './RichTextEditor'
 import VesselScopeChips from './VesselScopeChips'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+
+const ALT_COLORS = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+
+function AlternativeScopeChips({ alternatives, currentAltId, onChangeAltId }: { alternatives: QuotationPIAlternative[]; currentAltId: string | null; onChangeAltId: (altId: string | null) => void }) {
+    if (alternatives.length < 2) return null
+    return (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+            <button
+                onClick={() => onChangeAltId(null)}
+                style={{
+                    padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600,
+                    border: !currentAltId ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                    background: !currentAltId ? 'rgba(0,170,200,0.12)' : 'transparent',
+                    color: !currentAltId ? '#00aac8' : 'var(--text-secondary)',
+                    cursor: 'pointer'
+                }}
+            >All</button>
+            {alternatives.map((alt, idx) => {
+                const color = ALT_COLORS[idx % ALT_COLORS.length]
+                const active = currentAltId === alt.id
+                return (
+                    <button
+                        key={alt.id}
+                        onClick={() => onChangeAltId(alt.id)}
+                        style={{
+                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600,
+                            border: active ? `1.5px solid ${color}` : '1px solid var(--input-border)',
+                            background: active ? `${color}18` : 'transparent',
+                            color: active ? color : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                        }}
+                    >{alt.label || `Alt ${idx + 1}`}</button>
+                )
+            })}
+        </div>
+    )
+}
 
 function PickerDropdown({ placeholder, options, onSelect, fontSize = '0.85rem' }: { placeholder: string; options: { value: string; label: string }[]; onSelect: (value: string) => void; fontSize?: string }) {
     const [open, setOpen] = useState(false)
@@ -93,9 +130,10 @@ function getTabsForType(typeCode?: string): TabDef[] {
 interface QuotationEditorProps {
     quotation: Quotation
     onBack: () => void
+    onOpenQuotation?: (quotation: Quotation) => void
 }
 
-export default function QuotationEditor({ quotation, onBack }: QuotationEditorProps) {
+export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: QuotationEditorProps) {
     const [activeTab, setActiveTab] = useState<EditorTab>('vessel')
     const [q, setQ] = useState<Quotation>(quotation)
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
@@ -103,6 +141,10 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
     const [globalTexts, setGlobalTexts] = useState<PISectionTexts>(DEFAULT_SECTION_TEXTS)
     const [sanctionsVersions, setSanctionsVersions] = useState<PISanctionsVersion[]>([])
     const [showSectionOrder, setShowSectionOrder] = useState(false)
+    const [revisions, setRevisions] = useState<Quotation[]>([])
+    const [showRevisionHistory, setShowRevisionHistory] = useState(false)
+    const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
+    const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
@@ -127,6 +169,15 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                 await window.api.updateQuotation(fullQ.id, { nonRefundableType: 'percentage', nonRefundablePercent: 25 } as any)
             }
             setQ(fullQ)
+            // Load revision history
+            const groupId = fullQ.revisionGroupId || fullQ.id
+            const revs = await window.api.getQuotationRevisions(groupId)
+            setRevisions(Array.isArray(revs) ? revs : [])
+            // Load PI alternatives
+            if (fullQ.quotationTypeCode === 'P') {
+                const piAlts = await window.api.piGetQuotationAlternatives(fullQ.id)
+                setPiAlternatives(Array.isArray(piAlts) ? piAlts : [])
+            }
         }
         setPolicyTypes(Array.isArray(pt) ? pt : [])
         setVessels(Array.isArray(v) ? v : [])
@@ -138,7 +189,31 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
         return String(q.sectionTextsOverride?.[key] ?? globalTexts[key] ?? DEFAULT_SECTION_TEXTS[key] ?? '')
     }
 
+    const isLocked = q.isLocked === true
+
+    const handleCreateRevision = async () => {
+        try {
+            const newRev = await window.api.createQuotationRevision(q.id)
+            if ((newRev as any)?.error) { showError((newRev as any).message || 'Failed to create revision'); return }
+            showSuccess(`Revision R${newRev.revisionNumber} created`)
+            if (onOpenQuotation) onOpenQuotation(newRev)
+        } catch (err: any) {
+            showError(err.message || 'Failed to create revision')
+        }
+    }
+
+    const handleClearSnapshot = async () => {
+        try {
+            await window.api.clearExportSnapshot(q.id)
+            setQ(prev => ({ ...prev, exportSnapshot: undefined }))
+            showSuccess('Export snapshot cleared — next export will use current settings')
+        } catch (err: any) {
+            showError(err.message || 'Failed to clear snapshot')
+        }
+    }
+
     const updateField = async (field: string, value: any) => {
+        if (isLocked) return
         try {
             await window.api.updateQuotation(q.id, { [field]: value } as any)
             setQ(prev => ({ ...prev, [field]: value }))
@@ -147,6 +222,60 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
         }
     }
 
+    // P&I Alternatives management
+    const piAltColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+    const isPIType = q.quotationTypeCode === 'P'
+    const piAltTabs: EditorTab[] = ['conditions', 'warranties', 'deductibles', 'exclusions']
+    const showPIAltBar = isPIType && piAltTabs.includes(activeTab)
+
+    const handleAddPIAlternatives = async () => {
+        if (isLocked) return
+        try {
+            const a1 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 1')
+            const a2 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 2')
+            if ((a1 as any)?.error || (a2 as any)?.error) { showError('Failed to create alternatives'); return }
+            setPiAlternatives([a1, a2])
+            showSuccess('Alternatives created')
+        } catch (err: any) { showError(err.message || 'Failed') }
+    }
+
+    const handleAddPIAlternative = async () => {
+        if (isLocked) return
+        try {
+            const label = `Alternative ${piAlternatives.length + 1}`
+            const a = await window.api.piAddQuotationAlternative(q.id, label)
+            if ((a as any)?.error) { showError((a as any).message); return }
+            setPiAlternatives(prev => [...prev, a])
+        } catch (err: any) { showError(err.message || 'Failed') }
+    }
+
+    const handleRemoveLastPIAlternative = async () => {
+        if (isLocked || piAlternatives.length < 2) return
+        try {
+            if (piAlternatives.length === 2) {
+                // Remove both — exit alternatives mode
+                for (const alt of piAlternatives) await window.api.piDeleteQuotationAlternative(alt.id)
+                setPiAlternatives([])
+                setSelectedPIAltId(null)
+                showSuccess('Alternatives removed')
+            } else {
+                const last = piAlternatives[piAlternatives.length - 1]
+                await window.api.piDeleteQuotationAlternative(last.id)
+                setPiAlternatives(prev => prev.slice(0, -1))
+                if (selectedPIAltId === last.id) setSelectedPIAltId(null)
+                showSuccess('Alternative removed')
+            }
+        } catch (err: any) { showError(err.message || 'Failed') }
+    }
+
+    const _handleRenamePIAlternative = async (id: string, label: string) => {
+        try {
+            await window.api.piUpdateQuotationAlternative(id, { label })
+            setPiAlternatives(prev => prev.map(a => a.id === id ? { ...a, label } : a))
+        } catch (err: any) { showError(err.message || 'Failed') }
+    }
+    void _handleRenamePIAlternative
+
     const sc = statusColors[q.status] || statusColors.draft
 
     return (
@@ -154,6 +283,17 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
             <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                 <ArrowLeft size={18} /> Back to Quotations
             </button>
+
+            {/* Locked banner */}
+            {isLocked && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', marginBottom: '12px',
+                    borderRadius: '10px', background: 'rgba(255, 176, 32, 0.12)', border: '1px solid rgba(255, 176, 32, 0.3)',
+                    color: isLight ? '#8a6400' : '#ffb020', fontSize: '0.85rem', fontWeight: 600
+                }}>
+                    <Lock size={16} /> This is an older revision (read-only). {revisions.length > 1 && 'Switch to the latest revision to make changes.'}
+                </div>
+            )}
 
             {/* Header */}
             <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
@@ -171,6 +311,19 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                             {q.quotationTypeName}
                         </span>
                     )}
+                    {(q.revisionNumber || 0) > 0 && (
+                        <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            background: 'rgba(180, 100, 255, 0.15)',
+                            color: isLight ? '#7a3db8' : '#b464ff',
+                            letterSpacing: '0.03em'
+                        }}>
+                            R{q.revisionNumber}
+                        </span>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ref:</span>
                         <input
@@ -179,6 +332,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                             onChange={e => setQ(prev => ({ ...prev, referenceNumber: e.target.value }))}
                             onBlur={e => updateField('referenceNumber', e.target.value)}
                             placeholder="Reference number"
+                            disabled={isLocked}
                             style={{ padding: '6px 10px', borderRadius: '6px', width: '180px', fontSize: '0.9rem', fontWeight: 600 }}
                         />
                     </div>
@@ -188,6 +342,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                             type="date"
                             value={q.quotationDate || ''}
                             onChange={e => { setQ(prev => ({ ...prev, quotationDate: e.target.value })); updateField('quotationDate', e.target.value) }}
+                            disabled={isLocked}
                             style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
                         />
                     </div>
@@ -196,6 +351,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                         <select
                             value={q.policyTypeId || ''}
                             onChange={e => { setQ(prev => ({ ...prev, policyTypeId: e.target.value })); updateField('policyTypeId', e.target.value || null) }}
+                            disabled={isLocked}
                             style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
                         >
                             <option value="">Select type</option>
@@ -207,6 +363,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                         <select
                             value={q.status}
                             onChange={e => { const v = e.target.value as any; setQ(prev => ({ ...prev, status: v })); updateField('status', v) }}
+                            disabled={isLocked}
                             style={{
                                 padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem',
                                 background: sc.bg, color: sc.text, border: '1px solid var(--glass-border)', fontWeight: 600
@@ -224,13 +381,14 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                             type="checkbox"
                             checked={q.isRenewal}
                             onChange={e => { setQ(prev => ({ ...prev, isRenewal: e.target.checked })); updateField('isRenewal', e.target.checked) }}
+                            disabled={isLocked}
                             style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
                         />
                         Renewal
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Currency:</span>
-                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked} style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', flexShrink: 0 }}>Title:</span>
@@ -240,6 +398,7 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                             onChange={e => setQ(prev => ({ ...prev, title: e.target.value }))}
                             onBlur={e => updateField('title', e.target.value || null)}
                             placeholder="Auto from vessel/fleet name…"
+                            disabled={isLocked}
                             style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
                         />
                     </div>
@@ -264,6 +423,73 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                     >
                         <Download size={16} /> Word
                     </button>
+                    {q.exportSnapshot && !isLocked && (
+                        <button
+                            onClick={handleClearSnapshot}
+                            className="btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                            title="Clear saved export snapshot — next export will use current settings"
+                        >
+                            <RefreshCw size={16} /> Refresh Texts
+                        </button>
+                    )}
+                    {!isLocked && (
+                        <button
+                            onClick={handleCreateRevision}
+                            className="btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: isLight ? '#7a3db8' : '#b464ff' }}
+                        >
+                            <GitBranch size={16} /> Create Revision
+                        </button>
+                    )}
+                    {revisions.length > 1 && (
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                onClick={() => setShowRevisionHistory(!showRevisionHistory)}
+                                className="btn-secondary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                            >
+                                <History size={16} /> Revisions ({revisions.length})
+                            </button>
+                            {showRevisionHistory && (
+                                <>
+                                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowRevisionHistory(false)} />
+                                    <div style={{
+                                        position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100,
+                                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                                        borderRadius: '10px', padding: '6px', minWidth: '260px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                                    }}>
+                                        {revisions.map(rev => (
+                                            <button
+                                                key={rev.id}
+                                                onClick={() => {
+                                                    setShowRevisionHistory(false)
+                                                    if (rev.id !== q.id && onOpenQuotation) onOpenQuotation(rev)
+                                                }}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                                                    padding: '10px 14px', border: 'none', borderRadius: '6px',
+                                                    background: rev.id === q.id ? (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,170,200,0.12)') : 'transparent',
+                                                    color: 'var(--text-primary)', cursor: rev.id === q.id ? 'default' : 'pointer',
+                                                    fontSize: '0.85rem', textAlign: 'left'
+                                                }}
+                                                className={rev.id !== q.id ? 'hover-effect' : undefined}
+                                            >
+                                                <span style={{ fontWeight: 600, minWidth: '70px' }}>
+                                                    {rev.revisionNumber === 0 ? 'Original' : `R${rev.revisionNumber}`}
+                                                </span>
+                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', flex: 1 }}>
+                                                    {rev.referenceNumber}
+                                                </span>
+                                                {rev.isLocked && <Lock size={13} style={{ opacity: 0.4 }} />}
+                                                {rev.id === q.id && <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 700 }}>CURRENT</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -298,6 +524,70 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                 })}
             </div>
 
+            {/* P&I Alternatives Bar */}
+            {showPIAltBar && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
+                    marginBottom: '8px', borderRadius: '10px',
+                    background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)',
+                    border: '1px solid var(--glass-border)', flexWrap: 'wrap'
+                }}>
+                    {piAlternatives.length === 0 ? (
+                        <>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No alternatives configured</span>
+                            {!isLocked && (
+                                <button onClick={handleAddPIAlternatives} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Plus size={13} /> Add Alternatives
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => setSelectedPIAltId(null)}
+                                style={{
+                                    padding: '5px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
+                                    border: selectedPIAltId === null ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                                    background: selectedPIAltId === null ? 'rgba(0,170,200,0.12)' : 'transparent',
+                                    color: selectedPIAltId === null ? (isLight ? '#007a91' : '#00aac8') : 'var(--text-secondary)',
+                                    cursor: 'pointer'
+                                }}
+                            >All</button>
+                            {piAlternatives.map((alt, idx) => {
+                                const color = piAltColors[idx % piAltColors.length]
+                                const active = selectedPIAltId === alt.id
+                                return (
+                                    <button
+                                        key={alt.id}
+                                        onClick={() => setSelectedPIAltId(active ? null : alt.id)}
+                                        style={{
+                                            padding: '5px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
+                                            border: active ? `1.5px solid ${color}` : '1px solid var(--input-border)',
+                                            background: active ? `${color}18` : 'transparent',
+                                            color: active ? color : 'var(--text-secondary)',
+                                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+                                        }}
+                                    >
+                                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                                        {alt.label || `Alt ${idx + 1}`}
+                                    </button>
+                                )
+                            })}
+                            {!isLocked && (
+                                <>
+                                    <button onClick={handleAddPIAlternative} className="btn-secondary" style={{ padding: '5px 8px', fontSize: '0.78rem' }} title="Add alternative">
+                                        <Plus size={14} />
+                                    </button>
+                                    <button onClick={handleRemoveLastPIAlternative} className="btn-secondary" style={{ padding: '5px 8px', fontSize: '0.78rem', color: 'var(--danger)' }} title="Remove last alternative">
+                                        <Trash2 size={14} />
+                                    </button>
+                                </>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
             {/* Tab Content */}
             <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
                 {activeTab === 'insured' && <InsuredTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
@@ -307,13 +597,13 @@ export default function QuotationEditor({ quotation, onBack }: QuotationEditorPr
                 {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'sumInsured' && <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'warConditions' && <WarConditionsTab quotation={q} showError={showError} />}
-                {activeTab === 'conditions' && <ConditionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'conditions' && <ConditionsTab quotation={q} showSuccess={showSuccess} showError={showError} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
                 {activeTab === 'period' && <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'trading' && <TradingTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'warTrading' && <WarTradingTab quotation={q} updateField={updateField} setQ={setQ} />}
-                {activeTab === 'warranties' && <WarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
-                {activeTab === 'deductibles' && <DeductiblesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
-                {activeTab === 'exclusions' && <ExclusionsTab quotation={q} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'warranties' && <WarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
+                {activeTab === 'deductibles' && <DeductiblesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
+                {activeTab === 'exclusions' && <ExclusionsTab quotation={q} showSuccess={showSuccess} showError={showError} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
                 {activeTab === 'sanctions' && <SanctionsTab quotation={q} updateField={updateField} setQ={setQ} sanctionsVersions={sanctionsVersions} />}
                 {activeTab === 'subjectivities' && <SubjectivitiesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
                 {activeTab === 'premium' && <PremiumTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} isLight={isLight} getEffectiveText={getEffectiveText} />}
@@ -905,11 +1195,12 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveT
 
 // ==================== Conditions Tab ====================
 
-function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const [allClauses, setAllClauses] = useState<PIClause[]>([])
     const [clauseSets, setClauseSets] = useState<PIClauseSet[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [clauseVesselScopes, setClauseVesselScopes] = useState<Record<string, string[] | null>>({})
+    const [clauseAltIds, setClauseAltIds] = useState<Record<string, string | null>>({})
     const [descOverrides, setDescOverrides] = useState<Record<string, string>>({})
     const [additionalClauses, setAdditionalClauses] = useState<any[]>([])
     const [allAdditional, setAllAdditional] = useState<PIAdditionalClause[]>([])
@@ -935,6 +1226,7 @@ function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quota
         const safeSelected = Array.isArray(selected) ? selected : []
         setSelectedIds(new Set(safeSelected.map((r: any) => r.piClauseId)))
         setClauseVesselScopes(safeSelected.reduce((m: Record<string, string[] | null>, r: any) => { if (r.vesselScope) m[r.piClauseId] = r.vesselScope; return m }, {}))
+        setClauseAltIds(safeSelected.reduce((m: Record<string, string | null>, r: any) => { m[r.piClauseId] = r.alternativeId || null; return m }, {}))
         setDescOverrides(overrides)
         setAdditionalClauses(addClauses)
         const safeAllAdd = Array.isArray(allAdd) ? allAdd : []
@@ -1026,6 +1318,21 @@ function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quota
         await window.api.updateQuotationClauseVesselScope(quotation.id, piClauseId, scope)
     }
 
+    const updateClauseAltId = async (clauseId: string, altId: string | null) => {
+        // Find the row id for this clause
+        const selected = await window.api.getQuotationClauses(quotation.id)
+        const row = (Array.isArray(selected) ? selected : []).find((r: any) => r.piClauseId === clauseId)
+        if (row) {
+            await window.api.updateQuotationItemAlternativeId('quotation_clauses', row.id, altId)
+            setClauseAltIds(prev => ({ ...prev, [clauseId]: altId }))
+        }
+    }
+
+    // Filter clauses by selected alternative
+    const filteredClauseIds = piAlternatives.length >= 2 && selectedPIAltId
+        ? new Set(allClauses.filter(c => selectedIds.has(c.id) && (clauseAltIds[c.id] === selectedPIAltId || !clauseAltIds[c.id])).map(c => c.id))
+        : null
+
     const updateAdditionalClauseScope = async (id: string, scope: string[] | null) => {
         setAdditionalClauses(prev => prev.map(c => c.id === id ? { ...c, vesselScope: scope } : c))
         await window.api.updateQuotationItemVesselScope('quotation_additional_clauses', id, scope)
@@ -1063,7 +1370,7 @@ function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quota
                 </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
-                {allClauses.map(c => (
+                {allClauses.filter(c => !filteredClauseIds || filteredClauseIds.has(c.id) || !selectedIds.has(c.id)).map(c => (
                     <div key={c.id} style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(c.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                             <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleClause(c.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
@@ -1087,6 +1394,7 @@ function ConditionsTab({ quotation, showSuccess, showError }: { quotation: Quota
                         {selectedIds.has(c.id) && (
                             <div style={{ paddingLeft: '30px' }}>
                                 <VesselScopeChips vessels={qVessels} vesselScope={clauseVesselScopes[c.id]} onChange={scope => updateClauseScope(c.id, scope)} />
+                                <AlternativeScopeChips alternatives={piAlternatives} currentAltId={clauseAltIds[c.id] || null} onChangeAltId={altId => updateClauseAltId(c.id, altId)} />
                             </div>
                         )}
                     </div>
@@ -1434,12 +1742,14 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
 
 // ==================== Warranties Tab ====================
 
-function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
+function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, getEffectiveText, piAlternatives = [], selectedPIAltId: _selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
+    void _selectedPIAltId
     const [allWarranties, setAllWarranties] = useState<PIWarranty[]>([])
     const [tags, setTags] = useState<PIWarrantyTag[]>([])
     const [warrantySets, setWarrantySets] = useState<PIWarrantySet[]>([])
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [warrantyVesselScopes, setWarrantyVesselScopes] = useState<Record<string, string[] | null>>({})
+    const [warrantyAltIds, setWarrantyAltIds] = useState<Record<string, string | null>>({})
     const [customWarranties, setCustomWarranties] = useState<QuotationCustomWarranty[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [activeTab, setActiveTab] = useState<string>('all')
@@ -1470,13 +1780,18 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
         const safeSelectedRows = Array.isArray(selectedRows) ? selectedRows : []
         const safeSelected = safeSelectedRows.map((r: any) => r.piWarrantyId)
         const scopes: Record<string, string[] | null> = {}
-        for (const r of safeSelectedRows) { if (r.vesselScope) scopes[r.piWarrantyId] = r.vesselScope }
+        const altIds: Record<string, string | null> = {}
+        for (const r of safeSelectedRows) {
+            if (r.vesselScope) scopes[r.piWarrantyId] = r.vesselScope
+            altIds[r.piWarrantyId] = r.alternativeId || null
+        }
         const safeCustom = Array.isArray(custom) ? custom : []
         setAllWarranties(safeAll)
         setTags(safeTags)
         setWarrantySets(safeSets)
         setSelectedIds(safeSelected)
         setWarrantyVesselScopes(scopes)
+        setWarrantyAltIds(altIds)
         setCustomWarranties(safeCustom)
 
         // Apply default-selected sets on first load if quotation has no warranties yet
@@ -1546,6 +1861,20 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
     const updateWarrantyScope = async (piWarrantyId: string, scope: string[] | null) => {
         setWarrantyVesselScopes(prev => ({ ...prev, [piWarrantyId]: scope }))
         await window.api.updateQuotationWarrantyVesselScope(quotation.id, piWarrantyId, scope)
+    }
+
+    const updateWarrantyAltId = async (piWarrantyId: string, altId: string | null) => {
+        const rows = await window.api.getQuotationWarranties(quotation.id)
+        const row = (Array.isArray(rows) ? rows : []).find((r: any) => r.piWarrantyId === piWarrantyId)
+        if (row) {
+            await window.api.updateQuotationItemAlternativeId('quotation_warranties', row.id, altId)
+            setWarrantyAltIds(prev => ({ ...prev, [piWarrantyId]: altId }))
+        }
+    }
+
+    const updateCustomWarrantyAltId = async (id: string, altId: string | null) => {
+        await window.api.updateQuotationItemAlternativeId('quotation_custom_warranties', id, altId)
+        setCustomWarranties(prev => prev.map(cw => cw.id === id ? { ...cw, alternativeId: altId } : cw))
     }
 
     const updateCustomWarrantyScope = async (id: string, scope: string[] | null) => {
@@ -1727,6 +2056,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
                                         <button onClick={() => toggle(id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }} title="Remove"><X size={12} /></button>
                                     </div>
                                     <VesselScopeChips vessels={qVessels} vesselScope={warrantyVesselScopes[id]} onChange={scope => updateWarrantyScope(id, scope)} />
+                                    <AlternativeScopeChips alternatives={piAlternatives} currentAltId={warrantyAltIds[id] || null} onChangeAltId={altId => updateWarrantyAltId(id, altId)} />
                                 </div>
                             )
                         })}
@@ -1757,6 +2087,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
                                         )}
                                     </div>
                                     <VesselScopeChips vessels={qVessels} vesselScope={cw.vesselScope} onChange={scope => updateCustomWarrantyScope(cw.id, scope)} />
+                                    <AlternativeScopeChips alternatives={piAlternatives} currentAltId={cw.alternativeId || null} onChangeAltId={altId => updateCustomWarrantyAltId(cw.id, altId)} />
                                 </div>
                             )
                         })}
@@ -1845,7 +2176,8 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
 
 // ==================== Deductibles Tab ====================
 
-function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError?: (m: string) => void; isLight?: boolean; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
+function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiveText, piAlternatives = [], selectedPIAltId: _selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError?: (m: string) => void; isLight?: boolean; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
+    void _selectedPIAltId
     const [deductibles, setDeductibles] = useState<QuotationDeductible[]>([])
     const [masterDeductibles, setMasterDeductibles] = useState<PIDeductible[]>([])
     const [textDeds, setTextDeds] = useState<QuotationTextDeductible[]>([])
@@ -1961,6 +2293,16 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
         await window.api.updateQuotationDeductible(id, { vesselScope: scope })
     }
 
+    const updateDeductibleAltId = async (id: string, altId: string | null) => {
+        await window.api.updateQuotationItemAlternativeId('quotation_deductibles', id, altId)
+        setDeductibles(prev => prev.map(d => d.id === id ? { ...d, alternativeId: altId } : d))
+    }
+
+    const updateTextDeductibleAltId = async (id: string, altId: string | null) => {
+        await window.api.updateQuotationItemAlternativeId('quotation_text_deductibles', id, altId)
+        setTextDeds(prev => prev.map(d => d.id === id ? { ...d, alternativeId: altId } : d))
+    }
+
     const updateTextDeductibleScope = async (id: string, scope: string[] | null) => {
         setTextDeds(prev => prev.map(d => d.id === id ? { ...d, vesselScope: scope } : d))
         await window.api.updateQuotationTextDeductible(id, { vesselScope: scope })
@@ -2017,6 +2359,7 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                     )}
                     <div style={{ paddingLeft: '30px' }}>
                         <VesselScopeChips vessels={qVessels} vesselScope={d.vesselScope} onChange={scope => updateDeductibleScope(d.id, scope)} />
+                        <AlternativeScopeChips alternatives={piAlternatives} currentAltId={d.alternativeId || null} onChangeAltId={altId => updateDeductibleAltId(d.id, altId)} />
                     </div>
                 </div>
             ))}
@@ -2071,6 +2414,7 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                     </div>
                     <div style={{ paddingLeft: '30px' }}>
                         <VesselScopeChips vessels={qVessels} vesselScope={td.vesselScope} onChange={scope => updateTextDeductibleScope(td.id, scope)} />
+                        <AlternativeScopeChips alternatives={piAlternatives} currentAltId={td.alternativeId || null} onChangeAltId={altId => updateTextDeductibleAltId(td.id, altId)} />
                     </div>
                 </div>
             ))}
@@ -2125,7 +2469,8 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
 
 // ==================== Exclusions Tab ====================
 
-function ExclusionsTab({ quotation, showSuccess }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPIAltId: _selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
+    void _selectedPIAltId
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [selectedRows, setSelectedRows] = useState<any[]>([])
@@ -2224,6 +2569,16 @@ function ExclusionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
         await window.api.updateQuotationItemVesselScope('quotation_exclusions', id, scope)
     }
 
+    const updateExclusionAltId = async (id: string, altId: string | null) => {
+        await window.api.updateQuotationItemAlternativeId('quotation_exclusions', id, altId)
+        setSelectedRows(prev => prev.map(e => e.id === id ? { ...e, alternativeId: altId } : e))
+    }
+
+    const updateCustomExclusionAltId = async (id: string, altId: string | null) => {
+        await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', id, altId)
+        setCustomExclusions(prev => prev.map(e => e.id === id ? { ...e, alternativeId: altId } : e))
+    }
+
     // Custom exclusion handlers
     const addCustom = async () => {
         if (!newCustomText.trim()) return
@@ -2317,6 +2672,7 @@ function ExclusionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
                             {row && qVessels.length > 1 && (
                                 <div style={{ paddingLeft: '30px' }}>
                                     <VesselScopeChips vessels={qVessels} vesselScope={row.vesselScope} onChange={scope => updateExclusionScope(row.id, scope)} />
+                                    <AlternativeScopeChips alternatives={piAlternatives} currentAltId={row.alternativeId || null} onChangeAltId={altId => updateExclusionAltId(row.id, altId)} />
                                 </div>
                             )}
                         </div>
@@ -2354,6 +2710,7 @@ function ExclusionsTab({ quotation, showSuccess }: { quotation: Quotation; showS
                         {editingCustomId !== ce.id && qVessels.length > 1 && (
                             <div style={{ marginTop: '4px' }}>
                                 <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />
+                                <AlternativeScopeChips alternatives={piAlternatives} currentAltId={ce.alternativeId || null} onChangeAltId={altId => updateCustomExclusionAltId(ce.id, altId)} />
                             </div>
                         )}
                     </div>
@@ -2728,6 +3085,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [hullAlternatives, setHullAlternatives] = useState<QuotationHullAlternative[]>([])
     const [hullClauses, setHullClauses] = useState<HullClause[]>([])
+    const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
 
     useEffect(() => {
         loadInstalments()
@@ -2736,6 +3094,9 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
         if (quotation.quotationTypeCode === 'H') {
             window.api.hullGetQuotationAlternatives(quotation.id).then(a => setHullAlternatives(Array.isArray(a) ? a : []))
             window.api.hullGetClauses().then(c => setHullClauses(Array.isArray(c) ? c : []))
+        }
+        if (quotation.quotationTypeCode === 'P') {
+            window.api.piGetQuotationAlternatives(quotation.id).then(a => setPiAlternatives(Array.isArray(a) ? a : []))
         }
     }, [])
     const loadInstalments = async () => { setInstalments(await window.api.getQuotationInstalments(quotation.id)) }
@@ -2748,6 +3109,11 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
         const newTotal = hullAlternatives.reduce((sum, a) => sum + (a.id === altId ? (amount || 0) : (a.premiumAmount || 0)), 0)
         setQ(p => ({ ...p, premiumAmount: newTotal || undefined }))
         updateField('premiumAmount', newTotal || null)
+    }
+
+    const updatePIAlternativePremium = async (altId: string, amount: number | null) => {
+        await window.api.piUpdateQuotationAlternative(altId, { premiumAmount: amount })
+        setPiAlternatives(prev => prev.map(a => a.id === altId ? { ...a, premiumAmount: amount || undefined } : a))
     }
 
     const getDefaultDays = (count: number, index: number): number | undefined => {
@@ -2820,8 +3186,25 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
             {/* Single vessel: premium inputs */}
             {!isMultiVessel && (
                 <div style={{ marginBottom: '16px' }}>
-                    {/* Hull with multiple alternatives: per-alternative premium */}
-                    {quotation.quotationTypeCode === 'H' && hullAlternatives.length > 1 ? (
+                    {/* P&I with multiple alternatives: per-alternative premium */}
+                    {quotation.quotationTypeCode === 'P' && piAlternatives.length > 1 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                            {piAlternatives.map((alt, idx) => {
+                                const accentColor = ALT_COLORS[idx % ALT_COLORS.length]
+                                return (
+                                    <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
+                                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: accentColor, minWidth: '140px', whiteSpace: 'nowrap' }}>
+                                            {alt.label || `Alt ${idx + 1}`}
+                                        </label>
+                                        <input type="number" value={alt.premiumAmount || ''} onChange={e => setPiAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updatePIAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    ) :
+                    /* Hull with multiple alternatives: per-alternative premium */
+                    quotation.quotationTypeCode === 'H' && hullAlternatives.length > 1 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
                             {hullAlternatives.map((alt, idx) => {
                                 const clause = hullClauses.find(c => c.id === alt.hullClauseId)
@@ -2938,14 +3321,27 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                 }
                 const discountLabel = (quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : '') + (quotation.ncbEnabled && quotation.upccEnabled ? ' + ' : '') + (quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '')
                 const hullMultiAlt = quotation.quotationTypeCode === 'H' && hullAlternatives.length > 1
+                const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
+                const anyMultiAlt = hullMultiAlt || piMultiAlt
                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
                 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 return (
                     <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid rgba(0, 210, 255, 0.15)' }}>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: hullMultiAlt ? '8px' : '0' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: anyMultiAlt ? '8px' : '0' }}>
                             Payable Premium ({discountLabel})
                         </div>
-                        {hullMultiAlt ? (
+                        {piMultiAlt ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {piAlternatives.map((alt, idx) => (
+                                    <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: altColors[idx % altColors.length], minWidth: '140px' }}>
+                                            {alt.label || `Alt ${idx + 1}`}
+                                        </span>
+                                        <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(computePayable(alt.premiumAmount || 0))}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : hullMultiAlt ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {hullAlternatives.map((alt, idx) => {
                                     const clause = hullClauses.find(c => c.id === alt.hullClauseId)

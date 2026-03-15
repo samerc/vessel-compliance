@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -228,6 +228,14 @@ export interface Api {
 
   hullGetQuotationAgreedValueItems: (qId: string) => Promise<QuotationAgreedValueItem[]>
   hullSetQuotationAgreedValueItems: (qId: string, items: { hullTextId?: string; text: string; vesselScope?: string[] | null }[]) => Promise<void>
+  // P&I Alternatives
+  piGetQuotationAlternatives: (qId: string) => Promise<QuotationPIAlternative[]>
+  piAddQuotationAlternative: (qId: string, label?: string) => Promise<QuotationPIAlternative>
+  piUpdateQuotationAlternative: (id: string, updates: { label?: string; premiumAmount?: number | null }) => Promise<void>
+  piDeleteQuotationAlternative: (id: string) => Promise<void>
+  piReorderQuotationAlternatives: (ids: string[]) => Promise<void>
+  updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => Promise<void>
+  // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => Promise<QuotationHullAlternative[]>
   hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string) => Promise<QuotationHullAlternative>
   hullUpdateQuotationAlternative: (id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null }) => Promise<void>
@@ -417,6 +425,11 @@ export interface Api {
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>
   deleteQuotation: (id: string) => Promise<void>
+  createQuotationRevision: (sourceId: string) => Promise<Quotation>
+  duplicateQuotation: (sourceId: string) => Promise<Quotation>
+  getQuotationRevisions: (revisionGroupId: string) => Promise<Quotation[]>
+  saveExportSnapshot: (quotationId: string, snapshot: string) => Promise<void>
+  clearExportSnapshot: (quotationId: string) => Promise<void>
 
   // Quotation Sub-Tables
   getQuotationAssureds: (qId: string) => Promise<QuotationAssured[]>
@@ -440,7 +453,7 @@ export interface Api {
   updateQuotationSubLimit: (id: string, updates: { text?: string; amount?: number; currency?: string }) => Promise<void>
   deleteQuotationSubLimit: (id: string) => Promise<void>
 
-  getQuotationClauses: (qId: string) => Promise<{ piClauseId: string; vesselScope?: string[] | null }[]>
+  getQuotationClauses: (qId: string) => Promise<{ id: string; piClauseId: string; vesselScope?: string[] | null; alternativeId?: string | null }[]>
   setQuotationClauses: (qId: string, ids: string[], overrides?: Record<string, string>) => Promise<void>
   getQuotationClauseOverrides: (qId: string) => Promise<Record<string, string>>
   updateQuotationClauseOverride: (qId: string, clauseId: string, override: string | null) => Promise<void>
@@ -449,7 +462,7 @@ export interface Api {
   addQuotationAdditionalClause: (data: { quotationId: string; piAdditionalClauseId?: string; customText?: string; order?: number; vesselScope?: string[] }) => Promise<any>
   deleteQuotationAdditionalClause: (id: string) => Promise<void>
 
-  getQuotationWarranties: (qId: string) => Promise<{ id: string; piWarrantyId: string; order: number; vesselScope?: string[] | null }[]>
+  getQuotationWarranties: (qId: string) => Promise<{ id: string; piWarrantyId: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]>
   setQuotationWarranties: (qId: string, ids: string[]) => Promise<void>
   updateQuotationWarrantyVesselScope: (qId: string, piWarrantyId: string, vesselScope: string[] | null) => Promise<void>
   updateQuotationClauseVesselScope: (qId: string, piClauseId: string, vesselScope: string[] | null) => Promise<void>

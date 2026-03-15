@@ -241,6 +241,14 @@ const api = {
 
   hullGetQuotationAgreedValueItems: (qId: string) => ipcRenderer.invoke('hull:getQuotationAgreedValueItems', qId),
   hullSetQuotationAgreedValueItems: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationAgreedValueItems', qId, items),
+  // P&I Alternatives
+  piGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('pi:getQuotationAlternatives', qId),
+  piAddQuotationAlternative: (qId: string, label?: string) => ipcRenderer.invoke('pi:addQuotationAlternative', qId, label),
+  piUpdateQuotationAlternative: (id: string, updates: any) => ipcRenderer.invoke('pi:updateQuotationAlternative', id, updates),
+  piDeleteQuotationAlternative: (id: string) => ipcRenderer.invoke('pi:deleteQuotationAlternative', id),
+  piReorderQuotationAlternatives: (ids: string[]) => ipcRenderer.invoke('pi:reorderQuotationAlternatives', ids),
+  updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => ipcRenderer.invoke('quotation:updateItemAlternativeId', table, id, alternativeId),
+  // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('hull:getQuotationAlternatives', qId),
   hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label),
   hullUpdateQuotationAlternative: (id: string, updates: any) => ipcRenderer.invoke('hull:updateQuotationAlternative', id, updates),
@@ -430,6 +438,11 @@ const api = {
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
   updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),
   deleteQuotation: (id: string) => ipcRenderer.invoke('db:deleteQuotation', id),
+  createQuotationRevision: (sourceId: string) => ipcRenderer.invoke('db:createQuotationRevision', sourceId),
+  duplicateQuotation: (sourceId: string) => ipcRenderer.invoke('db:duplicateQuotation', sourceId),
+  getQuotationRevisions: (revisionGroupId: string) => ipcRenderer.invoke('db:getQuotationRevisions', revisionGroupId),
+  saveExportSnapshot: (quotationId: string, snapshot: string) => ipcRenderer.invoke('db:saveExportSnapshot', quotationId, snapshot),
+  clearExportSnapshot: (quotationId: string) => ipcRenderer.invoke('db:clearExportSnapshot', quotationId),
 
   // Quotation Sub-Tables
   getQuotationAssureds: (qId: string) => ipcRenderer.invoke('db:getQuotationAssureds', qId),

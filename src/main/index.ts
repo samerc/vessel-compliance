@@ -1448,6 +1448,15 @@ app.whenReady().then(() => {
   // Quotation Hull Data
   safeHandle('hull:getQuotationAgreedValueItems', (event, qId) => { requireSession(event); return db.getQuotationAgreedValueItems(qId) })
   safeHandle('hull:setQuotationAgreedValueItems', (event, qId, items) => { requireSession(event); return db.setQuotationAgreedValueItems(qId, items) })
+  // P&I Alternatives
+  safeHandle('pi:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationPIAlternatives(qId) })
+  safeHandle('pi:addQuotationAlternative', (event, qId, label) => { requireSession(event); return db.addQuotationPIAlternative(qId, label) })
+  safeHandle('pi:updateQuotationAlternative', (event, id, updates) => { requireSession(event); return db.updateQuotationPIAlternative(id, updates) })
+  safeHandle('pi:deleteQuotationAlternative', (event, id) => { requireSession(event); return db.deleteQuotationPIAlternative(id) })
+  safeHandle('pi:reorderQuotationAlternatives', (event, ids) => { requireSession(event); return db.reorderQuotationPIAlternatives(ids) })
+  safeHandle('quotation:updateItemAlternativeId', (event, table, id, alternativeId) => { requireSession(event); return db.updateQuotationItemAlternativeId(table, id, alternativeId) })
+
+  // Hull Alternatives
   safeHandle('hull:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationHullAlternatives(qId) })
   safeHandle('hull:addQuotationAlternative', (event, qId, hullClauseId, label) => { requireSession(event); return db.addQuotationHullAlternative(qId, hullClauseId, label) })
   safeHandle('hull:updateQuotationAlternative', (event, id, updates) => { requireSession(event); return db.updateQuotationHullAlternative(id, updates) })
@@ -1969,6 +1978,11 @@ app.whenReady().then(() => {
   safeHandle('db:addQuotation', (event, q) => { requireSession(event); return db.addQuotation(q) })
   safeHandle('db:updateQuotation', (event, id, updates) => { requireSession(event); return db.updateQuotation(id, updates) })
   safeHandle('db:deleteQuotation', (event, id) => { requireSession(event); return db.deleteQuotation(id) })
+  safeHandle('db:createQuotationRevision', (event, sourceId) => { requireSession(event); return db.createQuotationRevision(sourceId) })
+  safeHandle('db:duplicateQuotation', (event, sourceId) => { requireSession(event); return db.duplicateQuotation(sourceId) })
+  safeHandle('db:getQuotationRevisions', (event, revisionGroupId) => { requireSession(event); return db.getQuotationRevisions(revisionGroupId) })
+  safeHandle('db:saveExportSnapshot', (event, quotationId, snapshot) => { requireSession(event); return db.saveExportSnapshot(quotationId, snapshot) })
+  safeHandle('db:clearExportSnapshot', (event, quotationId) => { requireSession(event); return db.clearExportSnapshot(quotationId) })
 
   // Quotation Sub-Tables
   safeHandle('db:getQuotationAssureds', (event, qId) => { requireSession(event); return db.getQuotationAssureds(qId) })

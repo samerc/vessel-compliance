@@ -76,7 +76,7 @@ export default function QuotationManager() {
             {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} />}
             {view === 'settings' && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
-                <QuotationEditor quotation={editingQuotation} onBack={handleBackToList} />
+                <QuotationEditor quotation={editingQuotation} onBack={handleBackToList} onOpenQuotation={handleOpenEditor} />
             )}
         </div>
     )
