@@ -652,23 +652,17 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     }
 
     if (piMultiAlt) {
-      // Group clauses by alternative
-      // Per-alternative clauses
+      // Group clauses by alternative — shared clauses appear under each alternative
+      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
       for (const alt of data.piAlternatives) {
         const altIdx = data.piAlternatives.indexOf(alt)
         const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
-        if (altClauseIds.length > 0) {
+        const combinedIds = [...altClauseIds, ...sharedClauseIds]
+        if (combinedIds.length > 0) {
           condText += `Alternative ${altIdx + 1}:\n`
-          condText += renderClauseList(altClauseIds)
+          condText += renderClauseList(combinedIds)
           condText += '\n'
         }
-      }
-      // Shared clauses
-      const sharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
-      if (sharedClauseIds.length > 0) {
-        condText += `Applicable to both alternatives:\n`
-        condText += renderClauseList(sharedClauseIds)
-        condText += '\n'
       }
       // Additional clauses grouped by alternative
       const scopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
@@ -1702,24 +1696,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dPiMultiAlt = data.piAlternatives.length > 1
 
     if (dPiMultiAlt) {
-      // Per-alternative clauses
+      // Per-alternative clauses — shared clauses appear under each alternative
+      const dSharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
       for (const alt of data.piAlternatives) {
         const altIdx = data.piAlternatives.indexOf(alt)
         const altClauseIds = selectedClauses.filter(c => data.clauseAltIds[c.id] === alt.id).map(c => c.id)
-        const altClauses = altClauseIds.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
-        if (altClauses.length > 0) {
+        const combinedIds = [...altClauseIds, ...dSharedClauseIds]
+        const combinedClauses = combinedIds.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
+        if (combinedClauses.length > 0) {
           condContent.push(bup(`Alternative ${altIdx + 1}:`))
-          condContent.push(makeClauseTable(altClauses))
+          condContent.push(makeClauseTable(combinedClauses))
           condContent.push(emptyP())
         }
-      }
-      // Shared clauses
-      const dSharedClauseIds = selectedClauses.filter(c => !data.clauseAltIds[c.id]).map(c => c.id)
-      const dSharedClauses = dSharedClauseIds.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
-      if (dSharedClauses.length > 0) {
-        condContent.push(bup('Applicable to both alternatives:'))
-        condContent.push(makeClauseTable(dSharedClauses))
-        condContent.push(emptyP())
       }
       // Additional clauses grouped by alternative
       const dScopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
