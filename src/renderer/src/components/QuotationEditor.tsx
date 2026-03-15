@@ -176,7 +176,9 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
             // Load PI alternatives
             if (fullQ.quotationTypeCode === 'P') {
                 const piAlts = await window.api.piGetQuotationAlternatives(fullQ.id)
-                setPiAlternatives(Array.isArray(piAlts) ? piAlts : [])
+                const safeAlts = Array.isArray(piAlts) ? piAlts : []
+                setPiAlternatives(safeAlts)
+                if (safeAlts.length >= 2 && !selectedPIAltId) setSelectedPIAltId(safeAlts[0].id)
             }
         }
         setPolicyTypes(Array.isArray(pt) ? pt : [])
@@ -235,6 +237,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
             const a2 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 2')
             if ((a1 as any)?.error || (a2 as any)?.error) { showError('Failed to create alternatives'); return }
             setPiAlternatives([a1, a2])
+            setSelectedPIAltId(a1.id)
             showSuccess('Alternatives created')
         } catch (err: any) { showError(err.message || 'Failed') }
     }
@@ -543,23 +546,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                         </>
                     ) : (
                         <>
-                            <button
-                                onClick={() => setSelectedPIAltId(null)}
-                                style={{
-                                    padding: '5px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
-                                    border: selectedPIAltId === null ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                                    background: selectedPIAltId === null ? 'rgba(0,170,200,0.12)' : 'transparent',
-                                    color: selectedPIAltId === null ? (isLight ? '#007a91' : '#00aac8') : 'var(--text-secondary)',
-                                    cursor: 'pointer'
-                                }}
-                            >All</button>
                             {piAlternatives.map((alt, idx) => {
                                 const color = piAltColors[idx % piAltColors.length]
                                 const active = selectedPIAltId === alt.id
                                 return (
                                     <button
                                         key={alt.id}
-                                        onClick={() => setSelectedPIAltId(active ? null : alt.id)}
+                                        onClick={() => setSelectedPIAltId(alt.id)}
                                         style={{
                                             padding: '5px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
                                             border: active ? `1.5px solid ${color}` : '1px solid var(--input-border)',
