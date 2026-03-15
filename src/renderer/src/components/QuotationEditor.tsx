@@ -2630,15 +2630,13 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
 
     const toggle = async (id: string) => {
         const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
-        // Find the row matching this exclusion + current alternative
-        const row = selectedRows.find((r: any) =>
-            r.piExclusionId === id && (altId ? r.alternativeId === altId : true)
-        ) || selectedRows.find((r: any) => r.piExclusionId === id)
+        // Find the row matching this exclusion for the CURRENT alternative only
+        const row = altId
+            ? selectedRows.find((r: any) => r.piExclusionId === id && r.alternativeId === altId)
+            : selectedRows.find((r: any) => r.piExclusionId === id)
         if (row) {
-            // Deselect — delete this specific row
             await window.api.deleteQuotationExclusion(row.id)
         } else {
-            // Select — add with current alternative scope
             await window.api.addQuotationExclusion(quotation.id, id, altId)
         }
         const qe = await window.api.getQuotationExclusions(quotation.id)
