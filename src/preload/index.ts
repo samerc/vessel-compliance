@@ -502,6 +502,8 @@ const api = {
 
   getQuotationExclusions: (qId: string) => ipcRenderer.invoke('db:getQuotationExclusions', qId),
   setQuotationExclusions: (qId: string, items: any[]) => ipcRenderer.invoke('db:setQuotationExclusions', qId, items),
+  addQuotationExclusion: (qId: string, piExclusionId: string, altId?: string | null) => ipcRenderer.invoke('db:addQuotationExclusion', qId, piExclusionId, altId),
+  deleteQuotationExclusion: (id: string) => ipcRenderer.invoke('db:deleteQuotationExclusion', id),
   getQuotationCustomExclusions: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomExclusions', qId),
   addQuotationCustomExclusion: (data: { quotationId: string; text: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomExclusion', data),
   updateQuotationCustomExclusion: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomExclusion', id, updates),

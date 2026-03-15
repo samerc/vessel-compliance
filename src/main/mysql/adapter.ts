@@ -5710,6 +5710,19 @@ export class MySQLAdapter {
         }
     }
 
+    async addQuotationExclusion(quotationId: string, piExclusionId: string, alternativeId?: string | null): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, alternative_id) VALUES (?, ?, ?, ?)',
+            [id, quotationId, piExclusionId, alternativeId || null])
+        return { id, quotationId, piExclusionId, alternativeId: alternativeId || null }
+    }
+
+    async deleteQuotationExclusion(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_exclusions WHERE id = ?', [id])
+    }
+
     // -- Quotation Custom Exclusions --
     async getQuotationCustomExclusions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []

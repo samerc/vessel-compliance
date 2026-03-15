@@ -2043,6 +2043,8 @@ app.whenReady().then(() => {
 
   safeHandle('db:getQuotationExclusions', (event, qId) => { requireSession(event); return db.getQuotationExclusions(qId) })
   safeHandle('db:setQuotationExclusions', (event, qId, items) => { requireSession(event); return db.setQuotationExclusions(qId, items) })
+  safeHandle('db:addQuotationExclusion', (event, qId, piExclusionId, altId) => { requireSession(event); return db.addQuotationExclusion(qId, piExclusionId, altId) })
+  safeHandle('db:deleteQuotationExclusion', (event, id) => { requireSession(event); return db.deleteQuotationExclusion(id) })
   safeHandle('db:getQuotationCustomExclusions', (event, qId) => { requireSession(event); return db.getQuotationCustomExclusions(qId) })
   safeHandle('db:addQuotationCustomExclusion', (event, data) => { requireSession(event); return db.addQuotationCustomExclusion(data) })
   safeHandle('db:updateQuotationCustomExclusion', (event, id, updates) => { requireSession(event); return db.updateQuotationCustomExclusion(id, updates) })

@@ -2633,10 +2633,19 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
 
     const toggle = async (id: string) => {
         const newSet = new Set(selectedIds)
-        if (newSet.has(id)) newSet.delete(id)
-        else newSet.add(id)
+        const wasSelected = newSet.has(id)
+        if (wasSelected) {
+            newSet.delete(id)
+            // Delete only this specific exclusion row
+            const row = selectedRows.find((r: any) => r.piExclusionId === id)
+            if (row) await window.api.deleteQuotationExclusion(row.id)
+        } else {
+            newSet.add(id)
+            // Add with current alternative scope
+            const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+            await window.api.addQuotationExclusion(quotation.id, id, altId)
+        }
         setSelectedIds(newSet)
-        await window.api.setQuotationExclusions(quotation.id, Array.from(newSet).map(eid => ({ piExclusionId: eid })))
         const qe = await window.api.getQuotationExclusions(quotation.id)
         setSelectedRows(Array.isArray(qe) ? qe : [])
     }

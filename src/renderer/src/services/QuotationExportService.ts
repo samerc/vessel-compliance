@@ -606,7 +606,11 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       sl.text.replace('{amount}', formatAmountOnly(sl.amount)).replace('{currency}', sl.currency || 'USD')
     )
     if (liabilityText.includes('{sub_limits}')) {
-      liabilityText = liabilityText.replace('{sub_limits}', pdfSubLimitLines.join('\n'))
+      if (pdfSubLimitLines.length > 0) {
+        liabilityText = liabilityText.replace('{sub_limits}', pdfSubLimitLines.join('\n'))
+      } else {
+        liabilityText = liabilityText.replace(/\n*\{sub_limits\}\n*/g, '\n')
+      }
     } else if (pdfSubLimitLines.length > 0) {
       liabilityText += '\n\n' + pdfSubLimitLines.join('\n')
       liabilityText += '\n\nUnder no circumstances is the Combined Single Limit detailed above to be exceeded.'
@@ -1628,8 +1632,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const parts = rawText.split('{sub_limits}')
       const out: (Paragraph | Table)[] = []
       if (parts[0]?.trim()) out.push(...mp(parts[0].trim()))
-      out.push(...wordSubLimitParas)
-      out.push(emptyP())
+      if (wordSubLimitParas.length > 0) {
+        out.push(...wordSubLimitParas)
+        out.push(emptyP())
+      }
       if (parts[1]?.trim()) out.push(...mp(parts[1].trim()))
       return out
     }
