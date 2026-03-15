@@ -1326,12 +1326,13 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
         const altId = hasPIAlts ? selectedPIAltId : null
 
         if (hasPIAlts && altId) {
-            // Per-alternative: add clauses for this alternative without touching others
+            // Per-alternative: remove existing clauses for this alt, then add new set
+            const existingForAlt = clauseRows.filter(r => r.alternativeId === altId)
+            for (const row of existingForAlt) {
+                await window.api.deleteQuotationClause(quotation.id, row.piClauseId, altId)
+            }
             for (const cid of cs.clauseIds) {
-                const exists = clauseRows.some(r => r.piClauseId === cid && r.alternativeId === altId)
-                if (!exists) {
-                    await window.api.addQuotationClause(quotation.id, cid, altId)
-                }
+                await window.api.addQuotationClause(quotation.id, cid, altId)
             }
             // Apply description overrides
             if (cs.descriptionOverrides) {
