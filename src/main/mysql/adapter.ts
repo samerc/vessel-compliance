@@ -5421,10 +5421,14 @@ export class MySQLAdapter {
 
     async getQuotationClauseOverrides(quotationId: string): Promise<Record<string, string>> {
         if (!this.pool) return {}
-        const [rows] = await this.pool.query('SELECT pi_clause_id, description_override FROM quotation_clauses WHERE quotation_id = ? AND description_override IS NOT NULL', [quotationId])
+        const [rows] = await this.pool.query('SELECT pi_clause_id, description_override, alternative_id FROM quotation_clauses WHERE quotation_id = ? AND description_override IS NOT NULL', [quotationId])
         const overrides: Record<string, string> = {}
         for (const r of rows as any[]) {
-            if (r.description_override) overrides[r.pi_clause_id] = r.description_override
+            if (r.description_override) {
+                // Key by clauseId::altId for alt-specific overrides
+                const key = r.alternative_id ? `${r.pi_clause_id}::${r.alternative_id}` : r.pi_clause_id
+                overrides[key] = r.description_override
+            }
         }
         return overrides
     }
@@ -5462,9 +5466,17 @@ export class MySQLAdapter {
         }
     }
 
-    async updateQuotationClauseOverride(quotationId: string, clauseId: string, descriptionOverride: string | null): Promise<void> {
+    async updateQuotationClauseOverride(quotationId: string, clauseId: string, descriptionOverride: string | null, alternativeId?: string | null): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE quotation_clauses SET description_override = ? WHERE quotation_id = ? AND pi_clause_id = ?', [descriptionOverride, quotationId, clauseId])
+        if (alternativeId !== undefined) {
+            if (alternativeId) {
+                await this.pool.execute('UPDATE quotation_clauses SET description_override = ? WHERE quotation_id = ? AND pi_clause_id = ? AND alternative_id = ?', [descriptionOverride, quotationId, clauseId, alternativeId])
+            } else {
+                await this.pool.execute('UPDATE quotation_clauses SET description_override = ? WHERE quotation_id = ? AND pi_clause_id = ? AND alternative_id IS NULL', [descriptionOverride, quotationId, clauseId])
+            }
+        } else {
+            await this.pool.execute('UPDATE quotation_clauses SET description_override = ? WHERE quotation_id = ? AND pi_clause_id = ?', [descriptionOverride, quotationId, clauseId])
+        }
     }
 
     // -- Quotation Additional Clauses --

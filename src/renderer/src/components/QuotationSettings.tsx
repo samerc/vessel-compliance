@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Image, Calendar, Download, List } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, List } from 'lucide-react'
 import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -8,7 +8,7 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'logo' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
 
 type SettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -31,7 +31,6 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
         { id: 'sectionOrder', label: 'Section Order', icon: <List size={15} /> },
-        { id: 'logo', label: 'Logo', icon: <Image size={15} /> },
     ],
     pi: [
         { id: 'clauses', label: 'Conditions', icon: <BookOpen size={15} /> },
@@ -142,7 +141,7 @@ export default function QuotationSettings() {
             {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'sectionOrder' && <SectionOrderTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'logo' && <LogoTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+
             {activeTab === 'hullAgreedValueTexts' && <HullAgreedValueTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'hullClauses' && <HullClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             {activeTab === 'hullAdditionalConditions' && <HullAdditionalConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
@@ -2613,60 +2612,6 @@ function InstalmentDefaultsTab({ showSuccess }: TabProps) {
                     </div>
                 )
             })}
-        </section>
-    )
-}
-
-// ==================== Logo Tab ====================
-
-function LogoTab({ showSuccess }: TabProps) {
-    const [logoPath, setLogoPath] = useState<string | null>(null)
-    const [loaded, setLoaded] = useState(false)
-
-    useEffect(() => { loadData() }, [])
-    const loadData = async () => {
-        const path = await window.api.piGetQuotationLogoPath()
-        setLogoPath(path)
-        setLoaded(true)
-    }
-
-    const handleSelect = async () => {
-        const result = await window.api.setupSelectConfigFile()
-        if (result) {
-            await window.api.piSetQuotationLogoPath(result)
-            setLogoPath(result)
-            showSuccess('Logo path saved')
-        }
-    }
-
-    const handleClear = async () => {
-        await window.api.piSetQuotationLogoPath('')
-        setLogoPath(null)
-        showSuccess('Logo cleared')
-    }
-
-    if (!loaded) return <div style={{ color: 'var(--text-secondary)', padding: '20px' }}>Loading...</div>
-
-    return (
-        <section className="glass-card" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Quotation Logo</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>Upload a company logo to appear at the top of exported quotations.</p>
-
-            {logoPath && (
-                <div style={{ marginBottom: '16px', padding: '12px', borderRadius: '8px', border: '1px solid var(--table-border)', display: 'inline-block' }}>
-                    <img src={`safe-file://${logoPath}`} alt="Logo preview" style={{ maxWidth: '300px', maxHeight: '120px', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px', wordBreak: 'break-all' }}>{logoPath}</div>
-                </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={handleSelect} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
-                    <Image size={14} /> {logoPath ? 'Change Logo' : 'Select Logo'}
-                </button>
-                {logoPath && (
-                    <button onClick={handleClear} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Clear Logo</button>
-                )}
-            </div>
         </section>
     )
 }

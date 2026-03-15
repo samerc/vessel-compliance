@@ -2011,7 +2011,7 @@ app.whenReady().then(() => {
   safeHandle('db:addQuotationClause', (event, qId, piClauseId, alternativeId) => { requireSession(event); return db.addQuotationClause(qId, piClauseId, alternativeId) })
   safeHandle('db:deleteQuotationClause', (event, qId, piClauseId, alternativeId) => { requireSession(event); return db.deleteQuotationClause(qId, piClauseId, alternativeId) })
   safeHandle('db:getQuotationClauseOverrides', (event, qId) => { requireSession(event); return db.getQuotationClauseOverrides(qId) })
-  safeHandle('db:updateQuotationClauseOverride', (event, qId, clauseId, override) => { requireSession(event); return db.updateQuotationClauseOverride(qId, clauseId, override) })
+  safeHandle('db:updateQuotationClauseOverride', (event, qId, clauseId, override, alternativeId) => { requireSession(event); return db.updateQuotationClauseOverride(qId, clauseId, override, alternativeId) })
 
   safeHandle('db:getQuotationAdditionalClauses', (event, qId) => { requireSession(event); return db.getQuotationAdditionalClauses(qId) })
   safeHandle('db:addQuotationAdditionalClause', (event, data) => { requireSession(event); return db.addQuotationAdditionalClause(data) })

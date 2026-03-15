@@ -471,7 +471,7 @@ const api = {
   addQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) => ipcRenderer.invoke('db:addQuotationClause', qId, piClauseId, alternativeId),
   deleteQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) => ipcRenderer.invoke('db:deleteQuotationClause', qId, piClauseId, alternativeId),
   getQuotationClauseOverrides: (qId: string) => ipcRenderer.invoke('db:getQuotationClauseOverrides', qId),
-  updateQuotationClauseOverride: (qId: string, clauseId: string, override: string | null) => ipcRenderer.invoke('db:updateQuotationClauseOverride', qId, clauseId, override),
+  updateQuotationClauseOverride: (qId: string, clauseId: string, override: string | null, alternativeId?: string | null) => ipcRenderer.invoke('db:updateQuotationClauseOverride', qId, clauseId, override, alternativeId),
 
   getQuotationAdditionalClauses: (qId: string) => ipcRenderer.invoke('db:getQuotationAdditionalClauses', qId),
   addQuotationAdditionalClause: (data: any) => ipcRenderer.invoke('db:addQuotationAdditionalClause', data),

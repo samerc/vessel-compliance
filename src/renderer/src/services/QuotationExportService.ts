@@ -626,12 +626,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
     const piMultiAlt = data.piAlternatives.length > 1
 
-    const renderClauseList = (clauseIds: string[]) => {
+    const renderClauseList = (clauseIds: string[], altId?: string | null) => {
       let t = ''
       for (const cid of clauseIds) {
         const c = data.allClauses.find(cl => cl.id === cid)
         if (!c) continue
-        const desc = data.clauseOverrides[c.id] || c.description
+        const desc = (altId ? data.clauseOverrides[`${c.id}::${altId}`] : undefined) || data.clauseOverrides[c.id] || c.description
         const clauseDesc = desc ? ` \u2013 ${desc}` : ''
         const displayName = stripClauseRef(c.name || '')
         const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
@@ -661,7 +661,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const combinedIds = [...new Set([...altClauseIds, ...sharedClauseIds])]
         if (combinedIds.length > 0) {
           condText += `Alternative ${altIdx + 1}:\n`
-          condText += renderClauseList(combinedIds)
+          condText += renderClauseList(combinedIds, alt.id)
           condText += '\n'
         }
       }
@@ -1665,12 +1665,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const clauseRefW = Math.round(BODY_W * 0.32)
     const clauseDescW = BODY_W - clauseRefW
 
-    const makeClauseTable = (clauses: PIClause[]) => new Table({
+    const makeClauseTable = (clauses: PIClause[], altId?: string | null) => new Table({
       width: { size: BODY_W, type: WidthType.DXA },
       columnWidths: [clauseRefW, clauseDescW],
       layout: TableLayoutType.FIXED,
       rows: clauses.map(c => {
-        const desc = data.clauseOverrides[c.id] || c.description
+        const desc = (altId ? data.clauseOverrides[`${c.id}::${altId}`] : undefined) || data.clauseOverrides[c.id] || c.description
         const clauseDesc = desc ? ` \u2013 ${desc}` : ''
         const displayName = stripClauseRef(c.name || '')
         const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
@@ -1714,7 +1714,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const combinedClauses = combinedIds.map(id => data.allClauses.find(c => c.id === id)).filter(Boolean) as PIClause[]
         if (combinedClauses.length > 0) {
           condContent.push(bup(`Alternative ${altIdx + 1}:`))
-          condContent.push(makeClauseTable(combinedClauses))
+          condContent.push(makeClauseTable(combinedClauses, alt.id))
           condContent.push(emptyP())
         }
       }
@@ -2354,7 +2354,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const premRow = (label: string, amount: string, boldLabel = false) => new TableRow({
         children: [
           premCell(label, boldLabel, undefined, premLabelW),
-          premCell(amount, true, AlignmentType.RIGHT, premAmtW)
+          premCell(amount, true, undefined, premAmtW)
         ]
       })
       const premTable = (rows: TableRow[]) => new Table({

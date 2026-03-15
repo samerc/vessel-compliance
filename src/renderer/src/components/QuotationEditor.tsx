@@ -1327,10 +1327,10 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
             for (const cid of cs.clauseIds) {
                 await window.api.addQuotationClause(quotation.id, cid, altId)
             }
-            // Apply description overrides
+            // Apply description overrides scoped to this alternative
             if (cs.descriptionOverrides) {
                 for (const [cid, desc] of Object.entries(cs.descriptionOverrides)) {
-                    if (desc) await window.api.updateQuotationClauseOverride(quotation.id, cid, desc)
+                    if (desc) await window.api.updateQuotationClauseOverride(quotation.id, cid, desc, altId)
                 }
             }
             showSuccess(`Applied "${cs.name}" to ${piAlternatives.find(a => a.id === altId)?.label || 'alternative'}`)
@@ -1344,15 +1344,23 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
         loadData()
     }
 
+    // Resolve override key: clauseId::altId for alt-specific, clauseId for shared
+    const overrideKey = (clauseId: string) => {
+        if (piAlternatives.length < 2 || !selectedPIAltId) return clauseId
+        return `${clauseId}::${selectedPIAltId}`
+    }
+    const getOverride = (clauseId: string) => descOverrides[overrideKey(clauseId)] ?? descOverrides[clauseId]
+
     const updateDescOverride = async (clauseId: string, desc: string) => {
         const clause = allClauses.find(c => c.id === clauseId)
         const override = desc === (clause?.description || '') ? null : desc
+        const key = overrideKey(clauseId)
         if (override) {
-            setDescOverrides(prev => ({ ...prev, [clauseId]: override }))
+            setDescOverrides(prev => ({ ...prev, [key]: override }))
         } else {
-            setDescOverrides(prev => { const n = { ...prev }; delete n[clauseId]; return n })
+            setDescOverrides(prev => { const n = { ...prev }; delete n[key]; return n })
         }
-        await window.api.updateQuotationClauseOverride(quotation.id, clauseId, override)
+        await window.api.updateQuotationClauseOverride(quotation.id, clauseId, override, piAlternatives.length >= 2 ? selectedPIAltId : undefined)
     }
 
     const updateClauseScope = async (piClauseId: string, scope: string[] | null) => {
@@ -1423,14 +1431,14 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
                             <span style={{ fontWeight: 600, fontSize: '0.85rem', minWidth: '60px' }}>Cl. {c.clauseNumber}</span>
                             <span style={{ fontSize: '0.85rem' }}>{c.name}</span>
                             {c.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
-                            {descOverrides[c.id] && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)' }}>(edited)</span>}
+                            {getOverride(c.id) && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)' }}>(edited)</span>}
                         </label>
-                        {checked && (c.description || descOverrides[c.id]) && (
+                        {checked && (c.description || getOverride(c.id)) && (
                             <div style={{ marginTop: '6px', marginLeft: '32px' }}>
                                 <input
                                     type="text"
-                                    value={descOverrides[c.id] ?? c.description ?? ''}
-                                    onChange={e => setDescOverrides(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                    value={getOverride(c.id) ?? c.description ?? ''}
+                                    onChange={e => setDescOverrides(prev => ({ ...prev, [overrideKey(c.id)]: e.target.value }))}
                                     onBlur={e => updateDescOverride(c.id, e.target.value)}
                                     placeholder="Clause description..."
                                     style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
