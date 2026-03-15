@@ -1085,30 +1085,48 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   // Exclusions
   if (exclusionTexts.length > 0) {
     const piMultiAltE = data.piAlternatives.length > 1
-    const hasExclAltScoping = piMultiAltE && (data.selectedExclusions.some(e => e.alternativeId) || data.customExclusions.some(e => e.alternativeId))
-
-    if (hasExclAltScoping) {
+    if (piMultiAltE) {
       let exclText = ''
       // Build text per exclusion item with alternativeId
-      const allExclItems: { text: string; altId: string | null }[] = []
+      const allExclItems: { text: string; altId: string | null; exclId: string | null }[] = []
       for (const se of data.selectedExclusions) {
         const eScope = vesselScopeSuffix(se.vesselScope, data.quotationVessels)
         const t = se.customText ? se.customText + eScope : (se.piExclusionId ? ((data.allExclusions.find(e => e.id === se.piExclusionId)?.text || '') + eScope) : '')
-        if (t) allExclItems.push({ text: t, altId: se.alternativeId || null })
+        if (t) allExclItems.push({ text: t, altId: se.alternativeId || null, exclId: se.piExclusionId || null })
       }
       for (const ce of data.customExclusions) {
         const ceScope = vesselScopeSuffix(ce.vesselScope, data.quotationVessels)
-        allExclItems.push({ text: ce.text + ceScope, altId: ce.alternativeId || null })
+        allExclItems.push({ text: ce.text + ceScope, altId: ce.alternativeId || null, exclId: null })
       }
 
-      const shared = allExclItems.filter(e => !e.altId)
-      exclText += shared.map(e => `- ${e.text}`).join('\n')
+      // Find common exclusions (same piExclusionId in all alternatives)
+      const altIds = data.piAlternatives.map(a => a.id)
+      const exclByAlt = new Map<string, Set<string>>()
+      for (const item of allExclItems) {
+        if (item.exclId && item.altId) {
+          if (!exclByAlt.has(item.exclId)) exclByAlt.set(item.exclId, new Set())
+          exclByAlt.get(item.exclId)!.add(item.altId)
+        }
+      }
+      const commonExclIds = new Set<string>()
+      for (const [exclId, alts] of exclByAlt) {
+        if (altIds.every(aid => alts.has(aid))) commonExclIds.add(exclId)
+      }
 
+      // Shared (null alt) + common exclusions first
+      const sharedItems = allExclItems.filter(e => !e.altId)
+      const commonItems = allExclItems.filter(e => e.exclId && commonExclIds.has(e.exclId) && e.altId === altIds[0])
+      const baseItems = [...sharedItems, ...commonItems]
+      if (baseItems.length > 0) {
+        exclText += baseItems.map(e => `- ${e.text}`).join('\n')
+      }
+
+      // Per-alternative additional exclusions (not common)
       for (const alt of data.piAlternatives) {
-        const altItems = allExclItems.filter(e => e.altId === alt.id)
-        if (altItems.length > 0) {
-          exclText += `\n\nApplicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
-          exclText += altItems.map(e => `- ${e.text}`).join('\n')
+        const altOnly = allExclItems.filter(e => e.altId === alt.id && (!e.exclId || !commonExclIds.has(e.exclId)))
+        if (altOnly.length > 0) {
+          exclText += `\n\nAdditional exclusions applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
+          exclText += altOnly.map(e => `- ${e.text}`).join('\n')
         }
       }
       sectionMap.set('exclusions', ['Exclusions', exclText.trim()])
@@ -2241,28 +2259,45 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Exclusions ----
   if (exclusionTexts.length > 0) {
     const dPiMultiAltEx = data.piAlternatives.length > 1
-    const dHasExclAltScoping = dPiMultiAltEx && (data.selectedExclusions.some(e => e.alternativeId) || data.customExclusions.some(e => e.alternativeId))
-
-    if (dHasExclAltScoping) {
+    if (dPiMultiAltEx) {
       const exclContent: (Paragraph | Table)[] = []
-      const allExclItems: { text: string; altId: string | null }[] = []
+      const allExclItems: { text: string; altId: string | null; exclId: string | null }[] = []
       for (const se of data.selectedExclusions) {
         const eScope = vesselScopeSuffix(se.vesselScope, data.quotationVessels)
         const t = se.customText ? se.customText + eScope : (se.piExclusionId ? ((data.allExclusions.find(e => e.id === se.piExclusionId)?.text || '') + eScope) : '')
-        if (t) allExclItems.push({ text: t, altId: se.alternativeId || null })
+        if (t) allExclItems.push({ text: t, altId: se.alternativeId || null, exclId: se.piExclusionId || null })
       }
       for (const ce of data.customExclusions) {
         const ceScope = vesselScopeSuffix(ce.vesselScope, data.quotationVessels)
-        allExclItems.push({ text: ce.text + ceScope, altId: ce.alternativeId || null })
+        allExclItems.push({ text: ce.text + ceScope, altId: ce.alternativeId || null, exclId: null })
       }
-      const shared = allExclItems.filter(e => !e.altId)
-      exclContent.push(...shared.map(e => bulletP(e.text)))
+      // Find common exclusions (same piExclusionId in all alternatives)
+      const dAltIds = data.piAlternatives.map(a => a.id)
+      const dExclByAlt = new Map<string, Set<string>>()
+      for (const item of allExclItems) {
+        if (item.exclId && item.altId) {
+          if (!dExclByAlt.has(item.exclId)) dExclByAlt.set(item.exclId, new Set())
+          dExclByAlt.get(item.exclId)!.add(item.altId)
+        }
+      }
+      const dCommonExclIds = new Set<string>()
+      for (const [exclId, alts] of dExclByAlt) {
+        if (dAltIds.every(aid => alts.has(aid))) dCommonExclIds.add(exclId)
+      }
+      // Shared (null alt) + common exclusions
+      const dSharedItems = allExclItems.filter(e => !e.altId)
+      const dCommonItems = allExclItems.filter(e => e.exclId && dCommonExclIds.has(e.exclId) && e.altId === dAltIds[0])
+      const dBaseItems = [...dSharedItems, ...dCommonItems]
+      if (dBaseItems.length > 0) {
+        exclContent.push(...dBaseItems.map(e => bulletP(e.text)))
+      }
+      // Per-alternative additional exclusions
       for (const alt of data.piAlternatives) {
-        const altItems = allExclItems.filter(e => e.altId === alt.id)
-        if (altItems.length > 0) {
+        const altOnly = allExclItems.filter(e => e.altId === alt.id && (!e.exclId || !dCommonExclIds.has(e.exclId)))
+        if (altOnly.length > 0) {
           exclContent.push(emptyP())
-          exclContent.push(bup(`Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
-          exclContent.push(...altItems.map(e => bulletP(e.text)))
+          exclContent.push(bup(`Additional exclusions applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
+          exclContent.push(...altOnly.map(e => bulletP(e.text)))
         }
       }
       rowMap.set('exclusions', makeRow('Exclusions', exclContent))
