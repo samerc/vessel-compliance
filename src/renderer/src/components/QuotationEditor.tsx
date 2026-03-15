@@ -1789,9 +1789,12 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
 // ==================== Warranties Tab ====================
 
 function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, getEffectiveText, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
-    const matchesAlt = (altId: string | null | undefined) => {
-        if (piAlternatives.length < 2 || !selectedPIAltId) return true
-        return !altId || altId === selectedPIAltId
+    const altStyle = (altId: string | null | undefined): React.CSSProperties => {
+        if (piAlternatives.length < 2 || !selectedPIAltId) return {}
+        const matches = !altId || altId === selectedPIAltId
+        if (matches) return { borderLeft: `3px solid ${ALT_COLORS[piAlternatives.findIndex(a => a.id === selectedPIAltId) % ALT_COLORS.length]}` }
+        const otherIdx = piAlternatives.findIndex(a => a.id === altId)
+        return { borderLeft: `3px dashed ${ALT_COLORS[otherIdx >= 0 ? otherIdx % ALT_COLORS.length : 0]}40` }
     }
     const [allWarranties, setAllWarranties] = useState<PIWarranty[]>([])
     const [tags, setTags] = useState<PIWarrantyTag[]>([])
@@ -2094,7 +2097,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
                             const w = allWarranties.find(aw => aw.id === id)
                             if (!w) return null
                             return (
-                                <div key={id} style={{ borderBottom: '1px solid var(--table-border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)', opacity: matchesAlt(warrantyAltIds[id]) ? 1 : 0.4, transition: 'opacity 0.15s' }}>
+                                <div key={id} style={{ borderBottom: '1px solid var(--table-border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)', ...altStyle(warrantyAltIds[id]) }}>
                                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 8px', fontSize: '0.8rem' }}>
                                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', minWidth: '18px', textAlign: 'right' }}>{i + 1}.</span>
                                         <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
@@ -2113,7 +2116,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
                         {customWarranties.map((cw, i) => {
                             const idx = selectedIds.length + i
                             return (
-                                <div key={cw.id} style={{ borderBottom: i < customWarranties.length - 1 ? '1px solid var(--table-border)' : 'none', background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)', opacity: matchesAlt(cw.alternativeId) ? 1 : 0.4, transition: 'opacity 0.15s' }}>
+                                <div key={cw.id} style={{ borderBottom: i < customWarranties.length - 1 ? '1px solid var(--table-border)' : 'none', background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)', ...altStyle(cw.alternativeId) }}>
                                     <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', padding: '4px 8px', fontSize: '0.8rem' }}>
                                         <span style={{ color: 'var(--accent-primary)', fontSize: '0.72rem', minWidth: '18px', textAlign: 'right' }}>{idx + 1}.</span>
                                         {editingCustomId === cw.id ? (
@@ -2226,9 +2229,12 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
 // ==================== Deductibles Tab ====================
 
 function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiveText, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError?: (m: string) => void; isLight?: boolean; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
-    const matchesAlt = (altId: string | null | undefined) => {
-        if (piAlternatives.length < 2 || !selectedPIAltId) return true
-        return !altId || altId === selectedPIAltId
+    const altStyle = (altId: string | null | undefined): React.CSSProperties => {
+        if (piAlternatives.length < 2 || !selectedPIAltId) return {}
+        const matches = !altId || altId === selectedPIAltId
+        if (matches) return { borderLeft: `3px solid ${ALT_COLORS[piAlternatives.findIndex(a => a.id === selectedPIAltId) % ALT_COLORS.length]}` }
+        const otherIdx = piAlternatives.findIndex(a => a.id === altId)
+        return { borderLeft: `3px dashed ${ALT_COLORS[otherIdx >= 0 ? otherIdx % ALT_COLORS.length : 0]}40` }
     }
     const [deductibles, setDeductibles] = useState<QuotationDeductible[]>([])
     const [masterDeductibles, setMasterDeductibles] = useState<PIDeductible[]>([])
@@ -2375,7 +2381,7 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
 
             {/* Deductibles list */}
             {deductibles.map((d, i) => (
-                <div key={d.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', opacity: matchesAlt(d.alternativeId) ? 1 : 0.4, transition: 'opacity 0.15s' }}>
+                <div key={d.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', ...altStyle(d.alternativeId) }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
                         <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
                             <button onClick={() => moveDeductible(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={12} /></button>
@@ -2438,7 +2444,7 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                 )}
             </div>
             {textDeds.map((td, i) => (
-                <div key={td.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', opacity: matchesAlt(td.alternativeId) ? 1 : 0.4, transition: 'opacity 0.15s' }}>
+                <div key={td.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', ...altStyle(td.alternativeId) }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                         <div style={{ display: 'flex', gap: '1px', flexDirection: 'column', flexShrink: 0 }}>
                             <button onClick={() => moveTextDed(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
@@ -2522,9 +2528,12 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
 // ==================== Exclusions Tab ====================
 
 function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
-    const matchesAlt = (altId: string | null | undefined) => {
-        if (piAlternatives.length < 2 || !selectedPIAltId) return true
-        return !altId || altId === selectedPIAltId
+    const altStyle = (altId: string | null | undefined): React.CSSProperties => {
+        if (piAlternatives.length < 2 || !selectedPIAltId) return {}
+        const matches = !altId || altId === selectedPIAltId
+        if (matches) return { borderLeft: `3px solid ${ALT_COLORS[piAlternatives.findIndex(a => a.id === selectedPIAltId) % ALT_COLORS.length]}` }
+        const otherIdx = piAlternatives.findIndex(a => a.id === altId)
+        return { borderLeft: `3px dashed ${ALT_COLORS[otherIdx >= 0 ? otherIdx % ALT_COLORS.length : 0]}40` }
     }
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -2713,7 +2722,7 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                 {visibleExclusions.map(e => {
                     const row = selectedRows.find((r: any) => r.piExclusionId === e.id)
                     return (
-                        <div key={e.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(e.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent', opacity: row ? (matchesAlt(row.alternativeId) ? 1 : 0.4) : 1, transition: 'opacity 0.15s' }}>
+                        <div key={e.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(e.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent', ...(row ? altStyle(row.alternativeId) : {}) }}>
                             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
                                 <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggle(e.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)', marginTop: '2px' }} />
                                 <div style={{ flex: 1 }}>
@@ -2744,7 +2753,7 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                 </div>
 
                 {customExclusions.map((ce, i) => (
-                    <div key={ce.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)', opacity: matchesAlt(ce.alternativeId) ? 1 : 0.4, transition: 'opacity 0.15s' }}>
+                    <div key={ce.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)', ...altStyle(ce.alternativeId) }}>
                         {editingCustomId === ce.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                                 <textarea value={editCustomText} onChange={e => setEditCustomText(e.target.value)} style={{ flex: 1, minHeight: '40px', resize: 'none' }} />
