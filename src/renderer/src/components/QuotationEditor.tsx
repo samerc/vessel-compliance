@@ -2753,9 +2753,9 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
                                 </div>
                             </div>
                         )}
-                        {editingCustomId !== ce.id && qVessels.length > 1 && (
+                        {editingCustomId !== ce.id && (qVessels.length > 1 || piAlternatives.length >= 2) && (
                             <div style={{ marginTop: '4px' }}>
-                                <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />
+                                {qVessels.length > 1 && <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />}
                                 <AlternativeScopeChips alternatives={piAlternatives} currentAltId={ce.alternativeId || null} onChangeAltId={altId => updateCustomExclusionAltId(ce.id, altId)} />
                             </div>
                         )}

@@ -1036,23 +1036,27 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       return t
     }
 
+    const dedAggText = data.quotation.deductibleAggregateEnabled
+      ? (data.quotation.deductibleAggregateText || (st(data, 'deductiblesAggregate') ? stripHtml(st(data, 'deductiblesAggregate')) : ''))
+      : ''
+
     if (piMultiAltD && hasAltScoping(data.deductibles)) {
       const sharedDeds = data.deductibles.filter(d => !d.alternativeId)
       dedText += renderDedList(sharedDeds)
+      if (dedAggText) dedText += '\n' + dedAggText + '\n'
       for (const alt of data.piAlternatives) {
         const altDeds = data.deductibles.filter(d => d.alternativeId === alt.id)
         if (altDeds.length > 0) {
-          dedText += `\nDeductibles applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
+          dedText += `\nAdditional Deductibles applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
           dedText += renderDedList(altDeds)
         }
       }
     } else {
       dedText += renderDedList(data.deductibles)
+      if (dedAggText) dedText += '\n' + dedAggText + '\n'
     }
 
     dedText += '\n'
-    if (data.quotation.deductibleAggregateEnabled && data.quotation.deductibleAggregateText) dedText += '\n' + data.quotation.deductibleAggregateText + '\n\n'
-    else if (data.quotation.deductibleAggregateEnabled && st(data, 'deductiblesAggregate')) dedText += '\n' + stripHtml(st(data, 'deductiblesAggregate')) + '\n\n'
 
     if (piMultiAltD && hasAltScoping(data.textDeductibles)) {
       const sharedTds = data.textDeductibles.filter(td => !td.alternativeId)
@@ -1466,11 +1470,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   // Paragraph helpers - 11pt Arial black, line spacing 1.0
   const np = (text: string) => new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
   })
 
   const bp = (text: string) => new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true })]
   })
@@ -1481,6 +1487,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   const bulletP = (text: string) => new Paragraph({
     numbering: { reference: 'dash-bullet', level: 0 },
+    alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 40, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
   })
@@ -1489,7 +1496,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   const mp = (text: string): Paragraph[] => {
     if (!text) return []
-    if (isHtml(text)) return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: '000000' })
+    if (isHtml(text)) return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
     return text.split('\n').map(p =>
       p.trim() ? np(p) : emptyP()
     )
@@ -2181,13 +2188,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     const dPiMultiAltD = data.piAlternatives.length > 1 && hasAltScoping(data.deductibles)
 
+    const dDedAggText = data.quotation.deductibleAggregateEnabled
+      ? (data.quotation.deductibleAggregateText || st(data, 'deductiblesAggregate') || '')
+      : ''
+
     if (dPiMultiAltD) {
       const sharedDeds = data.deductibles.filter(d => !d.alternativeId)
       if (sharedDeds.length > 0) { dedContent.push(makeDedTable(sharedDeds)); dedContent.push(emptyP()) }
+      if (dDedAggText) { dedContent.push(...mp(dDedAggText)); dedContent.push(emptyP()) }
       for (const alt of data.piAlternatives) {
         const altDeds = data.deductibles.filter(d => d.alternativeId === alt.id)
         if (altDeds.length > 0) {
-          dedContent.push(bup(`Deductibles applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
+          dedContent.push(bup(`Additional Deductibles applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
           dedContent.push(makeDedTable(altDeds))
           dedContent.push(emptyP())
         }
@@ -2195,10 +2207,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (data.deductibles.length > 0) {
       dedContent.push(makeDedTable(data.deductibles))
       dedContent.push(emptyP())
+      if (dDedAggText) { dedContent.push(...mp(dDedAggText)); dedContent.push(emptyP()) }
     }
-
-    if (data.quotation.deductibleAggregateEnabled && data.quotation.deductibleAggregateText) { dedContent.push(...mp(data.quotation.deductibleAggregateText)); dedContent.push(emptyP()) }
-    else if (data.quotation.deductibleAggregateEnabled && st(data, 'deductiblesAggregate')) { dedContent.push(...mp(st(data, 'deductiblesAggregate'))); dedContent.push(emptyP()) }
 
     const dPiMultiAltTD = data.piAlternatives.length > 1 && hasAltScoping(data.textDeductibles)
     if (dPiMultiAltTD) {
@@ -2331,18 +2341,20 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.piAlternatives.length > 1) {
       const wMultiAlt = data.hullAlternatives.length > 1
       const wPiMultiAlt = data.piAlternatives.length > 1
-      const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT) => new TableCell({
+      const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT, widthPct?: number) => new TableCell({
         borders: noBorders(),
+        width: widthPct ? { size: widthPct, type: WidthType.PERCENTAGE } : undefined,
         children: [new Paragraph({ alignment: align, children: [new TextRun({ text, size: 22, font: 'Arial', bold, color: '000000' })] })]
       })
       const premRow = (label: string, amount: string, boldLabel = false) => new TableRow({
         children: [
-          premCell(label, boldLabel, undefined),
-          premCell(amount, true, AlignmentType.RIGHT)
+          premCell(label, boldLabel, undefined, 30),
+          premCell(amount, true, AlignmentType.RIGHT, 70)
         ]
       })
       const premTable = (rows: TableRow[]) => new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
         rows
       })
 
