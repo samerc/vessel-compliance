@@ -2804,20 +2804,25 @@ export class MySQLAdapter {
     ): Promise<EntityAddress> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.execute(
-            `INSERT INTO entity_addresses (id, entity_id, label, address_line1, address_line2, city, country, postal_code)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                id,
-                addr.entityId,
-                addr.label,
-                addr.addressLine1,
-                addr.addressLine2 || null,
-                addr.city || null,
-                addr.country || null,
-                addr.postalCode || null
-            ]
-        )
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute(
+                `INSERT INTO entity_addresses (id, entity_id, label, address_line1, address_line2, city, country, postal_code)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    id,
+                    addr.entityId,
+                    addr.label,
+                    addr.addressLine1,
+                    addr.addressLine2 || null,
+                    addr.city || null,
+                    addr.country || null,
+                    addr.postalCode || null
+                ]
+            )
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
         return { id, ...addr }
     }
 
