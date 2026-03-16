@@ -212,10 +212,10 @@ function App(): React.JSX.Element {
                         onClick={() => { setThemeTo(t.id); setShowUserMenu(false) }}
                         style={{
                           flex: 1, padding: '5px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                          background: theme === t.id ? (t.id === 'premium' ? 'rgba(139,58,74,0.15)' : 'rgba(0,210,255,0.1)') : 'transparent',
-                          border: theme === t.id ? (t.id === 'premium' ? '1px solid rgba(139,58,74,0.3)' : '1px solid var(--accent-primary)') : '1px solid transparent',
+                          background: theme === t.id ? (t.id === 'premium' ? 'rgba(124,140,248,0.12)' : 'rgba(0,210,255,0.1)') : 'transparent',
+                          border: theme === t.id ? (t.id === 'premium' ? '1px solid rgba(124,140,248,0.3)' : '1px solid var(--accent-primary)') : '1px solid transparent',
                           borderRadius: '6px', cursor: 'pointer',
-                          color: theme === t.id ? (t.id === 'premium' ? '#8b3a4a' : 'var(--accent-primary)') : 'var(--text-secondary)',
+                          color: theme === t.id ? (t.id === 'premium' ? '#7c8cf8' : 'var(--accent-primary)') : 'var(--text-secondary)',
                           fontSize: '0.72rem', fontWeight: theme === t.id ? 600 : 400
                         }}
                       >
