@@ -117,7 +117,7 @@ interface RichTextEditorProps {
 
 export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showFontFamily, showAlignment, showLineSpacing }: RichTextEditorProps) {
   const { theme } = useTheme()
-  const iconColor = useMemo(() => theme === 'light' ? '#606770' : 'rgba(255,255,255,0.6)', [theme])
+  const iconColor = useMemo(() => theme !== 'dark' ? '#606770' : 'rgba(255,255,255,0.6)', [theme])
   const activeIconColor = '#ffffff'
   const skipUpdate = useRef(false)
   const [fontSizeOpen, setFontSizeOpen] = useState(false)

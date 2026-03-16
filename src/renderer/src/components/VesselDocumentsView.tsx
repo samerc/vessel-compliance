@@ -55,7 +55,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   const { theme } = useTheme()
   const { user, hasPermission } = useAuth()
   const { showSuccess, showError } = useToast()
-  const isLight = theme === 'light'
+  const isLight = theme !== 'dark'
 
   // Resolve P&I expiry from dynamic policies first, fall back to legacy vessel field
   const effectivePolicyExpiry = useMemo(

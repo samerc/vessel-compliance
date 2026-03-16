@@ -21,7 +21,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
 
 export default function SurveyorDirectory() {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme !== 'dark'
   const { showError, showSuccess } = useToast()
 
   // ── Surveyors (paginated) ────────────────────────────────────────────────────

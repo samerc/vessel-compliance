@@ -64,7 +64,7 @@ export default function Dashboard({
   onNavigateToVessel?: (vesselId: string, section: 'documents' | 'policies') => void
 }) {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme !== 'dark'
   const { showError } = useToast()
 
   const [vessels, setVessels] = useState<Vessel[]>([])

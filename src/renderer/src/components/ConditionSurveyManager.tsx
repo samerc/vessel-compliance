@@ -27,7 +27,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const [closingSurveyId, setClosingSurveyId] = useState<string | null>(null)
   const [endorsementSurveyId, setEndorsementSurveyId] = useState<string | null>(null)
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme !== 'dark'
 
   // Confirmation modal state
   const [confirmation, setConfirmation] = useState<{

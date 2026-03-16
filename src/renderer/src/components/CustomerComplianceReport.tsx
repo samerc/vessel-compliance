@@ -204,7 +204,7 @@ export async function exportCustomerCompliancePDF(
 
 export default function CustomerComplianceReport() {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme !== 'dark'
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all')
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([])

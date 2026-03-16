@@ -11,7 +11,7 @@ export default function UserManager() {
     const { resetPassword, user: currentUser } = useAuth()
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
     const [users, setUsers] = useState<User[]>([])
     const [resettingUser, setResettingUser] = useState<string | null>(null)
     const [tempPassword, setTempPassword] = useState<string | null>(null)

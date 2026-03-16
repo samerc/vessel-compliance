@@ -48,27 +48,27 @@
 }
 
 .premium {
-  --bg-dark: #1a1d2e;
-  --bg-sidebar: rgba(255, 255, 255, 0.06);
-  --bg-card: rgba(255, 255, 255, 0.08);
-  --bg-card-hover: rgba(255, 255, 255, 0.12);
-  --accent-primary: #7c8cf8;
-  --accent-secondary: #5562d4;
-  --text-primary: #eef0f8;
-  --text-secondary: rgba(238, 240, 248, 0.55);
-  --danger: #f06060;
-  --success: #50d88a;
-  --warning: #f0c050;
+  --bg-dark: #e4e9f0;
+  --bg-sidebar: rgba(255, 255, 255, 0.75);
+  --bg-card: rgba(255, 255, 255, 0.55);
+  --bg-card-hover: rgba(255, 255, 255, 0.72);
+  --accent-primary: #4a7dca;
+  --accent-secondary: #3461a8;
+  --text-primary: #1a2436;
+  --text-secondary: #5a6a82;
+  --danger: #d94444;
+  --success: #2b9960;
+  --warning: #c89520;
 
-  --input-bg: rgba(255, 255, 255, 0.07);
-  --input-border: rgba(255, 255, 255, 0.12);
-  --input-text: #eef0f8;
-  --table-header-bg: rgba(255, 255, 255, 0.04);
-  --table-border: rgba(255, 255, 255, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.7);
+  --input-border: rgba(0, 0, 0, 0.12);
+  --input-text: #1a2436;
+  --table-header-bg: rgba(255, 255, 255, 0.35);
+  --table-border: rgba(0, 0, 0, 0.08);
 
-  --glass-blur: blur(24px);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.12);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(20px);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.5);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 * {
@@ -90,9 +90,9 @@ body {
 
 body.premium {
   background-image:
-    radial-gradient(at 0% 0%, rgba(124, 140, 248, 0.15) 0, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(85, 98, 212, 0.1) 0, transparent 50%),
-    radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.02) 0, transparent 70%);
+    radial-gradient(at 0% 0%, rgba(74, 125, 202, 0.12) 0, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(120, 160, 220, 0.08) 0, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(180, 200, 230, 0.1) 0, transparent 60%);
 }
 
 .glass-card {
@@ -110,8 +110,8 @@ body.premium {
 }
 
 .premium .glass-card:hover {
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
 h1,

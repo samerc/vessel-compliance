@@ -44,7 +44,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const { theme } = useTheme()
     const { user, hasPermission } = useAuth()
     const { showSuccess, showError } = useToast()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
 
     useEffect(() => {
         loadData()

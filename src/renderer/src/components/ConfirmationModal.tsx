@@ -22,7 +22,7 @@ export default function ConfirmationModal({
     onCancel
 }: ConfirmationModalProps) {
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
     const modalRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {

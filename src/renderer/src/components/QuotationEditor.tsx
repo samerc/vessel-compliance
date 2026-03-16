@@ -51,7 +51,7 @@ function PickerDropdown({ placeholder, options, onSelect, fontSize = '0.85rem' }
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
     const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
     useEffect(() => {
         if (!open) return
@@ -147,7 +147,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
 
     useEffect(() => {
         loadMasterData()
@@ -2561,7 +2561,7 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
     const [selectedClauseIds, setSelectedClauseIds] = useState<Set<string>>(new Set())
     const autoApplied = useRef(false)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
 
     useEffect(() => { loadData() }, [])
 
@@ -4276,7 +4276,7 @@ function HullClauseDropdown({ clauses, selectedId, onChange, description }: {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
     const bg = isLight ? '#ffffff' : '#1a1d28'
     const selected = clauses.find(c => c.id === selectedId)
 
@@ -4384,7 +4384,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
 }) {
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
     const bg = isLight ? '#ffffff' : '#1a1d28'
     const selectedItems = items.filter(i => selectedIds.has(i.id))
     const selectedCount = selectedItems.length

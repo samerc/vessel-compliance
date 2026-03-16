@@ -39,7 +39,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
-    const isLight = theme === 'light'
+    const isLight = theme !== 'dark'
 
     useEffect(() => { loadData() }, [])
 

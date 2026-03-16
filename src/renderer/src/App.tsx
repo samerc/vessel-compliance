@@ -131,9 +131,9 @@ function App(): React.JSX.Element {
   const userInitials = user?.username ? user.username.slice(0, 2).toUpperCase() : '??'
   const sc = sidebarCollapsed
 
-  const menuBg = theme === 'light' ? '#ffffff' : '#1e1e28'
-  const menuBorder = theme === 'light' ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.15)'
-  const menuShadow = theme === 'light' ? '0 10px 25px rgba(0,0,0,0.15)' : '0 10px 25px rgba(0,0,0,0.5)'
+  const menuBg = theme !== 'dark' ? '#ffffff' : '#1e1e28'
+  const menuBorder = theme !== 'dark' ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.15)'
+  const menuShadow = theme !== 'dark' ? '0 10px 25px rgba(0,0,0,0.15)' : '0 10px 25px rgba(0,0,0,0.5)'
 
   const navItem = (tab: typeof activeTab, icon: React.ReactNode, label: string) => (
     <NavItem
@@ -205,7 +205,7 @@ function App(): React.JSX.Element {
                     {([
                       { id: 'dark' as const, icon: <Moon size={13} />, label: 'Dark' },
                       { id: 'light' as const, icon: <Sun size={13} />, label: 'Light' },
-                      { id: 'premium' as const, icon: <Crown size={13} />, label: 'Premium' }
+                      { id: 'premium' as const, icon: <Crown size={13} />, label: 'Frost' }
                     ] as const).map(t => (
                       <button
                         key={t.id}
