@@ -82,6 +82,37 @@ CREATE TABLE IF NOT EXISTS entity_ubos (
   FOREIGN KEY (ubo_entity_id) REFERENCES entities(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS user_groups (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  is_system BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS group_permissions (
+  group_id VARCHAR(36) NOT NULL,
+  permission_key VARCHAR(100) NOT NULL,
+  PRIMARY KEY (group_id, permission_key),
+  FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_group_members (
+  user_id VARCHAR(36) NOT NULL,
+  group_id VARCHAR(36) NOT NULL,
+  PRIMARY KEY (user_id, group_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_permission_overrides (
+  user_id VARCHAR(36) NOT NULL,
+  permission_key VARCHAR(100) NOT NULL,
+  granted BOOLEAN NOT NULL DEFAULT TRUE,
+  PRIMARY KEY (user_id, permission_key),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS entity_addresses (
   id VARCHAR(36) PRIMARY KEY,
   entity_id VARCHAR(36) NOT NULL,

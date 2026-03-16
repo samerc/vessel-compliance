@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -1868,6 +1868,87 @@ export class MySQLAdapter {
                 }
             }
 
+            // --- RBAC: user_groups, group_permissions, user_group_members, user_permission_overrides ---
+            {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                try {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS user_groups (
+                        id VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        is_system BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS group_permissions (
+                        group_id VARCHAR(36) NOT NULL,
+                        permission_key VARCHAR(100) NOT NULL,
+                        PRIMARY KEY (group_id, permission_key),
+                        FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS user_group_members (
+                        user_id VARCHAR(36) NOT NULL,
+                        group_id VARCHAR(36) NOT NULL,
+                        PRIMARY KEY (user_id, group_id),
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS user_permission_overrides (
+                        user_id VARCHAR(36) NOT NULL,
+                        permission_key VARCHAR(100) NOT NULL,
+                        granted BOOLEAN NOT NULL DEFAULT TRUE,
+                        PRIMARY KEY (user_id, permission_key),
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                } finally {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
+
+                // Seed system groups if missing
+                const [existingGroups] = await this.pool.query("SELECT id FROM user_groups WHERE is_system = TRUE")
+                if ((existingGroups as any[]).length === 0) {
+                    const adminGroupId = uuidv4()
+                    const userGroupId = uuidv4()
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    try {
+                        await this.pool.execute(
+                            "INSERT INTO user_groups (id, name, description, is_system) VALUES (?, 'Administrator', 'Full access to all features', TRUE)",
+                            [adminGroupId]
+                        )
+                        await this.pool.execute(
+                            "INSERT INTO user_groups (id, name, description, is_system) VALUES (?, 'User', 'Basic read access', TRUE)",
+                            [userGroupId]
+                        )
+                        // Administrator group gets all permissions
+                        const { ALL_PERMISSION_KEYS } = await import('../../shared/types')
+                        for (const key of ALL_PERMISSION_KEYS) {
+                            await this.pool.execute(
+                                'INSERT IGNORE INTO group_permissions (group_id, permission_key) VALUES (?, ?)',
+                                [adminGroupId, key]
+                            )
+                        }
+                        // User group gets view-only permissions
+                        const viewPerms = ALL_PERMISSION_KEYS.filter((k: string) => k.endsWith(':view'))
+                        for (const key of viewPerms) {
+                            await this.pool.execute(
+                                'INSERT IGNORE INTO group_permissions (group_id, permission_key) VALUES (?, ?)',
+                                [userGroupId, key]
+                            )
+                        }
+                        // Assign existing admin users to Administrator group, others to User group
+                        const [allUsers] = await this.pool.query('SELECT id, role FROM users')
+                        for (const u of allUsers as any[]) {
+                            const gid = u.role === 'admin' ? adminGroupId : userGroupId
+                            await this.pool.execute(
+                                'INSERT IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)',
+                                [u.id, gid]
+                            )
+                        }
+                    } finally {
+                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    }
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -2884,6 +2965,116 @@ export class MySQLAdapter {
             'UPDATE vessel_assureds SET address_id = ? WHERE id = ?',
             [addressId, id]
         )
+    }
+
+    // --- RBAC: User Groups & Permissions ---
+
+    async getUserGroups(): Promise<UserGroup[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, description, is_system as isSystem, created_at as createdAt FROM user_groups ORDER BY is_system DESC, name ASC')
+        return (rows as any[]).map(r => ({ ...r, isSystem: Boolean(r.isSystem) }))
+    }
+
+    async addUserGroup(name: string, description?: string): Promise<UserGroup> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO user_groups (id, name, description, is_system) VALUES (?, ?, ?, FALSE)',
+            [id, name, description || null]
+        )
+        return { id, name, description, isSystem: false }
+    }
+
+    async updateUserGroup(id: string, name: string, description?: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE user_groups SET name = ?, description = ? WHERE id = ? AND is_system = FALSE', [name, description || null, id])
+    }
+
+    async deleteUserGroup(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM user_groups WHERE id = ? AND is_system = FALSE', [id])
+    }
+
+    async getGroupPermissions(groupId: string): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT permission_key FROM group_permissions WHERE group_id = ?', [groupId])
+        return (rows as any[]).map(r => r.permission_key)
+    }
+
+    async setGroupPermissions(groupId: string, permissionKeys: string[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute('DELETE FROM group_permissions WHERE group_id = ?', [groupId])
+            for (const key of permissionKeys) {
+                await this.pool.execute('INSERT INTO group_permissions (group_id, permission_key) VALUES (?, ?)', [groupId, key])
+            }
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+    }
+
+    async getUserGroupIds(userId: string): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT group_id FROM user_group_members WHERE user_id = ?', [userId])
+        return (rows as any[]).map(r => r.group_id)
+    }
+
+    async setUserGroups(userId: string, groupIds: string[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute('DELETE FROM user_group_members WHERE user_id = ?', [userId])
+            for (const gid of groupIds) {
+                await this.pool.execute('INSERT INTO user_group_members (user_id, group_id) VALUES (?, ?)', [userId, gid])
+            }
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+    }
+
+    async getUserPermissionOverrides(userId: string): Promise<{ permissionKey: string; granted: boolean }[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT permission_key as permissionKey, granted FROM user_permission_overrides WHERE user_id = ?', [userId])
+        return (rows as any[]).map(r => ({ ...r, granted: Boolean(r.granted) }))
+    }
+
+    async setUserPermissionOverrides(userId: string, overrides: { permissionKey: string; granted: boolean }[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute('DELETE FROM user_permission_overrides WHERE user_id = ?', [userId])
+            for (const o of overrides) {
+                await this.pool.execute('INSERT INTO user_permission_overrides (user_id, permission_key, granted) VALUES (?, ?, ?)', [userId, o.permissionKey, o.granted ? 1 : 0])
+            }
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+    }
+
+    /** Resolve effective permissions for a user: union of group perms + user overrides */
+    async resolveUserPermissions(userId: string): Promise<string[]> {
+        if (!this.pool) return []
+        // Get all permissions from all groups the user belongs to
+        const [groupPerms] = await this.pool.query(
+            `SELECT DISTINCT gp.permission_key
+             FROM group_permissions gp
+             INNER JOIN user_group_members ugm ON ugm.group_id = gp.group_id
+             WHERE ugm.user_id = ?`,
+            [userId]
+        )
+        const perms = new Set((groupPerms as any[]).map(r => r.permission_key))
+
+        // Apply per-user overrides
+        const [overrides] = await this.pool.query(
+            'SELECT permission_key, granted FROM user_permission_overrides WHERE user_id = ?',
+            [userId]
+        )
+        for (const o of overrides as any[]) {
+            if (o.granted) perms.add(o.permission_key)
+            else perms.delete(o.permission_key)
+        }
+        return Array.from(perms)
     }
 
     // --- Entity UBOs ---

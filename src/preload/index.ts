@@ -61,6 +61,20 @@ const api = {
   deleteEntityAddress: (id) => ipcRenderer.invoke('entityAddress:delete', id),
   updateVesselAssuredAddress: (id, addressId) => ipcRenderer.invoke('vesselAssured:updateAddress', id, addressId),
 
+  // RBAC
+  rbacGetGroups: () => ipcRenderer.invoke('rbac:getGroups'),
+  rbacAddGroup: (name: string, description?: string) => ipcRenderer.invoke('rbac:addGroup', name, description),
+  rbacUpdateGroup: (id: string, name: string, description?: string) => ipcRenderer.invoke('rbac:updateGroup', id, name, description),
+  rbacDeleteGroup: (id: string) => ipcRenderer.invoke('rbac:deleteGroup', id),
+  rbacGetGroupPermissions: (groupId: string) => ipcRenderer.invoke('rbac:getGroupPermissions', groupId),
+  rbacSetGroupPermissions: (groupId: string, keys: string[]) => ipcRenderer.invoke('rbac:setGroupPermissions', groupId, keys),
+  rbacGetUserGroupIds: (userId: string) => ipcRenderer.invoke('rbac:getUserGroupIds', userId),
+  rbacSetUserGroups: (userId: string, groupIds: string[]) => ipcRenderer.invoke('rbac:setUserGroups', userId, groupIds),
+  rbacGetUserPermissionOverrides: (userId: string) => ipcRenderer.invoke('rbac:getUserPermissionOverrides', userId),
+  rbacSetUserPermissionOverrides: (userId: string, overrides: { permissionKey: string; granted: boolean }[]) => ipcRenderer.invoke('rbac:setUserPermissionOverrides', userId, overrides),
+  rbacResolveUserPermissions: (userId: string) => ipcRenderer.invoke('rbac:resolveUserPermissions', userId),
+  rbacGetMyPermissions: () => ipcRenderer.invoke('rbac:getMyPermissions'),
+
   maintenanceSyncSettings: () => ipcRenderer.invoke('maintenance:syncSettings'),
 
 

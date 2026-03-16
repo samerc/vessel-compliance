@@ -147,6 +147,137 @@ export interface User {
   lastLoginAt?: string
 }
 
+// ── RBAC ─────────────────────────────────────────────────────────────────────
+
+export const PERMISSION_CATEGORIES = [
+  {
+    key: 'vessels',
+    label: 'Vessels',
+    permissions: [
+      { key: 'vessels:view', label: 'View vessels' },
+      { key: 'vessels:create', label: 'Create vessels' },
+      { key: 'vessels:edit', label: 'Edit vessels' },
+      { key: 'vessels:delete', label: 'Delete vessels' },
+      { key: 'vessels:activate', label: 'Activate / deactivate vessels' },
+    ],
+  },
+  {
+    key: 'entities',
+    label: 'Entities & Assureds',
+    permissions: [
+      { key: 'entities:view', label: 'View entities' },
+      { key: 'entities:create', label: 'Create entities' },
+      { key: 'entities:edit', label: 'Edit entities' },
+      { key: 'entities:delete', label: 'Delete entities' },
+      { key: 'entities:addresses', label: 'Manage addresses' },
+      { key: 'assureds:manage', label: 'Manage vessel assured roles' },
+    ],
+  },
+  {
+    key: 'documents',
+    label: 'Documents',
+    permissions: [
+      { key: 'documents:view', label: 'View documents' },
+      { key: 'documents:upload', label: 'Upload documents' },
+      { key: 'documents:delete', label: 'Delete documents' },
+    ],
+  },
+  {
+    key: 'quotations',
+    label: 'Quotations',
+    permissions: [
+      { key: 'quotations:view', label: 'View quotations' },
+      { key: 'quotations:create', label: 'Create quotations' },
+      { key: 'quotations:edit', label: 'Edit quotations' },
+      { key: 'quotations:delete', label: 'Delete quotations' },
+      { key: 'quotations:export', label: 'Export quotations (PDF / DOCX)' },
+      { key: 'quotations:approve', label: 'Approve quotations' },
+      { key: 'quotations:settings', label: 'Manage quotation settings (conditions, warranties, deductibles, etc.)' },
+    ],
+  },
+  {
+    key: 'policies',
+    label: 'Policies',
+    permissions: [
+      { key: 'policies:view', label: 'View policies' },
+      { key: 'policies:manage', label: 'Create / edit / delete policies' },
+    ],
+  },
+  {
+    key: 'surveys',
+    label: 'Surveys',
+    permissions: [
+      { key: 'surveys:view', label: 'View surveys' },
+      { key: 'surveys:manage', label: 'Create / edit / delete surveys' },
+      { key: 'surveys:defects', label: 'Manage defects' },
+    ],
+  },
+  {
+    key: 'compliance',
+    label: 'Compliance & Sanctions',
+    permissions: [
+      { key: 'compliance:view', label: 'View compliance alerts' },
+      { key: 'compliance:run', label: 'Run compliance checks' },
+      { key: 'compliance:review', label: 'Review sanctions results' },
+      { key: 'sanctions:search', label: 'Search sanctions' },
+    ],
+  },
+  {
+    key: 'reports',
+    label: 'Reports',
+    permissions: [
+      { key: 'reports:view', label: 'View reports' },
+      { key: 'reports:export', label: 'Export reports' },
+    ],
+  },
+  {
+    key: 'fleet',
+    label: 'Fleet & Renewals',
+    permissions: [
+      { key: 'fleets:view', label: 'View fleets' },
+      { key: 'fleets:manage', label: 'Manage fleets' },
+      { key: 'renewals:view', label: 'View renewals' },
+      { key: 'renewals:manage', label: 'Manage renewal statuses' },
+    ],
+  },
+  {
+    key: 'reminders',
+    label: 'Reminders',
+    permissions: [
+      { key: 'reminders:view', label: 'View reminders' },
+      { key: 'reminders:manage', label: 'Manage snooze / templates' },
+    ],
+  },
+  {
+    key: 'admin',
+    label: 'Administration',
+    permissions: [
+      { key: 'admin:users', label: 'Manage users' },
+      { key: 'admin:groups', label: 'Manage user groups & permissions' },
+      { key: 'admin:settings', label: 'System settings (doc types, roles, survey types, etc.)' },
+      { key: 'admin:database', label: 'Database configuration' },
+    ],
+  },
+] as const
+
+export type PermissionKey = typeof PERMISSION_CATEGORIES[number]['permissions'][number]['key']
+
+export const ALL_PERMISSION_KEYS: string[] = PERMISSION_CATEGORIES.flatMap(c => c.permissions.map(p => p.key))
+
+export interface UserGroup {
+  id: string
+  name: string
+  description?: string
+  isSystem: boolean
+  createdAt?: string
+}
+
+export interface UserPermissionOverride {
+  userId: string
+  permissionKey: string
+  granted: boolean // true = grant, false = revoke
+}
+
 export interface SanctionsMatch {
   id: string
   target_type: string

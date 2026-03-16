@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -78,6 +78,20 @@ export interface Api {
   updateEntityAddress: (id: string, updates: Partial<Omit<EntityAddress, 'id' | 'entityId'>>) => Promise<void>
   deleteEntityAddress: (id: string) => Promise<void>
   updateVesselAssuredAddress: (id: string, addressId: string | null) => Promise<void>
+
+  // RBAC
+  rbacGetGroups: () => Promise<UserGroup[]>
+  rbacAddGroup: (name: string, description?: string) => Promise<UserGroup>
+  rbacUpdateGroup: (id: string, name: string, description?: string) => Promise<void>
+  rbacDeleteGroup: (id: string) => Promise<void>
+  rbacGetGroupPermissions: (groupId: string) => Promise<string[]>
+  rbacSetGroupPermissions: (groupId: string, keys: string[]) => Promise<void>
+  rbacGetUserGroupIds: (userId: string) => Promise<string[]>
+  rbacSetUserGroups: (userId: string, groupIds: string[]) => Promise<void>
+  rbacGetUserPermissionOverrides: (userId: string) => Promise<{ permissionKey: string; granted: boolean }[]>
+  rbacSetUserPermissionOverrides: (userId: string, overrides: { permissionKey: string; granted: boolean }[]) => Promise<void>
+  rbacResolveUserPermissions: (userId: string) => Promise<string[]>
+  rbacGetMyPermissions: () => Promise<string[]>
 
   maintenanceSyncSettings: () => Promise<{ added: number }>
 

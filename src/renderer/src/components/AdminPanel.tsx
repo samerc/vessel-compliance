@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings } from '../../../shared/types'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users } from 'lucide-react'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../utils/dateUtils'
@@ -92,6 +92,17 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ periodDays: 7, reminderTemplate: DEFAULT_TEMPLATE })
     const [savingReminder, setSavingReminder] = useState(false)
 
+    // User Groups state
+    const [userGroups, setUserGroups] = useState<UserGroup[]>([])
+    const [newGroupName, setNewGroupName] = useState('')
+    const [newGroupDescription, setNewGroupDescription] = useState('')
+    const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+    const [editGroupName, setEditGroupName] = useState('')
+    const [editGroupDescription, setEditGroupDescription] = useState('')
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+    const [groupPermissions, setGroupPermissions] = useState<string[]>([])
+    const [collapsedPermCategories, setCollapsedPermCategories] = useState<Set<string>>(new Set())
+
     useEffect(() => {
         loadData()
         loadFileTypeSettings()
@@ -99,6 +110,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         loadComplianceSettings()
         loadReminderSettings()
         loadReportSettings()
+        loadUserGroups()
         window.api.getUserSectionAccess().then(setUserSectionAccess).catch(() => {})
     }, [])
 
@@ -109,6 +121,120 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         setUserSectionAccess(next)
         await window.api.setUserSectionAccess(next)
         showSuccess('User access updated')
+    }
+
+    // ── User Groups ──────────────────────────────────────────────────────────────
+    const loadUserGroups = async () => {
+        try {
+            const data = await window.api.rbacGetGroups()
+            if (Array.isArray(data)) setUserGroups(data)
+        } catch { /* ignore */ }
+    }
+
+    const handleAddGroup = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newGroupName.trim()) return
+        try {
+            const result = await window.api.rbacAddGroup(newGroupName.trim(), newGroupDescription.trim() || undefined)
+            if ((result as any)?.error) {
+                showError((result as any).message || 'Failed to add group')
+                return
+            }
+            setNewGroupName('')
+            setNewGroupDescription('')
+            loadUserGroups()
+            showSuccess('Group created')
+        } catch (err: any) {
+            showError(err.message || 'Failed to add group')
+        }
+    }
+
+    const handleDeleteGroup = async (id: string) => {
+        if (!confirm('Delete this group? Users in this group will lose its permissions.')) return
+        try {
+            await window.api.rbacDeleteGroup(id)
+            if (selectedGroupId === id) {
+                setSelectedGroupId(null)
+                setGroupPermissions([])
+            }
+            loadUserGroups()
+            showSuccess('Group deleted')
+        } catch (err: any) {
+            showError(err.message || 'Failed to delete group')
+        }
+    }
+
+    const startEditingGroup = (g: UserGroup) => {
+        setEditingGroupId(g.id)
+        setEditGroupName(g.name)
+        setEditGroupDescription(g.description || '')
+    }
+
+    const saveGroupEdit = async (id: string) => {
+        if (!editGroupName.trim()) return
+        try {
+            await window.api.rbacUpdateGroup(id, editGroupName.trim(), editGroupDescription.trim() || undefined)
+            setEditingGroupId(null)
+            loadUserGroups()
+            showSuccess('Group updated')
+        } catch (err: any) {
+            showError(err.message || 'Failed to update group')
+        }
+    }
+
+    const handleSelectGroup = async (groupId: string) => {
+        if (selectedGroupId === groupId) {
+            setSelectedGroupId(null)
+            setGroupPermissions([])
+            return
+        }
+        setSelectedGroupId(groupId)
+        try {
+            const perms = await window.api.rbacGetGroupPermissions(groupId)
+            setGroupPermissions(Array.isArray(perms) ? perms : [])
+        } catch {
+            setGroupPermissions([])
+        }
+    }
+
+    const handleToggleGroupPermission = async (groupId: string, permKey: string) => {
+        const next = groupPermissions.includes(permKey)
+            ? groupPermissions.filter(k => k !== permKey)
+            : [...groupPermissions, permKey]
+        setGroupPermissions(next)
+        try {
+            await window.api.rbacSetGroupPermissions(groupId, next)
+        } catch (err: any) {
+            showError(err.message || 'Failed to save permissions')
+            // reload to revert
+            const perms = await window.api.rbacGetGroupPermissions(groupId)
+            setGroupPermissions(Array.isArray(perms) ? perms : [])
+        }
+    }
+
+    const handleToggleCategoryAll = async (groupId: string, categoryPerms: readonly { key: string; label: string }[]) => {
+        const keys = categoryPerms.map(p => p.key)
+        const allSelected = keys.every(k => groupPermissions.includes(k))
+        const next = allSelected
+            ? groupPermissions.filter(k => !keys.includes(k))
+            : [...new Set([...groupPermissions, ...keys])]
+        setGroupPermissions(next)
+        try {
+            await window.api.rbacSetGroupPermissions(groupId, next)
+        } catch (err: any) {
+            showError(err.message || 'Failed to save permissions')
+            const perms = await window.api.rbacGetGroupPermissions(groupId)
+            setGroupPermissions(Array.isArray(perms) ? perms : [])
+        }
+    }
+
+    const togglePermCategory = (catKey: string) => {
+        setCollapsedPermCategories(prev => {
+            const next = new Set(prev)
+            if (next.has(catKey)) next.delete(catKey)
+            else next.add(catKey)
+            return next
+        })
     }
 
     const loadConfigPath = async () => {
@@ -772,6 +898,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin || userSectionAccess.includes('reminders') ? [{ id: 'reminders', label: 'Vessel Reminders', icon: <Bell size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('reportSettings') ? [{ id: 'reportSettings', label: 'Report Settings', icon: <FileText size={16} /> }] : []),
         ...(isAdmin ? [
+            { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
         ] : []),
@@ -1970,6 +2097,185 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         </div>
                     )}
             </section>
+            )}
+
+            {/* User Groups - admin only */}
+            {effectiveSection === 'userGroups' && isAdmin && (
+                <section className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+                    <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Users size={20} color="var(--accent-primary)" /> User Groups
+                    </h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                        Manage permission groups. Assign users to groups in the User Management page.
+                    </p>
+
+                    {/* Add Group Form */}
+                    <form onSubmit={handleAddGroup} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
+                        <div style={{ flex: '1 1 200px' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Group Name</label>
+                            <input
+                                type="text"
+                                value={newGroupName}
+                                onChange={e => setNewGroupName(e.target.value)}
+                                placeholder="e.g. Underwriters"
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div style={{ flex: '2 1 300px' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Description (optional)</label>
+                            <input
+                                type="text"
+                                value={newGroupDescription}
+                                onChange={e => setNewGroupDescription(e.target.value)}
+                                placeholder="Brief description of the group"
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Plus size={18} /> Add Group
+                        </button>
+                    </form>
+
+                    {/* Groups List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {userGroups.map(group => {
+                            const isSelected = selectedGroupId === group.id
+                            const isAdminGroup = group.isSystem && group.name.toLowerCase() === 'administrator'
+                            return (
+                                <div key={group.id} style={{ borderRadius: '10px', border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: isSelected ? 'rgba(var(--accent-primary-rgb,0,210,255),0.04)' : 'transparent', overflow: 'hidden' }}>
+                                    {/* Group Header Row */}
+                                    <div
+                                        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer' }}
+                                        onClick={() => {
+                                            if (editingGroupId !== group.id) handleSelectGroup(group.id)
+                                        }}
+                                    >
+                                        {isSelected ? <ChevronDown size={16} color="var(--accent-primary)" /> : <ChevronRight size={16} color="var(--text-secondary)" />}
+                                        {editingGroupId === group.id ? (
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }} onClick={e => e.stopPropagation()}>
+                                                <input
+                                                    type="text"
+                                                    value={editGroupName}
+                                                    onChange={e => setEditGroupName(e.target.value)}
+                                                    autoFocus
+                                                    style={{ flex: 1, fontSize: '0.9rem' }}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={editGroupDescription}
+                                                    onChange={e => setEditGroupDescription(e.target.value)}
+                                                    placeholder="Description"
+                                                    style={{ flex: 2, fontSize: '0.9rem' }}
+                                                />
+                                                <button onClick={() => saveGroupEdit(group.id)} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Save</button>
+                                                <button onClick={() => setEditingGroupId(null)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Cancel</button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div style={{ flex: 1 }}>
+                                                    <span style={{ fontWeight: '600', fontSize: '0.95rem' }}>{group.name}</span>
+                                                    {group.description && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginLeft: '12px' }}>{group.description}</span>}
+                                                </div>
+                                                {group.isSystem && (
+                                                    <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: '700', letterSpacing: '0.5px', background: 'rgba(147,51,234,0.1)', color: '#d8b4fe', border: '1px solid rgba(147,51,234,0.2)' }}>
+                                                        SYSTEM
+                                                    </span>
+                                                )}
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    {!group.isSystem && (
+                                                        <>
+                                                            <button
+                                                                onClick={e => { e.stopPropagation(); startEditingGroup(group) }}
+                                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}
+                                                                title="Edit group"
+                                                            >
+                                                                <Edit3 size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={e => { e.stopPropagation(); handleDeleteGroup(group.id) }}
+                                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
+                                                                title="Delete group"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Permission Editor (expanded) */}
+                                    {isSelected && (
+                                        <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--table-border)' }}>
+                                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '12px 0 16px', fontStyle: isAdminGroup ? 'italic' : 'normal' }}>
+                                                {isAdminGroup
+                                                    ? 'System administrator group — all permissions are granted and cannot be changed.'
+                                                    : 'Toggle permissions for this group. Changes are saved automatically.'}
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                {PERMISSION_CATEGORIES.map(cat => {
+                                                    const collapsed = collapsedPermCategories.has(cat.key)
+                                                    const allChecked = cat.permissions.every(p => isAdminGroup || groupPermissions.includes(p.key))
+                                                    const someChecked = cat.permissions.some(p => isAdminGroup || groupPermissions.includes(p.key))
+                                                    return (
+                                                        <div key={cat.key} style={{ borderRadius: '8px', border: '1px solid var(--table-border)', overflow: 'hidden' }}>
+                                                            {/* Category Header */}
+                                                            <div
+                                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--table-header-bg)', cursor: 'pointer' }}
+                                                                onClick={() => togglePermCategory(cat.key)}
+                                                            >
+                                                                {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={allChecked}
+                                                                    ref={el => { if (el) el.indeterminate = someChecked && !allChecked }}
+                                                                    onChange={e => { e.stopPropagation(); if (!isAdminGroup) handleToggleCategoryAll(group.id, cat.permissions) }}
+                                                                    disabled={isAdminGroup}
+                                                                    style={{ accentColor: 'var(--accent-primary)', width: '14px', height: '14px' }}
+                                                                    onClick={e => e.stopPropagation()}
+                                                                />
+                                                                <span style={{ fontSize: '0.7rem', fontWeight: '700', letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                                                    {cat.label}
+                                                                </span>
+                                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
+                                                                    {cat.permissions.filter(p => isAdminGroup || groupPermissions.includes(p.key)).length}/{cat.permissions.length}
+                                                                </span>
+                                                            </div>
+                                                            {/* Permissions */}
+                                                            {!collapsed && (
+                                                                <div style={{ padding: '8px 12px 8px 40px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                                    {cat.permissions.map(perm => (
+                                                                        <label key={perm.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 0', cursor: isAdminGroup ? 'default' : 'pointer' }}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isAdminGroup || groupPermissions.includes(perm.key)}
+                                                                                onChange={() => { if (!isAdminGroup) handleToggleGroupPermission(group.id, perm.key) }}
+                                                                                disabled={isAdminGroup}
+                                                                                style={{ accentColor: 'var(--accent-primary)', width: '14px', height: '14px' }}
+                                                                            />
+                                                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{perm.label}</span>
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+
+                        {userGroups.length === 0 && (
+                            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                No groups defined yet. Create one above.
+                            </div>
+                        )}
+                    </div>
+                </section>
             )}
 
 

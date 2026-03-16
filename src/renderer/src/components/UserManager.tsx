@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react'
-import { User } from '../../../shared/types'
-import { Trash2, Shield, RefreshCcw, ArrowLeftRight } from 'lucide-react'
+import { User, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
+import { Trash2, Shield, RefreshCcw, ArrowLeftRight, Users, X, Plus, Search, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 
 export default function UserManager() {
     const { resetPassword, user: currentUser } = useAuth()
     const { showSuccess, showError } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
     const [users, setUsers] = useState<User[]>([])
     // ... (rest of states)
     const [resettingUser, setResettingUser] = useState<string | null>(null)
@@ -22,6 +25,16 @@ export default function UserManager() {
         onConfirm: () => void
         isDangerous?: boolean
     }>({ show: false, title: '', message: '', onConfirm: () => { } })
+
+    // Groups & Permissions modal state
+    const [groupsModalUserId, setGroupsModalUserId] = useState<string | null>(null)
+    const [allGroups, setAllGroups] = useState<UserGroup[]>([])
+    const [userGroupIds, setUserGroupIds] = useState<string[]>([])
+    const [userOverrides, setUserOverrides] = useState<{ permissionKey: string; granted: boolean }[]>([])
+    const [resolvedPerms, setResolvedPerms] = useState<string[]>([])
+    const [overrideSearch, setOverrideSearch] = useState('')
+    const [showOverrideDropdown, setShowOverrideDropdown] = useState(false)
+    const [collapsedOverrideCats, setCollapsedOverrideCats] = useState<Set<string>>(new Set())
 
     const handleResetPassword = async (username: string) => {
         setConfirmation({
@@ -129,6 +142,131 @@ export default function UserManager() {
         }
     }
 
+    // ── Groups & Permissions Modal ──────────────────────────────────────────────
+    const openGroupsModal = async (userId: string) => {
+        setGroupsModalUserId(userId)
+        setOverrideSearch('')
+        setShowOverrideDropdown(false)
+        try {
+            const [groups, gIds, overrides, resolved] = await Promise.all([
+                window.api.rbacGetGroups(),
+                window.api.rbacGetUserGroupIds(userId),
+                window.api.rbacGetUserPermissionOverrides(userId),
+                window.api.rbacResolveUserPermissions(userId),
+            ])
+            setAllGroups(Array.isArray(groups) ? groups : [])
+            setUserGroupIds(Array.isArray(gIds) ? gIds : [])
+            setUserOverrides(Array.isArray(overrides) ? overrides : [])
+            setResolvedPerms(Array.isArray(resolved) ? resolved : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to load group data')
+            setGroupsModalUserId(null)
+        }
+    }
+
+    const closeGroupsModal = () => {
+        setGroupsModalUserId(null)
+        setAllGroups([])
+        setUserGroupIds([])
+        setUserOverrides([])
+        setResolvedPerms([])
+    }
+
+    const handleToggleUserGroup = async (groupId: string) => {
+        if (!groupsModalUserId) return
+        const next = userGroupIds.includes(groupId)
+            ? userGroupIds.filter(id => id !== groupId)
+            : [...userGroupIds, groupId]
+        setUserGroupIds(next)
+        try {
+            await window.api.rbacSetUserGroups(groupsModalUserId, next)
+            // Refresh resolved permissions
+            const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
+            setResolvedPerms(Array.isArray(resolved) ? resolved : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to update groups')
+            const gIds = await window.api.rbacGetUserGroupIds(groupsModalUserId)
+            setUserGroupIds(Array.isArray(gIds) ? gIds : [])
+        }
+    }
+
+    const handleAddOverride = async (permKey: string, granted: boolean) => {
+        if (!groupsModalUserId) return
+        // Don't add if already overridden
+        if (userOverrides.some(o => o.permissionKey === permKey)) return
+        const next = [...userOverrides, { permissionKey: permKey, granted }]
+        setUserOverrides(next)
+        setShowOverrideDropdown(false)
+        setOverrideSearch('')
+        try {
+            await window.api.rbacSetUserPermissionOverrides(groupsModalUserId, next)
+            const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
+            setResolvedPerms(Array.isArray(resolved) ? resolved : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to save override')
+            const overrides = await window.api.rbacGetUserPermissionOverrides(groupsModalUserId)
+            setUserOverrides(Array.isArray(overrides) ? overrides : [])
+        }
+    }
+
+    const handleToggleOverrideGranted = async (permKey: string) => {
+        if (!groupsModalUserId) return
+        const next = userOverrides.map(o =>
+            o.permissionKey === permKey ? { ...o, granted: !o.granted } : o
+        )
+        setUserOverrides(next)
+        try {
+            await window.api.rbacSetUserPermissionOverrides(groupsModalUserId, next)
+            const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
+            setResolvedPerms(Array.isArray(resolved) ? resolved : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to save override')
+        }
+    }
+
+    const handleRemoveOverride = async (permKey: string) => {
+        if (!groupsModalUserId) return
+        const next = userOverrides.filter(o => o.permissionKey !== permKey)
+        setUserOverrides(next)
+        try {
+            await window.api.rbacSetUserPermissionOverrides(groupsModalUserId, next)
+            const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
+            setResolvedPerms(Array.isArray(resolved) ? resolved : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to remove override')
+        }
+    }
+
+    const getPermLabel = (key: string): string => {
+        for (const cat of PERMISSION_CATEGORIES) {
+            for (const p of cat.permissions) {
+                if (p.key === key) return p.label
+            }
+        }
+        return key
+    }
+
+    const getCatLabel = (key: string): string => {
+        for (const cat of PERMISSION_CATEGORIES) {
+            for (const p of cat.permissions) {
+                if (p.key === key) return cat.label
+            }
+        }
+        return ''
+    }
+
+    // All permission keys not yet overridden, filtered by search
+    const availableOverrideKeys = PERMISSION_CATEGORIES.flatMap(cat =>
+        cat.permissions.map(p => p.key)
+    ).filter(k => !userOverrides.some(o => o.permissionKey === k))
+     .filter(k => {
+         if (!overrideSearch.trim()) return true
+         const lc = overrideSearch.toLowerCase()
+         return getPermLabel(k).toLowerCase().includes(lc) || k.toLowerCase().includes(lc)
+     })
+
+    const modalUser = groupsModalUserId ? users.find(u => u.id === groupsModalUserId) : null
+
     return (
         <div className="fade-in">
             <header style={{ marginBottom: '32px' }}>
@@ -195,7 +333,7 @@ export default function UserManager() {
                             </button>
                         </div>
                     )}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                         <caption className="sr-only">User accounts</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
@@ -239,6 +377,15 @@ export default function UserManager() {
                                     <td style={{ padding: '16px', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                                             <button
+                                                onClick={() => openGroupsModal(user.id)}
+                                                style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '8px' }}
+                                                className="hover-effect"
+                                                title="Groups & Permissions"
+                                                aria-label="Groups and permissions"
+                                            >
+                                                <Users size={18} />
+                                            </button>
+                                            <button
                                                 onClick={() => handleToggleRole(user)}
                                                 style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '8px' }}
                                                 className="hover-effect"
@@ -272,6 +419,254 @@ export default function UserManager() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* Groups & Permissions Modal */}
+            {groupsModalUserId && modalUser && (
+                <div
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+                    onClick={closeGroupsModal}
+                >
+                    <div
+                        style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--glass-border)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Users size={20} color="var(--accent-primary)" />
+                                    Groups & Permissions
+                                </h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                    {modalUser.username}
+                                    <span style={{
+                                        marginLeft: '8px', padding: '2px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '600',
+                                        background: modalUser.role === 'admin' ? 'rgba(147,51,234,0.1)' : 'rgba(34,197,94,0.1)',
+                                        color: modalUser.role === 'admin' ? '#d8b4fe' : '#86efac'
+                                    }}>
+                                        {modalUser.role.toUpperCase()}
+                                    </span>
+                                </p>
+                            </div>
+                            <button onClick={closeGroupsModal} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Section 1: Group Membership */}
+                        <div style={{ marginBottom: '24px' }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: '700', letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                                Group Membership
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {allGroups.map(group => (
+                                    <label key={group.id} style={{
+                                        display: 'flex', alignItems: 'center', gap: '12px',
+                                        padding: '10px 14px', borderRadius: '8px',
+                                        border: userGroupIds.includes(group.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)',
+                                        background: userGroupIds.includes(group.id) ? 'rgba(var(--accent-primary-rgb,0,210,255),0.06)' : 'transparent',
+                                        cursor: 'pointer'
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={userGroupIds.includes(group.id)}
+                                            onChange={() => handleToggleUserGroup(group.id)}
+                                            style={{ accentColor: 'var(--accent-primary)', width: '15px', height: '15px', flexShrink: 0 }}
+                                        />
+                                        <div style={{ flex: 1 }}>
+                                            <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{group.name}</span>
+                                            {group.description && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginLeft: '8px' }}>{group.description}</span>}
+                                        </div>
+                                        {group.isSystem && (
+                                            <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '700', background: 'rgba(147,51,234,0.1)', color: '#d8b4fe', border: '1px solid rgba(147,51,234,0.2)' }}>
+                                                SYSTEM
+                                            </span>
+                                        )}
+                                    </label>
+                                ))}
+                                {allGroups.length === 0 && (
+                                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                        No groups available. Create groups in the Admin Panel.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div style={{ height: '1px', background: 'var(--glass-border)', margin: '0 0 24px' }} />
+
+                        {/* Section 2: Permission Overrides */}
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <div style={{ fontSize: '0.7rem', fontWeight: '700', letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                    Permission Overrides
+                                </div>
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={() => setShowOverrideDropdown(!showOverrideDropdown)}
+                                        className="btn-secondary"
+                                        style={{ padding: '4px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        <Plus size={14} /> Add Override
+                                    </button>
+                                    {showOverrideDropdown && (
+                                        <div style={{
+                                            position: 'absolute', right: 0, top: '100%', marginTop: '4px',
+                                            width: '340px', maxHeight: '300px', overflowY: 'auto',
+                                            background: isLight ? '#ffffff' : '#1a1d28',
+                                            border: '1px solid var(--glass-border)', borderRadius: '10px',
+                                            boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 10
+                                        }}>
+                                            <div style={{ padding: '8px', borderBottom: '1px solid var(--table-border)', position: 'sticky', top: 0, background: isLight ? '#ffffff' : '#1a1d28' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--input-border)' }}>
+                                                    <Search size={14} color="var(--text-secondary)" />
+                                                    <input
+                                                        type="text"
+                                                        value={overrideSearch}
+                                                        onChange={e => setOverrideSearch(e.target.value)}
+                                                        placeholder="Search permissions..."
+                                                        autoFocus
+                                                        style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary)', padding: '2px 0' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div style={{ padding: '4px' }}>
+                                                {availableOverrideKeys.length === 0 && (
+                                                    <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                                                        {overrideSearch ? 'No matching permissions' : 'All permissions already overridden'}
+                                                    </div>
+                                                )}
+                                                {PERMISSION_CATEGORIES.map(cat => {
+                                                    const catPerms = cat.permissions.filter(p => availableOverrideKeys.includes(p.key))
+                                                    if (catPerms.length === 0) return null
+                                                    const collapsed = collapsedOverrideCats.has(cat.key)
+                                                    return (
+                                                        <div key={cat.key}>
+                                                            <div
+                                                                onClick={() => {
+                                                                    setCollapsedOverrideCats(prev => {
+                                                                        const next = new Set(prev)
+                                                                        if (next.has(cat.key)) next.delete(cat.key)
+                                                                        else next.add(cat.key)
+                                                                        return next
+                                                                    })
+                                                                }}
+                                                                style={{ padding: '6px 8px', fontSize: '0.68rem', fontWeight: '700', letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                            >
+                                                                {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                                                                {cat.label}
+                                                            </div>
+                                                            {!collapsed && catPerms.map(perm => (
+                                                                <div key={perm.key} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 8px 2px 20px' }}>
+                                                                    <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-primary)' }}>{perm.label}</span>
+                                                                    <button
+                                                                        onClick={() => handleAddOverride(perm.key, true)}
+                                                                        style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: '600', color: '#86efac', cursor: 'pointer' }}
+                                                                        title="Grant this permission"
+                                                                    >
+                                                                        Grant
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleAddOverride(perm.key, false)}
+                                                                        style={{ background: 'rgba(255,77,77,0.1)', border: '1px solid rgba(255,77,77,0.2)', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: '600', color: 'var(--danger)', cursor: 'pointer' }}
+                                                                        title="Revoke this permission"
+                                                                    >
+                                                                        Revoke
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px', fontStyle: 'italic' }}>
+                                Overrides take precedence over group permissions. Grant adds a permission; Revoke removes it.
+                            </p>
+
+                            {userOverrides.length === 0 ? (
+                                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', borderRadius: '8px', border: '1px dashed var(--table-border)' }}>
+                                    No overrides configured. This user inherits all permissions from their groups.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {userOverrides.map(override => (
+                                        <div key={override.permissionKey} style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 12px', borderRadius: '8px',
+                                            border: override.granted ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(255,77,77,0.2)',
+                                            background: override.granted ? 'rgba(34,197,94,0.04)' : 'rgba(255,77,77,0.04)'
+                                        }}>
+                                            <span style={{
+                                                padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.5px',
+                                                background: override.granted ? 'rgba(34,197,94,0.15)' : 'rgba(255,77,77,0.15)',
+                                                color: override.granted ? '#86efac' : 'var(--danger)'
+                                            }}>
+                                                {override.granted ? 'GRANT' : 'REVOKE'}
+                                            </span>
+                                            <div style={{ flex: 1 }}>
+                                                <span style={{
+                                                    fontSize: '0.88rem',
+                                                    color: 'var(--text-primary)',
+                                                    textDecoration: !override.granted ? 'line-through' : 'none',
+                                                    opacity: !override.granted ? 0.7 : 1
+                                                }}>
+                                                    {getPermLabel(override.permissionKey)}
+                                                </span>
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
+                                                    {getCatLabel(override.permissionKey)}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => handleToggleOverrideGranted(override.permissionKey)}
+                                                style={{
+                                                    background: 'transparent', border: '1px solid var(--table-border)', borderRadius: '4px',
+                                                    padding: '2px 8px', fontSize: '0.7rem', cursor: 'pointer', color: 'var(--text-secondary)'
+                                                }}
+                                                title={override.granted ? 'Switch to Revoke' : 'Switch to Grant'}
+                                            >
+                                                {override.granted ? 'Revoke' : 'Grant'}
+                                            </button>
+                                            <button
+                                                onClick={() => handleRemoveOverride(override.permissionKey)}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
+                                                title="Remove override"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Resolved Permissions Summary */}
+                            <div style={{ marginTop: '20px', padding: '12px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb,0,210,255),0.04)', border: '1px solid var(--table-border)' }}>
+                                <div style={{ fontSize: '0.7rem', fontWeight: '700', letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                    Effective Permissions ({resolvedPerms.length})
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {resolvedPerms.length === 0 && (
+                                        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>None</span>
+                                    )}
+                                    {resolvedPerms.map(key => (
+                                        <span key={key} style={{
+                                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem',
+                                            background: 'rgba(var(--accent-primary-rgb,0,210,255),0.1)',
+                                            color: 'var(--accent-primary)', border: '1px solid rgba(var(--accent-primary-rgb,0,210,255),0.2)'
+                                        }}>
+                                            {getPermLabel(key)}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
