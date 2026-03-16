@@ -17,6 +17,25 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '6.0.0',
+    date: 'March 2026',
+    items: [
+      { tag: 'New', text: 'Quotation Builder — create P&I, Hull, War Risk, FD&D, Loss of Hire, and Cargo quotations with a full tabbed editor' },
+      { tag: 'New', text: 'P&I Conditions: clause presets (Full Cover, Restricted, etc.), warranties with sets and bulk import, deductibles, exclusions, and limits of liability' },
+      { tag: 'New', text: 'Hull Conditions: agreed value, hull clause selection, configurable conditions, and Increased Value (IV) support' },
+      { tag: 'New', text: 'Alternatives: create multiple coverage options per quotation — each with its own conditions, warranties, deductibles, exclusions, and premium' },
+      { tag: 'New', text: 'Premium Management: per-vessel and per-alternative premiums, NCB/UPCC discounts, instalment schedules, and non-refundable options' },
+      { tag: 'New', text: 'Revisions & Duplication: revise sent quotations with version tracking, or duplicate to quickly create similar quotations' },
+      { tag: 'New', text: 'Export quotations to PDF and Word (DOCX) with professional formatting and configurable section ordering' },
+      { tag: 'New', text: 'Quotation Settings: manage clause presets, warranty sets, deductible templates, trading warranty templates, section text defaults, and more' },
+      { tag: 'New', text: 'Entity addresses: add multiple addresses per entity and assign per vessel role directly from the vessel page' },
+      { tag: 'New', text: 'Premium theme: a sophisticated burgundy-accented dark theme alongside Dark and Light' },
+      { tag: 'Improved', text: 'All dates unified to dd/mm/yyyy format across the entire app' },
+      { tag: 'Improved', text: 'Dynamic Address Book: searchable flag state dropdown and new "All" export option' },
+      { tag: 'Improved', text: 'Search added to policy renewals page' },
+    ],
+  },
+  {
     version: '5.4.1',
     date: 'March 2026',
     items: [
