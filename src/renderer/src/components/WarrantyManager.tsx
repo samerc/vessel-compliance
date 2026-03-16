@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, ChevronDown, ChevronRight, Bell, Check, X, AlertTriangle, Clock, FileWarning, ClipboardCheck, Link2 } from 'lucide-react'
+import { Plus, ChevronDown, Bell, Check, X, AlertTriangle, Clock, FileWarning, ClipboardCheck, Link2 } from 'lucide-react'
 import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -389,26 +389,25 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     const reminderList = reminders[w.id]
 
     return (
-      <div key={w.id} style={{
-        borderRadius: '10px', overflow: 'hidden',
-        border: `1px solid ${isLight ? '#e0e3e8' : 'rgba(255,255,255,0.08)'}`,
-        background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)',
-        marginBottom: '8px'
-      }}>
-        {/* Header row */}
+      <div key={w.id} className="glass-card" style={{ padding: 0, overflow: 'hidden', marginBottom: '8px' }}>
+        {/* Header row — matches policy card style */}
         <div
           onClick={() => toggleExpand(w.id)}
           style={{
-            display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
-            cursor: 'pointer', userSelect: 'none'
+            display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
+            cursor: 'pointer', userSelect: 'none',
+            background: isExpanded ? 'rgba(0,210,255,0.03)' : 'transparent'
           }}
         >
-          {isExpanded ? <ChevronDown size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} /> : <ChevronRight size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
-          <span style={{ fontWeight: '600', fontSize: '0.88rem', flex: 1 }}>{w.description}</span>
+          <ChevronDown size={16} style={{ transform: isExpanded ? 'none' : 'rotate(-90deg)', transition: 'transform 0.2s', color: 'var(--text-secondary)', flexShrink: 0 }} />
+          <span style={{ fontWeight: '600', fontSize: '0.9rem', flex: 1 }}>{w.description}</span>
+          {w.policyTypeName && (
+            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{w.policyTypeName}</span>
+          )}
           {/* Status badge */}
           <span style={{
-            padding: '2px 9px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700',
-            textTransform: 'uppercase', letterSpacing: '0.04em',
+            padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '600',
+            textTransform: 'uppercase',
             background: sc.bg, color: sc.color
           }}>{STATUS_LABELS[w.status]}</span>
           {/* Reminder count */}
@@ -424,30 +423,59 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         </div>
 
         {/* Sub-info row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 14px 10px 38px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-          {deadlineInfo}
-          {w.inceptionDate && (
-            <span style={{ fontSize: '0.78rem' }}>Inception: {formatDate(w.inceptionDate)}</span>
-          )}
-          {w.nextReminderDate && isActive && (
-            <span style={{ fontSize: '0.78rem', color: '#e6a800', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <Bell size={11} /> Next: {formatDate(w.nextReminderDate)}
-            </span>
-          )}
-          {w.conditionSurveyId && (
-            <span style={{
-              display: 'flex', alignItems: 'center', gap: '3px',
-              fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
-              borderRadius: '8px', background: 'rgba(0,170,200,0.12)', color: '#00aac8'
-            }}>
-              <Link2 size={11} /> Linked Survey
-            </span>
-          )}
-        </div>
+        {(deadlineInfo || w.inceptionDate || w.conditionSurveyId) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px 10px 42px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+            {deadlineInfo}
+            {w.inceptionDate && (
+              <span style={{ fontSize: '0.78rem' }}>Inception: {formatDate(w.inceptionDate)}</span>
+            )}
+            {w.nextReminderDate && isActive && (
+              <span style={{ fontSize: '0.78rem', color: '#e6a800', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <Bell size={11} /> Next: {formatDate(w.nextReminderDate)}
+              </span>
+            )}
+            {w.conditionSurveyId && (
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: '3px',
+                fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
+                borderRadius: '8px', background: 'rgba(0,170,200,0.12)', color: '#00aac8'
+              }}>
+                <Link2 size={11} /> Linked Survey
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Expanded body */}
         {isExpanded && (
-          <div style={{ borderTop: `1px solid ${isLight ? '#e0e3e8' : 'rgba(255,255,255,0.07)'}`, padding: '12px 14px 14px' }}>
+          <div style={{ borderTop: '1px solid var(--table-border)', padding: '0 16px 16px' }}>
+            {/* Info grid — matches policy card value grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', paddingTop: '12px' }}>
+              {w.deadlineType === 'days' && w.deadlineDays && (
+                <div style={{ fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Deadline</span>
+                  <div style={{ fontWeight: '500' }}>{w.deadlineDays} days from inception</div>
+                </div>
+              )}
+              {w.deadlineType === 'event' && w.deadlineEvent && (
+                <div style={{ fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Deadline Event</span>
+                  <div style={{ fontWeight: '500' }}>{w.deadlineEvent}</div>
+                </div>
+              )}
+              {w.inceptionDate && (
+                <div style={{ fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Inception Date</span>
+                  <div style={{ fontWeight: '500' }}>{formatDate(w.inceptionDate)}</div>
+                </div>
+              )}
+              {w.completedAt && (
+                <div style={{ fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Completed</span>
+                  <div style={{ fontWeight: '500' }}>{formatDate(w.completedAt)}</div>
+                </div>
+              )}
+            </div>
             {w.notes && (
               <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '12px' }}>
                 {w.notes}
