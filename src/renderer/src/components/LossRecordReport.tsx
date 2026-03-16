@@ -189,16 +189,16 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
 
   // ── Column layout ────────────────────────────────────────────────────────
   // With reserves: Claim# | Date | Damage Type | Payment Type | Paid | Reserves | Total = 182mm
-  //   12 | 22 | 40 | 34 | 26 | 26 | 22 = 182
+  //   22 | 22 | 36 | 30 | 24 | 24 | 24 = 182
   // Without reserves: Claim# | Date | Damage Type | Payment Type | Paid | Total = 182mm
-  //   12 | 22 | 48 | 40 | 30 | 30 = 182
+  //   22 | 22 | 44 | 36 | 28 | 30 = 182
 
   const showRes = opts.showReserves
   const colCount = showRes ? 7 : 6
 
   const colWidths = showRes
-    ? { claimId: 12, date: 22, dmg: 40, payType: 34, paid: 26, res: 26, total: 22 }
-    : { claimId: 12, date: 22, dmg: 48, payType: 40, paid: 30, total: 30 }
+    ? { claimId: 22, date: 22, dmg: 36, payType: 30, paid: 24, res: 24, total: 24 }
+    : { claimId: 22, date: 22, dmg: 44, payType: 36, paid: 28, total: 30 }
 
   const headRow = showRes
     ? ['Claim #', 'Date of Loss', 'Damage Type', 'Payment Type', `Paid (${cur})`, `Reserves (${cur})`, `Total Incurred (${cur})`]
