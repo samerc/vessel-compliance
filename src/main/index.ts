@@ -384,7 +384,8 @@ app.whenReady().then(() => {
     return await auth.changePassword(user.id, currentPassword, newPassword)
   })
 
-  safeHandle('auth:resetPassword', async (_event, { username }) => {
+  safeHandle('auth:resetPassword', async (event, { username }) => {
+    requireAdmin(event)
     return await auth.resetPassword(username)
   })
 

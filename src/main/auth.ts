@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
+import { randomBytes } from 'crypto'
 import { db } from './mysql/adapter'
 import { User } from '../shared/types'
 import Store from 'electron-store'
@@ -249,7 +250,7 @@ export class AuthService {
         }
 
         // Generate a simple temporary password (as requested)
-        const tempPassword = Math.random().toString(36).slice(-8)
+        const tempPassword = randomBytes(6).toString('base64url').slice(0, 10)
         const passwordHash = await bcrypt.hash(tempPassword, 10)
 
         await db.updateUserPassword(user.id, passwordHash)
