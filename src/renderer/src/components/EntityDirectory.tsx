@@ -584,12 +584,6 @@ export default function EntityDirectory() {
   const associatedVessels = selectedEntity ? getAssociatedVessels(selectedEntity.id) : []
   const parentCompanies = selectedEntity?.type === 'person' ? getParentCompanies(selectedEntity.id) : []
 
-  // ── VesselDetail drill-down ──────────────────────────────────────────────────
-  if (viewingVessel) {
-    return <VesselDetail vessel={viewingVessel} backLabel="Back to Entity" onBack={() => { setViewingVessel(null); loadData() }} />
-  }
-
-  // ── Color helpers ────────────────────────────────────────────────────────────
   // Load addresses when entity is selected
   useEffect(() => {
     if (selectedEntity) {
@@ -602,6 +596,13 @@ export default function EntityDirectory() {
       setEntityAddresses([])
     }
   }, [selectedEntity?.id])
+
+  // ── VesselDetail drill-down ──────────────────────────────────────────────────
+  if (viewingVessel) {
+    return <VesselDetail vessel={viewingVessel} backLabel="Back to Entity" onBack={() => { setViewingVessel(null); loadData() }} />
+  }
+
+  // ── Color helpers ────────────────────────────────────────────────────────────
 
   const resetAddrForm = () => setAddrForm({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
 
