@@ -679,7 +679,14 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {displayedVessels.length === 0 ? (
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan={8} style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                                <Loader2 size={32} className="spinner" style={{ opacity: 0.4, display: 'block', margin: '0 auto 14px' }} />
+                                                <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Searching...</div>
+                                            </td>
+                                        </tr>
+                                    ) : displayedVessels.length === 0 ? (
                                         <tr>
                                             <td colSpan={8} style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                                 <Search size={40} style={{ opacity: 0.15, marginBottom: '14px', display: 'block', margin: '0 auto 14px' }} />
