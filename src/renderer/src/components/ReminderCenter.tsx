@@ -29,7 +29,7 @@ export default function ReminderCenter({ onNavigateToVessel }: { onNavigateToVes
   const { user } = useAuth()
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
-  const isLight = theme !== 'dark'
+  const isLight = theme === 'light'
 
   const loadData = async () => {
     setIsLoading(true)

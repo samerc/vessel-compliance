@@ -59,7 +59,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   const { user } = useAuth()
   const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
-  const isLight = theme !== 'dark'
+  const isLight = theme === 'light'
 
   const [warranties, setWarranties] = useState<SurveyWarranty[]>([])
   const [endorsementsDue, setEndorsementsDue] = useState<any[]>([])

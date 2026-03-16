@@ -34,7 +34,7 @@ interface CustomerGroup {
 
 export default function FleetManager() {
   const { theme } = useTheme()
-  const isLight = theme !== 'dark'
+  const isLight = theme === 'light'
   const { showSuccess } = useToast()
 
   // --- data state ---

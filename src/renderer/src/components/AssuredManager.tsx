@@ -19,7 +19,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [entityUBOs, setEntityUBOs] = useState<EntityUBO[]>([])
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
-    const isLight = theme !== 'dark'
+    const isLight = theme === 'light'
 
     const [showAddForm, setShowAddForm] = useState(false)
     const [newName, setNewName] = useState('')

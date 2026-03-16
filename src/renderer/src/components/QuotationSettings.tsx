@@ -55,7 +55,7 @@ export default function QuotationSettings() {
     const [activeTab, setActiveTab] = useState<SettingsTab>('quotationTypes')
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
-    const isLight = theme !== 'dark'
+    const isLight = theme === 'light'
 
     const handleCategoryChange = (cat: SettingsCategory) => {
         setActiveCategory(cat)
@@ -1933,7 +1933,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
     const [editText, setEditText] = useState('')
     const [showAdd, setShowAdd] = useState(false)
     const { theme } = useTheme()
-    const isLight = theme !== 'dark'
+    const isLight = theme === 'light'
 
     useEffect(() => { loadData() }, [])
 
@@ -2403,7 +2403,7 @@ function StandardTextsTab({ showSuccess }: TabProps) {
     const [loaded, setLoaded] = useState(false)
     const [activeSection, setActiveSection] = useState(STANDARD_TEXT_SECTIONS[0])
     const { theme } = useTheme()
-    const isLight = theme !== 'dark'
+    const isLight = theme === 'light'
 
     useEffect(() => { loadData() }, [])
 

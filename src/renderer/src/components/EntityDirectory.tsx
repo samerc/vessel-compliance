@@ -79,7 +79,7 @@ export default function EntityDirectory() {
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
-  const isLight = theme !== 'dark'
+  const isLight = theme === 'light'
 
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(25)

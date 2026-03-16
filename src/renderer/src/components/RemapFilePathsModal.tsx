@@ -59,7 +59,7 @@ function applyPrefix(filePath: string, oldPrefix: string, newPrefix: string): st
 export default function RemapFilePathsModal({ vesselId, vesselName, onClose }: RemapFilePathsModalProps) {
     const { theme } = useTheme()
     const { showSuccess, showError } = useToast()
-    const isLight = theme !== 'dark'
+    const isLight = theme === 'light'
 
     const [step, setStep] = useState<'pick' | 'preview'>('pick')
     const [loading, setLoading] = useState(true)

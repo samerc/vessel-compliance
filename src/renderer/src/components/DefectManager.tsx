@@ -26,7 +26,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [editingDefectId, setEditingDefectId] = useState<string | null>(null)
   const [expandedClosureIds, setExpandedClosureIds] = useState<Set<string>>(new Set())
   const { theme } = useTheme()
-  const isLight = theme !== 'dark'
+  const isLight = theme === 'light'
 
   // Confirmation modal state
   const [confirmation, setConfirmation] = useState<{

@@ -17,7 +17,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [activeTab, setActiveTab] = useState<'documents' | 'policies' | 'sanctions'>('documents')
     const { showSuccess } = useToast()
     const { theme } = useTheme()
-    const isLight = theme !== 'dark'
+    const isLight = theme === 'light'
 
     // Sanctions compliance state
     const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])

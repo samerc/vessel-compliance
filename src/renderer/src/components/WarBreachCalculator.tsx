@@ -107,7 +107,7 @@ function fmtDate(d: string): string {
 
 export default function WarBreachCalculator() {
   const { theme } = useTheme()
-  const isLight = theme !== 'dark'
+  const isLight = theme === 'light'
   const { showSuccess, showError } = useToast()
 
   const [showHistory, setShowHistory] = useState(false)

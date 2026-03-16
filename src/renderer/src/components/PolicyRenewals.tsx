@@ -34,7 +34,7 @@ function formatPremium(value: number | null, currency: string | null): string {
 export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsProps) {
     const { theme } = useTheme()
     const { user } = useAuth()
-    const isLight = theme !== 'dark'
+    const isLight = theme === 'light'
     const now = new Date()
     const [selectedYear, setSelectedYear] = useState(now.getFullYear())
     const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1) // 1-based
