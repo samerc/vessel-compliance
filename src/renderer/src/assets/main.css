@@ -54,15 +54,15 @@
   --bg-card-hover: rgba(255, 255, 255, 0.06);
   --accent-primary: #8b3a4a;
   --accent-secondary: #5c1f2e;
-  --text-primary: #e4dde0;
-  --text-secondary: rgba(228, 221, 224, 0.5);
+  --text-primary: #ede8ea;
+  --text-secondary: rgba(237, 232, 234, 0.65);
   --danger: #e05252;
   --success: #4ecb71;
   --warning: #e5b84c;
 
   --input-bg: rgba(255, 255, 255, 0.04);
   --input-border: rgba(139, 58, 74, 0.18);
-  --input-text: #e4dde0;
+  --input-text: #ede8ea;
   --table-header-bg: rgba(139, 58, 74, 0.05);
   --table-border: rgba(139, 58, 74, 0.12);
 
