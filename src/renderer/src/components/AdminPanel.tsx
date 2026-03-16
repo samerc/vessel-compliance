@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
@@ -104,6 +104,12 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [groupPermissions, setGroupPermissions] = useState<string[]>([])
     const [collapsedPermCategories, setCollapsedPermCategories] = useState<Set<string>>(new Set())
 
+    // Backup & Restore state
+    const [backupInProgress, setBackupInProgress] = useState(false)
+    const [restoreInProgress, setRestoreInProgress] = useState(false)
+    const [lastBackupDate, setLastBackupDate] = useState<string | null>(null)
+    const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
+
     useEffect(() => {
         loadData()
         loadFileTypeSettings()
@@ -112,6 +118,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         loadReminderSettings()
         loadReportSettings()
         loadUserGroups()
+        loadLastBackupDate()
         window.api.getUserSectionAccess().then(setUserSectionAccess).catch(() => {})
     }, [])
 
@@ -130,6 +137,47 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             const data = await window.api.rbacGetGroups()
             if (Array.isArray(data)) setUserGroups(data)
         } catch { /* ignore */ }
+    }
+
+    const loadLastBackupDate = async () => {
+        try {
+            const date = await window.api.dbGetLastBackupDate()
+            setLastBackupDate(date || null)
+        } catch { /* ignore */ }
+    }
+
+    const handleBackup = async () => {
+        setBackupInProgress(true)
+        try {
+            const result = await window.api.dbBackup()
+            if (result?.error) {
+                showError(result.message || 'Backup failed')
+            } else if (result?.success) {
+                showSuccess('Database backup saved successfully')
+                loadLastBackupDate()
+            }
+        } catch (err: any) {
+            showError(err?.message || 'Backup failed')
+        } finally {
+            setBackupInProgress(false)
+        }
+    }
+
+    const handleRestore = async () => {
+        setShowRestoreConfirm(false)
+        setRestoreInProgress(true)
+        try {
+            const result = await window.api.dbRestore()
+            if (result?.error) {
+                showError(result.message || 'Restore failed')
+            } else if (result?.success) {
+                showSuccess('Database restored successfully. Please reload the application.')
+            }
+        } catch (err: any) {
+            showError(err?.message || 'Restore failed')
+        } finally {
+            setRestoreInProgress(false)
+        }
     }
 
     const handleAddGroup = async (e: React.FormEvent) => {
@@ -911,6 +959,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin ? [
             { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
+            { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
         ] : []),
     ]
@@ -1806,6 +1855,76 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             </div>
                         </div>
                     </div>
+            </section>
+            )}
+
+            {/* Backup & Restore */}
+            {effectiveSection === 'backup' && (
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Download size={20} color="var(--accent-primary)" /> Backup & Restore
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    Create a full database backup or restore from a previous backup file.
+                    User accounts are preserved during backup and restore operations.
+                </p>
+
+                {lastBackupDate && (
+                    <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Clock size={16} color="var(--accent-primary)" />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            Last backup: {formatDateTime(lastBackupDate)}
+                        </span>
+                    </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                    <button
+                        onClick={handleBackup}
+                        disabled={backupInProgress}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
+                    >
+                        {backupInProgress ? <Loader2 size={18} className="spin" /> : <Download size={18} />}
+                        {backupInProgress ? 'Backing up...' : 'Backup Database'}
+                    </button>
+                    <button
+                        onClick={() => setShowRestoreConfirm(true)}
+                        disabled={restoreInProgress}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                    >
+                        {restoreInProgress ? <Loader2 size={18} className="spin" /> : <Upload size={18} />}
+                        {restoreInProgress ? 'Restoring...' : 'Restore Database'}
+                    </button>
+                </div>
+
+                <div style={{ padding: '12px', background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} color="rgb(255, 165, 0)" />
+                    <span>Restoring a backup will replace all current data (except user accounts) with the backup contents. This action cannot be undone.</span>
+                </div>
+
+                {/* Restore confirmation modal */}
+                {showRestoreConfirm && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }} onClick={() => setShowRestoreConfirm(false)}>
+                        <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '90%', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                <AlertTriangle size={24} color="var(--danger)" />
+                                <h3 style={{ margin: 0 }}>Confirm Restore</h3>
+                            </div>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '8px' }}>
+                                This will replace all current data with the backup contents. User accounts will not be affected.
+                            </p>
+                            <p style={{ color: 'var(--danger)', fontSize: '0.85rem', fontWeight: '600', marginBottom: '24px' }}>
+                                This action cannot be undone.
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                <button onClick={() => setShowRestoreConfirm(false)} className="btn-secondary" style={{ padding: '8px 20px' }}>Cancel</button>
+                                <button onClick={handleRestore} className="btn-primary" style={{ padding: '8px 20px', background: 'var(--danger)' }}>Restore</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </section>
             )}
 

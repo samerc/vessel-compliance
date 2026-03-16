@@ -2245,6 +2245,32 @@ app.whenReady().then(() => {
     return db.getSetting('lastBackupDate')
   })
 
+  // Activity Log
+  safeHandle('activity:getLog', async (event, filters) => {
+    requireSession(event)
+    return await db.getActivityLog(filters || {})
+  })
+
+  safeHandle('activity:log', async (event, entry) => {
+    const user = requireSession(event)
+    return await db.logActivity({ ...entry, userId: user.id, username: user.username })
+  })
+
+  safeHandle('activity:getDistinctModules', async (event) => {
+    requireSession(event)
+    return await db.getActivityLogDistinctModules()
+  })
+
+  safeHandle('activity:getDistinctActions', async (event) => {
+    requireSession(event)
+    return await db.getActivityLogDistinctActions()
+  })
+
+  safeHandle('activity:getDistinctUsers', async (event) => {
+    requireSession(event)
+    return await db.getActivityLogDistinctUsers()
+  })
+
   createWindow()
 
   // Start the compliance scheduler after window is created

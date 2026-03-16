@@ -597,6 +597,13 @@ const api = {
   analyticsDeletePreset: (id: string) => ipcRenderer.invoke('analytics:deletePreset', id),
   analyticsGetData: (filters: any) => ipcRenderer.invoke('analytics:getData', filters),
 
+  // Activity Log
+  activityGetLog: (filters: any) => ipcRenderer.invoke('activity:getLog', filters),
+  activityLog: (entry: any) => ipcRenderer.invoke('activity:log', entry),
+  activityGetDistinctModules: () => ipcRenderer.invoke('activity:getDistinctModules'),
+  activityGetDistinctActions: () => ipcRenderer.invoke('activity:getDistinctActions'),
+  activityGetDistinctUsers: () => ipcRenderer.invoke('activity:getDistinctUsers'),
+
   // Report Settings
   reportSettingsGet: () => ipcRenderer.invoke('reportSettings:get'),
   reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),

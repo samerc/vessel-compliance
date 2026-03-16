@@ -7771,6 +7771,109 @@ export class MySQLAdapter {
             conn.release()
         }
     }
+
+    // --- Activity Log ---
+
+    async getActivityLog(filters: {
+        page?: number
+        limit?: number
+        module?: string
+        action?: string
+        userId?: string
+        dateFrom?: string
+        dateTo?: string
+        search?: string
+    }): Promise<PaginatedResult<any>> {
+        if (!this.pool) return { data: [], total: 0, page: 1, limit: 25, totalPages: 0 }
+
+        const { page = 1, limit = 25, module, action, userId, dateFrom, dateTo, search } = filters
+        const offset = (page - 1) * limit
+
+        let query = 'SELECT id, user_id AS userId, username, action, module, entity_type AS entityType, entity_id AS entityId, entity_name AS entityName, details, created_at AS createdAt FROM activity_log'
+        let countQuery = 'SELECT COUNT(*) as total FROM activity_log'
+        const conditions: string[] = []
+        const values: any[] = []
+
+        if (module) {
+            conditions.push('module = ?')
+            values.push(module)
+        }
+        if (action) {
+            conditions.push('action = ?')
+            values.push(action)
+        }
+        if (userId) {
+            conditions.push('user_id = ?')
+            values.push(userId)
+        }
+        if (dateFrom) {
+            conditions.push('created_at >= ?')
+            values.push(dateFrom)
+        }
+        if (dateTo) {
+            conditions.push('created_at <= ?')
+            values.push(dateTo + ' 23:59:59')
+        }
+        if (search) {
+            conditions.push('(entity_name LIKE ? OR details LIKE ? OR username LIKE ?)')
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`)
+        }
+
+        if (conditions.length > 0) {
+            const where = ' WHERE ' + conditions.join(' AND ')
+            query += where
+            countQuery += where
+        }
+
+        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+
+        const countValues = [...values]
+        values.push(limit, offset)
+
+        const [countResult] = await this.pool.query(countQuery, countValues)
+        const total = (countResult as any[])[0].total
+        const totalPages = Math.ceil(total / limit)
+
+        const [rows] = await this.pool.query(query, values)
+
+        return { data: rows as any[], total, page, limit, totalPages }
+    }
+
+    async logActivity(entry: {
+        userId: string
+        username: string
+        action: string
+        module: string
+        entityType?: string
+        entityId?: string
+        entityName?: string
+        details?: string
+    }): Promise<void> {
+        if (!this.pool) return
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO activity_log (id, user_id, username, action, module, entity_type, entity_id, entity_name, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, entry.userId, entry.username, entry.action, entry.module, entry.entityType || null, entry.entityId || null, entry.entityName || null, entry.details || null]
+        )
+    }
+
+    async getActivityLogDistinctModules(): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT DISTINCT module FROM activity_log ORDER BY module ASC')
+        return (rows as any[]).map(r => r.module)
+    }
+
+    async getActivityLogDistinctActions(): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT DISTINCT action FROM activity_log ORDER BY action ASC')
+        return (rows as any[]).map(r => r.action)
+    }
+
+    async getActivityLogDistinctUsers(): Promise<{ id: string; username: string }[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT DISTINCT al.user_id AS id, al.username FROM activity_log al ORDER BY al.username ASC')
+        return rows as any[]
+    }
 }
 
 export const db = new MySQLAdapter()

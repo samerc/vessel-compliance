@@ -597,6 +597,11 @@ export interface Api {
   analyticsUpdatePreset: (id: string, name: string, filters: any) => Promise<void>
   analyticsDeletePreset: (id: string) => Promise<void>
   analyticsGetData: (filters: any) => Promise<{ vessels: any[]; policyCoverage: any[] }>
+  activityGetLog: (filters: import('../shared/types').ActivityLogFilters) => Promise<import('../shared/types').PaginatedResult<import('../shared/types').ActivityLogEntry>>
+  activityLog: (entry: { action: string; module: string; entityType?: string; entityId?: string; entityName?: string; details?: string }) => Promise<void>
+  activityGetDistinctModules: () => Promise<string[]>
+  activityGetDistinctActions: () => Promise<string[]>
+  activityGetDistinctUsers: () => Promise<{ id: string; username: string }[]>
   updateUserAppVersion: (version: string) => Promise<void>
   updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => Promise<void>
   onUpdateChecking: (callback: () => void) => void
