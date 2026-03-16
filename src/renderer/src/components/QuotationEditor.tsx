@@ -1217,23 +1217,23 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
             window.api.piGetAdditionalClauseSets(),
             window.api.getQuotationVessels(quotation.id)
         ])
-        setAllClauses(clauses)
-        setClauseSets(sets)
+        setAllClauses(Array.isArray(clauses) ? clauses : [])
+        setClauseSets(Array.isArray(sets) ? sets : [])
         const safeSelected = Array.isArray(selected) ? selected : []
         setSelectedIds(new Set(safeSelected.map((r: any) => r.piClauseId)))
         setClauseRows(safeSelected.map((r: any) => ({ id: r.id, piClauseId: r.piClauseId, alternativeId: r.alternativeId || null })))
         setClauseVesselScopes(safeSelected.reduce((m: Record<string, string[] | null>, r: any) => { if (r.vesselScope) m[r.piClauseId] = r.vesselScope; return m }, {}))
         setClauseAltIds(safeSelected.reduce((m: Record<string, string | null>, r: any) => { m[r.piClauseId] = r.alternativeId || null; return m }, {}))
-        setDescOverrides(overrides)
-        setAdditionalClauses(addClauses)
+        setDescOverrides(overrides && !(overrides as any).error ? overrides : {})
+        const safeAddCl = Array.isArray(addClauses) ? addClauses : []
+        setAdditionalClauses(safeAddCl)
         const safeAllAdd = Array.isArray(allAdd) ? allAdd : []
         setAllAdditional(safeAllAdd)
-        setAdditionalClauseSets(addSets)
+        setAdditionalClauseSets(Array.isArray(addSets) ? addSets : [])
         setQVessels(Array.isArray(qv) ? qv : [])
 
         // Auto-add default additional clauses on first load if none exist
-        const safeAddClauses = Array.isArray(addClauses) ? addClauses : []
-        if (!additionalDefaultsApplied.current && safeAddClauses.length === 0 && safeAllAdd.length > 0) {
+        if (!additionalDefaultsApplied.current && safeAddCl.length === 0 && safeAllAdd.length > 0) {
             additionalDefaultsApplied.current = true
             const defaults = safeAllAdd.filter(c => c.defaultSelected)
             for (let i = 0; i < defaults.length; i++) {

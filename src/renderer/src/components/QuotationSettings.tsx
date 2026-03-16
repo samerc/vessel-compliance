@@ -22,7 +22,6 @@ const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
 const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; icon: any }[]> = {
     general: [
         { id: 'quotationTypes', label: 'Quotation Types', icon: <Tag size={15} /> },
-        { id: 'warranties', label: 'Warranties', icon: <Shield size={15} /> },
         { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
         { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
@@ -34,6 +33,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
     ],
     pi: [
         { id: 'clauses', label: 'Conditions', icon: <BookOpen size={15} /> },
+        { id: 'warranties', label: 'Warranties', icon: <Shield size={15} /> },
         { id: 'deductibles', label: 'Deductibles', icon: <Scale size={15} /> },
         { id: 'exclusions', label: 'Exclusions', icon: <AlertTriangle size={15} /> },
         { id: 'subLimits', label: 'Limits of Liability', icon: <FileText size={15} /> },
