@@ -94,7 +94,9 @@ export default function DynamicAddressBook() {
   const [selectedFlagStates, setSelectedFlagStates] = useState<string[]>([])
   const [flagUnassigned, setFlagUnassigned] = useState(false)
   const [customerType, setCustomerType] = useState<'broker' | 'direct' | 'both'>('both')
-  const [exportType, setExportType] = useState<'email' | 'phone' | 'both'>('email')
+  const [exportType, setExportType] = useState<'email' | 'phone' | 'both' | 'all'>('email')
+  const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
+  const [flagSearch, setFlagSearch] = useState('')
   const [vesselStatus, setVesselStatus] = useState<'active' | 'inactive' | 'all'>('active')
   const [contactMode, setContactMode] = useState<'all' | 'customers'>('all')
 
@@ -156,6 +158,7 @@ export default function DynamicAddressBook() {
     return results.filter(r => {
       if (exportType === 'email' && !r.email) return false
       if (exportType === 'phone' && !r.phone) return false
+      if (exportType === 'both' && !r.email && !r.phone) return false
       if (contactMode === 'customers' && !r.isCustomer && !r.isBroker) return false
       return true
     })
@@ -262,19 +265,58 @@ export default function DynamicAddressBook() {
 
         {/* Flag states */}
         {flagStates.length > 0 && (
-          <CollapsibleFilter label="Flag States" defaultCollapsed>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              <Chip
-                label="All"
-                selected={selectedFlagStates.length === flagStates.length}
-                onClick={() => setSelectedFlagStates(selectedFlagStates.length === flagStates.length ? [] : flagStates.map(f => f.id))}
-              />
-              <Chip label="Unassigned" selected={flagUnassigned} onClick={() => setFlagUnassigned(v => !v)} />
-              {flagStates.map(fs => (
-                <Chip key={fs.id} label={fs.name} selected={selectedFlagStates.includes(fs.id)} onClick={() => toggleFlag(fs.id)} />
-              ))}
+          <FilterSection label="Flag States">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+              <Chip label="All" selected={selectedFlagStates.length === 0 && !flagUnassigned} onClick={() => { setSelectedFlagStates([]); setFlagUnassigned(false) }} />
+              <Chip label="None" selected={selectedFlagStates.length === 0 && flagUnassigned} onClick={() => { setSelectedFlagStates([]); setFlagUnassigned(true) }} />
+              <Chip label="Unassigned" selected={flagUnassigned && selectedFlagStates.length > 0} onClick={() => setFlagUnassigned(v => !v)} />
             </div>
-          </CollapsibleFilter>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setFlagDropdownOpen(v => !v)}
+                style={{
+                  width: '100%', padding: '6px 10px', borderRadius: '6px',
+                  border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)', fontSize: '0.78rem', textAlign: 'left',
+                  cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {selectedFlagStates.length === 0 ? 'Select flag states...' : `${selectedFlagStates.length} selected`}
+                </span>
+                <ChevronDown size={13} style={{ flexShrink: 0, transform: flagDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.15s' }} />
+              </button>
+              {flagDropdownOpen && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+                  background: 'var(--bg-primary)', border: '1px solid var(--input-border)',
+                  borderRadius: '6px', marginTop: '2px', maxHeight: '200px', overflowY: 'auto',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                }}>
+                  <div style={{ padding: '6px', borderBottom: '1px solid var(--table-border)', position: 'sticky', top: 0, background: 'var(--bg-primary)' }}>
+                    <input
+                      placeholder="Search..."
+                      value={flagSearch}
+                      onChange={e => setFlagSearch(e.target.value)}
+                      autoFocus
+                      style={{ width: '100%', padding: '4px 8px', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  {flagStates.filter(fs => !flagSearch || fs.name.toLowerCase().includes(flagSearch.toLowerCase())).map(fs => (
+                    <label key={fs.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-primary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedFlagStates.includes(fs.id)}
+                        onChange={() => toggleFlag(fs.id)}
+                        style={{ accentColor: 'var(--accent-primary)' }}
+                      />
+                      {fs.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </FilterSection>
         )}
 
         {/* Vessel status */}
@@ -298,6 +340,7 @@ export default function DynamicAddressBook() {
         {/* Export */}
         <FilterSection label="Export Fields">
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <Chip label="All" selected={exportType === 'all'} onClick={() => setExportType('all')} />
             <Chip label="Email" selected={exportType === 'email'} onClick={() => setExportType('email')} />
             <Chip label="Phone" selected={exportType === 'phone'} onClick={() => setExportType('phone')} />
             <Chip label="Both" selected={exportType === 'both'} onClick={() => setExportType('both')} />

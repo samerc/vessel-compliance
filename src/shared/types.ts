@@ -405,7 +405,7 @@ export interface DABQueryCriteria {
   flagStateUnassigned?: boolean
   customerIds?: string[]
   customerType?: 'broker' | 'direct' | 'both'
-  exportType: 'email' | 'phone' | 'both'
+  exportType: 'email' | 'phone' | 'both' | 'all'
   vesselStatus?: 'active' | 'inactive' | 'all'
 }
 
