@@ -17,6 +17,19 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '6.2.0',
+    date: 'March 2026',
+    items: [
+      { tag: 'New', text: 'Role-Based Access Control (RBAC) — create custom user groups with granular permissions across all modules' },
+      { tag: 'New', text: 'User Groups — assign users to multiple groups with per-user permission overrides' },
+      { tag: 'New', text: 'UI enforces permissions — sidebar items, buttons, and pages hidden based on user access' },
+      { tag: 'New', text: 'Fleet Analytics redesign — professional dashboard with advanced filters, KPI cards, distribution tables, and bracket analysis' },
+      { tag: 'New', text: 'Analytics filter presets — save and load your favorite filter combinations' },
+      { tag: 'New', text: 'Analytics export — PDF report with branded header and Excel workbook with 8 sheets' },
+      { tag: 'Improved', text: 'User Management redesigned with card layout showing groups, permissions count, and version indicators' },
+    ],
+  },
+  {
     version: '6.0.0',
     date: 'March 2026',
     items: [
