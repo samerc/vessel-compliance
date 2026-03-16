@@ -112,13 +112,17 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const loadConfigPath = async () => {
-        const path = await window.api.setupGetConfigPath()
-        setConfigPath(path)
+        try {
+            const path = await window.api.setupGetConfigPath()
+            if (path) setConfigPath(path)
+        } catch { /* ignore */ }
     }
 
     const loadComplianceSettings = async () => {
-        const settings = await window.api.complianceGetScheduleSettings()
-        setComplianceSettings(settings)
+        try {
+            const settings = await window.api.complianceGetScheduleSettings()
+            if (settings && !(settings as any).error) setComplianceSettings(settings)
+        } catch { /* ignore */ }
     }
 
     const handleSaveComplianceSettings = async () => {
@@ -157,8 +161,10 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
 
     const loadReminderSettings = async () => {
-        const settings = await window.api.remindersGetSettings()
-        setReminderSettings(settings)
+        try {
+            const settings = await window.api.remindersGetSettings()
+            if (settings && !(settings as any).error) setReminderSettings(settings)
+        } catch { /* ignore */ }
     }
 
     const loadReportSettings = async () => {
@@ -247,7 +253,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     // --- Classification Societies ---
     const loadClassSocieties = async () => {
         const data = await window.api.getClassificationSocieties()
-        setClassSocieties([...data].sort((a, b) => a.name.localeCompare(b.name)))
+        const safe = Array.isArray(data) ? data : []
+        setClassSocieties([...safe].sort((a, b) => a.name.localeCompare(b.name)))
     }
 
     const handleAddClassSociety = async (e: React.FormEvent) => {
@@ -528,7 +535,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const handleShowRoleVessels = async (role: AssuredRole) => {
         if ((role.vesselCount || 0) === 0) return
         const vessels = await window.api.getVesselsByRole(role.name)
-        setRoleVesselPopup({ roleName: role.name, vessels })
+        setRoleVesselPopup({ roleName: role.name, vessels: Array.isArray(vessels) ? vessels : [] })
     }
 
     const handleAddSurveyType = async (e: React.FormEvent) => {

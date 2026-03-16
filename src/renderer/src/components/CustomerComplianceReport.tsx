@@ -100,22 +100,27 @@ export async function exportCustomerCompliancePDF(
   customerName: string,
   customerType: string | null,
 ): Promise<void> {
-  const [vessels, docTypes, allVesselDocs, allAssureds] = await Promise.all([
+  const [vesselsRaw, docTypesRaw, allVesselDocsRaw, allAssuredsRaw] = await Promise.all([
     window.api.getVessels(),
     window.api.getDocumentTypes(),
     window.api.getVesselDocuments(),
     window.api.getVesselAssureds(),
   ])
+  const vessels = Array.isArray(vesselsRaw) ? vesselsRaw : []
+  const docTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
+  const allVesselDocs = Array.isArray(allVesselDocsRaw) ? allVesselDocsRaw : []
+  const allAssureds = Array.isArray(allAssuredsRaw) ? allAssuredsRaw : []
 
-  const customerVessels = (vessels as any[]).filter(v => v.isActive && v.customerId === customerId)
+  const customerVessels = vessels.filter(v => v.isActive && v.customerId === customerId)
   if (customerVessels.length === 0) return
 
-  const allCustomDocTypes = (await Promise.all(
+  const customDocResults = await Promise.all(
     customerVessels.map(v => window.api.getVesselCustomDocTypes(v.id))
-  )).flat()
+  )
+  const allCustomDocTypes = customDocResults.filter(Array.isArray).flat()
 
   const vesselRows: CustomerVesselRow[] = customerVessels.map(vessel =>
-    buildVesselRow(vessel, docTypes as any[], allVesselDocs as any[], allAssureds as any[], allCustomDocTypes)
+    buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes)
   )
 
   const s = await getReportSettings()
@@ -210,10 +215,12 @@ export default function CustomerComplianceReport() {
   useEffect(() => { loadCustomers() }, [])
 
   const loadCustomers = async () => {
-    const vessels = await window.api.getVessels()
-    const entities = await window.api.getEntities()
-    const customerIds = new Set((vessels as any[]).filter(v => v.customerId).map(v => v.customerId))
-    const list = (entities as any[]).filter(e => customerIds.has(e.id))
+    const vesselsRaw = await window.api.getVessels()
+    const entitiesRaw = await window.api.getEntities()
+    const vessels = Array.isArray(vesselsRaw) ? vesselsRaw : []
+    const entities = Array.isArray(entitiesRaw) ? entitiesRaw : []
+    const customerIds = new Set(vessels.filter(v => v.customerId).map(v => v.customerId))
+    const list = entities.filter(e => customerIds.has(e.id))
       .sort((a, b) => a.name.localeCompare(b.name))
     setCustomers(list)
   }
@@ -221,28 +228,34 @@ export default function CustomerComplianceReport() {
   const loadReport = async () => {
     setLoading(true)
     try {
-      const [vessels, entities, docTypes, allVesselDocs, allAssureds] = await Promise.all([
+      const [vesselsRaw, entitiesRaw, docTypesRaw, allVesselDocsRaw, allAssuredsRaw] = await Promise.all([
         window.api.getVessels(),
         window.api.getEntities(),
         window.api.getDocumentTypes(),
         window.api.getVesselDocuments(),
         window.api.getVesselAssureds(),
       ])
+      const vessels = Array.isArray(vesselsRaw) ? vesselsRaw : []
+      const entities = Array.isArray(entitiesRaw) ? entitiesRaw : []
+      const docTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
+      const allVesselDocs = Array.isArray(allVesselDocsRaw) ? allVesselDocsRaw : []
+      const allAssureds = Array.isArray(allAssuredsRaw) ? allAssuredsRaw : []
 
-      const activeVessels = (vessels as any[]).filter(v => v.isActive)
+      const activeVessels = vessels.filter(v => v.isActive)
       const filtered = selectedCustomerId === 'all'
         ? activeVessels
         : activeVessels.filter(v => v.customerId === selectedCustomerId)
 
-      const allCustomDocTypes = (await Promise.all(
+      const customDocResults = await Promise.all(
         filtered.map((v: any) => window.api.getVesselCustomDocTypes(v.id))
-      )).flat()
+      )
+      const allCustomDocTypes = customDocResults.filter(Array.isArray).flat()
 
       const customerMap = new Map<string, CustomerGroup>()
 
       for (const vessel of filtered) {
         const customerId = vessel.customerId || null
-        const entity = customerId ? (entities as any[]).find(e => e.id === customerId) : null
+        const entity = customerId ? entities.find(e => e.id === customerId) : null
         const groupKey = customerId || '__unassigned__'
 
         if (!customerMap.has(groupKey)) {
@@ -254,7 +267,7 @@ export default function CustomerComplianceReport() {
           })
         }
 
-        const row = buildVesselRow(vessel, docTypes as any[], allVesselDocs as any[], allAssureds as any[], allCustomDocTypes)
+        const row = buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes)
         customerMap.get(groupKey)!.vessels.push(row)
       }
 

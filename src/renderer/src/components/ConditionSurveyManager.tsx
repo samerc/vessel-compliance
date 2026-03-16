@@ -69,28 +69,34 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   }, [vessel.id])
 
   const loadData = async () => {
-    const surveyData = await window.api.getConditionSurveys(vessel.id)
-    setSurveys(surveyData)
+    try {
+      const surveyData = await window.api.getConditionSurveys(vessel.id)
+      const safeSurveys = Array.isArray(surveyData) ? surveyData : []
+      setSurveys(safeSurveys)
 
-    const surveyorData = await window.api.getSurveyors()
-    setSurveyors(surveyorData)
+      const surveyorData = await window.api.getSurveyors()
+      setSurveyors(Array.isArray(surveyorData) ? surveyorData : [])
 
-    const typeData = await window.api.getConditionSurveyTypes()
-    setSurveyTypes(typeData)
+      const typeData = await window.api.getConditionSurveyTypes()
+      setSurveyTypes(Array.isArray(typeData) ? typeData : [])
 
-    const attachmentData = await window.api.getSurveyAttachments()
-    setAttachments(attachmentData)
+      const attachmentData = await window.api.getSurveyAttachments()
+      setAttachments(Array.isArray(attachmentData) ? attachmentData : [])
 
-    // Load defect counts
-    const counts: Record<string, { open: number; closed: number }> = {}
-    for (const survey of surveyData) {
-      const defects = await window.api.getSurveyDefects(survey.id)
-      counts[survey.id] = {
-        open: defects.filter(d => d.status === 'OPEN').length,
-        closed: defects.filter(d => d.status === 'CLOSED').length
+      // Load defect counts
+      const counts: Record<string, { open: number; closed: number }> = {}
+      for (const survey of safeSurveys) {
+        const defects = await window.api.getSurveyDefects(survey.id)
+        const safeDefects = Array.isArray(defects) ? defects : []
+        counts[survey.id] = {
+          open: safeDefects.filter(d => d.status === 'OPEN').length,
+          closed: safeDefects.filter(d => d.status === 'CLOSED').length
+        }
       }
+      setDefectCounts(counts)
+    } catch (error) {
+      console.error('Failed to load survey data:', error)
     }
-    setDefectCounts(counts)
   }
 
   // Lightweight refresh: only reload defect counts without reloading all surveys
@@ -181,7 +187,8 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   }
 
   const handleDeleteSurvey = async (survey: ConditionSurvey) => {
-    const defects = await window.api.getSurveyDefects(survey.id)
+    const defectsRaw = await window.api.getSurveyDefects(survey.id)
+    const defects = Array.isArray(defectsRaw) ? defectsRaw : []
     const attachs = attachments.filter(a => a.surveyId === survey.id)
     const msg = defects.length > 0 || attachs.length > 0
       ? `Delete survey? This will also delete ${defects.length} defect(s) and ${attachs.length} attachment(s).`
