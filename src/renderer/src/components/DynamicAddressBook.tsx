@@ -130,11 +130,14 @@ export default function DynamicAddressBook() {
     setLoading(true)
     setHasSearched(true)
     try {
+      // "All" selections mean "don't filter" — only send IDs when a subset is selected
+      const allFlagsSelected = selectedFlagStates.length === flagStates.length && flagStates.length > 0
+      const allPoliciesSelected = policyFilter === 'all'
       const criteria: DABQueryCriteria = {
         logic,
         exportType,
-        policyTypeIds: selectedPolicyTypeIds.length > 0 ? selectedPolicyTypeIds : undefined,
-        flagStateIds: selectedFlagStates.length > 0 ? selectedFlagStates : undefined,
+        policyTypeIds: !allPoliciesSelected && selectedPolicyTypeIds.length > 0 ? selectedPolicyTypeIds : undefined,
+        flagStateIds: !allFlagsSelected && selectedFlagStates.length > 0 ? selectedFlagStates : undefined,
         flagStateUnassigned: flagUnassigned || undefined,
         customerIds: undefined,
         customerType: customerType !== 'both' ? customerType : undefined,
