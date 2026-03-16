@@ -202,20 +202,21 @@ export class AuthService {
         this.clearSession(sessionId)
     }
 
-    async createUser(username: string, password: string, role: 'admin' | 'user'): Promise<{ success: boolean; message?: string }> {
+    async createUser(username: string, password: string, role: 'admin' | 'user'): Promise<{ success: boolean; message?: string; userId?: string }> {
         const existing = await db.getUser(username)
         if (existing) {
             return { success: false, message: 'Username already exists' }
         }
 
         const passwordHash = await bcrypt.hash(password, 10)
+        const userId = uuidv4()
         await db.addUser({
-            id: uuidv4(),
+            id: userId,
             username,
             passwordHash,
             role
         })
-        return { success: true }
+        return { success: true, userId }
     }
 
     async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; message?: string }> {

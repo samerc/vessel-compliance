@@ -1,9 +1,12 @@
-import { Notification } from 'electron'
+import { BrowserWindow, Notification } from 'electron'
 import { db } from '../mysql/adapter'
 
 class ComplianceScheduler {
     private checkTimer: NodeJS.Timeout | null = null
     private stopped = false
+    private _isRunning = false
+
+    get isRunning(): boolean { return this._isRunning }
 
     calculateNextRunTime(dayOfWeek: number, timeOfDay: string): string {
         const now = new Date()
@@ -28,7 +31,23 @@ class ComplianceScheduler {
         return nextRun.toISOString()
     }
 
+    private sendProgress(current: number, total: number, entityName: string): void {
+        try {
+            const windows = BrowserWindow.getAllWindows()
+            for (const win of windows) {
+                if (!win.isDestroyed()) {
+                    win.webContents.send('compliance:checkProgress', { current, total, entityName })
+                }
+            }
+        } catch { /* ignore */ }
+    }
+
     async runComplianceCheck(): Promise<void> {
+        if (this._isRunning) {
+            console.log('Compliance check already running, skipping')
+            return
+        }
+        this._isRunning = true
         console.log('Starting scheduled compliance check...')
 
         try {
@@ -65,10 +84,13 @@ class ComplianceScheduler {
             })
 
             let matchesFound = 0
+            let checkedCount = 0
             const threshold = settings.threshold / 100 // Convert to decimal
 
             // Check entities
             for (const entity of entitiesToCheck) {
+                checkedCount++
+                this.sendProgress(checkedCount, totalToCheck, entity.name)
                 try {
                     const params = new URLSearchParams({
                         q: entity.name,
@@ -131,6 +153,8 @@ class ComplianceScheduler {
 
             // Check vessels
             for (const vessel of vesselsToCheck) {
+                checkedCount++
+                this.sendProgress(checkedCount, totalToCheck, vessel.name)
                 try {
                     const params = new URLSearchParams({
                         q: vessel.name,
@@ -214,6 +238,9 @@ class ComplianceScheduler {
 
         } catch (error: any) {
             console.error('Compliance check failed:', error)
+        } finally {
+            this._isRunning = false
+            this.sendProgress(0, 0, '')
         }
     }
 

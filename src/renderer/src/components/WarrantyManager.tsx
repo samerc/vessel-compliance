@@ -144,7 +144,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     setEditingWarranty(w)
     setFormDescription(w.description)
     setFormDeadlineType(w.deadlineType)
-    setFormDeadlineDays(w.deadlineDays?.toString() || '')
+    setFormDeadlineDays(w.deadlineDays != null ? String(w.deadlineDays) : '')
     setFormDeadlineEvent(w.deadlineEvent || '')
     setFormInceptionDate(w.inceptionDate)
     setFormPolicyId(w.policyId || '')

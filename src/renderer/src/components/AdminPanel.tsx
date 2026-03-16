@@ -47,6 +47,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     })
     const [savingCompliance, setSavingCompliance] = useState(false)
     const [runningManualCheck, setRunningManualCheck] = useState(false)
+    const [checkProgress, setCheckProgress] = useState<{ current: number; total: number; entityName: string } | null>(null)
 
     // Sidebar navigation
     const [activeSection, setActiveSection] = useState<string>('docTypes')
@@ -270,17 +271,27 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     const handleRunManualCheck = async () => {
         setRunningManualCheck(true)
+        setCheckProgress(null)
+        const unsubscribe = window.api.onComplianceCheckProgress((data) => {
+            if (data.total === 0) {
+                setCheckProgress(null)
+            } else {
+                setCheckProgress(data)
+            }
+        })
         try {
             const result = await window.api.complianceRunManualCheck()
             if (result.success) {
-                showSuccess('Compliance check started. You will be notified when complete.')
+                showSuccess('Compliance check completed successfully.')
             } else {
                 showError(result.message || 'Failed to start compliance check')
             }
         } catch (error: any) {
             showError(error.message || 'Failed to start compliance check')
         } finally {
+            unsubscribe()
             setRunningManualCheck(false)
+            setCheckProgress(null)
         }
     }
 
@@ -1489,6 +1500,25 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                     Run Now
                                 </button>
                             </div>
+                            {runningManualCheck && checkProgress && checkProgress.total > 0 && (
+                                <div style={{ marginTop: '12px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                                            Checking: {checkProgress.entityName}
+                                        </span>
+                                        <span>{checkProgress.current} / {checkProgress.total}</span>
+                                    </div>
+                                    <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                                        <div style={{
+                                            height: '100%',
+                                            borderRadius: '3px',
+                                            background: 'var(--accent-primary)',
+                                            width: `${Math.round((checkProgress.current / checkProgress.total) * 100)}%`,
+                                            transition: 'width 0.3s ease'
+                                        }} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

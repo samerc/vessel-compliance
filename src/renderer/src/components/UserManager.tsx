@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { User, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
-import { Trash2, Shield, RefreshCcw, ArrowLeftRight, Users, X, Plus, Search, ChevronDown, ChevronRight, Clock, Key, Monitor } from 'lucide-react'
+import { Trash2, Shield, KeyRound, ArrowLeftRight, Users, X, Plus, Search, ChevronDown, ChevronRight, Key, Monitor } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -167,7 +167,11 @@ export default function UserManager() {
             const result = await window.api.authCreateUser(formData)
             if (result.success) {
                 setFormData({ username: '', password: '', role: 'user' })
-                loadUsers()
+                setShowCreateForm(false)
+                await loadUsers()
+                if (result.userId) {
+                    openGroupsModal(result.userId)
+                }
             } else {
                 setError(result.message || 'Failed to create user')
             }
@@ -422,149 +426,134 @@ export default function UserManager() {
             {loading ? (
                 <div style={{ color: 'var(--text-secondary)' }}>Loading users...</div>
             ) : (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
-                    gap: '16px'
-                }}>
-                    {users.map(user => {
-                        const vColor = getVersionColor(user.lastAppVersion)
-                        const groupIds = userGroupMap[user.id] || []
-                        const permCount = userPermCounts[user.id] || 0
-                        const isAdmin = user.role === 'admin'
+                <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+                        <caption className="sr-only">User accounts</caption>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>User</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Groups</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Permissions</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Version</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Last Login</th>
+                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {users.map(user => {
+                                const vColor = getVersionColor(user.lastAppVersion)
+                                const groupIds = userGroupMap[user.id] || []
+                                const permCount = userPermCounts[user.id] || 0
+                                const uIsAdmin = user.role === 'admin'
 
-                        return (
-                            <div key={user.id} style={{
-                                background: isLight ? '#ffffff' : 'rgba(255,255,255,0.04)',
-                                border: '1px solid var(--glass-border)',
-                                borderRadius: '12px',
-                                padding: '20px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '14px'
-                            }}>
-                                {/* Card Header — Avatar + Name + Role */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{
-                                        width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        background: isAdmin
-                                            ? 'linear-gradient(135deg, #9333ea, #7c3aed)'
-                                            : 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                                        color: '#fff', fontSize: '1.1rem', fontWeight: '700', flexShrink: 0,
-                                        textTransform: 'uppercase'
-                                    }}>
-                                        {user.username.charAt(0)}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontWeight: '700', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {user.username}
-                                        </div>
-                                        <span style={{
-                                            display: 'inline-block', marginTop: '2px',
-                                            padding: '2px 10px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '600',
-                                            background: isAdmin ? 'rgba(147,51,234,0.1)' : 'rgba(34,197,94,0.1)',
-                                            color: isAdmin ? '#d8b4fe' : '#86efac',
-                                            border: `1px solid ${isAdmin ? 'rgba(147,51,234,0.2)' : 'rgba(34,197,94,0.2)'}`
-                                        }}>
-                                            {user.role.toUpperCase()}
-                                        </span>
-                                    </div>
-                                    {/* Permission count badge */}
-                                    <div style={{
-                                        padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '600',
-                                        background: 'rgba(var(--accent-primary-rgb,0,210,255),0.08)',
-                                        color: 'var(--accent-primary)',
-                                        border: '1px solid rgba(var(--accent-primary-rgb,0,210,255),0.15)',
-                                        whiteSpace: 'nowrap', flexShrink: 0
-                                    }}>
-                                        {permCount} permission{permCount !== 1 ? 's' : ''}
-                                    </div>
-                                </div>
-
-                                {/* Groups Row */}
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', minHeight: '24px' }}>
-                                    {groupIds.length === 0 ? (
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No groups</span>
-                                    ) : (
-                                        groupIds.map(gId => (
-                                            <span key={gId} style={{
-                                                padding: '2px 10px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '600',
-                                                background: 'rgba(99,102,241,0.1)', color: isLight ? '#6366f1' : '#a5b4fc',
-                                                border: '1px solid rgba(99,102,241,0.2)'
+                                return (
+                                    <tr key={user.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <div style={{
+                                                    width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    background: uIsAdmin
+                                                        ? 'linear-gradient(135deg, #9333ea, #7c3aed)'
+                                                        : 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                                    color: '#fff', fontSize: '0.9rem', fontWeight: '700', flexShrink: 0,
+                                                    textTransform: 'uppercase'
+                                                }}>
+                                                    {user.username.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.username}</div>
+                                                    <span style={{
+                                                        display: 'inline-block', marginTop: '2px',
+                                                        padding: '1px 8px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '600',
+                                                        background: uIsAdmin ? 'rgba(147,51,234,0.1)' : 'rgba(34,197,94,0.1)',
+                                                        color: uIsAdmin ? '#d8b4fe' : '#86efac',
+                                                        border: `1px solid ${uIsAdmin ? 'rgba(147,51,234,0.2)' : 'rgba(34,197,94,0.2)'}`
+                                                    }}>
+                                                        {user.role.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                {groupIds.length === 0 ? (
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>
+                                                ) : (
+                                                    groupIds.map(gId => (
+                                                        <span key={gId} style={{
+                                                            padding: '1px 8px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: '600',
+                                                            background: 'rgba(99,102,241,0.1)', color: isLight ? '#6366f1' : '#a5b4fc',
+                                                            border: '1px solid rgba(99,102,241,0.2)'
+                                                        }}>
+                                                            {groupNameMap[gId] || gId}
+                                                        </span>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <span style={{
+                                                padding: '2px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '600',
+                                                background: 'rgba(var(--accent-primary-rgb,0,210,255),0.08)',
+                                                color: 'var(--accent-primary)',
+                                                border: '1px solid rgba(var(--accent-primary-rgb,0,210,255),0.15)',
                                             }}>
-                                                {groupNameMap[gId] || gId}
+                                                {permCount}
                                             </span>
-                                        ))
-                                    )}
-                                </div>
-
-                                {/* Info Row — Version + Last Login */}
-                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    {/* Version */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <Monitor size={14} color="var(--text-secondary)" />
-                                        <span style={{
-                                            padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '600',
-                                            background: vColor.bg, color: vColor.color, border: vColor.border
-                                        }}>
-                                            {user.lastAppVersion || 'Never'}
-                                        </span>
-                                    </div>
-                                    {/* Last Login */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-                                        <Clock size={14} color="var(--text-secondary)" />
-                                        <span style={{ fontSize: '0.78rem', color: user.lastLoginAt ? 'var(--text-secondary)' : 'var(--text-secondary)', opacity: user.lastLoginAt ? 1 : 0.5 }}>
-                                            {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Never'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Divider */}
-                                <div style={{ height: '1px', background: 'var(--glass-border)' }} />
-
-                                {/* Action Buttons */}
-                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                                    <button
-                                        onClick={() => openGroupsModal(user.id)}
-                                        style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '8px', border: 'none', cursor: 'pointer', borderRadius: '8px' }}
-                                        className="hover-effect"
-                                        title="Groups & Permissions"
-                                        aria-label="Groups and permissions"
-                                    >
-                                        <Users size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleToggleRole(user)}
-                                        style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '8px', border: 'none', cursor: 'pointer', borderRadius: '8px', opacity: user.id === currentUser?.id ? 0.3 : 1 }}
-                                        className="hover-effect"
-                                        title={user.id === currentUser?.id ? 'Cannot change own role' : `Change to ${user.role === 'admin' ? 'User' : 'Admin'}`}
-                                        aria-label="Toggle role"
-                                        disabled={user.id === currentUser?.id}
-                                    >
-                                        <ArrowLeftRight size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleResetPassword(user.username)}
-                                        style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '8px', border: 'none', cursor: 'pointer', borderRadius: '8px' }}
-                                        className="hover-effect"
-                                        title="Reset Password"
-                                        aria-label="Reset password"
-                                    >
-                                        <RefreshCcw size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(user.id)}
-                                        style={{ background: 'transparent', color: 'var(--danger)', padding: '8px', border: 'none', cursor: 'pointer', borderRadius: '8px' }}
-                                        className="hover-effect"
-                                        title="Delete User"
-                                        aria-label="Delete user"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            </div>
-                        )
-                    })}
+                                        </td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <span style={{
+                                                padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '600',
+                                                background: vColor.bg, color: vColor.color, border: vColor.border
+                                            }}>
+                                                {user.lastAppVersion || '—'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                                            {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : <span style={{ opacity: 0.5 }}>Never</span>}
+                                        </td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                                                <button
+                                                    onClick={() => openGroupsModal(user.id)}
+                                                    style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                                                    className="hover-effect"
+                                                    title="Groups & Permissions"
+                                                >
+                                                    <Users size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleRole(user)}
+                                                    style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px', opacity: user.id === currentUser?.id ? 0.3 : 1 }}
+                                                    className="hover-effect"
+                                                    title={user.id === currentUser?.id ? 'Cannot change own role' : `Change to ${user.role === 'admin' ? 'User' : 'Admin'}`}
+                                                    disabled={user.id === currentUser?.id}
+                                                >
+                                                    <ArrowLeftRight size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleResetPassword(user.username)}
+                                                    style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                                                    className="hover-effect"
+                                                    title="Reset Password"
+                                                >
+                                                    <KeyRound size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(user.id)}
+                                                    style={{ background: 'transparent', color: 'var(--danger)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                                                    className="hover-effect"
+                                                    title="Delete User"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             )}
 

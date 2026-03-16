@@ -497,7 +497,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                         placeholder="Search renewals..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        style={{ padding: '8px 28px 8px 36px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', width: '200px' }}
+                        style={{ padding: '8px 28px 8px 36px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', width: '200px' }}
                     />
                     {search && (
                         <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}>

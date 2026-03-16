@@ -9,7 +9,7 @@ export interface Api {
   authGetSession: () => Promise<Omit<User, 'passwordHash'> | null>
   authResetPassword: (username: string) => Promise<{ success: boolean; message?: string; newPassword?: string }>
   authLogout: () => Promise<void>
-  authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string }>
+  authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string; userId?: string }>
   getUsers: () => Promise<User[]>
   deleteUser: (id: string) => Promise<void>
   updateUserRole: (userId: string, role: 'admin' | 'user') => Promise<void>
@@ -133,6 +133,7 @@ export interface Api {
   complianceMarkResultReviewed: (resultId: string) => Promise<void>
   complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => Promise<{ success: boolean, message?: string }>
   complianceRunManualCheck: () => Promise<{ success: boolean; message?: string }>
+  onComplianceCheckProgress: (callback: (data: { current: number; total: number; entityName: string }) => void) => () => void
 
   // Flag States
   getFlagStates: () => Promise<FlagState[]>

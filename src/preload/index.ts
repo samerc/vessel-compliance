@@ -137,6 +137,11 @@ const api = {
   complianceMarkResultReviewed: (resultId: string) => ipcRenderer.invoke('compliance:markResultReviewed', resultId),
   complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => ipcRenderer.invoke('compliance:decideResult', resultId, decision),
   complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
+  onComplianceCheckProgress: (callback: (data: { current: number; total: number; entityName: string }) => void) => {
+    const handler = (_: any, data: any) => callback(data)
+    ipcRenderer.on('compliance:checkProgress', handler)
+    return () => { ipcRenderer.removeListener('compliance:checkProgress', handler) }
+  },
 
   // Flag States
   getFlagStates: () => ipcRenderer.invoke('db:getFlagStates'),

@@ -3680,10 +3680,13 @@ export class MySQLAdapter {
                 sw.completion_notes as completionNotes,
                 sw.condition_survey_id as conditionSurveyId,
                 sw.created_at as createdAt,
+                pt.name as policyTypeName,
                 (SELECT COUNT(*) FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id) as reminderCount,
                 (SELECT swr2.sent_at FROM survey_warranty_reminders swr2 WHERE swr2.warranty_id = sw.id ORDER BY swr2.sent_at DESC LIMIT 1) as lastReminderDate,
                 (SELECT swr3.next_reminder_date FROM survey_warranty_reminders swr3 WHERE swr3.warranty_id = sw.id ORDER BY swr3.created_at DESC LIMIT 1) as nextReminderDate
             FROM survey_warranties sw
+            LEFT JOIN vessel_dynamic_policies vdp ON vdp.id = sw.policy_id
+            LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
             WHERE sw.vessel_id = ?
             ORDER BY sw.created_at DESC
         `, [vesselId])
@@ -3758,7 +3761,7 @@ export class MySQLAdapter {
         await this.pool.query(
             `INSERT INTO survey_warranties (id, vessel_id, policy_id, description, deadline_type, deadline_days, deadline_event, inception_date, notes, status)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-            [id, data.vesselId, data.policyId || null, data.description, data.deadlineType, data.deadlineDays || null, data.deadlineEvent || null, data.inceptionDate, data.notes || null]
+            [id, data.vesselId, data.policyId || null, data.description, data.deadlineType, data.deadlineDays ?? null, data.deadlineEvent || null, data.inceptionDate, data.notes || null]
         )
         const [rows] = await this.pool.query('SELECT * FROM survey_warranties WHERE id = ?', [id])
         return (rows as any[])[0]

@@ -297,7 +297,16 @@ function KPI({ icon, gradient, label, value, sub }: {
         }}>
           {label}
         </div>
-        <div style={{ fontSize: '1.75rem', fontWeight: '800', lineHeight: 1, letterSpacing: '-0.03em' }}>
+        <div style={{
+          fontSize: String(value).length > 8 ? '1.4rem' : '1.75rem',
+          fontWeight: '800',
+          lineHeight: 1,
+          letterSpacing: '-0.03em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          width: '100%',
+        }}>
           {value}
         </div>
         {sub && (
@@ -1124,7 +1133,7 @@ export default function FleetAnalytics() {
   }
 
   return (
-    <div className="fade-in" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+    <div className="fade-in" style={{ display: 'flex', gap: '20px', height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
 
       {/* ── Left Sidebar: Filters ─────────────────────────────────── */}
       <aside style={{
@@ -1137,8 +1146,7 @@ export default function FleetAnalytics() {
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
-        position: 'sticky',
-        top: '20px',
+        overflowY: 'auto',
       }}>
         {/* Sidebar header */}
         <div style={{
@@ -1235,30 +1243,8 @@ export default function FleetAnalytics() {
           </CollapsibleFilter>
         )}
 
-        {/* Fleets */}
-        <FilterSection label="Fleets">
-          <MultiSelectDropdown
-            label="fleets"
-            options={fleets.map(f => ({ id: f.id, name: f.name }))}
-            selectedIds={filters.fleetIds}
-            onChange={ids => updateFilter('fleetIds', ids)}
-            isLight={isLight}
-          />
-        </FilterSection>
-
-        {/* Customers */}
-        <FilterSection label="Customers">
-          <MultiSelectDropdown
-            label="customers"
-            options={customerEntities.map(e => ({ id: e.id, name: e.name }))}
-            selectedIds={filters.customerIds}
-            onChange={ids => updateFilter('customerIds', ids)}
-            isLight={isLight}
-          />
-        </FilterSection>
-
         {/* Flag States */}
-        <CollapsibleFilter label="Flag States" defaultCollapsed>
+        <CollapsibleFilter label="Flag States">
           <MultiSelectDropdown
             label="flag states"
             options={flagStates.map(f => ({ id: f.id, name: f.name }))}
@@ -1269,12 +1255,34 @@ export default function FleetAnalytics() {
         </CollapsibleFilter>
 
         {/* Vessel Types */}
-        <CollapsibleFilter label="Vessel Types" defaultCollapsed>
+        <CollapsibleFilter label="Vessel Types">
           <MultiSelectDropdown
             label="vessel types"
             options={vesselTypes.map(vt => ({ id: vt.name, name: vt.name }))}
             selectedIds={filters.vesselTypeIds}
             onChange={ids => updateFilter('vesselTypeIds', ids)}
+            isLight={isLight}
+          />
+        </CollapsibleFilter>
+
+        {/* Fleets */}
+        <CollapsibleFilter label="Fleets" defaultCollapsed>
+          <MultiSelectDropdown
+            label="fleets"
+            options={fleets.map(f => ({ id: f.id, name: f.name }))}
+            selectedIds={filters.fleetIds}
+            onChange={ids => updateFilter('fleetIds', ids)}
+            isLight={isLight}
+          />
+        </CollapsibleFilter>
+
+        {/* Customers */}
+        <CollapsibleFilter label="Customers" defaultCollapsed>
+          <MultiSelectDropdown
+            label="customers"
+            options={customerEntities.map(e => ({ id: e.id, name: e.name }))}
+            selectedIds={filters.customerIds}
+            onChange={ids => updateFilter('customerIds', ids)}
             isLight={isLight}
           />
         </CollapsibleFilter>
@@ -1357,7 +1365,7 @@ export default function FleetAnalytics() {
       </aside>
 
       {/* ── Right Panel: Analytics Content ──────────────────────── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
 
         {/* Top bar */}
         <div style={{
