@@ -488,17 +488,17 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 <button onClick={goToCurrentMonth} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Today</button>
 
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--text-secondary)', opacity: 0.5 }} />
+                    <Search size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)', opacity: 0.5, pointerEvents: 'none' }} />
                     <input
                         type="text"
-                        placeholder="Search..."
+                        placeholder="Search renewals..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        style={{ padding: '7px 10px 7px 30px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', width: '180px' }}
+                        style={{ padding: '8px 28px 8px 36px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', width: '200px' }}
                     />
                     {search && (
                         <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}>
-                            <X size={12} />
+                            <X size={14} />
                         </button>
                     )}
                 </div>
