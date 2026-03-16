@@ -18,6 +18,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
@@ -76,6 +77,7 @@ export default function EntityDirectory() {
   const [addrForm, setAddrForm] = useState({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
+  const { hasPermission } = useAuth()
   const isLight = theme === 'light'
 
   const [page, setPage] = useState(1)
@@ -680,9 +682,11 @@ export default function EntityDirectory() {
           <button className="btn-secondary" onClick={() => setShowDuplicatesModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.9rem' }}>
             <ScanSearch size={16} /> Find Duplicates
           </button>
-          <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem' }}>
-            <Plus size={16} /> Create Entity
-          </button>
+          {hasPermission('entities:create') && (
+            <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem' }}>
+              <Plus size={16} /> Create Entity
+            </button>
+          )}
         </div>
       </header>
 
@@ -947,15 +951,19 @@ export default function EntityDirectory() {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
-                <button onClick={() => startEditing(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Pencil size={13} /> Edit
-                </button>
+                {hasPermission('entities:edit') && (
+                  <button onClick={() => startEditing(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Pencil size={13} /> Edit
+                  </button>
+                )}
                 <button onClick={() => openMergeModal(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Merge size={13} /> Merge
                 </button>
-                <button onClick={() => handleDeleteEntity(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--danger)' }}>
-                  <Trash2 size={13} />
-                </button>
+                {hasPermission('entities:delete') && (
+                  <button onClick={() => handleDeleteEntity(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--danger)' }}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
             </div>
 

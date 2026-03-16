@@ -35,7 +35,7 @@ function App(): React.JSX.Element {
   const [showChangelog, setShowChangelog] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const { isAuthenticated, isAdmin, logout, user } = useAuth()
+  const { isAuthenticated, isAdmin, logout, user, hasPermission } = useAuth()
   const { theme, setThemeTo } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
   const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
@@ -239,36 +239,36 @@ function App(): React.JSX.Element {
             <NavGroup id="fleet" label="Fleet" icon={<Ship size={14} />}
               groupCollapsed={collapsedGroups.has('fleet')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
-              {navItem('vessels', <Ship size={18} />, 'Vessels')}
-              {navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
-              {navItem('fleets', <LayoutDashboard size={18} />, 'Fleets')}
-              {navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
+              {hasPermission('vessels:view') && navItem('vessels', <Ship size={18} />, 'Vessels')}
+              {hasPermission('vessels:view') && navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
+              {hasPermission('fleets:view') && navItem('fleets', <LayoutDashboard size={18} />, 'Fleets')}
+              {hasPermission('fleets:view') && navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
             </NavGroup>
 
             <NavGroup id="compliance" label="Compliance" icon={<ShieldAlert size={14} />}
               groupCollapsed={collapsedGroups.has('compliance')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
-              {navItem('compliance', <ShieldAlert size={18} />, 'Compliance Center')}
-              {navItem('renewals', <Calendar size={18} />, 'Renewals')}
-              {navItem('sanctions-search', <Search size={18} />, 'Sanctions Search')}
-              {navItem('reminders', <Bell size={18} />, 'Reminders')}
+              {hasPermission('compliance:view') && navItem('compliance', <ShieldAlert size={18} />, 'Compliance Center')}
+              {hasPermission('policies:view') && navItem('renewals', <Calendar size={18} />, 'Renewals')}
+              {hasPermission('sanctions:search') && navItem('sanctions-search', <Search size={18} />, 'Sanctions Search')}
+              {hasPermission('reminders:view') && navItem('reminders', <Bell size={18} />, 'Reminders')}
             </NavGroup>
 
             <NavGroup id="operations" label="Operations" icon={<Layers size={14} />}
               groupCollapsed={collapsedGroups.has('operations')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
-              {navItem('directory', <BookOpen size={18} />, 'Directory')}
-              {navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
-              {navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
+              {hasPermission('entities:view') && navItem('directory', <BookOpen size={18} />, 'Directory')}
+              {hasPermission('surveys:view') && navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
+              {hasPermission('surveys:view') && navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
               {navItem('calculators', <Calculator size={18} />, 'Calculators')}
-              {navItem('quotations', <FileText size={18} />, 'Quotations')}
-              {navItem('reports', <ClipboardList size={18} />, 'Reports')}
+              {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
+              {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
             </NavGroup>
 
             <>
               <div style={{ height: '1px', background: 'var(--glass-border)', margin: '6px 4px', opacity: 0.5 }} />
-              {navItem('admin', <Settings size={18} />, 'Settings')}
-              {isAdmin && navItem('users', <UserCog size={18} />, 'User Management')}
+              {hasPermission('admin:settings') && navItem('admin', <Settings size={18} />, 'Settings')}
+              {hasPermission('admin:users') && navItem('users', <UserCog size={18} />, 'User Management')}
             </>
           </nav>
 

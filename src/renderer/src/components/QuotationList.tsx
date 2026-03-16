@@ -3,6 +3,7 @@ import { Plus, Search, FileText, Trash2, Copy, ChevronUp, ChevronDown, ChevronLe
 import { Quotation, QuotationType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatDateShort } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 
@@ -37,6 +38,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     const [showNewMenu, setShowNewMenu] = useState(false)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
+    const { hasPermission } = useAuth()
     const isLight = theme === 'light'
 
     useEffect(() => { loadData() }, [])
@@ -259,7 +261,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                 <button onClick={loadData} className="btn-secondary" style={{ padding: '8px', flexShrink: 0 }} title="Refresh">
                     <RotateCw size={16} />
                 </button>
-                <div style={{ position: 'relative' }}>
+                {hasPermission('quotations:create') && <div style={{ position: 'relative' }}>
                     <button
                         onClick={() => setShowNewMenu(!showNewMenu)}
                         className="btn-primary"
@@ -300,7 +302,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                             </div>
                         </>
                     )}
-                </div>
+                </div>}
             </div>
 
             {/* Table */}
@@ -435,14 +437,16 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                         >
                                             <Copy size={14} />
                                         </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ show: true, quotation: q }) }}
-                                            className="btn-secondary"
-                                            style={{ padding: '5px', color: 'var(--danger)' }}
-                                            title="Delete"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
+                                        {hasPermission('quotations:delete') && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ show: true, quotation: q }) }}
+                                                className="btn-secondary"
+                                                style={{ padding: '5px', color: 'var(--danger)' }}
+                                                title="Delete"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             )

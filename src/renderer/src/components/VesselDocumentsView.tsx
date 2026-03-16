@@ -53,7 +53,7 @@ function getDocStatus(
 
 export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload }: Props) {
   const { theme } = useTheme()
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
   const { showSuccess, showError } = useToast()
   const isLight = theme === 'light'
 
@@ -455,27 +455,29 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
         {/* Action bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' as const }}>
           {!hasFile ? (
-            <button
-              onClick={() => handleClickUpload(id)}
-              disabled={uploadingId === id}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '5px',
-                padding: required ? '5px 14px' : '4px 10px',
-                borderRadius: '6px', fontSize: '0.78rem', fontWeight: required ? '600' : '500',
-                cursor: uploadingId === id ? 'not-allowed' : 'pointer',
-                opacity: uploadingId === id ? 0.65 : 1,
-                background: required
-                  ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)')
-                  : 'transparent',
-                border: required
-                  ? `1px solid ${isLight ? 'rgba(0,119,163,0.5)' : 'rgba(0,210,255,0.4)'}`
-                  : `1px dashed ${isLight ? 'rgba(0,119,163,0.3)' : 'rgba(0,210,255,0.3)'}`,
-                color: isLight ? '#0077a3' : 'var(--accent-primary)',
-              }}
-            >
-              {uploadingId === id ? <Loader2 size={12} className="spinner" /> : <Upload size={12} />}
-              {uploadingId === id ? 'Uploading...' : 'Upload File'}
-            </button>
+            hasPermission('documents:upload') ? (
+              <button
+                onClick={() => handleClickUpload(id)}
+                disabled={uploadingId === id}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  padding: required ? '5px 14px' : '4px 10px',
+                  borderRadius: '6px', fontSize: '0.78rem', fontWeight: required ? '600' : '500',
+                  cursor: uploadingId === id ? 'not-allowed' : 'pointer',
+                  opacity: uploadingId === id ? 0.65 : 1,
+                  background: required
+                    ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)')
+                    : 'transparent',
+                  border: required
+                    ? `1px solid ${isLight ? 'rgba(0,119,163,0.5)' : 'rgba(0,210,255,0.4)'}`
+                    : `1px dashed ${isLight ? 'rgba(0,119,163,0.3)' : 'rgba(0,210,255,0.3)'}`,
+                  color: isLight ? '#0077a3' : 'var(--accent-primary)',
+                }}
+              >
+                {uploadingId === id ? <Loader2 size={12} className="spinner" /> : <Upload size={12} />}
+                {uploadingId === id ? 'Uploading...' : 'Upload File'}
+              </button>
+            ) : null
           ) : (
             <>
               <button onClick={() => window.api.fsOpen(doc!.filePath)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Open file">

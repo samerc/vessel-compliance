@@ -6,6 +6,7 @@ import 'flag-icons/css/flag-icons.min.css'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import VesselDetail from './VesselDetail'
 import SanctionsModal from './SanctionsModal'
 import { formatDateTime } from '../utils/dateUtils'
@@ -29,6 +30,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [openInEditMode, setOpenInEditMode] = useState(false)
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
+    const { hasPermission } = useAuth()
     const isLight = theme === 'light'
 
     // Pagination State
@@ -411,14 +413,16 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Vessel Registry</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>Search, filter, and manage all vessels across your fleets.</p>
                 </div>
-                <button
-                    onClick={() => setShowQuickAdd(!showQuickAdd)}
-                    className={showQuickAdd ? 'btn-secondary' : 'btn-primary'}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
-                >
-                    {showQuickAdd ? <X size={20} /> : <Plus size={20} />}
-                    {showQuickAdd ? 'Cancel' : 'Add Vessel'}
-                </button>
+                {hasPermission('vessels:create') && (
+                    <button
+                        onClick={() => setShowQuickAdd(!showQuickAdd)}
+                        className={showQuickAdd ? 'btn-secondary' : 'btn-primary'}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
+                    >
+                        {showQuickAdd ? <X size={20} /> : <Plus size={20} />}
+                        {showQuickAdd ? 'Cancel' : 'Add Vessel'}
+                    </button>
+                )}
             </header>
 
             {showQuickAdd && (

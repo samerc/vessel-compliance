@@ -890,22 +890,22 @@ app.whenReady().then(() => {
 
   // Database IPC Handlers - Read operations require session, deletes require admin
   safeHandle('db:getDocumentTypes', (event) => { requireSession(event); return db.getDocumentTypes() })
-  safeHandle('db:addDocumentType', (event, docType) => { requireSession(event); return db.addDocumentType(docType) })
-  safeHandle('db:updateDocumentType', (event, id, updates) => { requireSession(event); return db.updateDocumentType(id, updates) })
+  safeHandle('db:addDocumentType', async (event, docType) => { await requirePermission(event, 'admin:settings'); return db.addDocumentType(docType) })
+  safeHandle('db:updateDocumentType', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updateDocumentType(id, updates) })
   safeHandle('db:deleteDocumentType', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteDocumentType(id) })
 
   safeHandle('db:getVesselCustomDocTypes', (event, vesselId: string) => { requireSession(event); return db.getVesselCustomDocTypes(vesselId) })
-  safeHandle('db:addVesselCustomDocType', (event, docType) => { requireSession(event); return db.addVesselCustomDocType(docType) })
-  safeHandle('db:deleteVesselCustomDocType', (event, id: string) => { requireSession(event); return db.deleteVesselCustomDocType(id) })
+  safeHandle('db:addVesselCustomDocType', async (event, docType) => { await requirePermission(event, 'documents:upload'); return db.addVesselCustomDocType(docType) })
+  safeHandle('db:deleteVesselCustomDocType', async (event, id: string) => { await requirePermission(event, 'documents:delete'); return db.deleteVesselCustomDocType(id) })
 
   safeHandle('db:getFleets', (event) => { requireSession(event); return db.getFleets() })
-  safeHandle('db:addFleet', (event, fleet) => { requireSession(event); return db.addFleet(fleet) })
+  safeHandle('db:addFleet', async (event, fleet) => { await requirePermission(event, 'fleets:manage'); return db.addFleet(fleet) })
   safeHandle('db:deleteFleet', async (event, id) => { await requirePermission(event, 'fleets:manage'); return db.deleteFleet(id) })
 
   safeHandle('db:getVessels', (event) => { requireSession(event); return db.getVessels() })
   safeHandle('db:getVesselsPaginated', (event, params) => { requireSession(event); return db.getVesselsPaginated(params) })
   safeHandle('db:addVessel', async (event, vessel) => {
-    requireSession(event)
+    await requirePermission(event, 'vessels:create')
     try {
       const result = await db.addVessel(vessel)
       return { success: true, data: result }
@@ -913,7 +913,7 @@ app.whenReady().then(() => {
       return { success: false, message: error.message }
     }
   })
-  safeHandle('db:updateVessel', (event, id, updates) => { const user = requireSession(event); return db.updateVessel(id, updates, user.username) })
+  safeHandle('db:updateVessel', async (event, id, updates) => { const user = await requirePermission(event, 'vessels:edit'); return db.updateVessel(id, updates, user.username) })
   safeHandle('db:getVesselNameHistory', (event, vesselId) => { requireSession(event); return db.getVesselNameHistory(vesselId) })
   safeHandle('db:deleteVessel', async (event, id) => {
     await requirePermission(event, 'vessels:delete')
@@ -923,23 +923,23 @@ app.whenReady().then(() => {
 
   safeHandle('db:getVesselDocuments', (event, vesselId) => { requireSession(event); return db.getVesselDocuments(vesselId) })
   safeHandle('db:upsertVesselDocument', async (event, doc) => {
-    requireSession(event)
+    await requirePermission(event, 'documents:upload')
     await db.upsertVesselDocument(doc)
     if (doc.filePath) {
       await db.autoSnoozeVessel(doc.vesselId)
     }
   })
-  safeHandle('db:updateVesselDocumentExpiry', (event, vesselId, docTypeId, expiryDate) => { requireSession(event); return db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate) })
-  safeHandle('db:updateVesselDocumentReceivedDate', (event, vesselId, docTypeId, receivedDate) => { requireSession(event); return db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate) })
-  safeHandle('db:duplicateVesselDocument', (event, docId, uploadedBy) => { requireSession(event); return db.duplicateVesselDocument(docId, uploadedBy) })
-  safeHandle('db:deleteVesselDocumentById', (event, docId) => { requireSession(event); return db.deleteVesselDocumentById(docId) })
+  safeHandle('db:updateVesselDocumentExpiry', async (event, vesselId, docTypeId, expiryDate) => { await requirePermission(event, 'documents:upload'); return db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate) })
+  safeHandle('db:updateVesselDocumentReceivedDate', async (event, vesselId, docTypeId, receivedDate) => { await requirePermission(event, 'documents:upload'); return db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate) })
+  safeHandle('db:duplicateVesselDocument', async (event, docId, uploadedBy) => { await requirePermission(event, 'documents:upload'); return db.duplicateVesselDocument(docId, uploadedBy) })
+  safeHandle('db:deleteVesselDocumentById', async (event, docId) => { await requirePermission(event, 'documents:delete'); return db.deleteVesselDocumentById(docId) })
 
   // Entity IPC Handlers
   safeHandle('db:getEntities', (event) => { requireSession(event); return db.getEntities() })
   safeHandle('db:getEntitiesPaginated', (event, params) => { requireSession(event); return db.getEntitiesPaginated(params) })
-  safeHandle('db:addEntity', (event, entity) => { requireSession(event); return db.addEntity(entity) })
+  safeHandle('db:addEntity', async (event, entity) => { await requirePermission(event, 'entities:create'); return db.addEntity(entity) })
   safeHandle('db:updateEntity', async (event, id, updates) => {
-    requireSession(event)
+    await requirePermission(event, 'entities:edit')
     const docFields = ['passportFilePath', 'certificateOfIncorporationPath', 'articlesOfAssociationPath', 'kycFilePath']
     const hasDocChange = docFields.some(f => updates[f] !== undefined)
     await db.updateEntity(id, updates)
@@ -947,22 +947,22 @@ app.whenReady().then(() => {
       await db.autoSnoozeVesselsForEntity(id)
     }
   })
-  safeHandle('db:deleteEntity', (event, id) => { requireSession(event); return db.deleteEntity(id) })
-  safeHandle('db:mergeEntities', (event, sourceId, targetId, keepName) => { requireSession(event); return db.mergeEntities(sourceId, targetId, keepName) })
+  safeHandle('db:deleteEntity', async (event, id) => { await requirePermission(event, 'entities:delete'); return db.deleteEntity(id) })
+  safeHandle('db:mergeEntities', async (event, sourceId, targetId, keepName) => { await requirePermission(event, 'entities:edit'); return db.mergeEntities(sourceId, targetId, keepName) })
   safeHandle('maintenance:syncSettings', async (event) => { await requirePermission(event, 'admin:settings'); return db.syncAssuredRoles() })
 
   safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
-  safeHandle('db:addAssuredRole', (event, role) => { requireSession(event); return db.addAssuredRole(role) })
-  safeHandle('db:updateAssuredRole', (event, id, updates) => { requireSession(event); return db.updateAssuredRole(id, updates) })
-  safeHandle('db:deleteAssuredRole', (event, id) => { requireSession(event); return db.deleteAssuredRole(id) })
-  safeHandle('db:reorderAssuredRoles', (event, orderedIds) => { requireSession(event); return db.reorderAssuredRoles(orderedIds) })
+  safeHandle('db:addAssuredRole', async (event, role) => { await requirePermission(event, 'admin:settings'); return db.addAssuredRole(role) })
+  safeHandle('db:updateAssuredRole', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updateAssuredRole(id, updates) })
+  safeHandle('db:deleteAssuredRole', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteAssuredRole(id) })
+  safeHandle('db:reorderAssuredRoles', async (event, orderedIds) => { await requirePermission(event, 'admin:settings'); return db.reorderAssuredRoles(orderedIds) })
   safeHandle('db:getVesselsByRole', (event, roleName) => { requireSession(event); return db.getVesselsByRole(roleName) })
 
   // Flag States
   safeHandle('db:getFlagStates', (event) => { requireSession(event); return db.getFlagStates() })
-  safeHandle('db:addFlagState', (event, flagState) => { requireSession(event); return db.addFlagState(flagState) })
-  safeHandle('db:updateFlagState', (event, id, updates) => { requireSession(event); return db.updateFlagState(id, updates) })
-  safeHandle('db:deleteFlagState', (event, id) => { requireSession(event); return db.deleteFlagState(id) })
+  safeHandle('db:addFlagState', async (event, flagState) => { await requirePermission(event, 'admin:settings'); return db.addFlagState(flagState) })
+  safeHandle('db:updateFlagState', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updateFlagState(id, updates) })
+  safeHandle('db:deleteFlagState', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteFlagState(id) })
   safeHandle('db:getVesselsByFlagState', (event, flagStateId) => { requireSession(event); return db.getVesselsByFlagState(flagStateId) })
 
   // Policy Types
@@ -974,28 +974,28 @@ app.whenReady().then(() => {
 
   // Vessel Policies
   safeHandle('db:getVesselPolicies', (event, vesselId) => { requireSession(event); return db.getVesselPolicies(vesselId) })
-  safeHandle('db:addVesselPolicy', (event, vesselId, policyTypeId) => { requireSession(event); return db.addVesselPolicy(vesselId, policyTypeId) })
-  safeHandle('db:deleteVesselPolicy', (event, id) => { requireSession(event); return db.deleteVesselPolicy(id) })
+  safeHandle('db:addVesselPolicy', async (event, vesselId, policyTypeId) => { await requirePermission(event, 'policies:manage'); return db.addVesselPolicy(vesselId, policyTypeId) })
+  safeHandle('db:deleteVesselPolicy', async (event, id) => { await requirePermission(event, 'policies:manage'); return db.deleteVesselPolicy(id) })
 
   // Dynamic Address Book
   safeHandle('db:queryDAB', (event, criteria) => { requireSession(event); return db.queryDAB(criteria) })
 
   safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
-  safeHandle('db:addVesselAssured', (event, assured) => { requireSession(event); return db.addVesselAssured(assured) })
-  safeHandle('db:deleteVesselAssured', (event, id) => { requireSession(event); return db.deleteVesselAssured(id) })
-  safeHandle('db:updateVesselAssuredRole', (event, id, role) => { requireSession(event); return db.updateVesselAssuredRole(id, role) })
+  safeHandle('db:addVesselAssured', async (event, assured) => { await requirePermission(event, 'assureds:manage'); return db.addVesselAssured(assured) })
+  safeHandle('db:deleteVesselAssured', async (event, id) => { await requirePermission(event, 'assureds:manage'); return db.deleteVesselAssured(id) })
+  safeHandle('db:updateVesselAssuredRole', async (event, id, role) => { await requirePermission(event, 'assureds:manage'); return db.updateVesselAssuredRole(id, role) })
 
   safeHandle('db:getEntityUBOs', (event, assuredEntityId) => { requireSession(event); return db.getEntityUBOs(assuredEntityId) })
-  safeHandle('db:addEntityUBO', (event, ubo) => { requireSession(event); return db.addEntityUBO(ubo) })
-  safeHandle('db:deleteEntityUBO', (event, ubo) => { requireSession(event); return db.deleteEntityUBO(ubo) })
+  safeHandle('db:addEntityUBO', async (event, ubo) => { await requirePermission(event, 'entities:edit'); return db.addEntityUBO(ubo) })
+  safeHandle('db:deleteEntityUBO', async (event, ubo) => { await requirePermission(event, 'entities:edit'); return db.deleteEntityUBO(ubo) })
 
   // Entity Addresses
   safeHandle('entityAddress:getByEntity', (event, entityId) => { requireSession(event); return db.getEntityAddresses(entityId) })
   safeHandle('entityAddress:getAll', (event) => { requireSession(event); return db.getEntityAddresses() })
-  safeHandle('entityAddress:add', (event, addr) => { requireSession(event); return db.addEntityAddress(addr) })
-  safeHandle('entityAddress:update', (event, id, updates) => { requireSession(event); return db.updateEntityAddress(id, updates) })
-  safeHandle('entityAddress:delete', (event, id) => { requireSession(event); return db.deleteEntityAddress(id) })
-  safeHandle('vesselAssured:updateAddress', (event, id, addressId) => { requireSession(event); return db.updateVesselAssuredAddress(id, addressId) })
+  safeHandle('entityAddress:add', async (event, addr) => { await requirePermission(event, 'entities:addresses'); return db.addEntityAddress(addr) })
+  safeHandle('entityAddress:update', async (event, id, updates) => { await requirePermission(event, 'entities:addresses'); return db.updateEntityAddress(id, updates) })
+  safeHandle('entityAddress:delete', async (event, id) => { await requirePermission(event, 'entities:addresses'); return db.deleteEntityAddress(id) })
+  safeHandle('vesselAssured:updateAddress', async (event, id, addressId) => { await requirePermission(event, 'assureds:manage'); return db.updateVesselAssuredAddress(id, addressId) })
 
   // RBAC: User Groups & Permissions
   safeHandle('rbac:getGroups', (event) => { requireSession(event); return db.getUserGroups() })
@@ -1014,16 +1014,16 @@ app.whenReady().then(() => {
   // Surveyors
   safeHandle('db:getSurveyors', (event) => { requireSession(event); return db.getSurveyors() })
   safeHandle('db:getSurveyorsPaginated', (event, params) => { requireSession(event); return db.getSurveyorsPaginated(params) })
-  safeHandle('db:addSurveyor', (event, surveyor) => { requireSession(event); return db.addSurveyor(surveyor) })
-  safeHandle('db:updateSurveyor', (event, id, updates) => { requireSession(event); return db.updateSurveyor(id, updates) })
-  safeHandle('db:deleteSurveyor', (event, id) => { requireSession(event); return db.deleteSurveyor(id) })
+  safeHandle('db:addSurveyor', async (event, surveyor) => { await requirePermission(event, 'surveys:manage'); return db.addSurveyor(surveyor) })
+  safeHandle('db:updateSurveyor', async (event, id, updates) => { await requirePermission(event, 'surveys:manage'); return db.updateSurveyor(id, updates) })
+  safeHandle('db:deleteSurveyor', async (event, id) => { await requirePermission(event, 'surveys:manage'); return db.deleteSurveyor(id) })
 
   // Condition Surveys
   safeHandle('db:getConditionSurveys', (event, vesselId) => { requireSession(event); return db.getConditionSurveys(vesselId) })
-  safeHandle('db:addConditionSurvey', (event, survey) => { requireSession(event); return db.addConditionSurvey(survey) })
-  safeHandle('db:updateConditionSurvey', (event, id, updates) => { requireSession(event); return db.updateConditionSurvey(id, updates) })
+  safeHandle('db:addConditionSurvey', async (event, survey) => { await requirePermission(event, 'surveys:manage'); return db.addConditionSurvey(survey) })
+  safeHandle('db:updateConditionSurvey', async (event, id, updates) => { await requirePermission(event, 'surveys:manage'); return db.updateConditionSurvey(id, updates) })
   safeHandle('db:deleteConditionSurvey', async (event, id) => {
-    requireSession(event)
+    await requirePermission(event, 'surveys:manage')
     return db.deleteConditionSurvey(id)
   })
 
@@ -1043,18 +1043,18 @@ app.whenReady().then(() => {
     return db.deleteConditionSurveyType(id)
   })
   safeHandle('db:getSurveyDefects', (event, surveyId) => { requireSession(event); return db.getSurveyDefects(surveyId) })
-  safeHandle('db:addSurveyDefect', (event, defect) => { requireSession(event); return db.addSurveyDefect(defect) })
-  safeHandle('db:updateSurveyDefect', (event, id, updates) => { requireSession(event); return db.updateSurveyDefect(id, updates) })
-  safeHandle('db:deleteSurveyDefect', (event, id) => { requireSession(event); return db.deleteSurveyDefect(id) })
-  safeHandle('db:closeDefect', (event, id, closedBy, closureNotes) => { requireSession(event); return db.closeDefect(id, closedBy, closureNotes) })
-  safeHandle('db:reopenDefect', (event, id) => { requireSession(event); return db.reopenDefect(id) })
+  safeHandle('db:addSurveyDefect', async (event, defect) => { await requirePermission(event, 'surveys:defects'); return db.addSurveyDefect(defect) })
+  safeHandle('db:updateSurveyDefect', async (event, id, updates) => { await requirePermission(event, 'surveys:defects'); return db.updateSurveyDefect(id, updates) })
+  safeHandle('db:deleteSurveyDefect', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.deleteSurveyDefect(id) })
+  safeHandle('db:closeDefect', async (event, id, closedBy, closureNotes) => { await requirePermission(event, 'surveys:defects'); return db.closeDefect(id, closedBy, closureNotes) })
+  safeHandle('db:reopenDefect', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.reopenDefect(id) })
   safeHandle('db:getSurveyAttachments', (event, surveyId) => { requireSession(event); return db.getSurveyAttachments(surveyId) })
-  safeHandle('db:addSurveyAttachment', (event, attachment) => { requireSession(event); return db.addSurveyAttachment(attachment) })
+  safeHandle('db:addSurveyAttachment', async (event, attachment) => { await requirePermission(event, 'surveys:manage'); return db.addSurveyAttachment(attachment) })
   safeHandle('db:deleteSurveyAttachment', async (event, id) => { await requirePermission(event, 'surveys:manage'); return db.deleteSurveyAttachment(id) })
   safeHandle('db:getOpenDefectsByVessel', (event) => { requireSession(event); return db.getOpenDefectsByVessel() })
   safeHandle('db:getSurveyHistory', (event, vesselId) => { requireSession(event); return db.getSurveyHistory(vesselId) })
-  safeHandle('db:closeSurvey', (event, surveyId, userId) => { requireSession(event); return db.closeSurvey(surveyId, userId) })
-  safeHandle('db:updateConditionSurveyEndorsement', (event, surveyId, issued) => { requireSession(event); return db.updateConditionSurveyEndorsement(surveyId, issued) })
+  safeHandle('db:closeSurvey', async (event, surveyId, userId) => { await requirePermission(event, 'surveys:manage'); return db.closeSurvey(surveyId, userId) })
+  safeHandle('db:updateConditionSurveyEndorsement', async (event, surveyId, issued) => { await requirePermission(event, 'surveys:manage'); return db.updateConditionSurveyEndorsement(surveyId, issued) })
 
   // Dashboard
   safeHandle('dashboard:getActivity', (event) => { requireSession(event); return db.getDashboardActivity() })
@@ -1064,12 +1064,12 @@ app.whenReady().then(() => {
   safeHandle('survey_warranty:getAll', (event) => { requireSession(event); return db.getAllSurveyWarranties() })
   safeHandle('survey_warranty:getDueToday', (event) => { requireSession(event); return db.getSurveyWarrantiesDueToday() })
   safeHandle('survey_warranty:getEndorsementsDue', (event) => { requireSession(event); return db.getEndorsementsDue() })
-  safeHandle('survey_warranty:create', (event, data) => { requireSession(event); return db.createSurveyWarranty(data) })
-  safeHandle('survey_warranty:update', (event, id, data) => { requireSession(event); return db.updateSurveyWarranty(id, data) })
+  safeHandle('survey_warranty:create', async (event, data) => { await requirePermission(event, 'surveys:manage'); return db.createSurveyWarranty(data) })
+  safeHandle('survey_warranty:update', async (event, id, data) => { await requirePermission(event, 'surveys:manage'); return db.updateSurveyWarranty(id, data) })
   safeHandle('survey_warranty:delete', async (event, id) => { await requirePermission(event, 'surveys:manage'); return db.deleteSurveyWarranty(id) })
-  safeHandle('survey_warranty:logReminder', (event, data) => { requireSession(event); return db.logWarrantyReminder(data) })
+  safeHandle('survey_warranty:logReminder', async (event, data) => { await requirePermission(event, 'surveys:manage'); return db.logWarrantyReminder(data) })
   safeHandle('survey_warranty:getReminders', (event, warrantyId) => { requireSession(event); return db.getWarrantyReminders(warrantyId) })
-  safeHandle('survey_warranty:waive', (event, id, reason) => { requireSession(event); return db.waiverSurveyWarranty(id, reason) })
+  safeHandle('survey_warranty:waive', async (event, id, reason) => { await requirePermission(event, 'surveys:manage'); return db.waiverSurveyWarranty(id, reason) })
 
 
 
@@ -1079,8 +1079,8 @@ app.whenReady().then(() => {
     return db.getVesselFilePaths(vesselId)
   })
 
-  safeHandle('vessel:remapFilePaths', (event, remaps: { source: string; id: string; newPath: string }[]) => {
-    requireSession(event)
+  safeHandle('vessel:remapFilePaths', async (event, remaps: { source: string; id: string; newPath: string }[]) => {
+    await requirePermission(event, 'vessels:edit')
     if (!Array.isArray(remaps)) throw new Error('Invalid remaps payload')
     return db.remapVesselFilePaths(remaps)
   })
@@ -1106,16 +1106,16 @@ app.whenReady().then(() => {
   })
 
   // War Breach Records
-  safeHandle('warBreach:save', (event, record: any) => {
-    requireSession(event)
+  safeHandle('warBreach:save', async (event, record: any) => {
+    await requirePermission(event, 'quotations:edit')
     return db.saveWarBreachRecord(record)
   })
   safeHandle('warBreach:getAll', (event) => {
     requireSession(event)
     return db.getWarBreachRecords()
   })
-  safeHandle('warBreach:delete', (event, id: string) => {
-    requireSession(event)
+  safeHandle('warBreach:delete', async (event, id: string) => {
+    await requirePermission(event, 'quotations:edit')
     return db.deleteWarBreachRecord(id)
   })
 
@@ -1432,12 +1432,12 @@ app.whenReady().then(() => {
   })
 
   safeHandle('compliance:markResultReviewed', async (event, resultId: string) => {
-    const user = requireSession(event)
+    const user = await requirePermission(event, 'compliance:review')
     await db.markComplianceResultReviewed(resultId, user.username)
   })
 
   safeHandle('compliance:decideResult', async (event, resultId: string, decision: 'sanctioned' | 'cleared') => {
-    const user = requireSession(event)
+    const user = await requirePermission(event, 'compliance:review')
     await db.decideComplianceResult(resultId, decision, user.username)
     return { success: true }
   })
@@ -1450,10 +1450,10 @@ app.whenReady().then(() => {
 
   // Reminder IPC Handlers
   safeHandle('reminders:getSettings', (event) => { requireSession(event); return db.getReminderSettings() })
-  safeHandle('reminders:setSettings', (event, settings) => { requireSession(event); return db.setReminderSettings(settings) })
+  safeHandle('reminders:setSettings', async (event, settings) => { await requirePermission(event, 'reminders:manage'); return db.setReminderSettings(settings) })
   safeHandle('reminders:getVesselReminders', (event) => { requireSession(event); return db.getVesselReminders() })
-  safeHandle('reminders:snoozeVessel', (event, vesselId, username, periodDays) => { requireSession(event); return db.snoozeVessel(vesselId, username, periodDays) })
-  safeHandle('reminders:unsnoozeVessel', (event, vesselId) => { requireSession(event); return db.unsnoozeVessel(vesselId) })
+  safeHandle('reminders:snoozeVessel', async (event, vesselId, username, periodDays) => { await requirePermission(event, 'reminders:manage'); return db.snoozeVessel(vesselId, username, periodDays) })
+  safeHandle('reminders:unsnoozeVessel', async (event, vesselId) => { await requirePermission(event, 'reminders:manage'); return db.unsnoozeVessel(vesselId) })
 
   // P&I Clauses
   safeHandle('pi:getClauses', (event) => { requireSession(event); return db.getPIClauses() })
@@ -1498,26 +1498,26 @@ app.whenReady().then(() => {
 
   // Quotation Hull Data
   safeHandle('hull:getQuotationAgreedValueItems', (event, qId) => { requireSession(event); return db.getQuotationAgreedValueItems(qId) })
-  safeHandle('hull:setQuotationAgreedValueItems', (event, qId, items) => { requireSession(event); return db.setQuotationAgreedValueItems(qId, items) })
+  safeHandle('hull:setQuotationAgreedValueItems', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationAgreedValueItems(qId, items) })
   // P&I Alternatives
   safeHandle('pi:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationPIAlternatives(qId) })
-  safeHandle('pi:addQuotationAlternative', (event, qId, label) => { requireSession(event); return db.addQuotationPIAlternative(qId, label) })
-  safeHandle('pi:migrateSharedToAlternative', (event, qId, altId) => { requireSession(event); return db.piMigrateSharedToAlternative(qId, altId) })
-  safeHandle('pi:updateQuotationAlternative', (event, id, updates) => { requireSession(event); return db.updateQuotationPIAlternative(id, updates) })
-  safeHandle('pi:deleteQuotationAlternative', (event, id) => { requireSession(event); return db.deleteQuotationPIAlternative(id) })
-  safeHandle('pi:reorderQuotationAlternatives', (event, ids) => { requireSession(event); return db.reorderQuotationPIAlternatives(ids) })
-  safeHandle('quotation:updateItemAlternativeId', (event, table, id, alternativeId) => { requireSession(event); return db.updateQuotationItemAlternativeId(table, id, alternativeId) })
+  safeHandle('pi:addQuotationAlternative', async (event, qId, label) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationPIAlternative(qId, label) })
+  safeHandle('pi:migrateSharedToAlternative', async (event, qId, altId) => { await requirePermission(event, 'quotations:edit'); return db.piMigrateSharedToAlternative(qId, altId) })
+  safeHandle('pi:updateQuotationAlternative', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationPIAlternative(id, updates) })
+  safeHandle('pi:deleteQuotationAlternative', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationPIAlternative(id) })
+  safeHandle('pi:reorderQuotationAlternatives', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationPIAlternatives(ids) })
+  safeHandle('quotation:updateItemAlternativeId', async (event, table, id, alternativeId) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationItemAlternativeId(table, id, alternativeId) })
 
   // Hull Alternatives
   safeHandle('hull:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationHullAlternatives(qId) })
-  safeHandle('hull:addQuotationAlternative', (event, qId, hullClauseId, label) => { requireSession(event); return db.addQuotationHullAlternative(qId, hullClauseId, label) })
-  safeHandle('hull:updateQuotationAlternative', (event, id, updates) => { requireSession(event); return db.updateQuotationHullAlternative(id, updates) })
-  safeHandle('hull:deleteQuotationAlternative', (event, id) => { requireSession(event); return db.deleteQuotationHullAlternative(id) })
-  safeHandle('hull:reorderQuotationAlternatives', (event, ids) => { requireSession(event); return db.reorderQuotationHullAlternatives(ids) })
+  safeHandle('hull:addQuotationAlternative', async (event, qId, hullClauseId, label) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationHullAlternative(qId, hullClauseId, label) })
+  safeHandle('hull:updateQuotationAlternative', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationHullAlternative(id, updates) })
+  safeHandle('hull:deleteQuotationAlternative', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationHullAlternative(id) })
+  safeHandle('hull:reorderQuotationAlternatives', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationHullAlternatives(ids) })
   safeHandle('hull:getQuotationHullConditions', (event, qId) => { requireSession(event); return db.getQuotationHullConditions(qId) })
-  safeHandle('hull:setQuotationHullConditions', (event, qId, items) => { requireSession(event); return db.setQuotationHullConditions(qId, items) })
+  safeHandle('hull:setQuotationHullConditions', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationHullConditions(qId, items) })
   safeHandle('hull:getQuotationHullAdditionalConditions', (event, qId) => { requireSession(event); return db.getQuotationHullAdditionalConditions(qId) })
-  safeHandle('hull:setQuotationHullAdditionalConditions', (event, qId, items) => { requireSession(event); return db.setQuotationHullAdditionalConditions(qId, items) })
+  safeHandle('hull:setQuotationHullAdditionalConditions', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationHullAdditionalConditions(qId, items) })
 
   // War Risk Conditions
   safeHandle('war:getConditions', (event) => { requireSession(event); return db.getWarConditions() })
@@ -1526,7 +1526,7 @@ app.whenReady().then(() => {
   safeHandle('war:deleteCondition', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteWarCondition(id) })
   safeHandle('war:reorderConditions', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderWarConditions(ids) })
   safeHandle('war:getQuotationWarConditions', (event, qId) => { requireSession(event); return db.getQuotationWarConditions(qId) })
-  safeHandle('war:setQuotationWarConditions', (event, qId, items) => { requireSession(event); return db.setQuotationWarConditions(qId, items) })
+  safeHandle('war:setQuotationWarConditions', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationWarConditions(qId, items) })
 
   // War Risk Settings
   safeHandle('war:getSettings', (event) => { requireSession(event); return db.getWarSettings() })
@@ -1950,7 +1950,7 @@ app.whenReady().then(() => {
   safeHandle('db:deleteClassificationSociety', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteClassificationSociety(id) })
   safeHandle('db:reorderClassificationSocieties', async (event, ids) => { await requirePermission(event, 'admin:settings'); return db.reorderClassificationSocieties(ids) })
   safeHandle('vessels:getClassifications', (event, vesselId) => { requireSession(event); return db.getVesselClassifications(vesselId) })
-  safeHandle('vessels:setClassifications', (event, vesselId, csIds) => { requireSession(event); return db.setVesselClassifications(vesselId, csIds) })
+  safeHandle('vessels:setClassifications', async (event, vesselId, csIds) => { await requirePermission(event, 'vessels:edit'); return db.setVesselClassifications(vesselId, csIds) })
 
   // Vessel Types
   safeHandle('db:getVesselTypes', (event) => { requireSession(event); return db.getVesselTypes() })
@@ -1978,167 +1978,167 @@ app.whenReady().then(() => {
   // Vessel Dynamic Policies
   safeHandle('vessels:getDynamicPolicies', (event, vesselId) => { requireSession(event); return db.getVesselDynamicPolicies(vesselId) })
   safeHandle('vessels:getAllDynamicPolicies', (event) => { requireSession(event); return db.getAllVesselDynamicPolicies() })
-  safeHandle('vessels:addDynamicPolicy', (event, policy) => { requireSession(event); return db.addVesselDynamicPolicy(policy) })
-  safeHandle('vessels:updateDynamicPolicy', (event, id, updates) => { requireSession(event); return db.updateVesselDynamicPolicy(id, updates) })
-  safeHandle('vessels:deleteDynamicPolicy', (event, id) => { requireSession(event); return db.deleteVesselDynamicPolicy(id) })
-  safeHandle('vessels:setDynamicPolicyValues', (event, policyId, values) => { requireSession(event); return db.setVesselPolicyValues(policyId, values) })
+  safeHandle('vessels:addDynamicPolicy', async (event, policy) => { await requirePermission(event, 'policies:manage'); return db.addVesselDynamicPolicy(policy) })
+  safeHandle('vessels:updateDynamicPolicy', async (event, id, updates) => { await requirePermission(event, 'policies:manage'); return db.updateVesselDynamicPolicy(id, updates) })
+  safeHandle('vessels:deleteDynamicPolicy', async (event, id) => { await requirePermission(event, 'policies:manage'); return db.deleteVesselDynamicPolicy(id) })
+  safeHandle('vessels:setDynamicPolicyValues', async (event, policyId, values) => { await requirePermission(event, 'policies:manage'); return db.setVesselPolicyValues(policyId, values) })
 
   // Policy Expiry Alerts
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })
-  safeHandle('policies:setQuotationSentDate', (event, policyId: string, date: string | null) => { requireSession(event); return db.setQuotationSentDate(policyId, date) })
+  safeHandle('policies:setQuotationSentDate', async (event, policyId: string, date: string | null) => { await requirePermission(event, 'policies:manage'); return db.setQuotationSentDate(policyId, date) })
 
   // Renewal Status Types
   safeHandle('renewalStates:getAll', (event) => { requireSession(event); return db.getRenewalStatusTypes() })
-  safeHandle('renewalStates:add', (event, name: string, color: string) => { requireSession(event); return db.addRenewalStatusType(name, color) })
-  safeHandle('renewalStates:update', (event, id: string, name: string, color: string) => { requireSession(event); return db.updateRenewalStatusType(id, name, color) })
-  safeHandle('renewalStates:delete', (event, id: string) => { requireSession(event); return db.deleteRenewalStatusType(id) })
-  safeHandle('renewalStates:setForPolicy', (event, policyId: string, statusId: string | null) => { requireSession(event); return db.setRenewalStatusForPolicy(policyId, statusId) })
+  safeHandle('renewalStates:add', async (event, name: string, color: string) => { await requirePermission(event, 'renewals:manage'); return db.addRenewalStatusType(name, color) })
+  safeHandle('renewalStates:update', async (event, id: string, name: string, color: string) => { await requirePermission(event, 'renewals:manage'); return db.updateRenewalStatusType(id, name, color) })
+  safeHandle('renewalStates:delete', async (event, id: string) => { await requirePermission(event, 'renewals:manage'); return db.deleteRenewalStatusType(id) })
+  safeHandle('renewalStates:setForPolicy', async (event, policyId: string, statusId: string | null) => { await requirePermission(event, 'renewals:manage'); return db.setRenewalStatusForPolicy(policyId, statusId) })
 
   // Policy Renewal Notes
   safeHandle('renewalNotes:get', (event, policyId: string, policyNumber: string) => { requireSession(event); return db.getPolicyRenewalNotes(policyId, policyNumber) })
-  safeHandle('renewalNotes:add', (event, policyId: string, policyNumber: string, note: string) => {
-    const user = requireSession(event)
+  safeHandle('renewalNotes:add', async (event, policyId: string, policyNumber: string, note: string) => {
+    const user = await requirePermission(event, 'renewals:manage')
     return db.addPolicyRenewalNote(policyId, policyNumber, note, user.id, user.username)
   })
-  safeHandle('renewalNotes:delete', (event, noteId: string) => {
-    const user = requireSession(event)
+  safeHandle('renewalNotes:delete', async (event, noteId: string) => {
+    const user = await requirePermission(event, 'renewals:manage')
     return db.deletePolicyRenewalNote(noteId, user.id)
   })
 
   // Vessel Notes
   safeHandle('vesselNotes:get', (event, vesselId: string) => { requireSession(event); return db.getVesselNotes(vesselId) })
-  safeHandle('vesselNotes:add', (event, vesselId: string, note: string) => {
-    const user = requireSession(event)
+  safeHandle('vesselNotes:add', async (event, vesselId: string, note: string) => {
+    const user = await requirePermission(event, 'vessels:edit')
     return db.addVesselNote(vesselId, note, user.id, user.username)
   })
-  safeHandle('vesselNotes:delete', (event, noteId: string) => {
-    const user = requireSession(event)
+  safeHandle('vesselNotes:delete', async (event, noteId: string) => {
+    const user = await requirePermission(event, 'vessels:edit')
     return db.deleteVesselNote(noteId, user.id)
   })
 
   // Quotation Types
   safeHandle('db:getQuotationTypes', (event) => { requireSession(event); return db.getQuotationTypes() })
-  safeHandle('db:addQuotationType', (event, data) => { requireSession(event); return db.addQuotationType(data) })
-  safeHandle('db:updateQuotationType', (event, id, updates) => { requireSession(event); return db.updateQuotationType(id, updates) })
-  safeHandle('db:deleteQuotationType', (event, id) => { requireSession(event); return db.deleteQuotationType(id) })
-  safeHandle('db:reorderQuotationTypes', (event, ids) => { requireSession(event); return db.reorderQuotationTypes(ids) })
+  safeHandle('db:addQuotationType', async (event, data) => { await requirePermission(event, 'quotations:settings'); return db.addQuotationType(data) })
+  safeHandle('db:updateQuotationType', async (event, id, updates) => { await requirePermission(event, 'quotations:settings'); return db.updateQuotationType(id, updates) })
+  safeHandle('db:deleteQuotationType', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteQuotationType(id) })
+  safeHandle('db:reorderQuotationTypes', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderQuotationTypes(ids) })
 
   // Quotations
   safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })
   safeHandle('db:getQuotation', (event, id) => { requireSession(event); return db.getQuotation(id) })
-  safeHandle('db:addQuotation', (event, q) => { requireSession(event); return db.addQuotation(q) })
-  safeHandle('db:updateQuotation', (event, id, updates) => { requireSession(event); return db.updateQuotation(id, updates) })
-  safeHandle('db:deleteQuotation', (event, id) => { requireSession(event); return db.deleteQuotation(id) })
-  safeHandle('db:createQuotationRevision', (event, sourceId) => { requireSession(event); return db.createQuotationRevision(sourceId) })
-  safeHandle('db:duplicateQuotation', (event, sourceId) => { requireSession(event); return db.duplicateQuotation(sourceId) })
+  safeHandle('db:addQuotation', async (event, q) => { await requirePermission(event, 'quotations:create'); return db.addQuotation(q) })
+  safeHandle('db:updateQuotation', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotation(id, updates) })
+  safeHandle('db:deleteQuotation', async (event, id) => { await requirePermission(event, 'quotations:delete'); return db.deleteQuotation(id) })
+  safeHandle('db:createQuotationRevision', async (event, sourceId) => { await requirePermission(event, 'quotations:create'); return db.createQuotationRevision(sourceId) })
+  safeHandle('db:duplicateQuotation', async (event, sourceId) => { await requirePermission(event, 'quotations:create'); return db.duplicateQuotation(sourceId) })
   safeHandle('db:getQuotationRevisions', (event, revisionGroupId) => { requireSession(event); return db.getQuotationRevisions(revisionGroupId) })
-  safeHandle('db:saveExportSnapshot', (event, quotationId, snapshot) => { requireSession(event); return db.saveExportSnapshot(quotationId, snapshot) })
-  safeHandle('db:clearExportSnapshot', (event, quotationId) => { requireSession(event); return db.clearExportSnapshot(quotationId) })
+  safeHandle('db:saveExportSnapshot', async (event, quotationId, snapshot) => { await requirePermission(event, 'quotations:export'); return db.saveExportSnapshot(quotationId, snapshot) })
+  safeHandle('db:clearExportSnapshot', async (event, quotationId) => { await requirePermission(event, 'quotations:export'); return db.clearExportSnapshot(quotationId) })
 
   // Quotation Sub-Tables
   safeHandle('db:getQuotationAssureds', (event, qId) => { requireSession(event); return db.getQuotationAssureds(qId) })
-  safeHandle('db:addQuotationAssured', (event, data) => { requireSession(event); return db.addQuotationAssured(data) })
-  safeHandle('db:updateQuotationAssured', (event, id, updates) => { requireSession(event); return db.updateQuotationAssured(id, updates) })
-  safeHandle('db:deleteQuotationAssured', (event, id) => { requireSession(event); return db.deleteQuotationAssured(id) })
-  safeHandle('db:reorderQuotationAssureds', (event, ids) => { requireSession(event); return db.reorderQuotationAssureds(ids) })
+  safeHandle('db:addQuotationAssured', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationAssured(data) })
+  safeHandle('db:updateQuotationAssured', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationAssured(id, updates) })
+  safeHandle('db:deleteQuotationAssured', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationAssured(id) })
+  safeHandle('db:reorderQuotationAssureds', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationAssureds(ids) })
 
   safeHandle('db:getQuotationVessels', (event, qId) => { requireSession(event); return db.getQuotationVessels(qId) })
-  safeHandle('db:addQuotationVessel', (event, data) => { requireSession(event); return db.addQuotationVessel(data) })
-  safeHandle('db:updateQuotationVessel', (event, id, data) => { requireSession(event); return db.updateQuotationVessel(id, data) })
-  safeHandle('db:deleteQuotationVessel', (event, id) => { requireSession(event); return db.deleteQuotationVessel(id) })
-  safeHandle('db:reorderQuotationVessels', (event, ids) => { requireSession(event); return db.reorderQuotationVessels(ids) })
+  safeHandle('db:addQuotationVessel', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationVessel(data) })
+  safeHandle('db:updateQuotationVessel', async (event, id, data) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationVessel(id, data) })
+  safeHandle('db:deleteQuotationVessel', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationVessel(id) })
+  safeHandle('db:reorderQuotationVessels', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationVessels(ids) })
 
   safeHandle('db:getQuotationNewVessel', (event, qId) => { requireSession(event); return db.getQuotationNewVessel(qId) })
-  safeHandle('db:upsertQuotationNewVessel', (event, qId, data) => { requireSession(event); return db.upsertQuotationNewVessel(qId, data) })
-  safeHandle('db:deleteQuotationNewVessel', (event, qId) => { requireSession(event); return db.deleteQuotationNewVessel(qId) })
+  safeHandle('db:upsertQuotationNewVessel', async (event, qId, data) => { await requirePermission(event, 'quotations:edit'); return db.upsertQuotationNewVessel(qId, data) })
+  safeHandle('db:deleteQuotationNewVessel', async (event, qId) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationNewVessel(qId) })
 
   safeHandle('db:getQuotationSubLimits', (event, qId) => { requireSession(event); return db.getQuotationSubLimits(qId) })
-  safeHandle('db:addQuotationSubLimit', (event, data) => { requireSession(event); return db.addQuotationSubLimit(data) })
-  safeHandle('db:updateQuotationSubLimit', (event, id, updates) => { requireSession(event); return db.updateQuotationSubLimit(id, updates) })
-  safeHandle('db:deleteQuotationSubLimit', (event, id) => { requireSession(event); return db.deleteQuotationSubLimit(id) })
+  safeHandle('db:addQuotationSubLimit', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationSubLimit(data) })
+  safeHandle('db:updateQuotationSubLimit', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationSubLimit(id, updates) })
+  safeHandle('db:deleteQuotationSubLimit', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationSubLimit(id) })
 
   safeHandle('db:getQuotationClauses', (event, qId) => { requireSession(event); return db.getQuotationClauses(qId) })
-  safeHandle('db:setQuotationClauses', (event, qId, ids, overrides) => { requireSession(event); return db.setQuotationClauses(qId, ids, overrides) })
-  safeHandle('db:addQuotationClause', (event, qId, piClauseId, alternativeId) => { requireSession(event); return db.addQuotationClause(qId, piClauseId, alternativeId) })
-  safeHandle('db:deleteQuotationClause', (event, qId, piClauseId, alternativeId) => { requireSession(event); return db.deleteQuotationClause(qId, piClauseId, alternativeId) })
+  safeHandle('db:setQuotationClauses', async (event, qId, ids, overrides) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationClauses(qId, ids, overrides) })
+  safeHandle('db:addQuotationClause', async (event, qId, piClauseId, alternativeId) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationClause(qId, piClauseId, alternativeId) })
+  safeHandle('db:deleteQuotationClause', async (event, qId, piClauseId, alternativeId) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationClause(qId, piClauseId, alternativeId) })
   safeHandle('db:getQuotationClauseOverrides', (event, qId) => { requireSession(event); return db.getQuotationClauseOverrides(qId) })
-  safeHandle('db:updateQuotationClauseOverride', (event, qId, clauseId, override, alternativeId) => { requireSession(event); return db.updateQuotationClauseOverride(qId, clauseId, override, alternativeId) })
+  safeHandle('db:updateQuotationClauseOverride', async (event, qId, clauseId, override, alternativeId) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationClauseOverride(qId, clauseId, override, alternativeId) })
 
   safeHandle('db:getQuotationAdditionalClauses', (event, qId) => { requireSession(event); return db.getQuotationAdditionalClauses(qId) })
-  safeHandle('db:addQuotationAdditionalClause', (event, data) => { requireSession(event); return db.addQuotationAdditionalClause(data) })
-  safeHandle('db:deleteQuotationAdditionalClause', (event, id) => { requireSession(event); return db.deleteQuotationAdditionalClause(id) })
+  safeHandle('db:addQuotationAdditionalClause', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationAdditionalClause(data) })
+  safeHandle('db:deleteQuotationAdditionalClause', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationAdditionalClause(id) })
 
   safeHandle('db:getQuotationWarranties', (event, qId) => { requireSession(event); return db.getQuotationWarranties(qId) })
-  safeHandle('db:setQuotationWarranties', (event, qId, ids) => { requireSession(event); return db.setQuotationWarranties(qId, ids) })
-  safeHandle('db:updateQuotationWarrantyVesselScope', (event, qId, piWarrantyId, vesselScope) => { requireSession(event); return db.updateQuotationWarrantyVesselScope(qId, piWarrantyId, vesselScope) })
-  safeHandle('db:updateQuotationClauseVesselScope', (event, qId, piClauseId, vesselScope) => { requireSession(event); return db.updateQuotationClauseVesselScope(qId, piClauseId, vesselScope) })
+  safeHandle('db:setQuotationWarranties', async (event, qId, ids) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationWarranties(qId, ids) })
+  safeHandle('db:updateQuotationWarrantyVesselScope', async (event, qId, piWarrantyId, vesselScope) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationWarrantyVesselScope(qId, piWarrantyId, vesselScope) })
+  safeHandle('db:updateQuotationClauseVesselScope', async (event, qId, piClauseId, vesselScope) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationClauseVesselScope(qId, piClauseId, vesselScope) })
 
   safeHandle('db:getQuotationCustomWarranties', (event, qId) => { requireSession(event); return db.getQuotationCustomWarranties(qId) })
-  safeHandle('db:addQuotationCustomWarranty', (event, data) => { requireSession(event); return db.addQuotationCustomWarranty(data) })
-  safeHandle('db:updateQuotationCustomWarranty', (event, id, updates) => { requireSession(event); return db.updateQuotationCustomWarranty(id, updates) })
-  safeHandle('db:deleteQuotationCustomWarranty', (event, id) => { requireSession(event); return db.deleteQuotationCustomWarranty(id) })
-  safeHandle('db:reorderQuotationCustomWarranties', (event, ids) => { requireSession(event); return db.reorderQuotationCustomWarranties(ids) })
+  safeHandle('db:addQuotationCustomWarranty', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationCustomWarranty(data) })
+  safeHandle('db:updateQuotationCustomWarranty', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationCustomWarranty(id, updates) })
+  safeHandle('db:deleteQuotationCustomWarranty', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationCustomWarranty(id) })
+  safeHandle('db:reorderQuotationCustomWarranties', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationCustomWarranties(ids) })
 
   safeHandle('db:getQuotationDeductibles', (event, qId) => { requireSession(event); return db.getQuotationDeductibles(qId) })
-  safeHandle('db:addQuotationDeductible', (event, data) => { requireSession(event); return db.addQuotationDeductible(data) })
-  safeHandle('db:updateQuotationDeductible', (event, id, updates) => { requireSession(event); return db.updateQuotationDeductible(id, updates) })
-  safeHandle('db:deleteQuotationDeductible', (event, id) => { requireSession(event); return db.deleteQuotationDeductible(id) })
-  safeHandle('db:reorderQuotationDeductibles', (event, orderedIds) => { requireSession(event); return db.reorderQuotationDeductibles(orderedIds) })
+  safeHandle('db:addQuotationDeductible', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationDeductible(data) })
+  safeHandle('db:updateQuotationDeductible', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationDeductible(id, updates) })
+  safeHandle('db:deleteQuotationDeductible', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationDeductible(id) })
+  safeHandle('db:reorderQuotationDeductibles', async (event, orderedIds) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationDeductibles(orderedIds) })
 
   safeHandle('db:getQuotationTextDeductibles', (event, qId) => { requireSession(event); return db.getQuotationTextDeductibles(qId) })
-  safeHandle('db:addQuotationTextDeductible', (event, data) => { requireSession(event); return db.addQuotationTextDeductible(data) })
-  safeHandle('db:updateQuotationTextDeductible', (event, id, updates) => { requireSession(event); return db.updateQuotationTextDeductible(id, updates) })
-  safeHandle('db:deleteQuotationTextDeductible', (event, id) => { requireSession(event); return db.deleteQuotationTextDeductible(id) })
-  safeHandle('db:reorderQuotationTextDeductibles', (event, orderedIds) => { requireSession(event); return db.reorderQuotationTextDeductibles(orderedIds) })
+  safeHandle('db:addQuotationTextDeductible', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationTextDeductible(data) })
+  safeHandle('db:updateQuotationTextDeductible', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationTextDeductible(id, updates) })
+  safeHandle('db:deleteQuotationTextDeductible', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationTextDeductible(id) })
+  safeHandle('db:reorderQuotationTextDeductibles', async (event, orderedIds) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationTextDeductibles(orderedIds) })
 
   safeHandle('db:getQuotationExclusions', (event, qId) => { requireSession(event); return db.getQuotationExclusions(qId) })
-  safeHandle('db:setQuotationExclusions', (event, qId, items) => { requireSession(event); return db.setQuotationExclusions(qId, items) })
-  safeHandle('db:addQuotationExclusion', (event, qId, piExclusionId, altId) => { requireSession(event); return db.addQuotationExclusion(qId, piExclusionId, altId) })
-  safeHandle('db:deleteQuotationExclusion', (event, id) => { requireSession(event); return db.deleteQuotationExclusion(id) })
+  safeHandle('db:setQuotationExclusions', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationExclusions(qId, items) })
+  safeHandle('db:addQuotationExclusion', async (event, qId, piExclusionId, altId) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationExclusion(qId, piExclusionId, altId) })
+  safeHandle('db:deleteQuotationExclusion', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationExclusion(id) })
   safeHandle('db:getQuotationCustomExclusions', (event, qId) => { requireSession(event); return db.getQuotationCustomExclusions(qId) })
-  safeHandle('db:addQuotationCustomExclusion', (event, data) => { requireSession(event); return db.addQuotationCustomExclusion(data) })
-  safeHandle('db:updateQuotationCustomExclusion', (event, id, updates) => { requireSession(event); return db.updateQuotationCustomExclusion(id, updates) })
-  safeHandle('db:deleteQuotationCustomExclusion', (event, id) => { requireSession(event); return db.deleteQuotationCustomExclusion(id) })
-  safeHandle('db:reorderQuotationCustomExclusions', (event, ids) => { requireSession(event); return db.reorderQuotationCustomExclusions(ids) })
+  safeHandle('db:addQuotationCustomExclusion', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationCustomExclusion(data) })
+  safeHandle('db:updateQuotationCustomExclusion', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationCustomExclusion(id, updates) })
+  safeHandle('db:deleteQuotationCustomExclusion', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationCustomExclusion(id) })
+  safeHandle('db:reorderQuotationCustomExclusions', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationCustomExclusions(ids) })
 
-  safeHandle('db:updateQuotationItemVesselScope', (event, table, id, vesselScope) => { requireSession(event); return db.updateQuotationItemVesselScope(table, id, vesselScope) })
+  safeHandle('db:updateQuotationItemVesselScope', async (event, table, id, vesselScope) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationItemVesselScope(table, id, vesselScope) })
 
   safeHandle('db:getQuotationCustomSections', (event, qId) => { requireSession(event); return db.getQuotationCustomSections(qId) })
-  safeHandle('db:addQuotationCustomSection', (event, data) => { requireSession(event); return db.addQuotationCustomSection(data) })
-  safeHandle('db:updateQuotationCustomSection', (event, id, updates) => { requireSession(event); return db.updateQuotationCustomSection(id, updates) })
-  safeHandle('db:deleteQuotationCustomSection', (event, id) => { requireSession(event); return db.deleteQuotationCustomSection(id) })
-  safeHandle('db:reorderQuotationCustomSections', (event, ids) => { requireSession(event); return db.reorderQuotationCustomSections(ids) })
+  safeHandle('db:addQuotationCustomSection', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationCustomSection(data) })
+  safeHandle('db:updateQuotationCustomSection', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationCustomSection(id, updates) })
+  safeHandle('db:deleteQuotationCustomSection', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationCustomSection(id) })
+  safeHandle('db:reorderQuotationCustomSections', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationCustomSections(ids) })
   safeHandle('pi:getSectionOrderDefaults', (event) => { requireSession(event); return db.getSectionOrderDefaults() })
   safeHandle('pi:setSectionOrderDefaults', async (event, order) => { await requirePermission(event, 'quotations:settings'); return db.setSectionOrderDefaults(order) })
   safeHandle('pi:getSectionOrderDefaultsByType', (event, typeCode) => { requireSession(event); return db.getSectionOrderDefaultsByType(typeCode) })
   safeHandle('pi:setSectionOrderDefaultsByType', async (event, typeCode, order) => { await requirePermission(event, 'quotations:settings'); return db.setSectionOrderDefaultsByType(typeCode, order) })
 
   safeHandle('db:getQuotationExcludedCountries', (event, qId) => { requireSession(event); return db.getQuotationExcludedCountries(qId) })
-  safeHandle('db:setQuotationExcludedCountries', (event, qId, countries) => { requireSession(event); return db.setQuotationExcludedCountries(qId, countries) })
+  safeHandle('db:setQuotationExcludedCountries', async (event, qId, countries) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationExcludedCountries(qId, countries) })
 
   safeHandle('db:getPISubjectivities', (event) => { requireSession(event); return db.getPISubjectivities() })
-  safeHandle('db:addPISubjectivity', (event, data) => { requireSession(event); return db.addPISubjectivity(data) })
-  safeHandle('db:updatePISubjectivity', (event, id, data) => { requireSession(event); return db.updatePISubjectivity(id, data) })
-  safeHandle('db:deletePISubjectivity', (event, id) => { requireSession(event); return db.deletePISubjectivity(id) })
-  safeHandle('db:reorderPISubjectivities', (event, ids) => { requireSession(event); return db.reorderPISubjectivities(ids) })
+  safeHandle('db:addPISubjectivity', async (event, data) => { await requirePermission(event, 'quotations:settings'); return db.addPISubjectivity(data) })
+  safeHandle('db:updatePISubjectivity', async (event, id, data) => { await requirePermission(event, 'quotations:settings'); return db.updatePISubjectivity(id, data) })
+  safeHandle('db:deletePISubjectivity', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deletePISubjectivity(id) })
+  safeHandle('db:reorderPISubjectivities', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderPISubjectivities(ids) })
 
   safeHandle('db:getQuotationSubjectivities', (event, qId) => { requireSession(event); return db.getQuotationSubjectivities(qId) })
-  safeHandle('db:addQuotationSubjectivity', (event, data) => { requireSession(event); return db.addQuotationSubjectivity(data) })
-  safeHandle('db:updateQuotationSubjectivity', (event, id, data) => { requireSession(event); return db.updateQuotationSubjectivity(id, data) })
-  safeHandle('db:deleteQuotationSubjectivity', (event, id) => { requireSession(event); return db.deleteQuotationSubjectivity(id) })
+  safeHandle('db:addQuotationSubjectivity', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationSubjectivity(data) })
+  safeHandle('db:updateQuotationSubjectivity', async (event, id, data) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationSubjectivity(id, data) })
+  safeHandle('db:deleteQuotationSubjectivity', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationSubjectivity(id) })
 
   safeHandle('db:getQuotationInstalments', (event, qId) => { requireSession(event); return db.getQuotationInstalments(qId) })
-  safeHandle('db:setQuotationInstalments', (event, qId, instalments) => { requireSession(event); return db.setQuotationInstalments(qId, instalments) })
+  safeHandle('db:setQuotationInstalments', async (event, qId, instalments) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationInstalments(qId, instalments) })
 
   safeHandle('db:getQuotationInformation', (event, qId) => { requireSession(event); return db.getQuotationInformation(qId) })
-  safeHandle('db:addQuotationInformation', (event, data) => { requireSession(event); return db.addQuotationInformation(data) })
-  safeHandle('db:deleteQuotationInformation', (event, id) => { requireSession(event); return db.deleteQuotationInformation(id) })
+  safeHandle('db:addQuotationInformation', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationInformation(data) })
+  safeHandle('db:deleteQuotationInformation', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationInformation(id) })
 
   safeHandle('db:getQuotationNotes', (event, qId) => { requireSession(event); return db.getQuotationNotes(qId) })
-  safeHandle('db:addQuotationNote', (event, data) => { requireSession(event); return db.addQuotationNote(data) })
-  safeHandle('db:updateQuotationNote', (event, id, updates) => { requireSession(event); return db.updateQuotationNote(id, updates) })
-  safeHandle('db:deleteQuotationNote', (event, id) => { requireSession(event); return db.deleteQuotationNote(id) })
+  safeHandle('db:addQuotationNote', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationNote(data) })
+  safeHandle('db:updateQuotationNote', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationNote(id, updates) })
+  safeHandle('db:deleteQuotationNote', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationNote(id) })
 
   // Report Settings
   const REPORT_SETTINGS_KEY = 'reportSettings'
@@ -2157,7 +2157,7 @@ app.whenReady().then(() => {
     return raw ? { ...REPORT_SETTINGS_DEFAULTS, ...JSON.parse(raw) } : REPORT_SETTINGS_DEFAULTS
   })
   safeHandle('reportSettings:set', async (event, settings) => {
-    requireSession(event)
+    await requirePermission(event, 'admin:settings')
     await db.setSetting(REPORT_SETTINGS_KEY, JSON.stringify(settings))
   })
 

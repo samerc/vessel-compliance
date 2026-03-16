@@ -42,7 +42,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         isDangerous?: boolean
     }>({ show: false, title: '', message: '', onConfirm: () => { } })
     const { theme } = useTheme()
-    const { user, isAdmin } = useAuth()
+    const { user, hasPermission } = useAuth()
     const { showSuccess, showError } = useToast()
     const isLight = theme === 'light'
 
@@ -790,9 +790,11 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         </>
                     ) : (
                         <>
-                            <button onClick={() => setIsEditing(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.82rem' }}>
-                                Edit Details
-                            </button>
+                            {hasPermission('vessels:edit') && (
+                                <button onClick={() => setIsEditing(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.82rem' }}>
+                                    Edit Details
+                                </button>
+                            )}
                             <button
                                 onClick={handleToggleVesselActive}
                                 className="btn-secondary"
@@ -917,7 +919,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     </div>
                                 )}
                             </div>
-                            {isAdmin && (
+                            {hasPermission('vessels:delete') && (
                                 <button
                                     type="button"
                                     onClick={handleDeleteVessel}
@@ -1168,7 +1170,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         MISSING
                                                     </div>
                                                 )
-                                            ) : (
+                                            ) : hasPermission('documents:upload') ? (
                                                 <button
                                                     onClick={() => handleClickUpload(rowType.id)}
                                                     style={{
@@ -1190,7 +1192,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     <Upload size={14} />
                                                     UPLOAD FILE
                                                 </button>
-                                            )}
+                                            ) : null}
                                         </td>
                                         <td style={{ padding: '16px' }}>
                                             {rowHasFile ? (
@@ -1412,7 +1414,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     MISSING
                                                 </div>
                                             )
-                                        ) : (
+                                        ) : hasPermission('documents:upload') ? (
                                             <button
                                                 onClick={() => handleClickUpload(customType.id)}
                                                 style={{
@@ -1434,7 +1436,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 <Upload size={14} />
                                                 UPLOAD FILE
                                             </button>
-                                        )}
+                                        ) : null}
                                     </td>
                                     <td style={{ padding: '16px' }}>
                                         {rowHasFile ? (
