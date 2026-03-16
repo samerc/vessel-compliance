@@ -6,6 +6,7 @@ import {
   ScanSearch, MapPin
 } from 'lucide-react'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress } from '../../../shared/types'
+import { CaseToggleBtn } from './CaseToggle'
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -1139,7 +1140,10 @@ export default function EntityDirectory() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Name *</label>
-                <input type="text" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%' }} placeholder="Entity name" />
+                <div style={{ position: 'relative' }}>
+                  <input type="text" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%', paddingRight: '44px' }} placeholder="Entity name" />
+                  <CaseToggleBtn value={editForm.name} onChange={v => setEditForm(f => ({ ...f, name: v }))} />
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Type</label>
@@ -1182,7 +1186,10 @@ export default function EntityDirectory() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Name *</label>
-                <input type="text" value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%' }} placeholder="Entity name" autoFocus />
+                <div style={{ position: 'relative' }}>
+                  <input type="text" value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%', paddingRight: '44px' }} placeholder="Entity name" autoFocus />
+                  <CaseToggleBtn value={createForm.name} onChange={v => setCreateForm(f => ({ ...f, name: v }))} />
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Type</label>
