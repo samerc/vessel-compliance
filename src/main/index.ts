@@ -371,6 +371,15 @@ app.whenReady().then(() => {
         }
       }
     }
+    if (result.success && result.user) {
+      db.logActivity({
+        userId: result.user.id,
+        username: result.user.username,
+        action: 'LOGIN',
+        module: 'Auth',
+        details: 'User logged in'
+      }).catch(() => {})
+    }
     return result
   })
 
@@ -905,29 +914,71 @@ app.whenReady().then(() => {
   safeHandle('db:getVessels', (event) => { requireSession(event); return db.getVessels() })
   safeHandle('db:getVesselsPaginated', (event, params) => { requireSession(event); return db.getVesselsPaginated(params) })
   safeHandle('db:addVessel', async (event, vessel) => {
-    await requirePermission(event, 'vessels:create')
+    const user = await requirePermission(event, 'vessels:create')
     try {
       const result = await db.addVessel(vessel)
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'CREATE',
+        module: 'Vessels',
+        entityType: 'vessel',
+        entityId: result?.id || vessel.id,
+        entityName: vessel.name,
+        details: `Created vessel ${vessel.name}`
+      }).catch(() => {})
       return { success: true, data: result }
     } catch (error: any) {
       return { success: false, message: error.message }
     }
   })
-  safeHandle('db:updateVessel', async (event, id, updates) => { const user = await requirePermission(event, 'vessels:edit'); return db.updateVessel(id, updates, user.username) })
+  safeHandle('db:updateVessel', async (event, id, updates) => {
+    const user = await requirePermission(event, 'vessels:edit')
+    const result = await db.updateVessel(id, updates, user.username)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Vessels',
+      entityType: 'vessel',
+      entityId: id,
+      entityName: updates.name,
+      details: `Updated vessel ${updates.name || id}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:getVesselNameHistory', (event, vesselId) => { requireSession(event); return db.getVesselNameHistory(vesselId) })
   safeHandle('db:deleteVessel', async (event, id) => {
-    await requirePermission(event, 'vessels:delete')
+    const user = await requirePermission(event, 'vessels:delete')
     await db.deleteVessel(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Vessels',
+      entityType: 'vessel',
+      entityId: id,
+      details: `Deleted vessel ${id}`
+    }).catch(() => {})
     return { success: true }
   })
 
   safeHandle('db:getVesselDocuments', (event, vesselId) => { requireSession(event); return db.getVesselDocuments(vesselId) })
   safeHandle('db:upsertVesselDocument', async (event, doc) => {
-    await requirePermission(event, 'documents:upload')
+    const user = await requirePermission(event, 'documents:upload')
     await db.upsertVesselDocument(doc)
     if (doc.filePath) {
       await db.autoSnoozeVessel(doc.vesselId)
     }
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPLOAD',
+      module: 'Documents',
+      entityType: 'vessel_document',
+      entityId: doc.vesselId,
+      details: `Uploaded document for vessel ${doc.vesselId}`
+    }).catch(() => {})
   })
   safeHandle('db:updateVesselDocumentExpiry', async (event, vesselId, docTypeId, expiryDate) => { await requirePermission(event, 'documents:upload'); return db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate) })
   safeHandle('db:updateVesselDocumentReceivedDate', async (event, vesselId, docTypeId, receivedDate) => { await requirePermission(event, 'documents:upload'); return db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate) })
@@ -937,17 +988,54 @@ app.whenReady().then(() => {
   // Entity IPC Handlers
   safeHandle('db:getEntities', (event) => { requireSession(event); return db.getEntities() })
   safeHandle('db:getEntitiesPaginated', (event, params) => { requireSession(event); return db.getEntitiesPaginated(params) })
-  safeHandle('db:addEntity', async (event, entity) => { await requirePermission(event, 'entities:create'); return db.addEntity(entity) })
+  safeHandle('db:addEntity', async (event, entity) => {
+    const user = await requirePermission(event, 'entities:create')
+    const result = await db.addEntity(entity)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Entities',
+      entityType: 'entity',
+      entityId: result?.id || entity.id,
+      entityName: entity.name,
+      details: `Created entity ${entity.name}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:updateEntity', async (event, id, updates) => {
-    await requirePermission(event, 'entities:edit')
+    const user = await requirePermission(event, 'entities:edit')
     const docFields = ['passportFilePath', 'certificateOfIncorporationPath', 'articlesOfAssociationPath', 'kycFilePath']
     const hasDocChange = docFields.some(f => updates[f] !== undefined)
     await db.updateEntity(id, updates)
     if (hasDocChange) {
       await db.autoSnoozeVesselsForEntity(id)
     }
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Entities',
+      entityType: 'entity',
+      entityId: id,
+      entityName: updates.name,
+      details: `Updated entity ${updates.name || id}`
+    }).catch(() => {})
   })
-  safeHandle('db:deleteEntity', async (event, id) => { await requirePermission(event, 'entities:delete'); return db.deleteEntity(id) })
+  safeHandle('db:deleteEntity', async (event, id) => {
+    const user = await requirePermission(event, 'entities:delete')
+    const result = await db.deleteEntity(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Entities',
+      entityType: 'entity',
+      entityId: id,
+      details: `Deleted entity ${id}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:mergeEntities', async (event, sourceId, targetId, keepName) => { await requirePermission(event, 'entities:edit'); return db.mergeEntities(sourceId, targetId, keepName) })
   safeHandle('maintenance:syncSettings', async (event) => { await requirePermission(event, 'admin:settings'); return db.syncAssuredRoles() })
 
@@ -1020,11 +1108,34 @@ app.whenReady().then(() => {
 
   // Condition Surveys
   safeHandle('db:getConditionSurveys', (event, vesselId) => { requireSession(event); return db.getConditionSurveys(vesselId) })
-  safeHandle('db:addConditionSurvey', async (event, survey) => { await requirePermission(event, 'surveys:manage'); return db.addConditionSurvey(survey) })
+  safeHandle('db:addConditionSurvey', async (event, survey) => {
+    const user = await requirePermission(event, 'surveys:manage')
+    const result = await db.addConditionSurvey(survey)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Surveys',
+      entityType: 'survey',
+      entityId: result?.id || survey.id,
+      details: `Created condition survey for vessel ${survey.vesselId}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:updateConditionSurvey', async (event, id, updates) => { await requirePermission(event, 'surveys:manage'); return db.updateConditionSurvey(id, updates) })
   safeHandle('db:deleteConditionSurvey', async (event, id) => {
-    await requirePermission(event, 'surveys:manage')
-    return db.deleteConditionSurvey(id)
+    const user = await requirePermission(event, 'surveys:manage')
+    const result = await db.deleteConditionSurvey(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Surveys',
+      entityType: 'survey',
+      entityId: id,
+      details: `Deleted condition survey ${id}`
+    }).catch(() => {})
+    return result
   })
 
   // Condition Survey Types
@@ -1264,8 +1375,18 @@ app.whenReady().then(() => {
 
   // User Management (admin only)
   safeHandle('auth:createUser', async (event, { username, password, role }) => {
-    await requirePermission(event, 'admin:users')
-    return auth.createUser(username, password, role)
+    const user = await requirePermission(event, 'admin:users')
+    const result = await auth.createUser(username, password, role)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Users',
+      entityType: 'user',
+      entityName: username,
+      details: `Created user ${username} with role ${role}`
+    }).catch(() => {})
+    return result
   })
 
   safeHandle('db:getUsers', async (event) => {
@@ -2002,9 +2123,35 @@ app.whenReady().then(() => {
   // Vessel Dynamic Policies
   safeHandle('vessels:getDynamicPolicies', (event, vesselId) => { requireSession(event); return db.getVesselDynamicPolicies(vesselId) })
   safeHandle('vessels:getAllDynamicPolicies', (event) => { requireSession(event); return db.getAllVesselDynamicPolicies() })
-  safeHandle('vessels:addDynamicPolicy', async (event, policy) => { await requirePermission(event, 'policies:manage'); return db.addVesselDynamicPolicy(policy) })
+  safeHandle('vessels:addDynamicPolicy', async (event, policy) => {
+    const user = await requirePermission(event, 'policies:manage')
+    const result = await db.addVesselDynamicPolicy(policy)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Policies',
+      entityType: 'policy',
+      entityId: result || policy.id,
+      details: `Created policy for vessel ${policy.vesselId}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('vessels:updateDynamicPolicy', async (event, id, updates) => { await requirePermission(event, 'policies:manage'); return db.updateVesselDynamicPolicy(id, updates) })
-  safeHandle('vessels:deleteDynamicPolicy', async (event, id) => { await requirePermission(event, 'policies:manage'); return db.deleteVesselDynamicPolicy(id) })
+  safeHandle('vessels:deleteDynamicPolicy', async (event, id) => {
+    const user = await requirePermission(event, 'policies:manage')
+    const result = await db.deleteVesselDynamicPolicy(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Policies',
+      entityType: 'policy',
+      entityId: id,
+      details: `Deleted policy ${id}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('vessels:setDynamicPolicyValues', async (event, policyId, values) => { await requirePermission(event, 'policies:manage'); return db.setVesselPolicyValues(policyId, values) })
 
   // Policy Expiry Alerts
@@ -2051,9 +2198,49 @@ app.whenReady().then(() => {
   // Quotations
   safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })
   safeHandle('db:getQuotation', (event, id) => { requireSession(event); return db.getQuotation(id) })
-  safeHandle('db:addQuotation', async (event, q) => { await requirePermission(event, 'quotations:create'); return db.addQuotation(q) })
-  safeHandle('db:updateQuotation', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotation(id, updates) })
-  safeHandle('db:deleteQuotation', async (event, id) => { await requirePermission(event, 'quotations:delete'); return db.deleteQuotation(id) })
+  safeHandle('db:addQuotation', async (event, q) => {
+    const user = await requirePermission(event, 'quotations:create')
+    const result = await db.addQuotation(q)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Quotations',
+      entityType: 'quotation',
+      entityId: result?.id || q.id,
+      entityName: q.reference,
+      details: `Created quotation ${q.reference || ''}`
+    }).catch(() => {})
+    return result
+  })
+  safeHandle('db:updateQuotation', async (event, id, updates) => {
+    const user = await requirePermission(event, 'quotations:edit')
+    const result = await db.updateQuotation(id, updates)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Quotations',
+      entityType: 'quotation',
+      entityId: id,
+      details: `Updated quotation ${id}`
+    }).catch(() => {})
+    return result
+  })
+  safeHandle('db:deleteQuotation', async (event, id) => {
+    const user = await requirePermission(event, 'quotations:delete')
+    const result = await db.deleteQuotation(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Quotations',
+      entityType: 'quotation',
+      entityId: id,
+      details: `Deleted quotation ${id}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:createQuotationRevision', async (event, sourceId) => { await requirePermission(event, 'quotations:create'); return db.createQuotationRevision(sourceId) })
   safeHandle('db:duplicateQuotation', async (event, sourceId) => { await requirePermission(event, 'quotations:create'); return db.duplicateQuotation(sourceId) })
   safeHandle('db:getQuotationRevisions', (event, revisionGroupId) => { requireSession(event); return db.getQuotationRevisions(revisionGroupId) })
@@ -2198,7 +2385,7 @@ app.whenReady().then(() => {
 
   // Database Backup & Restore
   safeHandle('db:backup', async (event) => {
-    await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'admin:settings')
     const { dialog } = require('electron')
     const result = await dialog.showSaveDialog({
       title: 'Save Database Backup',
@@ -2210,11 +2397,18 @@ app.whenReady().then(() => {
     const backup = await db.backupDatabase()
     writeFileSync(result.filePath, JSON.stringify(backup, null, 2), 'utf-8')
     await db.setSetting('lastBackupDate', new Date().toISOString())
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'EXPORT',
+      module: 'System',
+      details: `Database backup exported to ${result.filePath}`
+    }).catch(() => {})
     return { success: true, filePath: result.filePath }
   })
 
   safeHandle('db:restore', async (event) => {
-    await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'admin:settings')
     const { dialog } = require('electron')
     const result = await dialog.showOpenDialog({
       title: 'Select Backup File to Restore',
@@ -2237,6 +2431,13 @@ app.whenReady().then(() => {
     }
 
     await db.restoreDatabase(data)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'RESTORE',
+      module: 'System',
+      details: `Database restored from ${filePath}`
+    }).catch(() => {})
     return { success: true }
   })
 
