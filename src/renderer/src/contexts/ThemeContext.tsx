@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from './AuthContext'
 
-type Theme = 'light' | 'dark'
+type Theme = 'light' | 'dark' | 'premium'
+
+const THEME_CYCLE: Theme[] = ['dark', 'light', 'premium']
 
 interface ThemeContextType {
     theme: Theme
     toggleTheme: () => void
+    setThemeTo: (t: Theme) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -19,8 +22,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const loadTheme = async () => {
             try {
                 const savedTheme = await window.api.themeGet()
-                setTheme(savedTheme)
-                applyTheme(savedTheme)
+                setTheme(savedTheme as Theme)
+                applyTheme(savedTheme as Theme)
             } catch (err) {
                 console.error('Failed to load theme:', err)
             } finally {
@@ -43,8 +46,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const reloadTheme = async () => {
             try {
                 const savedTheme = await window.api.themeGet()
-                setTheme(savedTheme)
-                applyTheme(savedTheme)
+                setTheme(savedTheme as Theme)
+                applyTheme(savedTheme as Theme)
             } catch (err) {
                 console.error('Failed to reload theme:', err)
             }
@@ -53,24 +56,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [user?.id, isAuthenticated])
 
     const applyTheme = (t: Theme) => {
-        if (t === 'light') {
-            document.body.classList.add('light')
-        } else {
-            document.body.classList.remove('light')
-        }
+        document.body.classList.remove('light', 'premium')
+        if (t === 'light') document.body.classList.add('light')
+        else if (t === 'premium') document.body.classList.add('premium')
     }
 
     const toggleTheme = async () => {
-        const newTheme = theme === 'light' ? 'dark' : 'light'
+        const idx = THEME_CYCLE.indexOf(theme)
+        const newTheme = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length]
         setTheme(newTheme)
         applyTheme(newTheme)
-        await window.api.themeSet(newTheme)
+        await window.api.themeSet(newTheme as any)
+    }
+
+    const setThemeTo = async (t: Theme) => {
+        setTheme(t)
+        applyTheme(t)
+        await window.api.themeSet(t as any)
     }
 
     if (loading) return null
 
     return (
-        <ThemeContext.Provider value={{ theme, toggleTheme }}>
+        <ThemeContext.Provider value={{ theme, toggleTheme, setThemeTo }}>
             {children}
         </ThemeContext.Provider>
     )

@@ -47,6 +47,30 @@
   --table-border: rgba(0, 0, 0, 0.1);
 }
 
+.premium {
+  --bg-dark: #0c0e14;
+  --bg-sidebar: rgba(12, 14, 22, 0.92);
+  --bg-card: rgba(255, 255, 255, 0.035);
+  --bg-card-hover: rgba(255, 255, 255, 0.06);
+  --accent-primary: #c9a44c;
+  --accent-secondary: #8b6914;
+  --text-primary: #e8e4dc;
+  --text-secondary: rgba(232, 228, 220, 0.5);
+  --danger: #e05252;
+  --success: #4ecb71;
+  --warning: #e5b84c;
+
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-border: rgba(201, 164, 76, 0.15);
+  --input-text: #e8e4dc;
+  --table-header-bg: rgba(201, 164, 76, 0.04);
+  --table-border: rgba(201, 164, 76, 0.1);
+
+  --glass-blur: blur(20px);
+  --glass-border: 1px solid rgba(201, 164, 76, 0.12);
+  --shadow-lg: 0 8px 40px 0 rgba(0, 0, 0, 0.5);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -64,6 +88,12 @@ body {
   overflow-x: hidden;
 }
 
+body.premium {
+  background-image:
+    radial-gradient(at 0% 0%, rgba(201, 164, 76, 0.08) 0, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(139, 105, 20, 0.06) 0, transparent 50%);
+}
+
 .glass-card {
   background: var(--bg-card);
   backdrop-filter: var(--glass-blur);
@@ -76,6 +106,10 @@ body {
 .glass-card:hover {
   background: var(--bg-card-hover);
   border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.premium .glass-card:hover {
+  border: 1px solid rgba(201, 164, 76, 0.2);
 }
 
 h1,
@@ -126,6 +160,12 @@ textarea:focus {
   box-shadow: 0 0 0 2px rgba(0, 210, 255, 0.2);
 }
 
+.premium input:focus,
+.premium select:focus,
+.premium textarea:focus {
+  box-shadow: 0 0 0 2px rgba(201, 164, 76, 0.2);
+}
+
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   color: white;
@@ -134,6 +174,10 @@ textarea:focus {
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+}
+
+.premium .btn-primary:hover {
+  box-shadow: 0 4px 15px rgba(201, 164, 76, 0.35);
 }
 
 .btn-secondary {
@@ -162,6 +206,14 @@ textarea:focus {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.premium ::-webkit-scrollbar-thumb {
+  background: rgba(201, 164, 76, 0.15);
+}
+
+.premium ::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 164, 76, 0.25);
 }
 
 .layout-container {

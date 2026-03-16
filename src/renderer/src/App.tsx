@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -36,7 +36,7 @@ function App(): React.JSX.Element {
   const [showWhatsNew, setShowWhatsNew] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { theme, setThemeTo } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
   const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
   const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
@@ -199,10 +199,32 @@ function App(): React.JSX.Element {
                 <button onClick={() => { setShowProfile(true); setShowUserMenu(false) }} style={{ width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left' }} className="hover-effect">
                   <KeyRound size={14} /> Change Password
                 </button>
-                <button onClick={() => { toggleTheme(); setShowUserMenu(false) }} style={{ width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left' }} className="hover-effect">
-                  {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-                  {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-                </button>
+                <div style={{ borderBottom: '1px solid var(--glass-border)', padding: '6px 14px' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Theme</div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {([
+                      { id: 'dark' as const, icon: <Moon size={13} />, label: 'Dark' },
+                      { id: 'light' as const, icon: <Sun size={13} />, label: 'Light' },
+                      { id: 'premium' as const, icon: <Crown size={13} />, label: 'Premium' }
+                    ] as const).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => { setThemeTo(t.id); setShowUserMenu(false) }}
+                        style={{
+                          flex: 1, padding: '5px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                          background: theme === t.id ? (t.id === 'premium' ? 'rgba(201,164,76,0.15)' : 'rgba(0,210,255,0.1)') : 'transparent',
+                          border: theme === t.id ? (t.id === 'premium' ? '1px solid rgba(201,164,76,0.3)' : '1px solid var(--accent-primary)') : '1px solid transparent',
+                          borderRadius: '6px', cursor: 'pointer',
+                          color: theme === t.id ? (t.id === 'premium' ? '#c9a44c' : 'var(--accent-primary)') : 'var(--text-secondary)',
+                          fontSize: '0.72rem', fontWeight: theme === t.id ? 600 : 400
+                        }}
+                      >
+                        {t.icon}
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <button onClick={() => { logout(); setShowUserMenu(false) }} style={{ width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left' }} className="hover-effect">
                   <LogOut size={14} /> Logout
                 </button>

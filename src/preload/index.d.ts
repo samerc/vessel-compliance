@@ -92,8 +92,8 @@ export interface Api {
   dialogOpenFileWord: () => Promise<string | null>
   importDefectsFromWord: (surveyId: string, filePath: string) => Promise<{ success: boolean; message?: string; count: number }>
 
-  themeGet: () => Promise<'light' | 'dark'>
-  themeSet: (theme: 'light' | 'dark') => Promise<void>
+  themeGet: () => Promise<'light' | 'dark' | 'premium'>
+  themeSet: (theme: 'light' | 'dark' | 'premium') => Promise<void>
 
   windowGetPreferences: () => Promise<{ width: number; height: number; x?: number; y?: number } | null>
   windowSavePreferences: () => Promise<void>
