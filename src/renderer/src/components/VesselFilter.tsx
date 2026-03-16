@@ -480,22 +480,38 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
                 {/* ── Filter sidebar ── */}
-                <div style={{ width: panelCollapsed ? '0' : '264px', flexShrink: 0, overflow: 'hidden', transition: 'width 0.25s ease', borderRight: '1px solid var(--glass-border)' }}>
-                    <div style={{ width: '264px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ width: panelCollapsed ? '0' : '280px', flexShrink: 0, overflow: 'hidden', transition: 'width 0.25s ease' }}>
+                    <div style={{
+                        width: '280px', height: '100%', display: 'flex', flexDirection: 'column',
+                        background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--table-border)',
+                        overflow: 'hidden'
+                    }}>
 
                         {/* Sidebar header */}
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                            <SlidersHorizontal size={14} color="var(--accent-primary)" />
-                            <span style={{ fontWeight: '700', fontSize: '0.85rem', flex: 1 }}>Filters</span>
+                        <div style={{
+                            padding: '16px 20px', borderBottom: '1px solid var(--table-border)',
+                            display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0
+                        }}>
+                            <div style={{
+                                width: 36, height: 36, borderRadius: 9,
+                                background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                            }}>
+                                <SlidersHorizontal size={16} color="#fff" />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Filters</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Refine your search</div>
+                            </div>
                             {activeFilterCount > 0 && (
-                                <span style={{ background: 'var(--accent-primary)', color: '#000', borderRadius: '10px', padding: '1px 7px', fontSize: '0.7rem', fontWeight: '700' }}>
+                                <span style={{ background: 'var(--accent-primary)', color: '#000', borderRadius: '10px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: '700' }}>
                                     {activeFilterCount}
                                 </span>
                             )}
                         </div>
 
                         {/* Scrollable filter content */}
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                             {/* Logic */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -629,7 +645,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                         </div>
 
                         {/* Apply / Clear */}
-                        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--glass-border)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--table-border)', display: 'flex', gap: '8px', flexShrink: 0 }}>
                             <button
                                 className="btn-primary"
                                 onClick={handleSearch}
