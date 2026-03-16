@@ -1009,14 +1009,8 @@ export default function EntityDirectory() {
               {(showAddAddress) && (
                 <div style={{ background: isLight ? '#f0f4f8' : 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '12px', marginBottom: '10px', border: '1px solid var(--table-border)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <input placeholder="Label (e.g. Registered Office)" value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                    <input placeholder="Address Line 1 *" value={addrForm.addressLine1} onChange={e => setAddrForm(p => ({ ...p, addressLine1: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                    <input placeholder="Address Line 2" value={addrForm.addressLine2} onChange={e => setAddrForm(p => ({ ...p, addressLine2: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input placeholder="City" value={addrForm.city} onChange={e => setAddrForm(p => ({ ...p, city: e.target.value }))} style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                      <input placeholder="Postal Code" value={addrForm.postalCode} onChange={e => setAddrForm(p => ({ ...p, postalCode: e.target.value }))} style={{ width: '90px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                    </div>
-                    <input placeholder="Country" value={addrForm.country} onChange={e => setAddrForm(p => ({ ...p, country: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                    <input placeholder="Label (e.g. Registered Office) *" value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                    <textarea placeholder="Paste or type full address *" value={addrForm.addressLine1} onChange={e => setAddrForm(p => ({ ...p, addressLine1: e.target.value }))} rows={3} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem', resize: 'vertical', fontFamily: 'inherit' }} />
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                       <button onClick={handleSaveAddress} disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()} className="btn-primary" style={{ padding: '5px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Save size={12} /> {editingAddress ? 'Update' : 'Save'}
@@ -1043,11 +1037,8 @@ export default function EntityDirectory() {
                           <button onClick={() => handleDeleteAddress(addr.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={12} /></button>
                         </div>
                       </div>
-                      <div style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                      <div style={{ color: 'var(--text-primary)', lineHeight: 1.4, whiteSpace: 'pre-line' }}>
                         {addr.addressLine1}
-                        {addr.addressLine2 && <><br />{addr.addressLine2}</>}
-                        {(addr.city || addr.postalCode) && <><br />{[addr.city, addr.postalCode].filter(Boolean).join(' ')}</>}
-                        {addr.country && <><br />{addr.country}</>}
                       </div>
                     </div>
                   ))}
