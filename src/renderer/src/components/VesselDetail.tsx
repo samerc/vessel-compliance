@@ -115,6 +115,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             const dp = await window.api.getVesselDynamicPolicies(vessel.id)
             setDynamicPolicies(Array.isArray(dp) ? dp : [])
         } catch { /* ignore */ }
+        try {
+            const notes = await window.api.getVesselNotes(vessel.id)
+            setVesselNoteCount(Array.isArray(notes) ? notes.length : 0)
+        } catch { /* ignore */ }
     }
 
     const loadDynamicPolicies = async () => {
@@ -326,6 +330,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
     const [newVesselNoteText, setNewVesselNoteText] = useState('')
     const [vesselNotesSaving, setVesselNotesSaving] = useState(false)
+    const [vesselNoteCount, setVesselNoteCount] = useState(0)
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
     const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
     const [showAddFlagModal, setShowAddFlagModal] = useState(false)
@@ -515,7 +520,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         setVesselNotesLoading(true)
         try {
             const data = await window.api.getVesselNotes(vessel.id)
-            setVesselNotesList(Array.isArray(data) ? data : [])
+            const list = Array.isArray(data) ? data : []
+            setVesselNotesList(list)
+            setVesselNoteCount(list.length)
         } finally {
             setVesselNotesLoading(false)
         }
@@ -526,7 +533,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         setVesselNotesSaving(true)
         try {
             const note = await window.api.addVesselNote(vessel.id, newVesselNoteText.trim())
-            setVesselNotesList(prev => [...prev, note])
+            setVesselNotesList(prev => { const next = [...prev, note]; setVesselNoteCount(next.length); return next })
             setNewVesselNoteText('')
         } finally {
             setVesselNotesSaving(false)
@@ -535,7 +542,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
     const handleDeleteVesselNote = async (noteId: string) => {
         await window.api.deleteVesselNote(noteId)
-        setVesselNotesList(prev => prev.filter(n => n.id !== noteId))
+        setVesselNotesList(prev => { const next = prev.filter(n => n.id !== noteId); setVesselNoteCount(next.length); return next })
     }
 
     return (
@@ -813,6 +820,17 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 }}
                             >
                                 <MessageSquare size={16} /> Notes
+                                {vesselNoteCount > 0 && (
+                                    <span style={{
+                                        position: 'absolute', top: '-6px', right: '-6px',
+                                        background: 'var(--accent-primary)', color: '#fff',
+                                        fontSize: '0.65rem', fontWeight: 700,
+                                        minWidth: '16px', height: '16px',
+                                        borderRadius: '8px', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center',
+                                        padding: '0 4px'
+                                    }}>{vesselNoteCount}</span>
+                                )}
                             </button>
                             <div style={{ position: 'relative' }}>
                                 <button
