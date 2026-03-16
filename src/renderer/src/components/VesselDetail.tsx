@@ -1567,6 +1567,21 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         showSuccess={showSuccess}
                         showError={showError}
                     />
+
+                    {/* Section divider between policies and warranties */}
+                    <div style={{
+                        margin: '32px 0 24px',
+                        display: 'flex', alignItems: 'center', gap: '12px'
+                    }}>
+                        <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
+                        <span style={{
+                            fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px',
+                            textTransform: 'uppercase', color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap'
+                        }}>Survey Warranties</span>
+                        <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
+                    </div>
+
                     <WarrantyManager
                         vesselId={vessel.id}
                         dynamicPolicies={dynamicPolicies}

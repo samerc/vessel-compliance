@@ -205,6 +205,7 @@ export interface Api {
   surveyWarrantyLogReminder: (data: Omit<SurveyWarrantyReminder, 'id' | 'createdAt'>) => Promise<SurveyWarrantyReminder>
   surveyWarrantyGetReminders: (warrantyId: string) => Promise<SurveyWarrantyReminder[]>
   surveyWarrantyWaive: (id: string, reason: string) => Promise<void>
+  surveyWarrantyCompleteWithSurvey: (warrantyId: string, completionNotes: string | null, userId: string) => Promise<void>
 
   // Reminders
   remindersGetSettings: () => Promise<ReminderSettings>

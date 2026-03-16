@@ -3824,6 +3824,34 @@ export class MySQLAdapter {
         )
     }
 
+    async completeWarrantyAndSurvey(warrantyId: string, completionNotes: string | null, userId: string): Promise<void> {
+        if (!this.pool) return
+        // 1. Complete the warranty
+        await this.pool.query(
+            `UPDATE survey_warranties SET status = 'completed', completed_at = NOW(), completion_notes = ? WHERE id = ?`,
+            [completionNotes, warrantyId]
+        )
+        // 2. Look up the linked survey
+        const [rows] = await this.pool.query(
+            `SELECT condition_survey_id FROM survey_warranties WHERE id = ?`,
+            [warrantyId]
+        )
+        const warranty = (rows as any[])[0]
+        if (warranty?.condition_survey_id) {
+            const surveyId = warranty.condition_survey_id
+            // 3. Close all open defects on that survey
+            await this.pool.query(
+                `UPDATE survey_defects SET status = 'CLOSED', closed_at = NOW(), closed_by = ? WHERE survey_id = ? AND status = 'OPEN'`,
+                [userId, surveyId]
+            )
+            // 4. Mark the survey as completed
+            await this.pool.query(
+                `UPDATE condition_surveys SET completed_at = NOW(), completed_by = ? WHERE id = ? AND completed_at IS NULL`,
+                [userId, surveyId]
+            )
+        }
+    }
+
     async closeSurvey(surveyId: string, userId: string): Promise<void> {
         if (!this.pool) return
         // Bulk-close all open defects

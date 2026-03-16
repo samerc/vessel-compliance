@@ -1070,6 +1070,7 @@ app.whenReady().then(() => {
   safeHandle('survey_warranty:logReminder', async (event, data) => { await requirePermission(event, 'surveys:manage'); return db.logWarrantyReminder(data) })
   safeHandle('survey_warranty:getReminders', (event, warrantyId) => { requireSession(event); return db.getWarrantyReminders(warrantyId) })
   safeHandle('survey_warranty:waive', async (event, id, reason) => { await requirePermission(event, 'surveys:manage'); return db.waiverSurveyWarranty(id, reason) })
+  safeHandle('survey_warranty:completeWithSurvey', async (event, warrantyId, completionNotes, userId) => { await requirePermission(event, 'surveys:manage'); return db.completeWarrantyAndSurvey(warrantyId, completionNotes, userId) })
 
 
 

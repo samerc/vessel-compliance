@@ -210,6 +210,7 @@ const api = {
   surveyWarrantyLogReminder: (data) => ipcRenderer.invoke('survey_warranty:logReminder', data),
   surveyWarrantyGetReminders: (warrantyId) => ipcRenderer.invoke('survey_warranty:getReminders', warrantyId),
   surveyWarrantyWaive: (id, reason) => ipcRenderer.invoke('survey_warranty:waive', id, reason),
+  surveyWarrantyCompleteWithSurvey: (warrantyId, completionNotes, userId) => ipcRenderer.invoke('survey_warranty:completeWithSurvey', warrantyId, completionNotes, userId),
 
   // Auto-Update
   updateCheckForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),

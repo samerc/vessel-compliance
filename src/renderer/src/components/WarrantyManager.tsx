@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, ChevronDown, ChevronRight, Bell, Check, X, AlertTriangle, Clock, FileWarning } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Bell, Check, X, AlertTriangle, Clock, FileWarning, ClipboardCheck, Link2 } from 'lucide-react'
 import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -197,16 +197,50 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     }
   }
 
+  // ── Convert to Survey ───────────────────────────────────────────
+  const handleConvertToSurvey = async (w: SurveyWarranty) => {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const newSurvey = await window.api.addConditionSurvey({
+        vesselId: w.vesselId,
+        surveyDate: today,
+        surveyorId: '',
+        surveyType: 'Warranty Survey',
+        reference: w.description.length > 100 ? w.description.substring(0, 100) + '...' : w.description,
+        notes: `Warranty: ${w.description}`,
+        createdBy: user?.username || 'System'
+      })
+      await window.api.surveyWarrantyUpdate(w.id, {
+        conditionSurveyId: newSurvey.id,
+        status: 'survey_done'
+      })
+      showSuccess('Survey created and linked to warranty')
+      loadWarranties()
+    } catch (err: any) {
+      showError(err.message || 'Failed to convert to survey')
+    }
+  }
+
   // ── Complete ─────────────────────────────────────────────────────
   const handleComplete = async () => {
     if (!completeWarrantyId) return
     try {
-      await window.api.surveyWarrantyUpdate(completeWarrantyId, {
-        status: 'completed',
-        completionNotes: completeNotes.trim() || null,
-        completedAt: new Date().toISOString()
-      })
-      showSuccess('Warranty completed')
+      const warranty = warranties.find(w => w.id === completeWarrantyId)
+      if (warranty?.conditionSurveyId) {
+        await window.api.surveyWarrantyCompleteWithSurvey(
+          completeWarrantyId,
+          completeNotes.trim() || null,
+          user?.id || ''
+        )
+        showSuccess('Warranty and linked survey completed')
+      } else {
+        await window.api.surveyWarrantyUpdate(completeWarrantyId, {
+          status: 'completed',
+          completionNotes: completeNotes.trim() || null,
+          completedAt: new Date().toISOString()
+        })
+        showSuccess('Warranty completed')
+      }
       setCompleteWarrantyId(null)
       setCompleteNotes('')
       loadWarranties()
@@ -400,6 +434,15 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
               <Bell size={11} /> Next: {formatDate(w.nextReminderDate)}
             </span>
           )}
+          {w.conditionSurveyId && (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: '3px',
+              fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
+              borderRadius: '8px', background: 'rgba(0,170,200,0.12)', color: '#00aac8'
+            }}>
+              <Link2 size={11} /> Linked Survey
+            </span>
+          )}
         </div>
 
         {/* Expanded body */}
@@ -471,6 +514,15 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <Bell size={13} /> Log Reminder
+                </button>
+              )}
+              {w.status === 'pending' && !w.conditionSurveyId && (
+                <button
+                  onClick={() => handleConvertToSurvey(w)}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00aac8', borderColor: 'rgba(0,170,200,0.35)' }}
+                >
+                  <ClipboardCheck size={13} /> Convert to Survey
                 </button>
               )}
               {w.status === 'pending' && (
