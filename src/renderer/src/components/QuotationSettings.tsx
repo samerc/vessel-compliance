@@ -206,6 +206,7 @@ function CollapsibleStandardTexts({ fields, showSuccess }: {
                                         onChange={val => setTexts(prev => ({ ...prev, [field.key]: val }))}
                                         minHeight={Math.max(60, (field.rows || 3) * 22)}
                                         showFontSize
+                                        showFontFamily
                                         showAlignment
                                         showLineSpacing
                                     />
@@ -2478,6 +2479,7 @@ function StandardTextsTab({ showSuccess }: TabProps) {
                             onChange={val => setTexts(prev => ({ ...prev, docHeader: val }))}
                             minHeight={60}
                             showFontSize
+                            showFontFamily
                             showAlignment
                             showLineSpacing
                         />
@@ -2488,6 +2490,7 @@ function StandardTextsTab({ showSuccess }: TabProps) {
                                 onChange={e => setTexts(prev => ({ ...prev, docHeaderSpacing: parseFloat(e.target.value) }))}
                                 style={{ fontSize: '0.78rem', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', width: '70px' }}
                             >
+                                <option value={0.9}>None</option>
                                 <option value={1}>1.0</option>
                                 <option value={1.15}>1.15</option>
                                 <option value={1.5}>1.5</option>
@@ -2505,6 +2508,7 @@ function StandardTextsTab({ showSuccess }: TabProps) {
                             onChange={val => setTexts(prev => ({ ...prev, docFooter: val }))}
                             minHeight={60}
                             showFontSize
+                            showFontFamily
                             showAlignment
                             showLineSpacing
                         />
@@ -2515,6 +2519,7 @@ function StandardTextsTab({ showSuccess }: TabProps) {
                                 onChange={e => setTexts(prev => ({ ...prev, docFooterSpacing: parseFloat(e.target.value) }))}
                                 style={{ fontSize: '0.78rem', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', width: '70px' }}
                             >
+                                <option value={0.9}>None</option>
                                 <option value={1}>1.0</option>
                                 <option value={1.15}>1.15</option>
                                 <option value={1.5}>1.5</option>

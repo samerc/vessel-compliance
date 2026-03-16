@@ -10,6 +10,36 @@ import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, AlignLeft,
 import { useTheme } from '../contexts/ThemeContext'
 import './RichTextEditor.css'
 
+// Custom FontFamily extension using TextStyle marks
+const FontFamily = Extension.create({
+  name: 'fontFamily',
+  addGlobalAttributes() {
+    return [{
+      types: ['textStyle'],
+      attributes: {
+        fontFamily: {
+          default: null,
+          parseHTML: el => (el as HTMLElement).style.fontFamily?.replace(/['"]+/g, '') || null,
+          renderHTML: attrs => {
+            if (!attrs.fontFamily) return {}
+            return { style: `font-family: ${attrs.fontFamily}` }
+          }
+        }
+      }
+    }]
+  }
+})
+
+const FONT_FAMILIES = [
+  { label: 'Default', value: '' },
+  { label: 'Times New Roman', value: 'Times New Roman, serif' },
+  { label: 'Arial', value: 'Arial, sans-serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Courier New', value: 'Courier New, monospace' },
+  { label: 'Verdana', value: 'Verdana, sans-serif' },
+  { label: 'Calibri', value: 'Calibri, sans-serif' },
+]
+
 // Custom FontSize extension using TextStyle marks
 const FontSize = Extension.create({
   name: 'fontSize',
@@ -64,6 +94,7 @@ const FONT_SIZES = [
 ]
 
 const LINE_SPACINGS = [
+  { label: 'None', value: '0.9' },
   { label: '1.0', value: '1' },
   { label: '1.15', value: '1.15' },
   { label: '1.5', value: '1.5' },
@@ -79,18 +110,21 @@ interface RichTextEditorProps {
   minHeight?: number
   maxWidth?: string
   showFontSize?: boolean
+  showFontFamily?: boolean
   showAlignment?: boolean
   showLineSpacing?: boolean
 }
 
-export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showAlignment, showLineSpacing }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showFontFamily, showAlignment, showLineSpacing }: RichTextEditorProps) {
   const { theme } = useTheme()
   const iconColor = useMemo(() => theme === 'light' ? '#606770' : 'rgba(255,255,255,0.6)', [theme])
   const activeIconColor = '#ffffff'
   const skipUpdate = useRef(false)
   const [fontSizeOpen, setFontSizeOpen] = useState(false)
+  const [fontFamilyOpen, setFontFamilyOpen] = useState(false)
   const [lineSpacingOpen, setLineSpacingOpen] = useState(false)
   const fontSizeRef = useRef<HTMLDivElement>(null)
+  const fontFamilyRef = useRef<HTMLDivElement>(null)
   const lineSpacingRef = useRef<HTMLDivElement>(null)
 
   const extensions = useMemo(() => {
@@ -108,8 +142,10 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' }
       })
     ]
-    if (showFontSize) {
-      exts.push(TextStyle, FontSize)
+    if (showFontSize || showFontFamily) {
+      exts.push(TextStyle)
+      if (showFontSize) exts.push(FontSize)
+      if (showFontFamily) exts.push(FontFamily)
     }
     if (showAlignment) {
       exts.push(TextAlign.configure({ types: ['paragraph'] }))
@@ -118,7 +154,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
       exts.push(LineHeight)
     }
     return exts
-  }, [showFontSize, showAlignment, showLineSpacing])
+  }, [showFontSize, showFontFamily, showAlignment, showLineSpacing])
 
   const editor = useEditor({
     extensions,
@@ -145,14 +181,15 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
 
   // Close dropdowns on outside click
   useEffect(() => {
-    if (!fontSizeOpen && !lineSpacingOpen) return
+    if (!fontSizeOpen && !fontFamilyOpen && !lineSpacingOpen) return
     const handler = (e: MouseEvent) => {
       if (fontSizeOpen && fontSizeRef.current && !fontSizeRef.current.contains(e.target as Node)) setFontSizeOpen(false)
+      if (fontFamilyOpen && fontFamilyRef.current && !fontFamilyRef.current.contains(e.target as Node)) setFontFamilyOpen(false)
       if (lineSpacingOpen && lineSpacingRef.current && !lineSpacingRef.current.contains(e.target as Node)) setLineSpacingOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [fontSizeOpen, lineSpacingOpen])
+  }, [fontSizeOpen, fontFamilyOpen, lineSpacingOpen])
 
   const toggleLink = useCallback(() => {
     if (!editor) return
@@ -178,6 +215,20 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   const setFontSize = (size: string) => {
     editor.chain().focus().setMark('textStyle', { fontSize: size }).run()
     setFontSizeOpen(false)
+  }
+
+  const currentFontFamily = (editor.getAttributes('textStyle') as any).fontFamily || ''
+  const fontFamilyLabel = currentFontFamily
+    ? FONT_FAMILIES.find(f => f.value === currentFontFamily)?.label || 'Custom'
+    : 'Font'
+
+  const setFontFamily = (family: string) => {
+    if (family) {
+      editor.chain().focus().setMark('textStyle', { fontFamily: family }).run()
+    } else {
+      editor.chain().focus().unsetMark('textStyle').run()
+    }
+    setFontFamilyOpen(false)
   }
 
   const setLineHeight = (lh: string) => {
@@ -212,6 +263,38 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
                       onClick={() => setFontSize(s.value)}
                     >
                       {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="rte-separator" />
+          </>
+        )}
+        {showFontFamily && (
+          <>
+            <div ref={fontFamilyRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="rte-btn rte-font-size-btn"
+                onClick={() => setFontFamilyOpen(!fontFamilyOpen)}
+                title="Font Family"
+                style={{ minWidth: '70px' }}
+              >
+                <span style={{ fontSize: '11px', color: iconColor, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>{fontFamilyLabel}</span>
+                <ChevronDown size={10} color={iconColor} />
+              </button>
+              {fontFamilyOpen && (
+                <div className="rte-font-size-dropdown" style={{ minWidth: '160px' }}>
+                  {FONT_FAMILIES.map(f => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      className={`rte-font-size-option${currentFontFamily === f.value ? ' active' : ''}`}
+                      onClick={() => setFontFamily(f.value)}
+                      style={{ fontFamily: f.value || 'inherit' }}
+                    >
+                      {f.label}
                     </button>
                   ))}
                 </div>

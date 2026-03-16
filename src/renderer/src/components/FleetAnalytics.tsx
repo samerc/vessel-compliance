@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Ship, Globe, Anchor, Calendar, TrendingUp, Shield, BarChart3,
   RefreshCw, Loader2, ChevronDown, ChevronRight, Save, Trash2,
-  FileDown, Users, Filter,
+  FileDown, Users, Filter, X,
 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -148,14 +148,17 @@ function CollapsibleFilter({ label, children, defaultCollapsed = false }: {
 
 // ── MultiSelectDropdown ───────────────────────────────────────────────────────
 
-function MultiSelectDropdown({ label, options, selectedIds, onChange }: {
+function MultiSelectDropdown({ label, options, selectedIds, onChange, isLight }: {
   label: string
   options: { id: string; name: string }[]
   selectedIds: string[]
   onChange: (ids: string[]) => void
+  isLight: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+
+  const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
 
   const filtered = useMemo(() => {
     if (!search) return options
@@ -175,7 +178,7 @@ function MultiSelectDropdown({ label, options, selectedIds, onChange }: {
         onClick={() => setOpen(v => !v)}
         style={{
           width: '100%', padding: '6px 10px', borderRadius: '6px',
-          border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+          border: '1px solid var(--input-border)', background: dropdownBg,
           color: 'var(--text-primary)', fontSize: '0.78rem', textAlign: 'left',
           cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}
@@ -190,14 +193,43 @@ function MultiSelectDropdown({ label, options, selectedIds, onChange }: {
       {open && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
-          background: 'var(--bg-primary)', border: '1px solid var(--input-border)',
-          borderRadius: '6px', marginTop: '2px', maxHeight: '200px', overflowY: 'auto',
+          background: dropdownBg, border: '1px solid var(--input-border)',
+          borderRadius: '6px', marginTop: '2px', maxHeight: '240px', overflowY: 'auto',
           boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
         }}>
+          {/* All / None buttons */}
+          <div style={{
+            display: 'flex', gap: '4px', padding: '6px 8px',
+            borderBottom: '1px solid var(--table-border)',
+            position: 'sticky', top: 0, background: dropdownBg, zIndex: 1,
+          }}>
+            <button
+              onClick={() => onChange(options.map(o => o.id))}
+              style={{
+                padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600,
+                borderRadius: '4px', border: '1px solid var(--input-border)',
+                background: 'transparent', color: 'var(--accent-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              All
+            </button>
+            <button
+              onClick={() => onChange([])}
+              style={{
+                padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600,
+                borderRadius: '4px', border: '1px solid var(--input-border)',
+                background: 'transparent', color: 'var(--text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              None
+            </button>
+          </div>
           {options.length > 6 && (
             <div style={{
               padding: '6px', borderBottom: '1px solid var(--table-border)',
-              position: 'sticky', top: 0, background: 'var(--bg-primary)',
+              position: 'sticky', top: 32, background: dropdownBg, zIndex: 1,
             }}>
               <input
                 placeholder="Search..."
@@ -207,7 +239,7 @@ function MultiSelectDropdown({ label, options, selectedIds, onChange }: {
                 style={{
                   width: '100%', padding: '4px 8px', fontSize: '0.78rem',
                   borderRadius: '4px', border: '1px solid var(--input-border)',
-                  background: 'var(--bg-primary)', color: 'var(--text-primary)', boxSizing: 'border-box',
+                  background: dropdownBg, color: 'var(--text-primary)', boxSizing: 'border-box',
                 }}
               />
             </div>
@@ -379,8 +411,24 @@ export default function FleetAnalytics() {
   const [loading, setLoading] = useState(false)
   const [hasQueried, setHasQueried] = useState(false)
 
-  // ── Export dropdown ─────────────────────────────────────────────────────────
-  const [exportOpen, setExportOpen] = useState(false)
+  // ── Export modal ────────────────────────────────────────────────────────────
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'excel'>('pdf')
+  const [exportSections, setExportSections] = useState({
+    kpi: true,
+    vesselTypes: true,
+    flagStates: true,
+    ageDistribution: true,
+    tonnageDistribution: true,
+    policyCoverage: true,
+    topCustomers: true,
+    ofacStatus: true,
+    rawVesselData: true,
+  })
+
+  const toggleExportSection = (key: keyof typeof exportSections) => {
+    setExportSections(prev => ({ ...prev, [key]: !prev[key] }))
+  }
 
   // ── Load reference data on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -483,8 +531,8 @@ export default function FleetAnalytics() {
   }
 
   // ── Export functions ────────────────────────────────────────────────────────
-  const exportPDF = async () => {
-    setExportOpen(false)
+  const exportPDF = async (sections: typeof exportSections) => {
+    setExportModalOpen(false)
     try {
       const settings = await getReportSettings()
       const navy: [number, number, number] = [10, 22, 40]
@@ -509,187 +557,229 @@ export default function FleetAnalytics() {
       doc.text(`Generated: ${date}`, pw - 10, 14, { align: 'right' })
 
       let y = 30
+      let needNewPage = false
+
+      const ensurePage = () => {
+        if (needNewPage) { doc.addPage(); y = 15; needNewPage = false }
+      }
 
       // ── KPI summary (2 rows of 3) ──
-      const kpiItems = [
-        { label: 'Vessels', value: String(kpis.total) },
-        { label: 'Avg Age', value: kpis.avgAge != null ? `${kpis.avgAge} yrs` : 'N/A' },
-        { label: 'Avg Tonnage', value: kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A' },
-        { label: 'Total Tonnage', value: fmt(kpis.totalTonnage) },
-        { label: 'Flags', value: String(kpis.flags) },
-        { label: 'Policy Coverage', value: `${kpis.policyCoveragePct}%` },
-      ]
-      const boxW = (pw - 20 - 8) / 3
-      const boxH = 14
-      for (let i = 0; i < kpiItems.length; i++) {
-        const col = i % 3
-        const row = Math.floor(i / 3)
-        const bx = 10 + col * (boxW + 4)
-        const by = y + row * (boxH + 4)
-        doc.setFillColor(240, 244, 250)
-        doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'F')
-        doc.setTextColor(...navy)
-        doc.setFontSize(7)
-        doc.setFont('helvetica', 'normal')
-        doc.text(kpiItems[i].label.toUpperCase(), bx + 4, by + 5)
-        doc.setFontSize(11)
-        doc.setFont('helvetica', 'bold')
-        doc.text(kpiItems[i].value, bx + 4, by + 11)
+      if (sections.kpi) {
+        const kpiItems = [
+          { label: 'Vessels', value: String(kpis.total) },
+          { label: 'Avg Age', value: kpis.avgAge != null ? `${kpis.avgAge} yrs` : 'N/A' },
+          { label: 'Avg Tonnage', value: kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A' },
+          { label: 'Total Tonnage', value: fmt(kpis.totalTonnage) },
+          { label: 'Flags', value: String(kpis.flags) },
+          { label: 'Policy Coverage', value: `${kpis.policyCoveragePct}%` },
+        ]
+        const boxW = (pw - 20 - 8) / 3
+        const boxH = 14
+        for (let i = 0; i < kpiItems.length; i++) {
+          const col = i % 3
+          const row = Math.floor(i / 3)
+          const bx = 10 + col * (boxW + 4)
+          const by = y + row * (boxH + 4)
+          doc.setFillColor(240, 244, 250)
+          doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'F')
+          doc.setTextColor(...navy)
+          doc.setFontSize(7)
+          doc.setFont('helvetica', 'normal')
+          doc.text(kpiItems[i].label.toUpperCase(), bx + 4, by + 5)
+          doc.setFontSize(11)
+          doc.setFont('helvetica', 'bold')
+          doc.text(kpiItems[i].value, bx + 4, by + 11)
+        }
+        y += 2 * (boxH + 4) + 8
       }
-      y += 2 * (boxH + 4) + 8
 
       // ── Vessel Type Distribution table ──
-      doc.setTextColor(...navy)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Vessel Type Distribution', 10, y)
-      y += 2
+      if (sections.vesselTypes) {
+        ensurePage()
+        doc.setTextColor(...navy)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Vessel Type Distribution', 10, y)
+        y += 2
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Type', 'Count', '%', 'Avg Age', 'Avg Tonnage']],
-        body: vesselTypeBreakdown.map(r => [
-          r.name,
-          String(r.count),
-          `${r.pct.toFixed(1)}%`,
-          r.avgAge != null ? `${r.avgAge} yrs` : 'N/A',
-          r.avgTonnage != null ? fmt(r.avgTonnage) : 'N/A',
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5 },
-        margin: { left: 10, right: 10 },
-      })
-      y = (doc as any).lastAutoTable.finalY + 8
+        autoTable(doc, {
+          startY: y,
+          head: [['Type', 'Count', '%', 'Avg Age', 'Avg Tonnage']],
+          body: vesselTypeBreakdown.map(r => [
+            r.name,
+            String(r.count),
+            `${r.pct.toFixed(1)}%`,
+            r.avgAge != null ? `${r.avgAge} yrs` : 'N/A',
+            r.avgTonnage != null ? fmt(r.avgTonnage) : 'N/A',
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5 },
+          margin: { left: 10, right: 10 },
+        })
+        y = (doc as any).lastAutoTable.finalY + 8
+      }
 
-      // ── Page 2: Flag States ──
-      doc.addPage()
-      y = 15
-      doc.setTextColor(...navy)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Flag State Distribution (Top 15)', 10, y)
-      y += 2
+      // ── Flag States ──
+      if (sections.flagStates) {
+        needNewPage = true
+        ensurePage()
+        doc.setTextColor(...navy)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Flag State Distribution (Top 15)', 10, y)
+        y += 2
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Flag', 'Count', '%']],
-        body: [
-          ...flagDistribution.rows.map(r => [r.name, String(r.count), `${r.pct.toFixed(1)}%`]),
-          ...(flagDistribution.othersCount > 0
-            ? [['Others', String(flagDistribution.othersCount),
-              `${pool.length > 0 ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(1) : 0}%`]]
-            : []),
-        ],
-        theme: 'grid',
-        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5 },
-        margin: { left: 10, right: 10 },
-      })
-      y = (doc as any).lastAutoTable.finalY + 8
+        autoTable(doc, {
+          startY: y,
+          head: [['Flag', 'Count', '%']],
+          body: [
+            ...flagDistribution.rows.map(r => [r.name, String(r.count), `${r.pct.toFixed(1)}%`]),
+            ...(flagDistribution.othersCount > 0
+              ? [['Others', String(flagDistribution.othersCount),
+                `${pool.length > 0 ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(1) : 0}%`]]
+              : []),
+          ],
+          theme: 'grid',
+          headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5 },
+          margin: { left: 10, right: 10 },
+        })
+        y = (doc as any).lastAutoTable.finalY + 8
+      }
 
       // ── Age Distribution ──
-      doc.setTextColor(...navy)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Age Distribution', 10, y)
-      y += 2
+      if (sections.ageDistribution) {
+        const ageStartY = y
+        doc.setTextColor(...navy)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Age Distribution', 10, y)
+        y += 2
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Range', 'Count', '%']],
-        body: ageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
-        theme: 'grid',
-        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5 },
-        margin: { left: 10, right: pw / 2 + 5 },
-      })
-      const ageTableBottom = (doc as any).lastAutoTable.finalY
+        autoTable(doc, {
+          startY: y,
+          head: [['Range', 'Count', '%']],
+          body: ageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+          theme: 'grid',
+          headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5 },
+          margin: { left: 10, right: sections.tonnageDistribution ? pw / 2 + 5 : 10 },
+        })
+        const ageTableBottom = (doc as any).lastAutoTable.finalY
 
-      // ── Tonnage Distribution (side by side) ──
-      doc.setTextColor(...navy)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Tonnage Distribution', pw / 2 + 5, y - 2)
+        // ── Tonnage Distribution (side by side if both selected) ──
+        if (sections.tonnageDistribution) {
+          doc.setTextColor(...navy)
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'bold')
+          doc.text('Tonnage Distribution', pw / 2 + 5, ageStartY)
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Range', 'Count', '%']],
-        body: tonnageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
-        theme: 'grid',
-        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5 },
-        margin: { left: pw / 2 + 5, right: 10 },
-      })
-      y = Math.max(ageTableBottom, (doc as any).lastAutoTable.finalY) + 8
+          autoTable(doc, {
+            startY: ageStartY + 2,
+            head: [['Range', 'Count', '%']],
+            body: tonnageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+            theme: 'grid',
+            headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 7.5 },
+            margin: { left: pw / 2 + 5, right: 10 },
+          })
+          y = Math.max(ageTableBottom, (doc as any).lastAutoTable.finalY) + 8
+        } else {
+          y = ageTableBottom + 8
+        }
+      } else if (sections.tonnageDistribution) {
+        doc.setTextColor(...navy)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Tonnage Distribution', 10, y)
+        y += 2
 
-      // ── Page 3: Policy Coverage + Customers + OFAC ──
-      doc.addPage()
-      y = 15
-      doc.setTextColor(...navy)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Policy Coverage', 10, y)
-      y += 2
+        autoTable(doc, {
+          startY: y,
+          head: [['Range', 'Count', '%']],
+          body: tonnageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+          theme: 'grid',
+          headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5 },
+          margin: { left: 10, right: 10 },
+        })
+        y = (doc as any).lastAutoTable.finalY + 8
+      }
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Policy Type', 'Vessels Covered', '%']],
-        body: policyCoverage.map(r => [
-          r.name,
-          String(r.vesselCount),
-          `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5 },
-        margin: { left: 10, right: 10 },
-      })
-      y = (doc as any).lastAutoTable.finalY + 8
+      // ── Policy Coverage ──
+      if (sections.policyCoverage) {
+        needNewPage = true
+        ensurePage()
+        doc.setTextColor(...navy)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Policy Coverage', 10, y)
+        y += 2
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Policy Type', 'Vessels Covered', '%']],
+          body: policyCoverage.map(r => [
+            r.name,
+            String(r.vesselCount),
+            `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5 },
+          margin: { left: 10, right: 10 },
+        })
+        y = (doc as any).lastAutoTable.finalY + 8
+      }
 
       // ── Top Customers ──
-      doc.setTextColor(...navy)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Top Customers', 10, y)
-      y += 2
+      if (sections.topCustomers) {
+        doc.setTextColor(...navy)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Top Customers', 10, y)
+        y += 2
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Customer', 'Vessels', '%', 'Types']],
-        body: customerConcentration.map(r => [
-          r.name,
-          String(r.count),
-          `${r.pct.toFixed(1)}%`,
-          r.types,
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5 },
-        margin: { left: 10, right: 10 },
-      })
-      y = (doc as any).lastAutoTable.finalY + 8
+        autoTable(doc, {
+          startY: y,
+          head: [['Customer', 'Vessels', '%', 'Types']],
+          body: customerConcentration.map(r => [
+            r.name,
+            String(r.count),
+            `${r.pct.toFixed(1)}%`,
+            r.types,
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5 },
+          margin: { left: 10, right: 10 },
+        })
+        y = (doc as any).lastAutoTable.finalY + 8
+      }
 
       // ── OFAC Status ──
-      doc.setTextColor(...navy)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.text('OFAC / Sanctions Status', 10, y)
-      y += 2
+      if (sections.ofacStatus) {
+        doc.setTextColor(...navy)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('OFAC / Sanctions Status', 10, y)
+        y += 2
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Status', 'Count', '%']],
-        body: ofacStatus.map(r => [
-          r.label,
-          String(r.count),
-          `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`,
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5 },
-        margin: { left: 10, right: 10 },
-      })
+        autoTable(doc, {
+          startY: y,
+          head: [['Status', 'Count', '%']],
+          body: ofacStatus.map(r => [
+            r.label,
+            String(r.count),
+            `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`,
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 7.5 },
+          margin: { left: 10, right: 10 },
+        })
+      }
 
       // ── Page footers ──
       const totalPages = doc.getNumberOfPages()
@@ -715,133 +805,164 @@ export default function FleetAnalytics() {
     }
   }
 
-  const exportExcel = () => {
-    setExportOpen(false)
+  const exportExcel = (sections: typeof exportSections) => {
+    setExportModalOpen(false)
     try {
       const dateStr = new Date().toISOString().slice(0, 10)
       const wb = XLSX.utils.book_new()
 
       // ── Sheet 1: Summary ──
-      const summaryData = [
-        ['Fleet Analytics Report'],
-        [],
-        ['Generated:', new Date().toLocaleDateString()],
-        ['Vessels in Selection:', kpis.total],
-        [],
-        ['Metric', 'Value'],
-        ['Average Age', kpis.avgAge != null ? `${kpis.avgAge} yrs` : 'N/A'],
-        ['Average Tonnage', kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A'],
-        ['Total Tonnage', fmt(kpis.totalTonnage)],
-        ['Flags', kpis.flags],
-        ['Policy Coverage', `${kpis.policyCoveragePct}%`],
-      ]
-      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
-      wsSummary['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }]
-      wsSummary['!cols'] = [{ wch: 22 }, { wch: 18 }]
-      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
+      if (sections.kpi) {
+        const summaryData = [
+          ['Fleet Analytics Report'],
+          [],
+          ['Generated:', new Date().toLocaleDateString()],
+          ['Vessels in Selection:', kpis.total],
+          [],
+          ['Metric', 'Value'],
+          ['Average Age', kpis.avgAge != null ? `${kpis.avgAge} yrs` : 'N/A'],
+          ['Average Tonnage', kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A'],
+          ['Total Tonnage', fmt(kpis.totalTonnage)],
+          ['Flags', kpis.flags],
+          ['Policy Coverage', `${kpis.policyCoveragePct}%`],
+        ]
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
+        wsSummary['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }]
+        wsSummary['!cols'] = [{ wch: 22 }, { wch: 18 }]
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
+      }
 
       // ── Sheet 2: Vessel Type Distribution ──
-      const typeData = [
-        ['Type', 'Count', 'Percentage', 'Avg Age', 'Avg Tonnage'],
-        ...vesselTypeBreakdown.map(r => [
-          r.name,
-          r.count,
-          `${r.pct.toFixed(1)}%`,
-          r.avgAge != null ? r.avgAge : 'N/A',
-          r.avgTonnage != null ? r.avgTonnage : 'N/A',
-        ]),
-      ]
-      const wsTypes = XLSX.utils.aoa_to_sheet(typeData)
-      wsTypes['!cols'] = [{ wch: 24 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 14 }]
-      XLSX.utils.book_append_sheet(wb, wsTypes, 'Vessel Type Distribution')
+      if (sections.vesselTypes) {
+        const typeData = [
+          ['Type', 'Count', 'Percentage', 'Avg Age', 'Avg Tonnage'],
+          ...vesselTypeBreakdown.map(r => [
+            r.name,
+            r.count,
+            `${r.pct.toFixed(1)}%`,
+            r.avgAge != null ? r.avgAge : 'N/A',
+            r.avgTonnage != null ? r.avgTonnage : 'N/A',
+          ]),
+        ]
+        const wsTypes = XLSX.utils.aoa_to_sheet(typeData)
+        wsTypes['!cols'] = [{ wch: 24 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 14 }]
+        XLSX.utils.book_append_sheet(wb, wsTypes, 'Vessel Type Distribution')
+      }
 
       // ── Sheet 3: Flag States (all, not just top 15) ──
-      const allFlags = Array.from(
-        groupBy(pool, (v: any) => v.flagStateId || '__none__').entries()
-      ).map(([flagId, vs]) => {
-        const fs = flagMap.get(flagId)
-        return {
-          name: fs?.name ?? '(Unassigned)',
-          count: vs.length,
-          pct: pool.length > 0 ? (vs.length / pool.length) * 100 : 0,
-        }
-      }).sort((a, b) => b.count - a.count)
+      if (sections.flagStates) {
+        const allFlags = Array.from(
+          groupBy(pool, (v: any) => v.flagStateId || '__none__').entries()
+        ).map(([flagId, vs]) => {
+          const fs = flagMap.get(flagId)
+          return {
+            name: fs?.name ?? '(Unassigned)',
+            count: vs.length,
+            pct: pool.length > 0 ? (vs.length / pool.length) * 100 : 0,
+          }
+        }).sort((a, b) => b.count - a.count)
 
-      const flagData = [
-        ['Flag', 'Count', 'Percentage'],
-        ...allFlags.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`]),
-      ]
-      const wsFlags = XLSX.utils.aoa_to_sheet(flagData)
-      wsFlags['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 12 }]
-      XLSX.utils.book_append_sheet(wb, wsFlags, 'Flag States')
+        const flagData = [
+          ['Flag', 'Count', 'Percentage'],
+          ...allFlags.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`]),
+        ]
+        const wsFlags = XLSX.utils.aoa_to_sheet(flagData)
+        wsFlags['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 12 }]
+        XLSX.utils.book_append_sheet(wb, wsFlags, 'Flag States')
+      }
 
       // ── Sheet 4: Age Distribution ──
-      const ageData = [
-        ['Range', 'Count', 'Percentage'],
-        ...ageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
-      ]
-      const wsAge = XLSX.utils.aoa_to_sheet(ageData)
-      wsAge['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
-      XLSX.utils.book_append_sheet(wb, wsAge, 'Age Distribution')
+      if (sections.ageDistribution) {
+        const ageData = [
+          ['Range', 'Count', 'Percentage'],
+          ...ageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
+        ]
+        const wsAge = XLSX.utils.aoa_to_sheet(ageData)
+        wsAge['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
+        XLSX.utils.book_append_sheet(wb, wsAge, 'Age Distribution')
+      }
 
       // ── Sheet 5: Tonnage Distribution ──
-      const tonnageData = [
-        ['Range', 'Count', 'Percentage'],
-        ...tonnageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
-      ]
-      const wsTonnage = XLSX.utils.aoa_to_sheet(tonnageData)
-      wsTonnage['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
-      XLSX.utils.book_append_sheet(wb, wsTonnage, 'Tonnage Distribution')
+      if (sections.tonnageDistribution) {
+        const tonnageData = [
+          ['Range', 'Count', 'Percentage'],
+          ...tonnageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
+        ]
+        const wsTonnage = XLSX.utils.aoa_to_sheet(tonnageData)
+        wsTonnage['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
+        XLSX.utils.book_append_sheet(wb, wsTonnage, 'Tonnage Distribution')
+      }
 
       // ── Sheet 6: Policy Coverage ──
-      const policyData = [
-        ['Policy Type', 'Vessels Covered', 'Percentage'],
-        ...policyCoverage.map(r => [
-          r.name,
-          r.vesselCount,
-          `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
-        ]),
-      ]
-      const wsPolicy = XLSX.utils.aoa_to_sheet(policyData)
-      wsPolicy['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 12 }]
-      XLSX.utils.book_append_sheet(wb, wsPolicy, 'Policy Coverage')
+      if (sections.policyCoverage) {
+        const policyData = [
+          ['Policy Type', 'Vessels Covered', 'Percentage'],
+          ...policyCoverage.map(r => [
+            r.name,
+            r.vesselCount,
+            `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
+          ]),
+        ]
+        const wsPolicy = XLSX.utils.aoa_to_sheet(policyData)
+        wsPolicy['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 12 }]
+        XLSX.utils.book_append_sheet(wb, wsPolicy, 'Policy Coverage')
+      }
 
       // ── Sheet 7: Customers (top 10) ──
-      const customerData = [
-        ['Customer', 'Vessels', 'Percentage', 'Types'],
-        ...customerConcentration.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`, r.types]),
-      ]
-      const wsCustomers = XLSX.utils.aoa_to_sheet(customerData)
-      wsCustomers['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 30 }]
-      XLSX.utils.book_append_sheet(wb, wsCustomers, 'Customers')
+      if (sections.topCustomers) {
+        const customerData = [
+          ['Customer', 'Vessels', 'Percentage', 'Types'],
+          ...customerConcentration.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`, r.types]),
+        ]
+        const wsCustomers = XLSX.utils.aoa_to_sheet(customerData)
+        wsCustomers['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 30 }]
+        XLSX.utils.book_append_sheet(wb, wsCustomers, 'Customers')
+      }
 
-      // ── Sheet 8: Vessels (raw data) ──
-      const vesselData = [
-        ['Name', 'IMO', 'Type', 'Flag', 'Built Year', 'Age', 'Gross Tonnage',
-          'Active', 'Customer Type', 'OFAC Status'],
-        ...pool.map((v: any) => {
-          const fs = flagMap.get(v.flagStateId)
-          const age = v.builtYear ? currentYear - v.builtYear : ''
-          return [
-            v.name || '',
-            v.imoNumber || '',
-            v.vesselType || '',
-            fs?.name ?? '',
-            v.builtYear || '',
-            age,
-            v.grossTonnage ? Number(v.grossTonnage) : '',
-            v.isActive ? 'Yes' : 'No',
-            v.customerType || '',
-            v.ofacStatus || 'NOT_CHECKED',
-          ]
-        }),
-      ]
-      const wsVessels = XLSX.utils.aoa_to_sheet(vesselData)
-      wsVessels['!cols'] = [
-        { wch: 28 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 12 },
-        { wch: 6 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 16 },
-      ]
-      XLSX.utils.book_append_sheet(wb, wsVessels, 'Vessels')
+      // ── Sheet 8: OFAC Status ──
+      if (sections.ofacStatus) {
+        const ofacData = [
+          ['Status', 'Count', 'Percentage'],
+          ...ofacStatus.map(r => [
+            r.label,
+            r.count,
+            `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`,
+          ]),
+        ]
+        const wsOfac = XLSX.utils.aoa_to_sheet(ofacData)
+        wsOfac['!cols'] = [{ wch: 20 }, { wch: 8 }, { wch: 12 }]
+        XLSX.utils.book_append_sheet(wb, wsOfac, 'OFAC Status')
+      }
+
+      // ── Sheet 9: Vessels (raw data) ──
+      if (sections.rawVesselData) {
+        const vesselData = [
+          ['Name', 'IMO', 'Type', 'Flag', 'Built Year', 'Age', 'Gross Tonnage',
+            'Active', 'Customer Type', 'OFAC Status'],
+          ...pool.map((v: any) => {
+            const fs = flagMap.get(v.flagStateId)
+            const age = v.builtYear ? currentYear - v.builtYear : ''
+            return [
+              v.name || '',
+              v.imoNumber || '',
+              v.vesselType || '',
+              fs?.name ?? '',
+              v.builtYear || '',
+              age,
+              v.grossTonnage ? Number(v.grossTonnage) : '',
+              v.isActive ? 'Yes' : 'No',
+              v.customerType || '',
+              v.ofacStatus || 'NOT_CHECKED',
+            ]
+          }),
+        ]
+        const wsVessels = XLSX.utils.aoa_to_sheet(vesselData)
+        wsVessels['!cols'] = [
+          { wch: 28 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 12 },
+          { wch: 6 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 16 },
+        ]
+        XLSX.utils.book_append_sheet(wb, wsVessels, 'Vessels')
+      }
 
       XLSX.writeFile(wb, `Fleet_Analytics_${dateStr}.xlsx`)
       showSuccess('Excel exported successfully')
@@ -1121,6 +1242,7 @@ export default function FleetAnalytics() {
             options={fleets.map(f => ({ id: f.id, name: f.name }))}
             selectedIds={filters.fleetIds}
             onChange={ids => updateFilter('fleetIds', ids)}
+            isLight={isLight}
           />
         </FilterSection>
 
@@ -1131,6 +1253,7 @@ export default function FleetAnalytics() {
             options={customerEntities.map(e => ({ id: e.id, name: e.name }))}
             selectedIds={filters.customerIds}
             onChange={ids => updateFilter('customerIds', ids)}
+            isLight={isLight}
           />
         </FilterSection>
 
@@ -1141,6 +1264,7 @@ export default function FleetAnalytics() {
             options={flagStates.map(f => ({ id: f.id, name: f.name }))}
             selectedIds={filters.flagStateIds}
             onChange={ids => updateFilter('flagStateIds', ids)}
+            isLight={isLight}
           />
         </CollapsibleFilter>
 
@@ -1151,6 +1275,7 @@ export default function FleetAnalytics() {
             options={vesselTypes.map(vt => ({ id: vt.name, name: vt.name }))}
             selectedIds={filters.vesselTypeIds}
             onChange={ids => updateFilter('vesselTypeIds', ids)}
+            isLight={isLight}
           />
         </CollapsibleFilter>
 
@@ -1264,54 +1389,16 @@ export default function FleetAnalytics() {
               </button>
             )}
             {hasQueried && pool.length > 0 && (
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setExportOpen(o => !o)}
-                  className="btn-secondary"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    padding: '8px 14px', fontSize: '0.84rem',
-                  }}
-                >
-                  <FileDown size={16} /> Export
-                  <ChevronDown size={13} style={{
-                    transform: exportOpen ? 'rotate(180deg)' : 'none', transition: '0.15s',
-                  }} />
-                </button>
-                {exportOpen && (
-                  <div style={{
-                    position: 'absolute', top: '100%', right: 0, zIndex: 20,
-                    background: 'var(--bg-primary)', border: '1px solid var(--input-border)',
-                    borderRadius: '8px', marginTop: '4px', minWidth: '140px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    overflow: 'hidden',
-                  }}>
-                    <button
-                      onClick={exportPDF}
-                      style={{
-                        width: '100%', padding: '10px 16px', background: 'none',
-                        border: 'none', cursor: 'pointer', textAlign: 'left',
-                        fontSize: '0.84rem', color: 'var(--text-primary)',
-                      }}
-                      className="hover-effect"
-                    >
-                      PDF Report
-                    </button>
-                    <button
-                      onClick={exportExcel}
-                      style={{
-                        width: '100%', padding: '10px 16px', background: 'none',
-                        border: 'none', cursor: 'pointer', textAlign: 'left',
-                        fontSize: '0.84rem', color: 'var(--text-primary)',
-                        borderTop: '1px solid var(--table-border)',
-                      }}
-                      className="hover-effect"
-                    >
-                      Excel Spreadsheet
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => setExportModalOpen(true)}
+                className="btn-secondary"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 14px', fontSize: '0.84rem',
+                }}
+              >
+                <FileDown size={16} /> Export
+              </button>
             )}
           </div>
         </div>
@@ -1693,6 +1780,149 @@ export default function FleetAnalytics() {
           </>
         )}
       </div>
+
+      {/* ── Export Modal ── */}
+      {exportModalOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setExportModalOpen(false) }}
+        >
+          <div style={{
+            background: isLight ? '#ffffff' : '#1a1d28',
+            borderRadius: '16px', padding: '24px', width: '440px', maxWidth: '90vw',
+            boxShadow: '0 16px 48px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              marginBottom: '20px',
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Export Analytics</h3>
+              <button
+                onClick={() => setExportModalOpen(false)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-secondary)', padding: '4px',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Format selector */}
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{
+                fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)',
+                textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
+              }}>
+                Format
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {(['pdf', 'excel'] as const).map(fmt => (
+                  <label key={fmt} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    cursor: 'pointer', fontSize: '0.88rem',
+                    padding: '6px 14px', borderRadius: '8px',
+                    border: `1px solid ${exportFormat === fmt ? 'var(--accent-primary)' : 'var(--input-border)'}`,
+                    background: exportFormat === fmt
+                      ? (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,170,200,0.12)')
+                      : 'transparent',
+                  }}>
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value={fmt}
+                      checked={exportFormat === fmt}
+                      onChange={() => setExportFormat(fmt)}
+                      style={{ accentColor: 'var(--accent-primary)' }}
+                    />
+                    {fmt === 'pdf' ? 'PDF Report' : 'Excel Spreadsheet'}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Section checkboxes */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{
+                fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)',
+                textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
+              }}>
+                Sections to include
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {([
+                  { key: 'kpi' as const, label: 'KPI Summary' },
+                  { key: 'vesselTypes' as const, label: 'Vessel Type Distribution' },
+                  { key: 'flagStates' as const, label: 'Flag State Distribution' },
+                  { key: 'ageDistribution' as const, label: 'Age Distribution' },
+                  { key: 'tonnageDistribution' as const, label: 'Tonnage Distribution' },
+                  { key: 'policyCoverage' as const, label: 'Policy Coverage' },
+                  { key: 'topCustomers' as const, label: 'Top Customers' },
+                  { key: 'ofacStatus' as const, label: 'OFAC Status' },
+                  { key: 'rawVesselData' as const, label: 'Raw Vessel Data' },
+                ]).map(item => {
+                  const isExcelOnly = item.key === 'rawVesselData'
+                  const disabled = isExcelOnly && exportFormat === 'pdf'
+                  return (
+                    <label key={item.key} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      cursor: disabled ? 'default' : 'pointer',
+                      fontSize: '0.86rem',
+                      color: disabled ? 'var(--text-secondary)' : 'var(--text-primary)',
+                      opacity: disabled ? 0.5 : 1,
+                      padding: '3px 0',
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={disabled ? false : exportSections[item.key]}
+                        onChange={() => !disabled && toggleExportSection(item.key)}
+                        disabled={disabled}
+                        style={{ accentColor: 'var(--accent-primary)' }}
+                      />
+                      {item.label}
+                      {isExcelOnly && (
+                        <span style={{
+                          fontSize: '0.68rem', color: 'var(--text-secondary)',
+                          fontStyle: 'italic',
+                        }}>
+                          (Excel only)
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setExportModalOpen(false)}
+                style={{ padding: '8px 18px', fontSize: '0.86rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  if (exportFormat === 'pdf') {
+                    exportPDF(exportSections)
+                  } else {
+                    exportExcel(exportSections)
+                  }
+                }}
+                style={{ padding: '8px 18px', fontSize: '0.86rem' }}
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -7561,10 +7561,15 @@ export class MySQLAdapter {
     async addAnalyticsPreset(preset: { userId: string; name: string; filters: AnalyticsFilters }): Promise<AnalyticsPreset> {
         if (!this.pool) throw new Error('No DB')
         const id = uuidv4()
-        await this.pool.execute(
-            'INSERT INTO analytics_presets (id, user_id, name, filters) VALUES (?, ?, ?, ?)',
-            [id, preset.userId, preset.name, JSON.stringify(preset.filters)]
-        )
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute(
+                'INSERT INTO analytics_presets (id, user_id, name, filters) VALUES (?, ?, ?, ?)',
+                [id, preset.userId, preset.name, JSON.stringify(preset.filters)]
+            )
+        } finally {
+            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
         return { id, userId: preset.userId, name: preset.name, filters: preset.filters }
     }
 
