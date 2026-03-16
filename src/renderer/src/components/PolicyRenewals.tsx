@@ -88,8 +88,10 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved)
-                    if (Array.isArray(parsed) && parsed.length === DEFAULT_COL_WIDTHS.length) {
-                        setColWidths(parsed)
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        // Pad with defaults if columns were added, or truncate if removed
+                        const merged = DEFAULT_COL_WIDTHS.map((def, i) => (i < parsed.length ? parsed[i] : def))
+                        setColWidths(merged)
                     }
                 } catch { /* ignore */ }
             }
