@@ -619,7 +619,7 @@ export default function EntityDirectory() {
         })
         showSuccess('Address updated')
       } else {
-        await window.api.addEntityAddress({
+        const res = await window.api.addEntityAddress({
           entityId: selectedEntity.id,
           label: addrForm.label.trim(),
           addressLine1: addrForm.addressLine1.trim(),
@@ -628,6 +628,7 @@ export default function EntityDirectory() {
           country: addrForm.country.trim() || undefined,
           postalCode: addrForm.postalCode.trim() || undefined
         })
+        if (res && (res as any).error) { showError((res as any).message || 'Failed to add'); return }
         showSuccess('Address added')
       }
       const addrs = await window.api.getEntityAddresses(selectedEntity.id)

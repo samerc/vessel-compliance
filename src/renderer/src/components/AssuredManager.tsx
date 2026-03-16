@@ -274,6 +274,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                 country: addrForm.country.trim() || undefined,
                 postalCode: addrForm.postalCode.trim() || undefined
             })
+            if (newAddr && (newAddr as any).error) { showError((newAddr as any).message || 'Failed to add address'); return }
             if (newAddr && newAddr.id) {
                 setAllAddresses(prev => [...prev, newAddr])
                 await handleChangeAddress(vesselAssuredId, newAddr.id)

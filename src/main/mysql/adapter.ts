@@ -1840,6 +1840,24 @@ export class MySQLAdapter {
 
             // --- Entity Addresses + vessel_assureds.address_id ---
             {
+                // Ensure entity_addresses table exists (migration fallback)
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                try {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS entity_addresses (
+                        id VARCHAR(36) PRIMARY KEY,
+                        entity_id VARCHAR(36) NOT NULL,
+                        label VARCHAR(255) NOT NULL,
+                        address_line1 VARCHAR(500) NOT NULL,
+                        address_line2 VARCHAR(500),
+                        city VARCHAR(255),
+                        country VARCHAR(255),
+                        postal_code VARCHAR(50),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                } finally {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                }
                 const [addrCols] = await this.pool.query(
                     "SHOW COLUMNS FROM vessel_assureds LIKE 'address_id'"
                 )
