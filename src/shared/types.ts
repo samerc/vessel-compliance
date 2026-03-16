@@ -1197,6 +1197,30 @@ export interface VesselInsurancePolicy {
   fleetName?: string
 }
 
+export interface ActivityLogEntry {
+  id: string
+  userId: string
+  username: string
+  action: string
+  module: string
+  entityType?: string
+  entityId?: string
+  entityName?: string
+  details?: string
+  createdAt: string
+}
+
+export interface ActivityLogFilters {
+  page?: number
+  limit?: number
+  module?: string
+  action?: string
+  userId?: string
+  dateFrom?: string
+  dateTo?: string
+  search?: string
+}
+
 export interface ReportSettings {
   companyName: string
   companySubtitle: string

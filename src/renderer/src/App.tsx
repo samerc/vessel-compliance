@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -21,6 +21,7 @@ import VesselFilter from './components/VesselFilter'
 import PolicyRenewals from './components/PolicyRenewals'
 import Reports from './components/Reports'
 import FleetAnalytics from './components/FleetAnalytics'
+import ActivityLog from './components/ActivityLog'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
@@ -28,7 +29,7 @@ import ChangelogModal from './components/ChangelogModal'
 import WhatsNewModal from './components/WhatsNewModal'
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -269,6 +270,7 @@ function App(): React.JSX.Element {
               <div style={{ height: '1px', background: 'var(--glass-border)', margin: '6px 4px', opacity: 0.5 }} />
               {hasPermission('admin:settings') && navItem('admin', <Settings size={18} />, 'Settings')}
               {hasPermission('admin:users') && navItem('users', <UserCog size={18} />, 'User Management')}
+              {hasPermission('admin:settings') && navItem('activity-log', <ScrollText size={18} />, 'Activity Log')}
             </>
           </nav>
 
@@ -327,6 +329,7 @@ function App(): React.JSX.Element {
           {activeTab === 'renewals' && <PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} />}
           {activeTab === 'reports' && <Reports />}
           {activeTab === 'analytics' && <FleetAnalytics />}
+          {activeTab === 'activity-log' && <ActivityLog />}
         </main>
         <UpdateNotification />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}

@@ -680,3 +680,20 @@ CREATE TABLE IF NOT EXISTS quotation_war_conditions (
   vessel_scope TEXT DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- System-wide activity log
+CREATE TABLE IF NOT EXISTS activity_log (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  username VARCHAR(100) NOT NULL,
+  action VARCHAR(50) NOT NULL,
+  module VARCHAR(50) NOT NULL,
+  entity_type VARCHAR(50) NULL,
+  entity_id VARCHAR(36) NULL,
+  entity_name VARCHAR(255) NULL,
+  details TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_activity_created (created_at),
+  INDEX idx_activity_module (module),
+  INDEX idx_activity_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
