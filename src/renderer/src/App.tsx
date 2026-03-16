@@ -242,7 +242,7 @@ function App(): React.JSX.Element {
               {hasPermission('vessels:view') && navItem('vessels', <Ship size={18} />, 'Vessels')}
               {hasPermission('vessels:view') && navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
               {hasPermission('fleets:view') && navItem('fleets', <LayoutDashboard size={18} />, 'Fleets')}
-              {hasPermission('fleets:view') && navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
+              {hasPermission('analytics:view') && navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
             </NavGroup>
 
             <NavGroup id="compliance" label="Compliance" icon={<ShieldAlert size={14} />}

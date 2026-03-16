@@ -1,52 +1,27 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Ship, Globe, Anchor, Calendar, TrendingUp,
-  RefreshCw, Loader2, BarChart2, Shield,
+  Ship, Globe, Anchor, Calendar, TrendingUp, Shield, BarChart3,
+  RefreshCw, Loader2, ChevronDown, ChevronRight, Save, Trash2,
+  FileDown, Users, Filter,
 } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import { useTheme } from '../contexts/ThemeContext'
+import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
+import {
+  AnalyticsFilters, AnalyticsPreset,
+  PolicyType, Fleet, Entity, FlagState, VesselType,
+} from '../../../shared/types'
+import { getReportSettings } from '../services/ReportSettingsService'
 import { getFlagClass } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 
 const currentYear = new Date().getFullYear()
+const fmt = (n: number) => n.toLocaleString()
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function bucket(val: number | undefined | null, ranges: { label: string; min: number; max: number }[]): string {
-  if (!val) return 'Unknown'
-  const b = ranges.find(r => val >= r.min && val < r.max)
-  return b ? b.label : `${ranges[ranges.length - 1].label}+`
-}
-
-const AGE_RANGES = [
-  { label: '< 5 yr', min: currentYear - 4, max: currentYear + 1 },
-  { label: '5–10 yr', min: currentYear - 9, max: currentYear - 4 },
-  { label: '10–20 yr', min: currentYear - 19, max: currentYear - 9 },
-  { label: '20–30 yr', min: currentYear - 29, max: currentYear - 19 },
-  { label: '30+ yr', min: 0, max: currentYear - 29 },
-]
-
-const GT_RANGES = [
-  { label: '< 1k', min: 0, max: 1000 },
-  { label: '1k–5k', min: 1000, max: 5000 },
-  { label: '5k–15k', min: 5000, max: 15000 },
-  { label: '15k–50k', min: 15000, max: 50000 },
-  { label: '50k+', min: 50000, max: Infinity },
-]
-
-function ageBucket(builtYear?: number | null): string {
-  if (!builtYear) return 'Unknown'
-  const age = currentYear - builtYear
-  if (age < 5) return '< 5 yr'
-  if (age < 10) return '5–10 yr'
-  if (age < 20) return '10–20 yr'
-  if (age < 30) return '20–30 yr'
-  return '30+ yr'
-}
-
-function gtBucket(gt?: number | null): string {
-  if (!gt) return 'Unknown'
-  return bucket(gt, GT_RANGES)
-}
 
 function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
   const map = new Map<string, T[]>()
@@ -56,6 +31,211 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
     map.get(k)!.push(item)
   }
   return map
+}
+
+const AGE_BUCKETS = [
+  { label: '0-5 yrs', min: 0, max: 5, color: '#10b981' },
+  { label: '5-10', min: 5, max: 10, color: '#22c55e' },
+  { label: '10-15', min: 10, max: 15, color: '#84cc16' },
+  { label: '15-20', min: 15, max: 20, color: '#eab308' },
+  { label: '20-25', min: 20, max: 25, color: '#f59e0b' },
+  { label: '25+', min: 25, max: 999, color: '#ef4444' },
+]
+
+const TONNAGE_BUCKETS = [
+  { label: '0-5K', min: 0, max: 5000, color: '#06b6d4' },
+  { label: '5-10K', min: 5000, max: 10000, color: '#0ea5e9' },
+  { label: '10-25K', min: 10000, max: 25000, color: '#3b82f6' },
+  { label: '25-50K', min: 25000, max: 50000, color: '#6366f1' },
+  { label: '50-100K', min: 50000, max: 100000, color: '#8b5cf6' },
+  { label: '100K+', min: 100000, max: Infinity, color: '#a855f7' },
+]
+
+const OFAC_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+  CLEARED: { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)', text: '#10b981' },
+  PENDING: { bg: 'rgba(128,128,128,0.1)', border: 'rgba(128,128,128,0.2)', text: '#888888' },
+  POTENTIAL_MATCH: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', text: '#f59e0b' },
+  MATCH: { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', text: '#ef4444' },
+  NOT_CHECKED: { bg: 'rgba(128,128,128,0.08)', border: 'rgba(128,128,128,0.15)', text: '#6b7280' },
+}
+
+const DEFAULT_FILTERS: AnalyticsFilters = {
+  activeOnly: true,
+  policyTypeIds: [],
+  fleetIds: [],
+  customerIds: [],
+  flagStateIds: [],
+  vesselTypeIds: [],
+}
+
+// ── Chip ──────────────────────────────────────────────────────────────────────
+
+function Chip({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '4px 12px',
+        borderRadius: '14px',
+        fontSize: '0.78rem',
+        fontWeight: selected ? 600 : 400,
+        cursor: 'pointer',
+        border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
+        background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
+        color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+        transition: 'all 0.15s',
+        whiteSpace: 'nowrap',
+        lineHeight: '1.4',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+// ── FilterSection ─────────────────────────────────────────────────────────────
+
+function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
+      <div style={{
+        fontSize: '0.7rem',
+        fontWeight: 700,
+        color: 'var(--text-secondary)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.6px',
+        marginBottom: '10px',
+      }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// ── CollapsibleFilter ─────────────────────────────────────────────────────────
+
+function CollapsibleFilter({ label, children, defaultCollapsed = false }: {
+  label: string
+  children: React.ReactNode
+  defaultCollapsed?: boolean
+}) {
+  const [open, setOpen] = useState(!defaultCollapsed)
+  return (
+    <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          width: '100%', marginBottom: open ? '10px' : 0,
+        }}
+      >
+        <span style={{
+          fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)',
+          textTransform: 'uppercase', letterSpacing: '0.6px',
+        }}>
+          {label}
+        </span>
+        {open
+          ? <ChevronDown size={13} color="var(--text-secondary)" />
+          : <ChevronRight size={13} color="var(--text-secondary)" />}
+      </button>
+      {open && children}
+    </div>
+  )
+}
+
+// ── MultiSelectDropdown ───────────────────────────────────────────────────────
+
+function MultiSelectDropdown({ label, options, selectedIds, onChange }: {
+  label: string
+  options: { id: string; name: string }[]
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const filtered = useMemo(() => {
+    if (!search) return options
+    const q = search.toLowerCase()
+    return options.filter(o => o.name.toLowerCase().includes(q))
+  }, [options, search])
+
+  const toggle = (id: string) => {
+    onChange(selectedIds.includes(id)
+      ? selectedIds.filter(x => x !== id)
+      : [...selectedIds, id])
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', padding: '6px 10px', borderRadius: '6px',
+          border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+          color: 'var(--text-primary)', fontSize: '0.78rem', textAlign: 'left',
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedIds.length === 0 ? `Select ${label}...` : `${selectedIds.length} selected`}
+        </span>
+        <ChevronDown size={13} style={{
+          flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: '0.15s',
+        }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+          background: 'var(--bg-primary)', border: '1px solid var(--input-border)',
+          borderRadius: '6px', marginTop: '2px', maxHeight: '200px', overflowY: 'auto',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+        }}>
+          {options.length > 6 && (
+            <div style={{
+              padding: '6px', borderBottom: '1px solid var(--table-border)',
+              position: 'sticky', top: 0, background: 'var(--bg-primary)',
+            }}>
+              <input
+                placeholder="Search..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%', padding: '4px 8px', fontSize: '0.78rem',
+                  borderRadius: '4px', border: '1px solid var(--input-border)',
+                  background: 'var(--bg-primary)', color: 'var(--text-primary)', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          )}
+          {filtered.map(o => (
+            <label key={o.id} style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem',
+              color: 'var(--text-primary)',
+            }}>
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(o.id)}
+                onChange={() => toggle(o.id)}
+                style={{ accentColor: 'var(--accent-primary)' }}
+              />
+              {o.name}
+            </label>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+              No results
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
@@ -79,7 +259,10 @@ function KPI({ icon, gradient, label, value, sub }: {
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+        <div style={{
+          fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600',
+          textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px',
+        }}>
           {label}
         </div>
         <div style={{ fontSize: '1.75rem', fontWeight: '800', lineHeight: 1, letterSpacing: '-0.03em' }}>
@@ -95,111 +278,7 @@ function KPI({ icon, gradient, label, value, sub }: {
   )
 }
 
-// ── Bar row ───────────────────────────────────────────────────────────────────
-
-function BarRow({ label, count, total, max, color, prefix }: {
-  label: string
-  count: number
-  total: number
-  max: number
-  color: string
-  prefix?: React.ReactNode
-}) {
-  const widthPct = max > 0 ? (count / max) * 100 : 0
-  const pctOfTotal = total > 0 ? Math.round((count / total) * 100) : 0
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 0' }}>
-      {prefix && (
-        <div style={{ width: '22px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-          {prefix}
-        </div>
-      )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '5px' }}>
-          <span style={{ fontSize: '0.82rem', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {label}
-          </span>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
-              {pctOfTotal}%
-            </span>
-            <span style={{ fontSize: '0.84rem', fontWeight: '700', color, fontVariantNumeric: 'tabular-nums', minWidth: '20px', textAlign: 'right' }}>
-              {count}
-            </span>
-          </div>
-        </div>
-        <div style={{ height: '8px', background: 'var(--table-border)', borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%',
-            width: `${widthPct}%`,
-            background: color,
-            borderRadius: '4px',
-            transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
-          }} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Histogram (vertical column bars for ordinal data) ─────────────────────────
-
-function Histogram({ data, color, total }: {
-  data: { label: string; count: number }[]
-  color: string
-  total: number
-}) {
-  const known = data.filter(d => d.label !== 'Unknown')
-  const unknownCount = data.find(d => d.label === 'Unknown')?.count ?? 0
-  const maxCount = Math.max(...known.map(d => d.count), 1)
-  const CHART_H = 80
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end', height: `${CHART_H + 38}px` }}>
-        {known.map(({ label, count }) => {
-          const barH = count > 0 ? Math.max(Math.round((count / maxCount) * CHART_H), 6) : 0
-          const pct = total > 0 ? Math.round((count / total) * 100) : 0
-          return (
-            <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-              <div style={{ height: '38px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: '5px' }}>
-                {count > 0 && (
-                  <>
-                    <span style={{ fontSize: '0.78rem', fontWeight: '700', color, lineHeight: 1 }}>{count}</span>
-                    <span style={{ fontSize: '0.63rem', color: 'var(--text-secondary)', lineHeight: 1, marginTop: '2px' }}>{pct}%</span>
-                  </>
-                )}
-              </div>
-              <div style={{
-                width: '100%',
-                height: barH > 0 ? `${barH}px` : '2px',
-                background: barH > 0 ? color : 'var(--table-border)',
-                borderRadius: '4px 4px 0 0',
-                opacity: count === 0 ? 0.3 : 1,
-                transition: 'height 0.7s cubic-bezier(0.4,0,0.2,1)',
-              }} />
-            </div>
-          )
-        })}
-      </div>
-      <div style={{ display: 'flex', gap: '6px', borderTop: '2px solid var(--table-border)', paddingTop: '7px' }}>
-        {known.map(({ label }) => (
-          <div key={label} style={{ flex: 1, textAlign: 'center', fontSize: '0.67rem', color: 'var(--text-secondary)', lineHeight: '1.3' }}>
-            {label}
-          </div>
-        ))}
-      </div>
-      {unknownCount > 0 && (
-        <div style={{ marginTop: '10px', fontSize: '0.73rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-          + {unknownCount} vessel{unknownCount !== 1 ? 's' : ''} with no data
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Chart section card ────────────────────────────────────────────────────────
+// ── ChartCard ─────────────────────────────────────────────────────────────────
 
 function ChartCard({ title, icon, accentColor, count, children }: {
   title: string
@@ -239,411 +318,1381 @@ function ChartCard({ title, icon, accentColor, count, children }: {
   )
 }
 
-// ── OFAC status row ───────────────────────────────────────────────────────────
+// ── ProgressBar (inline) ──────────────────────────────────────────────────────
 
-const OFAC_STYLE: Record<string, { bg: string; border: string; text: string }> = {
-  'CLEARED':         { bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.35)', text: '#10b981' },
-  'POTENTIAL MATCH': { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', text: '#f59e0b' },
-  'MATCH':           { bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)',  text: '#ef4444' },
-  'SANCTIONED':      { bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)',  text: '#ef4444' },
-  'ERROR':           { bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)',  text: '#ef4444' },
-  'PENDING':         { bg: 'rgba(128,128,128,0.1)',  border: 'rgba(128,128,128,0.2)', text: '#888888' },
-}
-
-function OfacRow({ label, count, total, barColor }: {
-  label: string
-  count: number
-  total: number
-  barColor: string
-}) {
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0
-  const s = OFAC_STYLE[label] ?? OFAC_STYLE['PENDING']
+function ProgressBar({ pct }: { pct: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 0' }}>
-      <span style={{
-        padding: '3px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700',
-        background: s.bg, border: `1px solid ${s.border}`, color: s.text,
-        whiteSpace: 'nowrap', flexShrink: 0, minWidth: '128px', textAlign: 'center',
-        letterSpacing: '0.02em',
-      }}>
-        {label}
-      </span>
-      <div style={{ flex: 1, height: '8px', background: 'var(--table-border)', borderRadius: '4px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: '4px', transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)' }} />
-      </div>
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'baseline', flexShrink: 0, minWidth: '52px', justifyContent: 'flex-end' }}>
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
-        <span style={{ fontSize: '0.84rem', fontWeight: '700', color: s.text, fontVariantNumeric: 'tabular-nums', minWidth: '18px', textAlign: 'right' }}>{count}</span>
-      </div>
+    <div style={{
+      height: '6px', borderRadius: '3px',
+      background: 'rgba(0,170,200,0.15)',
+      flex: 1, minWidth: '60px',
+    }}>
+      <div style={{
+        height: '100%', borderRadius: '3px',
+        background: 'var(--accent-primary)',
+        width: `${Math.min(pct, 100)}%`,
+        transition: 'width 0.5s ease',
+      }} />
     </div>
   )
 }
 
-// ── main component ────────────────────────────────────────────────────────────
+// ── table cell style helpers ──────────────────────────────────────────────────
+
+const thStyle: React.CSSProperties = {
+  padding: '10px 14px', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600,
+  color: 'var(--text-secondary)', background: 'var(--table-header-bg)',
+  borderBottom: '1px solid var(--table-border)', whiteSpace: 'nowrap',
+}
+
+const tdStyle = (idx: number): React.CSSProperties => ({
+  padding: '9px 14px', fontSize: '0.84rem', color: 'var(--text-primary)',
+  borderBottom: '1px solid var(--table-border)',
+  background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)',
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Main component ───────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
 
 export default function FleetAnalytics() {
-  useTheme()
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
+  const { showSuccess, showError } = useToast()
+  useAuth()
 
+  // ── Reference data ──────────────────────────────────────────────────────────
+  const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
+  const [fleets, setFleets] = useState<Fleet[]>([])
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [flagStates, setFlagStates] = useState<FlagState[]>([])
+  const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
+  const [presets, setPresets] = useState<AnalyticsPreset[]>([])
+
+  // ── Filter state ────────────────────────────────────────────────────────────
+  const [filters, setFilters] = useState<AnalyticsFilters>({ ...DEFAULT_FILTERS })
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('')
+
+  // ── Result state ────────────────────────────────────────────────────────────
   const [vessels, setVessels] = useState<any[]>([])
-  const [flagStates, setFlagStates] = useState<any[]>([])
-  const [fleets, setFleets] = useState<any[]>([])
+  const [policyCoverage, setPolicyCoverage] = useState<{ name: string; vesselCount: number }[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeOnly, setActiveOnly] = useState(true)
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+  const [hasQueried, setHasQueried] = useState(false)
 
-  const loadData = async () => {
+  // ── Export dropdown ─────────────────────────────────────────────────────────
+  const [exportOpen, setExportOpen] = useState(false)
+
+  // ── Load reference data on mount ────────────────────────────────────────────
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [pt, fl, en, fs, vt, pr] = await Promise.all([
+          window.api.getPolicyTypes(),
+          window.api.getFleets(),
+          window.api.getEntities(),
+          window.api.getFlagStates(),
+          window.api.getVesselTypes(),
+          window.api.analyticsGetPresets(),
+        ])
+        setPolicyTypes(Array.isArray(pt) ? pt : [])
+        setFleets(Array.isArray(fl) ? fl : [])
+        setEntities(Array.isArray(en) ? en : [])
+        setFlagStates(Array.isArray(fs) ? fs : [])
+        setVesselTypes(Array.isArray(vt) ? vt : [])
+        setPresets(Array.isArray(pr) ? pr : [])
+      } catch { /* ignore */ }
+    }
+    load()
+  }, [])
+
+  // ── Derived: customers (entities that are customers of at least one vessel) ─
+  // We don't know at filter-load time which entities are customers, so we show all entities.
+  // The backend filters by customer_id anyway.
+  const customerEntities = useMemo(() =>
+    entities.filter(e => e.type === 'company'),
+  [entities])
+
+  // ── Apply filters ───────────────────────────────────────────────────────────
+  const applyFilters = useCallback(async () => {
     setLoading(true)
+    setHasQueried(true)
     try {
-      const [v, fs, fl] = await Promise.all([
-        window.api.getVessels(),
-        window.api.getFlagStates(),
-        window.api.getFleets(),
-      ])
-      setVessels(Array.isArray(v) ? v : [])
-      setFlagStates(Array.isArray(fs) ? fs : [])
-      setFleets(Array.isArray(fl) ? fl : [])
-      setLastRefreshed(new Date())
-    } catch { /* ignore */ }
-    setLoading(false)
+      const result = await window.api.analyticsGetData(filters) as any
+      if (result && !result.error) {
+        setVessels(Array.isArray(result.vessels) ? result.vessels : [])
+        setPolicyCoverage(Array.isArray(result.policyCoverage) ? result.policyCoverage : [])
+      } else {
+        showError('Failed to load analytics data')
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load analytics data'
+      showError(msg)
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, showError])
+
+  // ── Preset management ───────────────────────────────────────────────────────
+  const handleSavePreset = async () => {
+    const name = window.prompt('Preset name:')
+    if (!name?.trim()) return
+    try {
+      const created = await window.api.analyticsAddPreset(name.trim(), filters) as any
+      if (created && !created.error) {
+        setPresets(p => [...p, created])
+        setSelectedPresetId(created.id)
+        showSuccess(`Preset "${name.trim()}" saved`)
+      }
+    } catch {
+      showError('Failed to save preset')
+    }
   }
 
-  useEffect(() => { loadData() }, [])
+  const handleLoadPreset = (id: string) => {
+    setSelectedPresetId(id)
+    const preset = presets.find(p => p.id === id)
+    if (preset?.filters) {
+      setFilters({
+        ...DEFAULT_FILTERS,
+        ...preset.filters,
+      })
+    }
+  }
 
-  // ── derived data ─────────────────────────────────────────────────────────────
-  const pool = useMemo(() => activeOnly ? vessels.filter(v => v.isActive) : vessels, [vessels, activeOnly])
+  const handleDeletePreset = async (id: string) => {
+    try {
+      await window.api.analyticsDeletePreset(id)
+      setPresets(p => p.filter(x => x.id !== id))
+      if (selectedPresetId === id) setSelectedPresetId('')
+      showSuccess('Preset deleted')
+    } catch {
+      showError('Failed to delete preset')
+    }
+  }
+
+  // ── Filter update helpers ───────────────────────────────────────────────────
+  const updateFilter = <K extends keyof AnalyticsFilters>(key: K, value: AnalyticsFilters[K]) => {
+    setFilters(f => ({ ...f, [key]: value }))
+  }
+
+  // ── Vessel status helper ────────────────────────────────────────────────────
+  type VesselStatusFilter = 'active' | 'inactive' | 'all'
+  const vesselStatus: VesselStatusFilter = filters.activeOnly ? 'active' : 'all'
+  const setVesselStatus = (s: VesselStatusFilter) => {
+    updateFilter('activeOnly', s === 'active')
+  }
+
+  // ── Export functions ────────────────────────────────────────────────────────
+  const exportPDF = async () => {
+    setExportOpen(false)
+    try {
+      const settings = await getReportSettings()
+      const navy: [number, number, number] = [10, 22, 40]
+      const accent: [number, number, number] = settings.primaryColor ?? [0, 170, 200]
+      const date = new Date().toLocaleDateString()
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pw = doc.internal.pageSize.getWidth()
+
+      // ── Header bar ──
+      doc.setFillColor(...navy)
+      doc.rect(0, 0, pw, 22, 'F')
+      doc.setFillColor(...accent)
+      doc.rect(0, 0, 3, 22, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text(settings.companyName || 'Fleet Analytics', 10, 10)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Fleet Analytics Report', 10, 16)
+      doc.setFontSize(8)
+      doc.text(`Generated: ${date}`, pw - 10, 14, { align: 'right' })
+
+      let y = 30
+
+      // ── KPI summary (2 rows of 3) ──
+      const kpiItems = [
+        { label: 'Vessels', value: String(kpis.total) },
+        { label: 'Avg Age', value: kpis.avgAge != null ? `${kpis.avgAge} yrs` : 'N/A' },
+        { label: 'Avg Tonnage', value: kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A' },
+        { label: 'Total Tonnage', value: fmt(kpis.totalTonnage) },
+        { label: 'Flags', value: String(kpis.flags) },
+        { label: 'Policy Coverage', value: `${kpis.policyCoveragePct}%` },
+      ]
+      const boxW = (pw - 20 - 8) / 3
+      const boxH = 14
+      for (let i = 0; i < kpiItems.length; i++) {
+        const col = i % 3
+        const row = Math.floor(i / 3)
+        const bx = 10 + col * (boxW + 4)
+        const by = y + row * (boxH + 4)
+        doc.setFillColor(240, 244, 250)
+        doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'F')
+        doc.setTextColor(...navy)
+        doc.setFontSize(7)
+        doc.setFont('helvetica', 'normal')
+        doc.text(kpiItems[i].label.toUpperCase(), bx + 4, by + 5)
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'bold')
+        doc.text(kpiItems[i].value, bx + 4, by + 11)
+      }
+      y += 2 * (boxH + 4) + 8
+
+      // ── Vessel Type Distribution table ──
+      doc.setTextColor(...navy)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Vessel Type Distribution', 10, y)
+      y += 2
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Type', 'Count', '%', 'Avg Age', 'Avg Tonnage']],
+        body: vesselTypeBreakdown.map(r => [
+          r.name,
+          String(r.count),
+          `${r.pct.toFixed(1)}%`,
+          r.avgAge != null ? `${r.avgAge} yrs` : 'N/A',
+          r.avgTonnage != null ? fmt(r.avgTonnage) : 'N/A',
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5 },
+        margin: { left: 10, right: 10 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+
+      // ── Page 2: Flag States ──
+      doc.addPage()
+      y = 15
+      doc.setTextColor(...navy)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Flag State Distribution (Top 15)', 10, y)
+      y += 2
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Flag', 'Count', '%']],
+        body: [
+          ...flagDistribution.rows.map(r => [r.name, String(r.count), `${r.pct.toFixed(1)}%`]),
+          ...(flagDistribution.othersCount > 0
+            ? [['Others', String(flagDistribution.othersCount),
+              `${pool.length > 0 ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(1) : 0}%`]]
+            : []),
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5 },
+        margin: { left: 10, right: 10 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+
+      // ── Age Distribution ──
+      doc.setTextColor(...navy)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Age Distribution', 10, y)
+      y += 2
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Range', 'Count', '%']],
+        body: ageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+        theme: 'grid',
+        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5 },
+        margin: { left: 10, right: pw / 2 + 5 },
+      })
+      const ageTableBottom = (doc as any).lastAutoTable.finalY
+
+      // ── Tonnage Distribution (side by side) ──
+      doc.setTextColor(...navy)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Tonnage Distribution', pw / 2 + 5, y - 2)
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Range', 'Count', '%']],
+        body: tonnageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+        theme: 'grid',
+        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5 },
+        margin: { left: pw / 2 + 5, right: 10 },
+      })
+      y = Math.max(ageTableBottom, (doc as any).lastAutoTable.finalY) + 8
+
+      // ── Page 3: Policy Coverage + Customers + OFAC ──
+      doc.addPage()
+      y = 15
+      doc.setTextColor(...navy)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Policy Coverage', 10, y)
+      y += 2
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Policy Type', 'Vessels Covered', '%']],
+        body: policyCoverage.map(r => [
+          r.name,
+          String(r.vesselCount),
+          `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5 },
+        margin: { left: 10, right: 10 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+
+      // ── Top Customers ──
+      doc.setTextColor(...navy)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Top Customers', 10, y)
+      y += 2
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Customer', 'Vessels', '%', 'Types']],
+        body: customerConcentration.map(r => [
+          r.name,
+          String(r.count),
+          `${r.pct.toFixed(1)}%`,
+          r.types,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5 },
+        margin: { left: 10, right: 10 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+
+      // ── OFAC Status ──
+      doc.setTextColor(...navy)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('OFAC / Sanctions Status', 10, y)
+      y += 2
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Status', 'Count', '%']],
+        body: ofacStatus.map(r => [
+          r.label,
+          String(r.count),
+          `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5 },
+        margin: { left: 10, right: 10 },
+      })
+
+      // ── Page footers ──
+      const totalPages = doc.getNumberOfPages()
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p)
+        const ph = doc.internal.pageSize.getHeight()
+        doc.setDrawColor(200, 200, 200)
+        doc.line(10, ph - 12, pw - 10, ph - 12)
+        doc.setFontSize(7)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(130, 130, 130)
+        doc.text(`Generated ${date}`, 10, ph - 7)
+        doc.text(settings.companyName || '', pw / 2, ph - 7, { align: 'center' })
+        doc.text(`Page ${p} of ${totalPages}`, pw - 10, ph - 7, { align: 'right' })
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10)
+      doc.save(`Fleet_Analytics_${dateStr}.pdf`)
+      showSuccess('PDF exported successfully')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to export PDF'
+      showError(msg)
+    }
+  }
+
+  const exportExcel = () => {
+    setExportOpen(false)
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10)
+      const wb = XLSX.utils.book_new()
+
+      // ── Sheet 1: Summary ──
+      const summaryData = [
+        ['Fleet Analytics Report'],
+        [],
+        ['Generated:', new Date().toLocaleDateString()],
+        ['Vessels in Selection:', kpis.total],
+        [],
+        ['Metric', 'Value'],
+        ['Average Age', kpis.avgAge != null ? `${kpis.avgAge} yrs` : 'N/A'],
+        ['Average Tonnage', kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A'],
+        ['Total Tonnage', fmt(kpis.totalTonnage)],
+        ['Flags', kpis.flags],
+        ['Policy Coverage', `${kpis.policyCoveragePct}%`],
+      ]
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
+      wsSummary['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }]
+      wsSummary['!cols'] = [{ wch: 22 }, { wch: 18 }]
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
+
+      // ── Sheet 2: Vessel Type Distribution ──
+      const typeData = [
+        ['Type', 'Count', 'Percentage', 'Avg Age', 'Avg Tonnage'],
+        ...vesselTypeBreakdown.map(r => [
+          r.name,
+          r.count,
+          `${r.pct.toFixed(1)}%`,
+          r.avgAge != null ? r.avgAge : 'N/A',
+          r.avgTonnage != null ? r.avgTonnage : 'N/A',
+        ]),
+      ]
+      const wsTypes = XLSX.utils.aoa_to_sheet(typeData)
+      wsTypes['!cols'] = [{ wch: 24 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 14 }]
+      XLSX.utils.book_append_sheet(wb, wsTypes, 'Vessel Type Distribution')
+
+      // ── Sheet 3: Flag States (all, not just top 15) ──
+      const allFlags = Array.from(
+        groupBy(pool, (v: any) => v.flagStateId || '__none__').entries()
+      ).map(([flagId, vs]) => {
+        const fs = flagMap.get(flagId)
+        return {
+          name: fs?.name ?? '(Unassigned)',
+          count: vs.length,
+          pct: pool.length > 0 ? (vs.length / pool.length) * 100 : 0,
+        }
+      }).sort((a, b) => b.count - a.count)
+
+      const flagData = [
+        ['Flag', 'Count', 'Percentage'],
+        ...allFlags.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`]),
+      ]
+      const wsFlags = XLSX.utils.aoa_to_sheet(flagData)
+      wsFlags['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 12 }]
+      XLSX.utils.book_append_sheet(wb, wsFlags, 'Flag States')
+
+      // ── Sheet 4: Age Distribution ──
+      const ageData = [
+        ['Range', 'Count', 'Percentage'],
+        ...ageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
+      ]
+      const wsAge = XLSX.utils.aoa_to_sheet(ageData)
+      wsAge['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
+      XLSX.utils.book_append_sheet(wb, wsAge, 'Age Distribution')
+
+      // ── Sheet 5: Tonnage Distribution ──
+      const tonnageData = [
+        ['Range', 'Count', 'Percentage'],
+        ...tonnageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
+      ]
+      const wsTonnage = XLSX.utils.aoa_to_sheet(tonnageData)
+      wsTonnage['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
+      XLSX.utils.book_append_sheet(wb, wsTonnage, 'Tonnage Distribution')
+
+      // ── Sheet 6: Policy Coverage ──
+      const policyData = [
+        ['Policy Type', 'Vessels Covered', 'Percentage'],
+        ...policyCoverage.map(r => [
+          r.name,
+          r.vesselCount,
+          `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
+        ]),
+      ]
+      const wsPolicy = XLSX.utils.aoa_to_sheet(policyData)
+      wsPolicy['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 12 }]
+      XLSX.utils.book_append_sheet(wb, wsPolicy, 'Policy Coverage')
+
+      // ── Sheet 7: Customers (top 10) ──
+      const customerData = [
+        ['Customer', 'Vessels', 'Percentage', 'Types'],
+        ...customerConcentration.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`, r.types]),
+      ]
+      const wsCustomers = XLSX.utils.aoa_to_sheet(customerData)
+      wsCustomers['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 30 }]
+      XLSX.utils.book_append_sheet(wb, wsCustomers, 'Customers')
+
+      // ── Sheet 8: Vessels (raw data) ──
+      const vesselData = [
+        ['Name', 'IMO', 'Type', 'Flag', 'Built Year', 'Age', 'Gross Tonnage',
+          'Active', 'Customer Type', 'OFAC Status'],
+        ...pool.map((v: any) => {
+          const fs = flagMap.get(v.flagStateId)
+          const age = v.builtYear ? currentYear - v.builtYear : ''
+          return [
+            v.name || '',
+            v.imoNumber || '',
+            v.vesselType || '',
+            fs?.name ?? '',
+            v.builtYear || '',
+            age,
+            v.grossTonnage ? Number(v.grossTonnage) : '',
+            v.isActive ? 'Yes' : 'No',
+            v.customerType || '',
+            v.ofacStatus || 'NOT_CHECKED',
+          ]
+        }),
+      ]
+      const wsVessels = XLSX.utils.aoa_to_sheet(vesselData)
+      wsVessels['!cols'] = [
+        { wch: 28 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 12 },
+        { wch: 6 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 16 },
+      ]
+      XLSX.utils.book_append_sheet(wb, wsVessels, 'Vessels')
+
+      XLSX.writeFile(wb, `Fleet_Analytics_${dateStr}.xlsx`)
+      showSuccess('Excel exported successfully')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to export Excel'
+      showError(msg)
+    }
+  }
+
+  // ── Derived analytics ───────────────────────────────────────────────────────
+  const pool = vessels
 
   const flagMap = useMemo(() => new Map(flagStates.map(f => [f.id, f])), [flagStates])
-  const fleetMap = useMemo(() => new Map(fleets.map(f => [f.id, f.name])), [fleets])
+  const entityMap = useMemo(() => new Map(entities.map(e => [e.id, e])), [entities])
 
   const kpis = useMemo(() => {
-    const withAge = pool.filter(v => v.builtYear)
+    const withAge = pool.filter((v: any) => v.builtYear)
     const avgAge = withAge.length > 0
-      ? Math.round(withAge.reduce((s, v) => s + (currentYear - v.builtYear), 0) / withAge.length)
+      ? (withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) / withAge.length)
       : null
-    const withTonnage = pool.filter(v => v.grossTonnage)
+    const withTonnage = pool.filter((v: any) => v.grossTonnage)
     const avgTonnage = withTonnage.length > 0
-      ? Math.round(withTonnage.reduce((s, v) => s + Number(v.grossTonnage), 0) / withTonnage.length)
+      ? Math.round(withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) / withTonnage.length)
       : null
-    const flags = new Set(pool.filter(v => v.flagStateId).map(v => v.flagStateId)).size
-    const types = new Set(pool.filter(v => v.vesselType).map(v => v.vesselType)).size
-    return { total: pool.length, flags, types, avgAge, avgTonnage }
-  }, [pool])
+    const totalTonnage = withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0)
+    const flags = new Set(pool.filter((v: any) => v.flagStateId).map((v: any) => v.flagStateId)).size
+    const withPolicy = policyCoverage.length > 0
+      ? new Set(policyCoverage.flatMap(() => pool.filter((v: any) => v.id).map((v: any) => v.id)))
+      : new Set<string>()
+    // Policy coverage % = vessels with at least 1 active policy / total
+    const coveredVesselIds = new Set<string>()
+    for (const pc of policyCoverage) {
+      // We know vesselCount but not which vessels; approximate with ratio
+      void pc
+    }
+    // Better: count vessels that appear in policyCoverage data
+    // Since we only have aggregated counts, use the total covered count
+    const totalCoveredVessels = policyCoverage.reduce((s, pc) => Math.max(s, Number(pc.vesselCount)), 0)
+    const policyCoveragePct = pool.length > 0
+      ? Math.round((totalCoveredVessels / pool.length) * 100)
+      : 0
 
-  const byFlag = useMemo(() => {
-    const grouped = groupBy(pool, v => {
-      const fs = flagMap.get(v.flagStateId)
-      return fs?.name ?? '(Unassigned)'
-    })
+    void withPolicy
+    void coveredVesselIds
+
+    return {
+      total: pool.length,
+      avgAge: avgAge != null ? +avgAge.toFixed(1) : null,
+      avgTonnage,
+      totalTonnage,
+      flags,
+      policyCoveragePct,
+    }
+  }, [pool, policyCoverage])
+
+  // ── Vessel Type Breakdown ───────────────────────────────────────────────────
+  const vesselTypeBreakdown = useMemo(() => {
+    const grouped = groupBy(pool, (v: any) => v.vesselType || '(Unknown)')
     return Array.from(grouped.entries())
       .map(([name, items]) => {
-        const fs = flagStates.find(f => f.name === name)
-        return { name, count: items.length, iso3: fs?.iso3Code ?? '' }
+        const withAge = items.filter((v: any) => v.builtYear)
+        const avgAge = withAge.length > 0
+          ? +(withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) / withAge.length).toFixed(1)
+          : null
+        const withTonnage = items.filter((v: any) => v.grossTonnage)
+        const avgTonnage = withTonnage.length > 0
+          ? Math.round(withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) / withTonnage.length)
+          : null
+        return { name, count: items.length, pct: pool.length > 0 ? (items.length / pool.length) * 100 : 0, avgAge, avgTonnage }
       })
       .sort((a, b) => b.count - a.count)
-      .slice(0, 12)
-  }, [pool, flagMap, flagStates])
+  }, [pool])
 
-  const byType = useMemo(() => {
-    const grouped = groupBy(pool, v => v.vesselType || '(Unknown)')
+  // ── Flag State Distribution ─────────────────────────────────────────────────
+  const flagDistribution = useMemo(() => {
+    const grouped = groupBy(pool, (v: any) => v.flagStateId || '__none__')
+    const items = Array.from(grouped.entries())
+      .map(([flagId, vessels]) => {
+        const fs = flagMap.get(flagId)
+        return {
+          name: fs?.name ?? '(Unassigned)',
+          iso3: fs?.iso3Code ?? '',
+          count: vessels.length,
+          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+    if (items.length <= 15) return { rows: items, othersCount: 0 }
+    const top15 = items.slice(0, 15)
+    const othersCount = items.slice(15).reduce((s, i) => s + i.count, 0)
+    return { rows: top15, othersCount }
+  }, [pool, flagMap])
+
+  // ── Age Profile ─────────────────────────────────────────────────────────────
+  const ageProfile = useMemo(() => {
+    return AGE_BUCKETS.map(b => {
+      const count = pool.filter((v: any) => {
+        if (!v.builtYear) return false
+        const age = currentYear - v.builtYear
+        return age >= b.min && age < b.max
+      }).length
+      return { ...b, count, pct: pool.length > 0 ? (count / pool.length) * 100 : 0 }
+    })
+  }, [pool])
+
+  // ── Tonnage Profile ─────────────────────────────────────────────────────────
+  const tonnageProfile = useMemo(() => {
+    return TONNAGE_BUCKETS.map(b => {
+      const count = pool.filter((v: any) => {
+        const gt = Number(v.grossTonnage)
+        if (!gt) return false
+        return gt >= b.min && gt < b.max
+      }).length
+      return { ...b, count, pct: pool.length > 0 ? (count / pool.length) * 100 : 0 }
+    })
+  }, [pool])
+
+  // ── Customer Concentration ──────────────────────────────────────────────────
+  const customerConcentration = useMemo(() => {
+    const withCustomer = pool.filter((v: any) => v.customerId)
+    const grouped = groupBy(withCustomer, (v: any) => v.customerId)
     return Array.from(grouped.entries())
-      .map(([name, items]) => ({ name, count: items.length }))
+      .map(([customerId, vessels]) => {
+        const entity = entityMap.get(customerId)
+        const types = [...new Set(vessels.map((v: any) => v.vesselType).filter(Boolean))].join(', ')
+        return {
+          name: entity?.name ?? '(Unknown)',
+          count: vessels.length,
+          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
+          types,
+        }
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
-  }, [pool])
+  }, [pool, entityMap])
 
-  const byClass = useMemo(() => {
-    const grouped = groupBy(pool, v => v.classificationSociety || '(None)')
-    return Array.from(grouped.entries())
-      .map(([name, items]) => ({ name, count: items.length }))
-      .sort((a, b) => b.count - a.count)
-  }, [pool])
-
-  const byFleet = useMemo(() => {
-    const grouped = groupBy(pool, v => fleetMap.get(v.fleetId) ?? '(Unassigned)')
-    return Array.from(grouped.entries())
-      .map(([name, items]) => ({ name, count: items.length }))
-      .sort((a, b) => b.count - a.count)
-  }, [pool, fleetMap])
-
-  const byAge = useMemo(() => {
-    const order = AGE_RANGES.map(r => r.label)
-    const grouped = groupBy(pool, v => ageBucket(v.builtYear))
-    return order
-      .map(label => ({ label, count: grouped.get(label)?.length ?? 0 }))
-      .concat(grouped.has('Unknown') ? [{ label: 'Unknown', count: grouped.get('Unknown')!.length }] : [])
-  }, [pool])
-
-  const byTonnage = useMemo(() => {
-    const order = GT_RANGES.map(r => r.label)
-    const grouped = groupBy(pool, v => gtBucket(v.grossTonnage))
-    return order
-      .map(label => ({ label, count: grouped.get(label)?.length ?? 0 }))
-      .concat(grouped.has('Unknown') ? [{ label: 'Unknown', count: grouped.get('Unknown')!.length }] : [])
-  }, [pool])
-
-  const byCustomerType = useMemo(() => {
-    const broker = pool.filter(v => v.customerType === 'broker').length
-    const direct = pool.filter(v => v.customerType === 'direct').length
-    const unassigned = pool.filter(v => !v.customerType).length
-    return [
-      { label: 'Broker', count: broker },
-      { label: 'Direct', count: direct },
-      { label: 'Unassigned', count: unassigned },
-    ].filter(x => x.count > 0)
-  }, [pool])
-
-  const byOfac = useMemo(() => {
-    const groups = groupBy(pool, v => v.ofacStatus || 'PENDING')
-    const order = ['CLEARED', 'POTENTIAL_MATCH', 'MATCH', 'SANCTIONED', 'ERROR', 'PENDING']
+  // ── OFAC Status ─────────────────────────────────────────────────────────────
+  const ofacStatus = useMemo(() => {
+    const groups = groupBy(pool, (v: any) => v.ofacStatus || 'NOT_CHECKED')
+    const order = ['CLEARED', 'PENDING', 'POTENTIAL_MATCH', 'MATCH', 'NOT_CHECKED'] as const
     return order.map(status => ({
       label: status.replace(/_/g, ' '),
+      key: status,
       count: groups.get(status)?.length ?? 0,
-      color: status === 'CLEARED' ? '#10b981'
-        : status === 'PENDING' ? '#888888'
-        : status === 'POTENTIAL_MATCH' ? '#f59e0b'
-        : '#ef4444',
-    })).filter(x => x.count > 0)
+    }))
   }, [pool])
 
-  // ── color palette ─────────────────────────────────────────────────────────────
-  const BLUE    = '#0ea5e9'
-  const PURPLE  = '#8b5cf6'
-  const GREEN   = '#10b981'
-  const AMBER   = '#f59e0b'
-  const PINK    = '#ec4899'
-  const TEAL    = '#14b8a6'
-  const INDIGO  = '#6366f1'
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── Render ─────────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
 
   const G = {
-    blue:   'linear-gradient(135deg, #0ea5e9, #2563eb)',
+    blue: 'linear-gradient(135deg, #0ea5e9, #2563eb)',
     purple: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-    green:  'linear-gradient(135deg, #10b981, #059669)',
-    amber:  'linear-gradient(135deg, #f59e0b, #d97706)',
-    pink:   'linear-gradient(135deg, #ec4899, #be185d)',
+    green: 'linear-gradient(135deg, #10b981, #059669)',
+    amber: 'linear-gradient(135deg, #f59e0b, #d97706)',
+    pink: 'linear-gradient(135deg, #ec4899, #be185d)',
+    teal: 'linear-gradient(135deg, #14b8a6, #0d9488)',
   }
 
-  const maxFlag     = byFlag[0]?.count ?? 1
-  const maxType     = byType[0]?.count ?? 1
-  const maxClass    = byClass[0]?.count ?? 1
-  const maxFleet    = byFleet[0]?.count ?? 1
-  const maxCustomer = Math.max(...byCustomerType.map(b => b.count), 1)
-
   return (
-    <div className="fade-in">
-      {/* ── Header ── */}
-      <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Fleet Analytics</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-            Statistical breakdown of your vessel portfolio.
-            {lastRefreshed && (
-              <span style={{ marginLeft: '8px', opacity: 0.6 }}>
-                Updated {lastRefreshed.toLocaleTimeString()}
+    <div className="fade-in" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+
+      {/* ── Left Sidebar: Filters ─────────────────────────────────── */}
+      <aside style={{
+        width: '280px',
+        flexShrink: 0,
+        background: 'var(--bg-card)',
+        borderRadius: '14px',
+        border: '1px solid var(--table-border)',
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        position: 'sticky',
+        top: '20px',
+      }}>
+        {/* Sidebar header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          paddingBottom: '16px', borderBottom: '1px solid var(--table-border)',
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 9,
+            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Filter size={16} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Filters</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Refine your analysis</div>
+          </div>
+        </div>
+
+        {/* Saved Presets */}
+        <FilterSection label="Saved Presets">
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <select
+              value={selectedPresetId}
+              onChange={e => handleLoadPreset(e.target.value)}
+              style={{
+                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
+                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <option value="">Select preset...</option>
+              {presets.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleSavePreset}
+              title="Save current filters"
+              style={{
+                background: 'none', border: '1px solid var(--input-border)',
+                borderRadius: '6px', padding: '5px 7px', cursor: 'pointer',
+                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
+              }}
+            >
+              <Save size={14} />
+            </button>
+          </div>
+          {selectedPresetId && (
+            <button
+              onClick={() => handleDeletePreset(selectedPresetId)}
+              style={{
+                marginTop: '6px', background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--danger)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px',
+                padding: 0,
+              }}
+            >
+              <Trash2 size={12} /> Delete preset
+            </button>
+          )}
+        </FilterSection>
+
+        {/* Vessel Status */}
+        <FilterSection label="Vessel Status">
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {(['active', 'inactive', 'all'] as const).map(s => (
+              <Chip
+                key={s}
+                label={s.charAt(0).toUpperCase() + s.slice(1)}
+                selected={vesselStatus === s || (s === 'all' && !filters.activeOnly)}
+                onClick={() => setVesselStatus(s)}
+              />
+            ))}
+          </div>
+        </FilterSection>
+
+        {/* Policy Types */}
+        {policyTypes.length > 0 && (
+          <CollapsibleFilter label="Policy Types">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {policyTypes.map(pt => (
+                <Chip
+                  key={pt.id}
+                  label={pt.name}
+                  selected={filters.policyTypeIds.includes(pt.id)}
+                  onClick={() => updateFilter('policyTypeIds',
+                    filters.policyTypeIds.includes(pt.id)
+                      ? filters.policyTypeIds.filter(x => x !== pt.id)
+                      : [...filters.policyTypeIds, pt.id]
+                  )}
+                />
+              ))}
+            </div>
+          </CollapsibleFilter>
+        )}
+
+        {/* Fleets */}
+        <FilterSection label="Fleets">
+          <MultiSelectDropdown
+            label="fleets"
+            options={fleets.map(f => ({ id: f.id, name: f.name }))}
+            selectedIds={filters.fleetIds}
+            onChange={ids => updateFilter('fleetIds', ids)}
+          />
+        </FilterSection>
+
+        {/* Customers */}
+        <FilterSection label="Customers">
+          <MultiSelectDropdown
+            label="customers"
+            options={customerEntities.map(e => ({ id: e.id, name: e.name }))}
+            selectedIds={filters.customerIds}
+            onChange={ids => updateFilter('customerIds', ids)}
+          />
+        </FilterSection>
+
+        {/* Flag States */}
+        <CollapsibleFilter label="Flag States" defaultCollapsed>
+          <MultiSelectDropdown
+            label="flag states"
+            options={flagStates.map(f => ({ id: f.id, name: f.name }))}
+            selectedIds={filters.flagStateIds}
+            onChange={ids => updateFilter('flagStateIds', ids)}
+          />
+        </CollapsibleFilter>
+
+        {/* Vessel Types */}
+        <CollapsibleFilter label="Vessel Types" defaultCollapsed>
+          <MultiSelectDropdown
+            label="vessel types"
+            options={vesselTypes.map(vt => ({ id: vt.name, name: vt.name }))}
+            selectedIds={filters.vesselTypeIds}
+            onChange={ids => updateFilter('vesselTypeIds', ids)}
+          />
+        </CollapsibleFilter>
+
+        {/* Age Range */}
+        <FilterSection label="Age Range (years)">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.ageMin ?? ''}
+              onChange={e => updateFilter('ageMin', e.target.value ? Number(e.target.value) : undefined)}
+              min={0}
+              style={{
+                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
+                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+                color: 'var(--text-primary)', width: '100%',
+              }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>to</span>
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.ageMax ?? ''}
+              onChange={e => updateFilter('ageMax', e.target.value ? Number(e.target.value) : undefined)}
+              min={0}
+              style={{
+                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
+                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+                color: 'var(--text-primary)', width: '100%',
+              }}
+            />
+          </div>
+        </FilterSection>
+
+        {/* Tonnage Range */}
+        <FilterSection label="Tonnage Range (GT)">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.tonnageMin ?? ''}
+              onChange={e => updateFilter('tonnageMin', e.target.value ? Number(e.target.value) : undefined)}
+              min={0}
+              style={{
+                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
+                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+                color: 'var(--text-primary)', width: '100%',
+              }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>to</span>
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.tonnageMax ?? ''}
+              onChange={e => updateFilter('tonnageMax', e.target.value ? Number(e.target.value) : undefined)}
+              min={0}
+              style={{
+                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
+                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
+                color: 'var(--text-primary)', width: '100%',
+              }}
+            />
+          </div>
+        </FilterSection>
+
+        {/* Apply button */}
+        <button
+          onClick={applyFilters}
+          disabled={loading}
+          className="btn-primary"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '8px', width: '100%', marginTop: '4px',
+          }}
+        >
+          {loading ? <Loader2 size={16} className="spinner" /> : <BarChart3 size={16} />}
+          {loading ? 'Loading...' : 'Apply Filters'}
+        </button>
+      </aside>
+
+      {/* ── Right Panel: Analytics Content ──────────────────────── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+
+        {/* Top bar */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginBottom: '20px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1 style={{ fontSize: '1.6rem', margin: 0, fontWeight: 800 }}>Fleet Analytics</h1>
+            {hasQueried && (
+              <span style={{
+                padding: '3px 12px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700,
+                background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)',
+                border: '1px solid rgba(0, 210, 255, 0.2)',
+              }}>
+                {pool.length} vessel{pool.length !== 1 ? 's' : ''}
               </span>
             )}
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            onClick={() => setActiveOnly(v => !v)}
-            className={activeOnly ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 16px', fontSize: '0.84rem' }}
-          >
-            {activeOnly ? 'Active Vessels Only' : 'All Vessels'}
-          </button>
-          <button
-            onClick={loadData}
-            className="btn-secondary"
-            style={{ padding: '8px 10px' }}
-            title="Refresh data"
-            disabled={loading}
-          >
-            {loading ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
-          </button>
-        </div>
-      </header>
-
-      {loading && vessels.length === 0 ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: 'var(--text-secondary)' }}>
-          <Loader2 size={28} className="spinner" />
-        </div>
-      ) : (
-        <>
-          {/* ── KPI Row ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px', marginBottom: '20px' }}>
-            <KPI
-              icon={<Ship size={20} color="#fff" />}
-              gradient={G.blue}
-              label="Vessels"
-              value={kpis.total}
-              sub={activeOnly ? 'active only' : 'total in fleet'}
-            />
-            <KPI
-              icon={<Globe size={20} color="#fff" />}
-              gradient={G.purple}
-              label="Flags in Use"
-              value={kpis.flags}
-              sub={`${Math.round((kpis.flags / Math.max(flagStates.length, 1)) * 100)}% of registry`}
-            />
-            <KPI
-              icon={<Anchor size={20} color="#fff" />}
-              gradient={G.green}
-              label="Vessel Types"
-              value={kpis.types}
-              sub={kpis.types > 0 ? `${kpis.types} distinct type${kpis.types !== 1 ? 's' : ''}` : undefined}
-            />
-            <KPI
-              icon={<Calendar size={20} color="#fff" />}
-              gradient={G.amber}
-              label="Avg Fleet Age"
-              value={kpis.avgAge != null ? `${kpis.avgAge} yr` : '—'}
-              sub={kpis.avgAge != null ? `Built ~${currentYear - kpis.avgAge}` : 'No age data'}
-            />
-            <KPI
-              icon={<TrendingUp size={20} color="#fff" />}
-              gradient={G.pink}
-              label="Avg Tonnage"
-              value={kpis.avgTonnage != null ? `${kpis.avgTonnage.toLocaleString()} GT` : '—'}
-              sub={kpis.avgTonnage != null ? 'gross tonnage' : 'No tonnage data'}
-            />
           </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {hasQueried && (
+              <button
+                onClick={applyFilters}
+                className="btn-secondary"
+                style={{ padding: '8px 10px' }}
+                title="Refresh data"
+                disabled={loading}
+              >
+                {loading ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
+              </button>
+            )}
+            {hasQueried && pool.length > 0 && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setExportOpen(o => !o)}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 14px', fontSize: '0.84rem',
+                  }}
+                >
+                  <FileDown size={16} /> Export
+                  <ChevronDown size={13} style={{
+                    transform: exportOpen ? 'rotate(180deg)' : 'none', transition: '0.15s',
+                  }} />
+                </button>
+                {exportOpen && (
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, zIndex: 20,
+                    background: 'var(--bg-primary)', border: '1px solid var(--input-border)',
+                    borderRadius: '8px', marginTop: '4px', minWidth: '140px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    overflow: 'hidden',
+                  }}>
+                    <button
+                      onClick={exportPDF}
+                      style={{
+                        width: '100%', padding: '10px 16px', background: 'none',
+                        border: 'none', cursor: 'pointer', textAlign: 'left',
+                        fontSize: '0.84rem', color: 'var(--text-primary)',
+                      }}
+                      className="hover-effect"
+                    >
+                      PDF Report
+                    </button>
+                    <button
+                      onClick={exportExcel}
+                      style={{
+                        width: '100%', padding: '10px 16px', background: 'none',
+                        border: 'none', cursor: 'pointer', textAlign: 'left',
+                        fontSize: '0.84rem', color: 'var(--text-primary)',
+                        borderTop: '1px solid var(--table-border)',
+                      }}
+                      className="hover-effect"
+                    >
+                      Excel Spreadsheet
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-          {/* ── Row 1: Flag (wider) + Type ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '14px', marginBottom: '14px' }}>
-            <ChartCard
-              title="By Flag State"
-              icon={<Globe size={13} />}
-              accentColor={BLUE}
-              count={byFlag.length}
-            >
-              {byFlag.length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No flag data</p>
-                : byFlag.map(({ name, count, iso3 }) => {
-                  const flagCls = iso3 ? getFlagClass(iso3) : ''
-                  return (
-                    <BarRow
-                      key={name}
-                      label={name}
-                      count={count}
-                      total={pool.length}
-                      max={maxFlag}
-                      color={BLUE}
-                      prefix={
-                        flagCls
-                          ? <span className={`fi ${flagCls}`} style={{ width: '20px', height: '14px', borderRadius: '2px', display: 'block', flexShrink: 0 }} />
-                          : <span style={{ display: 'block', width: '20px', height: '14px', borderRadius: '2px', background: 'var(--table-border)', flexShrink: 0 }} />
-                      }
-                    />
-                  )
-                })
-              }
-            </ChartCard>
+        {/* ── Content ── */}
+        {!hasQueried ? (
+          <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center' }}>
+            <BarChart3 size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.25 }} />
+            <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              No analysis run yet
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+              Configure filters on the left, then click <strong>Apply Filters</strong> to generate analytics.
+            </p>
+          </div>
+        ) : loading ? (
+          <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <Loader2 size={32} className="spinner" style={{ marginBottom: '12px', opacity: 0.5 }} />
+            <p style={{ margin: 0 }}>Analyzing fleet data...</p>
+          </div>
+        ) : pool.length === 0 ? (
+          <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center' }}>
+            <Ship size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.25 }} />
+            <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              No vessels match filters
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+              Try adjusting your filter criteria.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* ── Section 1: KPI Cards ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+              <KPI
+                icon={<Ship size={20} color="#fff" />}
+                gradient={G.blue}
+                label="Vessels"
+                value={kpis.total}
+                sub={filters.activeOnly ? 'active only' : 'all vessels'}
+              />
+              <KPI
+                icon={<Calendar size={20} color="#fff" />}
+                gradient={G.amber}
+                label="Avg Age"
+                value={kpis.avgAge != null ? `${kpis.avgAge} yr` : '--'}
+                sub={kpis.avgAge != null ? `Built ~${currentYear - Math.round(kpis.avgAge)}` : 'No age data'}
+              />
+              <KPI
+                icon={<TrendingUp size={20} color="#fff" />}
+                gradient={G.pink}
+                label="Avg Tonnage"
+                value={kpis.avgTonnage != null ? `${fmt(kpis.avgTonnage)} GT` : '--'}
+                sub="gross tonnage"
+              />
+              <KPI
+                icon={<Anchor size={20} color="#fff" />}
+                gradient={G.teal}
+                label="Total Tonnage"
+                value={kpis.totalTonnage > 0 ? `${fmt(Math.round(kpis.totalTonnage))} GT` : '--'}
+                sub="fleet total"
+              />
+              <KPI
+                icon={<Globe size={20} color="#fff" />}
+                gradient={G.purple}
+                label="Flags"
+                value={kpis.flags}
+                sub={`${kpis.flags} unique flag${kpis.flags !== 1 ? 's' : ''}`}
+              />
+              <KPI
+                icon={<Shield size={20} color="#fff" />}
+                gradient={G.green}
+                label="Policy Coverage"
+                value={`${kpis.policyCoveragePct}%`}
+                sub="vessels with active policy"
+              />
+            </div>
 
+            {/* ── Section 2: Vessel Type Breakdown ── */}
             <ChartCard
-              title="By Vessel Type"
+              title="Vessel Type Distribution"
               icon={<Ship size={13} />}
-              accentColor={PURPLE}
-              count={byType.length}
+              accentColor="#8b5cf6"
+              count={vesselTypeBreakdown.length}
             >
-              {byType.length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No type data</p>
-                : byType.map(({ name, count }) => (
-                  <BarRow key={name} label={name} count={count} total={pool.length} max={maxType} color={PURPLE} />
-                ))
-              }
+              {vesselTypeBreakdown.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No type data</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Type</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
+                        <th style={{ ...thStyle, minWidth: '120px' }}>%</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Avg Age</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Avg Tonnage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vesselTypeBreakdown.map((row, idx) => (
+                        <tr key={row.name}>
+                          <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
+                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.count}</td>
+                          <td style={tdStyle(idx)}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <ProgressBar pct={row.pct} />
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
+                                {row.pct.toFixed(0)}%
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ ...tdStyle(idx), textAlign: 'right', color: 'var(--text-secondary)' }}>
+                            {row.avgAge != null ? `${row.avgAge} yr` : '--'}
+                          </td>
+                          <td style={{ ...tdStyle(idx), textAlign: 'right', color: 'var(--text-secondary)' }}>
+                            {row.avgTonnage != null ? fmt(row.avgTonnage) : '--'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </ChartCard>
-          </div>
 
-          {/* ── Row 2: Classification + Fleet ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+            <div style={{ height: '14px' }} />
+
+            {/* ── Section 3: Flag State Distribution ── */}
             <ChartCard
-              title="By Classification Society"
-              icon={<BarChart2 size={13} />}
-              accentColor={GREEN}
-              count={byClass.length}
+              title="Flag State Distribution"
+              icon={<Globe size={13} />}
+              accentColor="#0ea5e9"
+              count={flagDistribution.rows.length + (flagDistribution.othersCount > 0 ? 1 : 0)}
             >
-              {byClass.length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No classification data</p>
-                : byClass.map(({ name, count }) => (
-                  <BarRow key={name} label={name} count={count} total={pool.length} max={maxClass} color={GREEN} />
-                ))
-              }
+              {flagDistribution.rows.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No flag data</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Flag</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
+                        <th style={{ ...thStyle, minWidth: '120px' }}>%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {flagDistribution.rows.map((row, idx) => {
+                        const flagCls = row.iso3 ? getFlagClass(row.iso3) : ''
+                        return (
+                          <tr key={row.name}>
+                            <td style={tdStyle(idx)}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {flagCls ? (
+                                  <span className={`fi ${flagCls}`} style={{ width: '20px', height: '14px', borderRadius: '2px', display: 'block', flexShrink: 0 }} />
+                                ) : (
+                                  <span style={{ display: 'block', width: '20px', height: '14px', borderRadius: '2px', background: 'var(--table-border)', flexShrink: 0 }} />
+                                )}
+                                <span style={{ fontWeight: 600 }}>{row.name}</span>
+                              </div>
+                            </td>
+                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.count}</td>
+                            <td style={tdStyle(idx)}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ProgressBar pct={row.pct} />
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
+                                  {row.pct.toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {flagDistribution.othersCount > 0 && (
+                        <tr>
+                          <td style={{ ...tdStyle(flagDistribution.rows.length), fontStyle: 'italic', color: 'var(--text-secondary)' }}>
+                            Others
+                          </td>
+                          <td style={{ ...tdStyle(flagDistribution.rows.length), textAlign: 'right', fontWeight: 700 }}>
+                            {flagDistribution.othersCount}
+                          </td>
+                          <td style={tdStyle(flagDistribution.rows.length)}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <ProgressBar pct={pool.length > 0 ? (flagDistribution.othersCount / pool.length) * 100 : 0} />
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
+                                {pool.length > 0 ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(0) : 0}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </ChartCard>
 
-            <ChartCard
-              title="By Fleet"
-              icon={<BarChart2 size={13} />}
-              accentColor={AMBER}
-              count={byFleet.length}
-            >
-              {byFleet.length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No fleet data</p>
-                : byFleet.map(({ name, count }) => (
-                  <BarRow key={name} label={name} count={count} total={pool.length} max={maxFleet} color={AMBER} />
-                ))
-              }
-            </ChartCard>
-          </div>
+            <div style={{ height: '14px' }} />
 
-          {/* ── Row 3: Age + Tonnage (histogram) ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+            {/* ── Section 4: Age Profile ── */}
             <ChartCard
               title="Age Distribution"
               icon={<Calendar size={13} />}
-              accentColor={PINK}
-              count={pool.filter(v => v.builtYear).length > 0 ? pool.filter(v => v.builtYear).length : undefined}
+              accentColor="#f59e0b"
             >
-              {pool.filter(v => v.builtYear).length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No age data</p>
-                : <Histogram data={byAge} color={PINK} total={pool.filter(v => v.builtYear).length} />
-              }
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {ageProfile.map(b => (
+                  <div key={b.label} style={{
+                    padding: '12px 16px', borderRadius: '8px',
+                    border: '1px solid var(--glass-border)',
+                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                    minWidth: '100px', flex: '1 1 100px', textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: b.color, marginBottom: '4px' }}>
+                      {b.count}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                      {b.pct.toFixed(0)}%
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      {b.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </ChartCard>
 
+            <div style={{ height: '14px' }} />
+
+            {/* ── Section 5: Tonnage Profile ── */}
             <ChartCard
               title="Tonnage Distribution"
               icon={<TrendingUp size={13} />}
-              accentColor={TEAL}
-              count={pool.filter(v => v.grossTonnage).length > 0 ? pool.filter(v => v.grossTonnage).length : undefined}
+              accentColor="#14b8a6"
             >
-              {pool.filter(v => v.grossTonnage).length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No tonnage data</p>
-                : <Histogram data={byTonnage} color={TEAL} total={pool.filter(v => v.grossTonnage).length} />
-              }
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {tonnageProfile.map(b => (
+                  <div key={b.label} style={{
+                    padding: '12px 16px', borderRadius: '8px',
+                    border: '1px solid var(--glass-border)',
+                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                    minWidth: '100px', flex: '1 1 100px', textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: b.color, marginBottom: '4px' }}>
+                      {b.count}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                      {b.pct.toFixed(0)}%
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      {b.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </ChartCard>
-          </div>
 
-          {/* ── Row 4: Customer Type + OFAC ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={{ height: '14px' }} />
+
+            {/* ── Section 6: Policy Coverage Matrix ── */}
             <ChartCard
-              title="By Customer Type"
-              icon={<Anchor size={13} />}
-              accentColor={INDIGO}
-              count={byCustomerType.reduce((s, x) => s + x.count, 0) || undefined}
+              title="Policy Coverage"
+              icon={<Shield size={13} />}
+              accentColor="#10b981"
+              count={policyCoverage.length}
             >
-              {byCustomerType.length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No customer data</p>
-                : byCustomerType.map(({ label, count }) => (
-                  <BarRow key={label} label={label} count={count} total={pool.length} max={maxCustomer} color={INDIGO} />
-                ))
-              }
+              {policyCoverage.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No active policies found</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Policy Type</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Vessels Covered</th>
+                        <th style={{ ...thStyle, minWidth: '120px' }}>% of Selection</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {policyCoverage.map((row, idx) => {
+                        const pct = pool.length > 0 ? (Number(row.vesselCount) / pool.length) * 100 : 0
+                        return (
+                          <tr key={row.name}>
+                            <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
+                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.vesselCount}</td>
+                            <td style={tdStyle(idx)}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ProgressBar pct={pct} />
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
+                                  {pct.toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </ChartCard>
 
+            <div style={{ height: '14px' }} />
+
+            {/* ── Section 7: Customer Concentration ── */}
+            <ChartCard
+              title="Top Customers"
+              icon={<Users size={13} />}
+              accentColor="#6366f1"
+              count={customerConcentration.length}
+            >
+              {customerConcentration.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No customer data</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Customer</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Vessels</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>%</th>
+                        <th style={thStyle}>Types</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customerConcentration.map((row, idx) => (
+                        <tr key={row.name}>
+                          <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
+                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.count}</td>
+                          <td style={{ ...tdStyle(idx), textAlign: 'right', color: 'var(--text-secondary)' }}>
+                            {row.pct.toFixed(0)}%
+                          </td>
+                          <td style={{ ...tdStyle(idx), color: 'var(--text-secondary)', fontSize: '0.8rem', maxWidth: '200px' }}>
+                            {row.types || '--'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </ChartCard>
+
+            <div style={{ height: '14px' }} />
+
+            {/* ── Section 8: OFAC Status ── */}
             <ChartCard
               title="OFAC / Sanctions Status"
               icon={<Shield size={13} />}
               accentColor="#ef4444"
-              count={pool.length || undefined}
             >
-              {byOfac.length === 0
-                ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No OFAC data</p>
-                : byOfac.map(({ label, count, color }) => (
-                  <OfacRow key={label} label={label} count={count} total={pool.length} barColor={color} />
-                ))
-              }
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {ofacStatus.map(s => {
+                  const style = OFAC_STYLES[s.key] ?? OFAC_STYLES.PENDING
+                  return (
+                    <div key={s.key} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '8px 14px', borderRadius: '20px',
+                      background: style.bg,
+                      border: `1px solid ${style.border}`,
+                    }}>
+                      <span style={{
+                        fontSize: '0.75rem', fontWeight: 700, color: style.text,
+                        textTransform: 'uppercase', letterSpacing: '0.02em',
+                      }}>
+                        {s.label}:
+                      </span>
+                      <span style={{
+                        fontSize: '0.95rem', fontWeight: 800, color: style.text,
+                      }}>
+                        {s.count}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </ChartCard>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

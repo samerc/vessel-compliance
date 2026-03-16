@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -7542,6 +7542,109 @@ export class MySQLAdapter {
         if (!this.pool) return
         const json = JSON.stringify(settings)
         await this.pool.execute("INSERT INTO app_settings (setting_key, setting_value) VALUES ('war_settings', ?) ON DUPLICATE KEY UPDATE setting_value = ?", [json, json])
+    }
+
+    // ==================== Analytics Presets ====================
+
+    async getAnalyticsPresets(userId: string): Promise<AnalyticsPreset[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.execute(
+            'SELECT id, user_id AS userId, name, filters, created_at AS createdAt FROM analytics_presets WHERE user_id = ? ORDER BY name',
+            [userId]
+        )
+        return (rows as any[]).map(r => ({
+            ...r,
+            filters: typeof r.filters === 'string' ? JSON.parse(r.filters) : r.filters
+        }))
+    }
+
+    async addAnalyticsPreset(preset: { userId: string; name: string; filters: AnalyticsFilters }): Promise<AnalyticsPreset> {
+        if (!this.pool) throw new Error('No DB')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO analytics_presets (id, user_id, name, filters) VALUES (?, ?, ?, ?)',
+            [id, preset.userId, preset.name, JSON.stringify(preset.filters)]
+        )
+        return { id, userId: preset.userId, name: preset.name, filters: preset.filters }
+    }
+
+    async updateAnalyticsPreset(id: string, name: string, filters: AnalyticsFilters): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE analytics_presets SET name = ?, filters = ? WHERE id = ?',
+            [name, JSON.stringify(filters), id]
+        )
+    }
+
+    async deleteAnalyticsPreset(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM analytics_presets WHERE id = ?', [id])
+    }
+
+    // ==================== Analytics Query ====================
+
+    async getAnalyticsData(filters: AnalyticsFilters): Promise<any> {
+        if (!this.pool) return {}
+        // Build WHERE conditions
+        const conditions: string[] = []
+        const params: any[] = []
+
+        if (filters.activeOnly) conditions.push('v.is_active = TRUE')
+        if (filters.ageMin != null) conditions.push(`v.built_year <= ?`) , params.push(new Date().getFullYear() - filters.ageMin)
+        if (filters.ageMax != null) conditions.push(`v.built_year >= ?`), params.push(new Date().getFullYear() - filters.ageMax)
+        if (filters.tonnageMin != null) conditions.push('v.gross_tonnage >= ?'), params.push(filters.tonnageMin)
+        if (filters.tonnageMax != null) conditions.push('v.gross_tonnage <= ?'), params.push(filters.tonnageMax)
+        if (filters.fleetIds?.length) {
+            conditions.push(`v.fleet_id IN (${filters.fleetIds.map(() => '?').join(',')})`)
+            params.push(...filters.fleetIds)
+        }
+        if (filters.customerIds?.length) {
+            conditions.push(`v.customer_id IN (${filters.customerIds.map(() => '?').join(',')})`)
+            params.push(...filters.customerIds)
+        }
+        if (filters.flagStateIds?.length) {
+            conditions.push(`v.flag_state_id IN (${filters.flagStateIds.map(() => '?').join(',')})`)
+            params.push(...filters.flagStateIds)
+        }
+        if (filters.vesselTypeIds?.length) {
+            conditions.push(`v.vessel_type IN (${filters.vesselTypeIds.map(() => '?').join(',')})`)
+            params.push(...filters.vesselTypeIds)
+        }
+        if (filters.policyTypeIds?.length) {
+            conditions.push(`v.id IN (SELECT DISTINCT vdp.vessel_id FROM vessel_dynamic_policies vdp WHERE vdp.policy_type_id IN (${filters.policyTypeIds.map(() => '?').join(',')}) AND vdp.status = 'active')`)
+            params.push(...filters.policyTypeIds)
+        }
+
+        const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
+
+        // Main vessel query
+        const [vessels] = await this.pool.execute(
+            `SELECT v.id, v.name, v.imo_number AS imoNumber, v.fleet_id AS fleetId, v.flag_state_id AS flagStateId,
+                    v.built_year AS builtYear, v.gross_tonnage AS grossTonnage, v.vessel_type AS vesselType,
+                    v.is_active AS isActive, v.customer_id AS customerId, v.customer_type AS customerType,
+                    v.ofac_status AS ofacStatus, v.classification_society AS classificationSociety
+             FROM vessels v ${where}`,
+            params
+        )
+
+        const vList = vessels as any[]
+        const vesselIds = vList.map(v => v.id)
+
+        // Policy coverage for filtered vessels
+        let policyCoverage: any[] = []
+        if (vesselIds.length > 0) {
+            const [pRows] = await this.pool.execute(
+                `SELECT pt.name, COUNT(DISTINCT vdp.vessel_id) AS vesselCount
+                 FROM vessel_dynamic_policies vdp
+                 JOIN policy_types pt ON vdp.policy_type_id = pt.id
+                 WHERE vdp.status = 'active' AND vdp.vessel_id IN (${vesselIds.map(() => '?').join(',')})
+                 GROUP BY pt.id, pt.name ORDER BY vesselCount DESC`,
+                vesselIds
+            )
+            policyCoverage = pRows as any[]
+        }
+
+        return { vessels: vList, policyCoverage }
     }
 }
 

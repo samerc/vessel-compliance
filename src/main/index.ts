@@ -1119,6 +1119,28 @@ app.whenReady().then(() => {
     return db.deleteWarBreachRecord(id)
   })
 
+  // ── Analytics Presets ──
+  safeHandle('analytics:getPresets', (event) => {
+    const user = requireSession(event)
+    return db.getAnalyticsPresets(user.id)
+  })
+  safeHandle('analytics:addPreset', async (event, name: string, filters: any) => {
+    const user = requireSession(event)
+    return db.addAnalyticsPreset({ userId: user.id, name, filters })
+  })
+  safeHandle('analytics:updatePreset', async (event, id: string, name: string, filters: any) => {
+    requireSession(event)
+    return db.updateAnalyticsPreset(id, name, filters)
+  })
+  safeHandle('analytics:deletePreset', async (event, id: string) => {
+    requireSession(event)
+    return db.deleteAnalyticsPreset(id)
+  })
+  safeHandle('analytics:getData', async (event, filters: any) => {
+    await requirePermission(event, 'analytics:view')
+    return db.getAnalyticsData(filters)
+  })
+
   // File System IPC Handlers (session required, path validation)
   safeHandle('fs:exists', (event, filePath: string) => {
     requireSession(event)

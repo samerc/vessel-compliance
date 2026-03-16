@@ -236,6 +236,8 @@ export const PERMISSION_CATEGORIES = [
     permissions: [
       { key: 'fleets:view', label: 'View fleets' },
       { key: 'fleets:manage', label: 'Manage fleets' },
+      { key: 'analytics:view', label: 'View fleet analytics' },
+      { key: 'analytics:export', label: 'Export analytics reports' },
       { key: 'renewals:view', label: 'View renewals' },
       { key: 'renewals:manage', label: 'Manage renewal statuses' },
     ],
@@ -698,6 +700,29 @@ export interface TradingWarrantyTemplate {
   name: string
   text: string
   order: number
+}
+
+// ==================== Fleet Analytics ====================
+
+export interface AnalyticsPreset {
+  id: string
+  userId: string
+  name: string
+  filters: AnalyticsFilters
+  createdAt?: string
+}
+
+export interface AnalyticsFilters {
+  activeOnly: boolean
+  policyTypeIds: string[]
+  fleetIds: string[]
+  customerIds: string[]
+  flagStateIds: string[]
+  vesselTypeIds: string[]
+  ageMin?: number
+  ageMax?: number
+  tonnageMin?: number
+  tonnageMax?: number
 }
 
 // ==================== Hull Quotation Settings ====================

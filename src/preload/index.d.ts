@@ -579,6 +579,11 @@ export interface Api {
   warBreachSave: (record: any) => Promise<{ id: string }>
   warBreachGetAll: () => Promise<any[]>
   warBreachDelete: (id: string) => Promise<void>
+  analyticsGetPresets: () => Promise<import('../shared/types').AnalyticsPreset[]>
+  analyticsAddPreset: (name: string, filters: any) => Promise<import('../shared/types').AnalyticsPreset>
+  analyticsUpdatePreset: (id: string, name: string, filters: any) => Promise<void>
+  analyticsDeletePreset: (id: string) => Promise<void>
+  analyticsGetData: (filters: any) => Promise<{ vessels: any[]; policyCoverage: any[] }>
   updateUserAppVersion: (version: string) => Promise<void>
   updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => Promise<void>
   onUpdateChecking: (callback: () => void) => void

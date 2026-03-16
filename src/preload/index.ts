@@ -583,6 +583,13 @@ const api = {
   warBreachGetAll: () => ipcRenderer.invoke('warBreach:getAll'),
   warBreachDelete: (id: string) => ipcRenderer.invoke('warBreach:delete', id),
 
+  // Analytics
+  analyticsGetPresets: () => ipcRenderer.invoke('analytics:getPresets'),
+  analyticsAddPreset: (name: string, filters: any) => ipcRenderer.invoke('analytics:addPreset', name, filters),
+  analyticsUpdatePreset: (id: string, name: string, filters: any) => ipcRenderer.invoke('analytics:updatePreset', id, name, filters),
+  analyticsDeletePreset: (id: string) => ipcRenderer.invoke('analytics:deletePreset', id),
+  analyticsGetData: (filters: any) => ipcRenderer.invoke('analytics:getData', filters),
+
   // Report Settings
   reportSettingsGet: () => ipcRenderer.invoke('reportSettings:get'),
   reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),
