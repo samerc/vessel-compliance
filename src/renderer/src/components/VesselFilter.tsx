@@ -3,24 +3,26 @@ import { createPortal } from 'react-dom'
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown, Ship, X, Loader2 } from 'lucide-react'
 import { Vessel, PolicyType, FlagState, ClassificationSociety, Entity, VesselDynamicPolicy, VesselType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface VesselFilterProps {
     onNavigateToVessel?: (vesselId: string) => void
 }
 
 // ── Reusable multi-select dropdown with inline search ──────────────────────────
-function MultiSelectDropdown({ options, selected, onChange, placeholder = 'Any' }: {
+function MultiSelectDropdown({ options, selected, onChange, placeholder = 'Any', isLight }: {
     options: { id: string; label: string; sublabel?: string }[]
     selected: string[]
     onChange: (ids: string[]) => void
     placeholder?: string
+    isLight: boolean
 }) {
     const [open, setOpen] = useState(false)
     const [search, setSearch] = useState('')
     const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
     const btnRef = useRef<HTMLButtonElement>(null)
     const searchRef = useRef<HTMLInputElement>(null)
-    const isLight = document.body.classList.contains('light')
+    const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
     const showSearch = options.length > 6
 
     const close = () => { setOpen(false); setSearch('') }
@@ -62,8 +64,8 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder = 'Any' 
                 onClick={handleToggle}
                 style={{
                     display: 'flex', alignItems: 'center', gap: '6px',
-                    padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem',
-                    background: 'var(--input-bg)',
+                    padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem',
+                    background: dropdownBg,
                     color: selected.length > 0 ? 'var(--text-primary)' : 'var(--text-secondary)',
                     border: selected.length > 0 ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
                     cursor: 'pointer', width: '100%', textAlign: 'left',
@@ -91,28 +93,57 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder = 'Any' 
                     <div
                         style={{
                             position: 'fixed', top: pos.top, left: pos.left, width: pos.width,
-                            zIndex: 9999, background: isLight ? '#ffffff' : '#1a1d28',
-                            border: '1px solid var(--input-border)', borderRadius: '8px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
+                            zIndex: 9999, background: dropdownBg,
+                            border: '1px solid var(--input-border)', borderRadius: '6px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                             display: 'flex', flexDirection: 'column', maxHeight: '280px',
                         }}
                         onMouseDown={e => e.stopPropagation()}
                     >
+                        {/* All / None buttons */}
+                        <div style={{
+                            display: 'flex', gap: '4px', padding: '6px 8px',
+                            borderBottom: '1px solid var(--table-border)',
+                            flexShrink: 0,
+                        }}>
+                            <button
+                                onMouseDown={e => { e.preventDefault(); onChange(options.map(o => o.id)) }}
+                                style={{
+                                    padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600,
+                                    borderRadius: '4px', border: '1px solid var(--input-border)',
+                                    background: 'transparent', color: 'var(--accent-primary)',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                All
+                            </button>
+                            <button
+                                onMouseDown={e => { e.preventDefault(); onChange([]) }}
+                                style={{
+                                    padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600,
+                                    borderRadius: '4px', border: '1px solid var(--input-border)',
+                                    background: 'transparent', color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                None
+                            </button>
+                        </div>
                         {/* Search input — shown when list is long */}
                         {showSearch && (
                             <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--table-border)', flexShrink: 0 }}>
                                 <input
                                     ref={searchRef}
                                     type="text"
-                                    placeholder="Search…"
+                                    placeholder="Search..."
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                     onMouseDown={e => e.stopPropagation()}
                                     style={{
-                                        width: '100%', padding: '4px 8px', borderRadius: '5px',
+                                        width: '100%', padding: '4px 8px', borderRadius: '4px',
                                         border: '1px solid var(--input-border)',
-                                        background: isLight ? '#f0f2f5' : '#0f1118',
-                                        color: 'var(--text-primary)', fontSize: '0.8rem',
+                                        background: dropdownBg,
+                                        color: 'var(--text-primary)', fontSize: '0.78rem',
                                         boxSizing: 'border-box', outline: 'none',
                                     }}
                                 />
@@ -121,29 +152,28 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder = 'Any' 
                         {/* Options list */}
                         <div style={{ overflowY: 'auto', flex: 1 }}>
                             {filtered.length === 0 && (
-                                <div style={{ padding: '10px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                <div style={{ padding: '10px 12px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                                     {search ? 'No matches' : 'No options available'}
                                 </div>
                             )}
                             {filtered.map(opt => {
                                 const checked = selected.includes(opt.id)
                                 return (
-                                    <div
+                                    <label
                                         key={opt.id}
                                         onMouseDown={e => { e.preventDefault(); toggle(opt.id) }}
                                         style={{
-                                            display: 'flex', alignItems: 'center', gap: '10px',
-                                            padding: '7px 12px', cursor: 'pointer',
-                                            background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent',
-                                            borderBottom: '1px solid var(--table-border)',
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem',
+                                            color: 'var(--text-primary)',
                                         }}
                                     >
                                         <input type="checkbox" readOnly checked={checked} style={{ accentColor: 'var(--accent-primary)', pointerEvents: 'none', flexShrink: 0 }} />
-                                        <span style={{ fontSize: '0.83rem', color: 'var(--text-primary)' }}>
+                                        <span>
                                             {opt.label}
-                                            {opt.sublabel && <span style={{ color: 'var(--text-secondary)', marginLeft: '4px' }}>— {opt.sublabel}</span>}
+                                            {opt.sublabel && <span style={{ color: 'var(--text-secondary)', marginLeft: '4px' }}>-- {opt.sublabel}</span>}
                                         </span>
-                                    </div>
+                                    </label>
                                 )
                             })}
                         </div>
@@ -203,6 +233,8 @@ const _cache = {
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) {
     const { showError } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
@@ -407,25 +439,26 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     })), [classSocieties])
 
     const chip = (selected: boolean) => ({
-        padding: '4px 10px', borderRadius: '6px',
+        padding: '4px 12px', borderRadius: '14px',
         border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
-        background: selected ? 'rgba(var(--accent-primary-rgb, 0,210,255), 0.12)' : 'transparent',
+        background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
         color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
         cursor: 'pointer', fontSize: '0.78rem',
-        fontWeight: selected ? '600' : '400',
-        transition: 'var(--transition)', whiteSpace: 'nowrap' as const,
+        fontWeight: selected ? 600 : 400,
+        transition: 'all 0.15s', whiteSpace: 'nowrap' as const,
+        lineHeight: '1.4',
     })
 
     const numInput = {
-        width: '80px', padding: '5px 8px', borderRadius: '6px',
-        border: '1px solid var(--input-border)', background: 'var(--input-bg)',
-        color: 'var(--text-primary)', fontSize: '0.82rem',
+        flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
+        border: '1px solid var(--input-border)', background: isLight ? '#ffffff' : '#1a1d28',
+        color: 'var(--text-primary)', width: '100%',
     }
 
     const th = { padding: '11px 16px', fontSize: '0.73rem', fontWeight: '700', textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: 'var(--text-secondary)' }
 
     const SectionLabel = ({ children }: { children: string }) => (
-        <div style={{ fontSize: '0.68rem', fontWeight: '700', letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '10px' }}>
             {children}
         </div>
     )
@@ -483,6 +516,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                         selected={selectedPolicyTypes}
                                         onChange={setSelectedPolicyTypes}
                                         placeholder="Any policy type"
+                                        isLight={isLight}
                                     />
                                     {selectedPolicyTypes.length > 0 && (
                                         <div style={{ marginTop: '8px' }}>
@@ -508,6 +542,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                         selected={selectedVesselTypes}
                                         onChange={setSelectedVesselTypes}
                                         placeholder="Any vessel type"
+                                        isLight={isLight}
                                     />
                                 </div>
                             )}
@@ -521,6 +556,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                         selected={allSelectedFlags}
                                         onChange={handleFlagChange}
                                         placeholder="Any flag state"
+                                        isLight={isLight}
                                     />
                                 </div>
                             )}
@@ -534,6 +570,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                         selected={selectedClassifications}
                                         onChange={setSelectedClassifications}
                                         placeholder="Any classification"
+                                        isLight={isLight}
                                     />
                                 </div>
                             )}
@@ -543,20 +580,20 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                             {/* Year Built */}
                             <div>
                                 <SectionLabel>Year Built</SectionLabel>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <input type="number" placeholder="From" value={yearFrom} onChange={e => setYearFrom(e.target.value)} style={numInput} />
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>–</span>
-                                    <input type="number" placeholder="To" value={yearTo} onChange={e => setYearTo(e.target.value)} style={numInput} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input type="number" placeholder="Min" value={yearFrom} onChange={e => setYearFrom(e.target.value)} min={0} style={numInput} />
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>to</span>
+                                    <input type="number" placeholder="Max" value={yearTo} onChange={e => setYearTo(e.target.value)} min={0} style={numInput} />
                                 </div>
                             </div>
 
                             {/* Gross Tonnage */}
                             <div>
                                 <SectionLabel>Gross Tonnage</SectionLabel>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <input type="number" placeholder="From" value={gtFrom} onChange={e => setGtFrom(e.target.value)} style={numInput} />
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>–</span>
-                                    <input type="number" placeholder="To" value={gtTo} onChange={e => setGtTo(e.target.value)} style={numInput} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input type="number" placeholder="Min" value={gtFrom} onChange={e => setGtFrom(e.target.value)} min={0} style={numInput} />
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>to</span>
+                                    <input type="number" placeholder="Max" value={gtTo} onChange={e => setGtTo(e.target.value)} min={0} style={numInput} />
                                 </div>
                             </div>
 
@@ -565,7 +602,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                             {/* Customer */}
                             <div>
                                 <SectionLabel>Customer</SectionLabel>
-                                <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: selectedCustomerId ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)', background: 'var(--input-bg)', color: selectedCustomerId ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: '8px' }}>
+                                <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: selectedCustomerId ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)', background: isLight ? '#ffffff' : '#1a1d28', color: selectedCustomerId ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '0.78rem', marginBottom: '8px' }}>
                                     <option value="">Any</option>
                                     {customerEntities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                                 </select>
@@ -597,10 +634,10 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                 className="btn-primary"
                                 onClick={handleSearch}
                                 disabled={loading || !hasAnyCriteria}
-                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem' }}
+                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                             >
-                                {loading ? <Loader2 size={14} className="spinner" /> : <Search size={14} />}
-                                {loading ? 'Searching…' : 'Apply Filters'}
+                                {loading ? <Loader2 size={16} className="spinner" /> : <Search size={16} />}
+                                {loading ? 'Loading...' : 'Apply Filters'}
                             </button>
                             {hasAnyCriteria && (
                                 <button onClick={clearAll} className="btn-secondary" style={{ padding: '6px 10px' }} title="Clear all filters">
