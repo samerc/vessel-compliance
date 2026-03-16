@@ -298,7 +298,7 @@ function KPI({ icon, gradient, label, value, sub }: {
           {label}
         </div>
         <div style={{
-          fontSize: String(value).length > 8 ? '1.4rem' : '1.75rem',
+          fontSize: String(value).length > 12 ? '1rem' : String(value).length > 8 ? '1.25rem' : '1.75rem',
           fontWeight: '800',
           lineHeight: 1,
           letterSpacing: '-0.03em',
@@ -413,6 +413,8 @@ export default function FleetAnalytics() {
   // ── Filter state ────────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<AnalyticsFilters>({ ...DEFAULT_FILTERS })
   const [selectedPresetId, setSelectedPresetId] = useState<string>('')
+  const [showPresetInput, setShowPresetInput] = useState(false)
+  const [presetNameInput, setPresetNameInput] = useState('')
 
   // ── Result state ────────────────────────────────────────────────────────────
   const [vessels, setVessels] = useState<any[]>([])
@@ -491,17 +493,23 @@ export default function FleetAnalytics() {
 
   // ── Preset management ───────────────────────────────────────────────────────
   const handleSavePreset = async () => {
-    const name = window.prompt('Preset name:')
-    if (!name?.trim()) return
+    if (!presetNameInput.trim()) {
+      setShowPresetInput(true)
+      return
+    }
     try {
-      const created = await window.api.analyticsAddPreset(name.trim(), filters) as any
-      if (created && !created.error) {
+      const created = await window.api.analyticsAddPreset(presetNameInput.trim(), filters) as any
+      if (created && !created.error && created.id) {
         setPresets(p => [...p, created])
         setSelectedPresetId(created.id)
-        showSuccess(`Preset "${name.trim()}" saved`)
+        showSuccess(`Preset "${presetNameInput.trim()}" saved`)
+        setPresetNameInput('')
+        setShowPresetInput(false)
+      } else {
+        showError(created?.message || 'Failed to save preset')
       }
-    } catch {
-      showError('Failed to save preset')
+    } catch (err: any) {
+      showError(err?.message || 'Failed to save preset')
     }
   }
 
@@ -1184,7 +1192,7 @@ export default function FleetAnalytics() {
               ))}
             </select>
             <button
-              onClick={handleSavePreset}
+              onClick={() => setShowPresetInput(!showPresetInput)}
               title="Save current filters"
               style={{
                 background: 'none', border: '1px solid var(--input-border)',
@@ -1195,6 +1203,37 @@ export default function FleetAnalytics() {
               <Save size={14} />
             </button>
           </div>
+          {showPresetInput && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={presetNameInput}
+                onChange={e => setPresetNameInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSavePreset() }}
+                placeholder="Preset name..."
+                autoFocus
+                style={{
+                  flex: 1, padding: '6px 10px', fontSize: '0.82rem',
+                  borderRadius: '6px', border: '1px solid var(--input-border)',
+                  background: 'var(--input-bg)', color: 'var(--text-primary)',
+                }}
+              />
+              <button
+                onClick={handleSavePreset}
+                disabled={!presetNameInput.trim()}
+                className="btn-primary"
+                style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => { setShowPresetInput(false); setPresetNameInput('') }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
           {selectedPresetId && (
             <button
               onClick={() => handleDeletePreset(selectedPresetId)}
