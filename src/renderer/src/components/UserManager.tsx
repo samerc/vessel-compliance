@@ -3,6 +3,7 @@ import { User } from '../../../shared/types'
 import { Trash2, Shield, RefreshCcw, ArrowLeftRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateTime } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 
 export default function UserManager() {
@@ -230,7 +231,7 @@ export default function UserManager() {
                                         </span>
                                     </td>
                                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                                        {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
+                                        {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Never'}
                                     </td>
                                     <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                                         {user.lastAppVersion || '-'}

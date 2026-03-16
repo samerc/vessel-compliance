@@ -8,6 +8,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import VesselDetail from './VesselDetail'
 import SanctionsModal from './SanctionsModal'
+import { formatDateTime } from '../utils/dateUtils'
 
 
 // Simple debounce hook implementation if not available
@@ -379,7 +380,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                 title={
                     isError ? 'API request failed. Click refresh to try again.' :
                         isPotentialMatch ? 'Click to review potential matches' :
-                            `Last checked: ${vessel.ofacCheckedAt ? new Date(vessel.ofacCheckedAt).toLocaleString() : 'Never'}`
+                            `Last checked: ${vessel.ofacCheckedAt ? formatDateTime(vessel.ofacCheckedAt) : 'Never'}`
                 }
                 onClick={handleBadgeClick}
             >

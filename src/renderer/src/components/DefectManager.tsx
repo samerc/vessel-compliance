@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { formatDate } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import { ReportService } from '../services/ReportService'
 
@@ -237,7 +238,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       'Status': d.status,
       'Due Date': d.dueDate || '',
       'Closed By': d.closedBy || '',
-      'Closed At': d.closedAt ? new Date(d.closedAt).toLocaleDateString() : '',
+      'Closed At': d.closedAt ? formatDate(d.closedAt) : '',
       'Notes': d.notes || ''
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
@@ -587,7 +588,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                             <div style={{ display: 'flex', gap: '20px', color: 'var(--text-secondary)' }}>
                               {defect.closedAt && (
                                 <div>
-                                  <strong style={{ color: 'var(--text-primary)' }}>Closed:</strong> {new Date(defect.closedAt).toLocaleDateString()}
+                                  <strong style={{ color: 'var(--text-primary)' }}>Closed:</strong> {formatDate(defect.closedAt)}
                                 </div>
                               )}
                               {defect.closedBy && (

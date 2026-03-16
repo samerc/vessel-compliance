@@ -3,6 +3,7 @@ import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateTime } from '../utils/dateUtils'
 
 // ── Section definitions ────────────────────────────────────────────────────────
 const GRANTABLE_SECTIONS = [
@@ -1324,11 +1325,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             {complianceSettings.lastRunAt && (
                                 <div style={{ padding: '12px', background: 'rgba(0, 210, 255, 0.1)', border: '1px solid rgba(0, 210, 255, 0.2)', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem' }}>
                                     <div style={{ marginBottom: '4px' }}>
-                                        <strong>Last run:</strong> {new Date(complianceSettings.lastRunAt).toLocaleString()}
+                                        <strong>Last run:</strong> {formatDateTime(complianceSettings.lastRunAt)}
                                     </div>
                                     {complianceSettings.nextRunAt && (
                                         <div>
-                                            <strong>Next run:</strong> {new Date(complianceSettings.nextRunAt).toLocaleString()}
+                                            <strong>Next run:</strong> {formatDateTime(complianceSettings.nextRunAt)}
                                         </div>
                                     )}
                                 </div>

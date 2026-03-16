@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Search, RefreshCw, Eye, ChevronUp, ChevronDown } from 'lucide-react'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+import { formatDate } from '../utils/dateUtils'
 
 interface Props {
   onNavigateToVessel: (vesselId: string) => void
@@ -328,7 +329,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                         )}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
-                        {new Date(survey.surveyDate).toLocaleDateString()}
+                        {formatDate(survey.surveyDate)}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
                         {survey.surveyType || '-'}

@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable'
 import { Upload, FileText, X, AlertCircle } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
+import { formatDateShort, formatDate } from '../utils/dateUtils'
 import type { ReportSettings } from '../../../shared/types'
 
 // ── Data model ────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ interface LossUWY {
 function excelSerialToDate(serial: number): string {
   // Excel date serial: days since 1900-01-01, with Lotus 123 leap-year bug correction
   const date = new Date((serial - 25569) * 86400 * 1000)
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDateShort(date)
 }
 
 function fmt(v: number): string {
@@ -184,7 +185,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(190, 190, 190)
-  doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, titleY + 9)
+  doc.text(`Date Issued: ${formatDate(new Date())}`, 14, titleY + 9)
 
   // ── Column layout ────────────────────────────────────────────────────────
   // With reserves: Claim# | Date | Damage Type | Payment Type | Paid | Reserves | Total = 182mm

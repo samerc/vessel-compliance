@@ -3,6 +3,7 @@ import XLSX from 'xlsx-js-style'
 import { useTheme } from '../contexts/ThemeContext'
 import { Plus, X, Copy, ChevronDown, ChevronRight, Settings, CheckCircle, FileSpreadsheet, Save, History, Trash2, RotateCcw, Eye } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateShort, formatDateLong } from '../utils/dateUtils'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -780,7 +781,7 @@ export default function WarBreachCalculator() {
               {historyRecords.map((rec, idx) => {
                 const vessels = (() => { try { return JSON.parse(rec.vesselsJson) } catch { return [] } })()
                 const vesselCount = vessels.filter((v: any) => v.calc !== null).length
-                const date = new Date(rec.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                const date = formatDateShort(rec.createdAt)
                 const isConfirming = deleteConfirmId === rec.id
                 return (
                   <div
@@ -862,7 +863,7 @@ export default function WarBreachCalculator() {
         const recVessels: (VesselRow & { calc: VesselCalc | null })[] = (() => { try { return JSON.parse(viewingRecord.vesselsJson) } catch { return [] } })()
         const recSettings: TaxSettings = (() => { try { return JSON.parse(viewingRecord.settingsJson) } catch { return DEFAULT_SETTINGS } })()
         const recTotal = parseFloat(viewingRecord.totalNetDue)
-        const date = new Date(viewingRecord.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+        const date = formatDateLong(viewingRecord.createdAt)
         const cvn = viewingRecord.coverNoteNo || ''
         const curr = viewingRecord.currency || ''
         const bdet = viewingRecord.breachDetails || ''

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, ExternalLink, Calendar, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react'
 import { changelogService, ChangelogEntry } from '../services/ChangelogService'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { formatDateLong } from '../utils/dateUtils'
 
 interface ChangelogModalProps {
     onClose: () => void
@@ -71,12 +72,8 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
         })
     }
 
-    const formatDate = (dateStr: string) => {
-        return new Date(dateStr).toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        })
+    const formatChangelogDate = (dateStr: string) => {
+        return formatDateLong(dateStr)
     }
 
     return (
@@ -193,7 +190,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                                         <div style={{ fontSize: '1rem', fontWeight: '600' }}>{entry.name || `Version ${entry.version}`}</div>
                                         <div style={{ fontSize: '0.75rem', opacity: 0.6, display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <Calendar size={12} />
-                                            {formatDate(entry.date)}
+                                            {formatChangelogDate(entry.date)}
                                         </div>
                                     </div>
                                 </div>

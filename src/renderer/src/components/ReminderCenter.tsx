@@ -14,6 +14,7 @@ import { VesselReminder, ReminderSettings } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { formatDate } from '../utils/dateUtils'
 
 const DEFAULT_TEMPLATE = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
 
@@ -277,7 +278,7 @@ export default function ReminderCenter({ onNavigateToVessel }: { onNavigateToVes
                   </div>
                   {reminder.isSnoozed && reminder.snoozeUntil && (
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      Snoozed by {reminder.snoozedBy} until {new Date(reminder.snoozeUntil).toLocaleDateString()}
+                      Snoozed by {reminder.snoozedBy} until {formatDate(reminder.snoozeUntil)}
                     </div>
                   )}
                 </div>

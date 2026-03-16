@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { Vessel, DocumentType, VesselDocument } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+import { formatDateShort, formatDateLong } from '../utils/dateUtils'
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 type RGB = [number, number, number]
@@ -40,7 +41,7 @@ const MARGIN = 10
 const dateOnly = (s: string | null | undefined) => (s ? s.split('T')[0] : '')
 
 const fmt = (s: string | null | undefined) =>
-  s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+  s ? (formatDateShort(s) || '—') : '—'
 
 const isExpired = (d: string | null | undefined) =>
   !!d && new Date(d) < new Date(new Date().setHours(0, 0, 0, 0))
@@ -116,7 +117,7 @@ function drawPageFooter(doc: jsPDF, pageNum: number, total: number) {
   doc.setFontSize(7.5)
   doc.setTextColor(...C.textSec)
   doc.text(
-    `Generated ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+    `Generated ${formatDateLong(new Date())}`,
     MARGIN, H - 7,
   )
   doc.text('Al Bahriah Insurance & Reinsurance SAL', W / 2, H - 7, { align: 'center' })
@@ -247,7 +248,7 @@ export const ReportServiceV2 = {
 
     doc.setFontSize(8.5)
     doc.text(
-      `Report date: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+      `Report date: ${formatDateLong(new Date())}`,
       MARGIN, y + 22,
     )
 

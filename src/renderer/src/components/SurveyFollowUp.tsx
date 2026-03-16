@@ -4,6 +4,7 @@ import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../..
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateShort } from '../utils/dateUtils'
 
 interface SurveyFollowUpProps {
   onNavigateToVessel?: (vesselId: string) => void
@@ -37,9 +38,7 @@ function daysRemaining(deadlineDate: Date): number {
 
 function formatDate(s?: string | null): string {
   if (!s) return '-'
-  const d = new Date(s)
-  if (isNaN(d.getTime())) return s
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDateShort(s) || s
 }
 
 type UrgencyLevel = 'overdue' | 'urgent' | 'normal' | 'done'

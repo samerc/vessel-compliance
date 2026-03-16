@@ -3,6 +3,7 @@ import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, Che
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { formatDate, formatDateTime } from '../utils/dateUtils'
 
 interface ComplianceCenterProps {
     onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
@@ -449,7 +450,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                                     </span>
                                                 </td>
                                                 <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                                                    {result.createdAt ? new Date(result.createdAt).toLocaleDateString() : '-'}
+                                                    {result.createdAt ? formatDate(result.createdAt) : '-'}
                                                 </td>
                                                 <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                                                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -548,7 +549,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                     <div key={log.id} style={{ padding: '14px 20px', borderBottom: '1px solid var(--table-border)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                {log.runAt ? new Date(log.runAt).toLocaleString() : '-'}
+                                                {log.runAt ? formatDateTime(log.runAt) : '-'}
                                             </span>
                                             <span style={{
                                                 padding: '2px 8px',

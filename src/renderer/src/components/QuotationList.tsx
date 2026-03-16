@@ -3,6 +3,7 @@ import { Plus, Search, FileText, Trash2, Copy, ChevronUp, ChevronDown, ChevronLe
 import { Quotation, QuotationType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { formatDateShort } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 
 const statusColors: Record<string, { bg: string; text: string }> = {
@@ -168,7 +169,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
 
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return '-'
-        return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        return formatDateShort(dateStr) || '-'
     }
 
     const thStyle = (field: SortField, align: 'left' | 'right' = 'left'): React.CSSProperties => ({

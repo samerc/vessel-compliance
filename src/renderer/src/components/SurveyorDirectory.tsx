@@ -8,6 +8,7 @@ import {
 import { Surveyor, SurveyorQueryParams, ConditionSurvey, SurveyDefect, Vessel } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { formatDateShort } from '../utils/dateUtils'
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -529,7 +530,7 @@ export default function SurveyorDirectory() {
                         {/* Meta row */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {new Date(survey.surveyDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            {formatDateShort(survey.surveyDate)}
                           </span>
                           {typeName && (
                             <span style={{ fontSize: '0.73rem', padding: '1px 7px', borderRadius: '4px', background: accentBg, border: `1px solid ${isLight ? 'rgba(26,115,232,0.12)' : 'rgba(0,210,255,0.12)'}`, color: 'var(--accent-primary)', fontWeight: 500 }}>

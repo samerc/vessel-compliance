@@ -22,6 +22,7 @@ import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
 import { exportCustomerCompliancePDF } from './CustomerComplianceReport'
+import { formatDateTime } from '../utils/dateUtils'
 
 function jaroWinkler(s1: string, s2: string): number {
   s1 = s1.toLowerCase().trim()
@@ -548,7 +549,7 @@ export default function EntityDirectory() {
     return (
       <div
         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '4px', fontSize: '0.68rem', background: config.bg, border: config.border, color: config.color, cursor: isPotentialMatch ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
-        title={isError ? 'API request failed. Click refresh to retry.' : isPotentialMatch ? 'Click to review potential matches' : `Last checked: ${target?.ofacCheckedAt ? new Date(target.ofacCheckedAt).toLocaleString() : 'Never'}`}
+        title={isError ? 'API request failed. Click refresh to retry.' : isPotentialMatch ? 'Click to review potential matches' : `Last checked: ${target?.ofacCheckedAt ? formatDateTime(target.ofacCheckedAt) : 'Never'}`}
         onClick={e => { e.stopPropagation(); if (isPotentialMatch) handleViewPotentialMatch(entity, vessel) }}
       >
         {config.icon}

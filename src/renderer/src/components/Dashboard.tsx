@@ -7,6 +7,7 @@ import {
 import { Vessel, VesselDocument, DocumentType, Entity, SurveyWarranty } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateShort } from '../utils/dateUtils'
 
 interface DashboardActivity {
   recentVessels: Array<{ id: string; name: string; imoNumber: string; fleetName?: string; createdAt: string; isActive: boolean }>
@@ -38,11 +39,9 @@ function relativeTime(dateStr?: string | null): string {
   return `${months}mo ago`
 }
 
-function formatDate(s?: string | null): string {
+function fmtDate(s?: string | null): string {
   if (!s) return '—'
-  const d = new Date(s)
-  if (isNaN(d.getTime())) return s
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDateShort(s) || '—'
 }
 
 function formatFieldName(name: string): string {
@@ -416,7 +415,7 @@ export default function Dashboard({
                         ) : '—'}
                       </td>
                       <td style={{ padding: '7px 10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
-                        {item.expiryDate ? formatDate(item.expiryDate) : '—'}
+                        {item.expiryDate ? fmtDate(item.expiryDate) : '—'}
                       </td>
                     </tr>
                   )
@@ -566,7 +565,7 @@ export default function Dashboard({
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: '0.72rem', fontWeight: '700', color: days <= 2 ? 'var(--danger)' : '#10b981' }}>{days === 0 ? 'Today' : `${days}d`}</div>
-                      <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>{formatDate(r.endDate)}</div>
+                      <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>{fmtDate(r.endDate)}</div>
                     </div>
                   </div>
                 )

@@ -3,6 +3,7 @@ import { Plus, ChevronDown, ChevronRight, Bell, Check, X, AlertTriangle, Clock, 
 import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateShort } from '../utils/dateUtils'
 
 interface WarrantyManagerProps {
   vesselId: string
@@ -39,9 +40,7 @@ function daysRemaining(deadlineDate: Date): number {
 
 function formatDate(s?: string | null): string {
   if (!s) return '-'
-  const d = new Date(s)
-  if (isNaN(d.getTime())) return s
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDateShort(s) || s
 }
 
 export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: WarrantyManagerProps) {
@@ -327,7 +326,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       const remaining = daysRemaining(deadlineDate)
       const isOverdue = remaining < 0
       const urgentSoon = remaining >= 0 && remaining <= 7
-      const deadlineDateStr = deadlineDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      const deadlineDateStr = formatDateShort(deadlineDate)
 
       deadlineInfo = (
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>

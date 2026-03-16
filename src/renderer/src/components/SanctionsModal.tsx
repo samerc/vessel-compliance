@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { X, AlertTriangle, Shield, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
+import { formatDate } from '../utils/dateUtils'
 
 interface SanctionsModalProps {
   searchedName: string
@@ -196,7 +197,7 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
                   )}
                   {match.listed_on && !match.score && (
                     <span style={{ fontSize: '0.75rem', color: isLight ? '#666' : 'var(--text-secondary)', marginLeft: 'auto' }}>
-                      Listed: {new Date(match.listed_on).toLocaleDateString()}
+                      Listed: {formatDate(match.listed_on)}
                     </span>
                   )}
                 </div>

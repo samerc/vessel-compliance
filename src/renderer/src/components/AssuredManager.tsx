@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import SanctionsModal from './SanctionsModal'
 import ConfirmationModal from './ConfirmationModal'
+import { formatDateTime } from '../utils/dateUtils'
 
 interface AssuredManagerProps {
     vessel: Vessel
@@ -626,7 +627,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                 title={
                     isError ? 'API request failed. Click refresh to try again.' :
                         isPotentialMatch ? 'Click to review potential matches' :
-                            `Last checked: ${entity.ofacCheckedAt ? new Date(entity.ofacCheckedAt).toLocaleString() : 'Never'}`
+                            `Last checked: ${entity.ofacCheckedAt ? formatDateTime(entity.ofacCheckedAt) : 'Never'}`
                 }
                 onClick={handleBadgeClick}
             >

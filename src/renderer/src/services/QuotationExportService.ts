@@ -30,6 +30,7 @@ import {
 import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
+import { formatDateLong } from '../utils/dateUtils'
 
 // ==================== Export Snapshot ====================
 
@@ -526,7 +527,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   const ddqCountries = data.excludedCountries.filter(c => c.listType === 'ddq')
   const exclusionTexts = getExclusionTexts(data)
   const dateStr = data.quotation.quotationDate
-    ? new Date(data.quotation.quotationDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
+    ? formatDateLong(data.quotation.quotationDate)
     : ''
 
   let startY = 18
@@ -1489,7 +1490,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   const ddqCountries = data.excludedCountries.filter(c => c.listType === 'ddq')
   const exclusionTexts = getExclusionTexts(data)
   const dateStr = data.quotation.quotationDate
-    ? new Date(data.quotation.quotationDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
+    ? formatDateLong(data.quotation.quotationDate)
     : ''
 
   // Paragraph helpers - 11pt Arial black, line spacing 1.0

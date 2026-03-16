@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare, Search } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import { formatDateTime } from '../utils/dateUtils'
 import * as XLSX from 'xlsx'
 
 interface PolicyRenewalsProps {
@@ -830,7 +831,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                         </div>
                                         <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-primary)' }}>{n.createdByUsername || 'Unknown'}</span>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-                                            {new Date(n.createdAt).toLocaleString()}
+                                            {formatDateTime(n.createdAt)}
                                         </span>
                                         {n.createdByUserId === user?.id && (
                                             <button

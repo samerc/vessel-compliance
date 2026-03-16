@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import type { Vessel, DocumentType, VesselDocument, VesselCustomDocType, VesselDynamicPolicy } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+import { formatDate } from '../utils/dateUtils'
 
 interface Props {
   vessel: Vessel
@@ -369,7 +370,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
                 border: '1px solid rgba(0, 210, 255, 0.2)',
                 display: 'inline-flex', alignItems: 'center', gap: '4px', alignSelf: 'flex-start',
               }}>
-                P&I · {new Date(effectivePolicyExpiry).toLocaleDateString()}
+                P&I · {formatDate(effectivePolicyExpiry)}
               </span>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

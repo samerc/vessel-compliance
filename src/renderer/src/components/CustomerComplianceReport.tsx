@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { Download, FileText, Users, AlertCircle, CheckCircle } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
+import { formatDate } from '../utils/dateUtils'
 
 interface CustomerVesselRow {
   vesselId: string
@@ -136,7 +137,7 @@ export async function exportCustomerCompliancePDF(
   doc.text('Compliance Report', 14, titleY)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(190, 190, 190)
   doc.text(`${customerName}${customerType ? ` · ${customerType.toUpperCase()}` : ''}`, 14, titleY + 8)
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, titleY + 16)
+  doc.text(`Date: ${formatDate(new Date())}`, 14, titleY + 16)
 
   const bodyRows: any[][] = vesselRows.map(v => {
     const pctColor: [number, number, number] = v.pct === 100 ? [0, 140, 70] : v.missing > 0 ? [192, 0, 0] : [180, 83, 9]
@@ -286,7 +287,7 @@ export default function CustomerComplianceReport() {
       doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
       doc.text('Customer Compliance Report', 14, titleY)
       doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(190, 190, 190)
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, titleY + 9)
+      doc.text(`Date: ${formatDate(new Date())}`, 14, titleY + 9)
 
       let startY = s.companySubtitle ? 64 : 60
 

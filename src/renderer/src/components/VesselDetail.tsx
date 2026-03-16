@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, VesselDynamicPolicy, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, Entity, ClassificationSociety, VesselType } from '../../../shared/types'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
+import { formatDate, formatDateTime, formatDateShort, formatDateLong } from '../utils/dateUtils'
 import 'flag-icons/css/flag-icons.min.css'
 
 import { ReportService } from '../services/ReportService'
@@ -768,7 +769,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     Former name{nameHistory.length > 1 ? 's' : ''}: {nameHistory.map((h, i) => (
                                         <span key={h.id}>
                                             <em>{h.previousName}</em>
-                                            <span style={{ fontSize: '0.7rem', opacity: 0.7 }}> ({new Date(h.changedAt).toLocaleDateString()})</span>
+                                            <span style={{ fontSize: '0.7rem', opacity: 0.7 }}> ({formatDate(h.changedAt)})</span>
                                             {i < nameHistory.length - 1 ? ', ' : ''}
                                         </span>
                                     ))}
@@ -1220,7 +1221,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                                                 Expires with P&I ·{' '}
                                                                 <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                                                                    {new Date(vessel.policyExpiryDate).toLocaleDateString()}
+                                                                    {formatDate(vessel.policyExpiryDate)}
                                                                 </span>
                                                             </span>
                                                         </div>
@@ -1752,7 +1753,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         </div>
                                         <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-primary)' }}>{n.createdByUsername || 'Unknown'}</span>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-                                            {new Date(n.createdAt).toLocaleString()}
+                                            {formatDateTime(n.createdAt)}
                                         </span>
                                         {n.createdByUserId === user?.id && (
                                             <button
@@ -2404,7 +2405,7 @@ function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: Vessel
         let label: string
         if (d.getTime() === today.getTime()) label = 'Today'
         else if (d.getTime() === yesterday.getTime()) label = 'Yesterday'
-        else label = new Date(entry.changedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        else label = formatDateLong(entry.changedAt)
         if (!seenLabels.has(label)) { seenLabels.set(label, []); groups.push({ label, entries: seenLabels.get(label)! }) }
         seenLabels.get(label)!.push(entry)
     }
@@ -2428,7 +2429,7 @@ function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: Vessel
                 {[
                     { label: 'Total Changes', value: auditLog.length, icon: <Clock size={16} />, accent: true },
                     { label: 'Contributors', value: uniqueUsers, icon: <Users size={16} />, accent: false },
-                    { label: 'Since', value: firstChange ? firstChange.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—', icon: <Calendar size={16} />, accent: false },
+                    { label: 'Since', value: firstChange ? formatDateShort(firstChange) : '—', icon: <Calendar size={16} />, accent: false },
                 ].map(stat => (
                     <div key={stat.label} className="glass-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: stat.accent ? 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))' : (isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: stat.accent ? 'white' : 'var(--accent-primary)' }}>

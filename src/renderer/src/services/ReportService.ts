@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy, ConditionSurvey, SurveyDefect, Surveyor } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+import { formatDate } from '../utils/dateUtils'
 
 // Guard against IPC error objects (safeHandle returns { error:true } on failure)
 const safeArray = (v: unknown): any[] => Array.isArray(v) ? v : []
@@ -84,7 +85,7 @@ export const ReportService = {
           'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry, type.annualRenewal, doc?.receivedDate),
           'Date of Receipt': doc?.receivedDate || 'N/A',
           'Expiry Date': expiryToShow,
-          'Uploaded Date': doc?.uploadedDate ? new Date(doc.uploadedDate).toLocaleDateString() : 'N/A'
+          'Uploaded Date': doc?.uploadedDate ? formatDate(doc.uploadedDate) : 'N/A'
         })
       }
     }
@@ -101,7 +102,7 @@ export const ReportService = {
         'Status': getExcelDocStatus(!!vDoc?.filePath, vDoc?.expiryDate),
         'Date of Receipt': vDoc?.receivedDate || 'N/A',
         'Expiry Date': vDoc?.expiryDate || 'N/A',
-        'Uploaded Date': vDoc?.uploadedDate ? new Date(vDoc.uploadedDate).toLocaleDateString() : 'N/A'
+        'Uploaded Date': vDoc?.uploadedDate ? formatDate(vDoc.uploadedDate) : 'N/A'
       })
     })
 
@@ -373,7 +374,7 @@ export const ReportService = {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(150, 150, 150)
-    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 37)
+    doc.text(`Date Issued: ${formatDate(new Date())}`, 14, 37)
 
     // Vessel Info Section
     doc.setTextColor(0, 0, 0)
@@ -948,7 +949,7 @@ export const ReportService = {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(150, 150, 150)
-    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 37)
+    doc.text(`Date Issued: ${formatDate(new Date())}`, 14, 37)
 
     // Fleet Info Section
     doc.setTextColor(0, 0, 0)
@@ -1181,7 +1182,7 @@ export const ReportService = {
     const latestCloseTs = isSurveyClosed
       ? defects.filter(d => d.closedAt).map(d => d.closedAt!).sort().pop()
       : undefined
-    const surveyClosedDisplay = latestCloseTs ? new Date(latestCloseTs).toLocaleDateString() : null
+    const surveyClosedDisplay = latestCloseTs ? formatDate(latestCloseTs) : null
 
     // ── Header band ──────────────────────────────────────────────────
     doc.setFillColor(15, 18, 24)
@@ -1198,7 +1199,7 @@ export const ReportService = {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(190, 190, 190)
-    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 14, 43)
+    doc.text(`Date Issued: ${formatDate(new Date())}`, 14, 43)
 
     // ── Vessel name & IMO ────────────────────────────────────────────
     doc.setTextColor(0, 0, 0)
@@ -1293,7 +1294,7 @@ export const ReportService = {
         d.description,
         d.severity || '—',
         d.status,
-        d.closedAt ? new Date(d.closedAt).toLocaleDateString() : '—',
+        d.closedAt ? formatDate(d.closedAt) : '—',
       ])
 
       autoTable(doc, {
