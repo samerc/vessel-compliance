@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare } from 'lucide-react'
+import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare, Search } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import * as XLSX from 'xlsx'
@@ -43,6 +43,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const [sortDir, setSortDir] = useState<SortDir>('asc')
     const [groupByFleet, setGroupByFleet] = useState(false)
     const [multiMonthView, setMultiMonthView] = useState(false)
+    const [search, setSearch] = useState('')
 
     // Renewal status management
     const [statusTypes, setStatusTypes] = useState<RenewalStatusType[]>([])
@@ -270,7 +271,20 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     }
 
     const sortedRenewals = useMemo(() => {
-        const sorted = [...renewals]
+        let filtered = renewals
+        if (search.trim()) {
+            const q = search.toLowerCase()
+            filtered = renewals.filter(r =>
+                (r.vesselName || '').toLowerCase().includes(q) ||
+                (r.imoNumber || '').toLowerCase().includes(q) ||
+                (r.customerName || '').toLowerCase().includes(q) ||
+                (r.fleetName || '').toLowerCase().includes(q) ||
+                (r.policyTypeName || '').toLowerCase().includes(q) ||
+                (r.policyNumber || '').toLowerCase().includes(q) ||
+                (r.renewalStatusName || '').toLowerCase().includes(q)
+            )
+        }
+        const sorted = [...filtered]
         sorted.sort((a, b) => {
             const aVal = a[sortField] ?? ''
             const bVal = b[sortField] ?? ''
@@ -281,7 +295,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             return sortDir === 'asc' ? cmp : -cmp
         })
         return sorted
-    }, [renewals, sortField, sortDir])
+    }, [renewals, sortField, sortDir, search])
 
     const groupedRenewals = useMemo(() => {
         if (!groupByFleet) return null
@@ -472,6 +486,22 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 </div>
 
                 <button onClick={goToCurrentMonth} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Today</button>
+
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--text-secondary)', opacity: 0.5 }} />
+                    <input
+                        type="text"
+                        placeholder="Search..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        style={{ padding: '7px 10px 7px 30px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', width: '180px' }}
+                    />
+                    {search && (
+                        <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}>
+                            <X size={12} />
+                        </button>
+                    )}
+                </div>
 
                 <button
                     onClick={() => setMultiMonthView(v => !v)}
