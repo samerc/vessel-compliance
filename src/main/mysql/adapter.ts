@@ -3668,6 +3668,38 @@ export class MySQLAdapter {
         }
     }
 
+    // --- Dashboard Data Quality ---
+    async getDataQualityAlerts(): Promise<{ vesselsNoCustomer: number; entitiesNoEmail: number; entitiesNoPhone: number; policiesNoEndDate: number }> {
+        if (!this.pool) return { vesselsNoCustomer: 0, entitiesNoEmail: 0, entitiesNoPhone: 0, policiesNoEndDate: 0 }
+        const [[r1]] = await this.pool.query(
+            'SELECT COUNT(*) as cnt FROM vessels WHERE is_active = TRUE AND customer_id IS NULL'
+        ) as any
+        const [[r2]] = await this.pool.query(
+            "SELECT COUNT(*) as cnt FROM entities WHERE email IS NULL OR email = ''"
+        ) as any
+        const [[r3]] = await this.pool.query(
+            "SELECT COUNT(*) as cnt FROM entities WHERE phone IS NULL OR phone = ''"
+        ) as any
+        const [[r4]] = await this.pool.query(`
+            SELECT COUNT(*) as cnt FROM vessel_dynamic_policies vdp
+            WHERE vdp.status = 'active'
+              AND NOT EXISTS (
+                SELECT 1 FROM vessel_policy_values vpv
+                JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
+                WHERE vpv.policy_id = vdp.id
+                  AND ptc.field_type = 'date'
+                  AND LOWER(ptc.name) LIKE '%end%'
+                  AND vpv.value_date IS NOT NULL
+              )
+        `) as any
+        return {
+            vesselsNoCustomer: Number(r1?.cnt ?? 0),
+            entitiesNoEmail: Number(r2?.cnt ?? 0),
+            entitiesNoPhone: Number(r3?.cnt ?? 0),
+            policiesNoEndDate: Number(r4?.cnt ?? 0)
+        }
+    }
+
     // --- Survey Warranties ---
     async getSurveyWarrantiesByVessel(vesselId: string): Promise<any[]> {
         if (!this.pool) return []
@@ -7681,6 +7713,63 @@ export class MySQLAdapter {
         }
 
         return { vessels: vList, policyCoverage }
+    }
+
+    async backupDatabase(): Promise<{ tables: Record<string, any[]>; exportedAt: string; version: string }> {
+        if (!this.pool) throw new Error('Not connected')
+
+        const [tableRows] = await this.pool.query('SHOW TABLES') as any[]
+        const dbKey = Object.keys(tableRows[0])[0]
+        const tableNames: string[] = tableRows.map((r: any) => r[dbKey])
+
+        const tables: Record<string, any[]> = {}
+        for (const table of tableNames) {
+            // Skip users table to avoid locking out on restore
+            if (table === 'users') continue
+            const [rows] = await this.pool.query(`SELECT * FROM \`${table}\``)
+            tables[table] = rows as any[]
+        }
+
+        return {
+            tables,
+            exportedAt: new Date().toISOString(),
+            version: '1'
+        }
+    }
+
+    async restoreDatabase(data: { tables: Record<string, any[]> }): Promise<void> {
+        if (!this.pool) throw new Error('Not connected')
+
+        const conn = await this.pool.getConnection()
+        try {
+            await conn.query('SET FOREIGN_KEY_CHECKS = 0')
+
+            for (const [table, rows] of Object.entries(data.tables)) {
+                // Skip users table to avoid locking out
+                if (table === 'users') continue
+                await conn.query(`TRUNCATE TABLE \`${table}\``)
+
+                if (rows.length === 0) continue
+
+                // Insert in batches of 100
+                for (let i = 0; i < rows.length; i += 100) {
+                    const batch = rows.slice(i, i + 100)
+                    const columns = Object.keys(batch[0])
+                    const placeholders = batch
+                        .map(() => `(${columns.map(() => '?').join(',')})`)
+                        .join(',')
+                    const values = batch.flatMap(row => columns.map(col => row[col]))
+                    await conn.query(
+                        `INSERT INTO \`${table}\` (${columns.map(c => `\`${c}\``).join(',')}) VALUES ${placeholders}`,
+                        values
+                    )
+                }
+            }
+
+            await conn.query('SET FOREIGN_KEY_CHECKS = 1')
+        } finally {
+            conn.release()
+        }
     }
 }
 

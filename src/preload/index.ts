@@ -198,6 +198,7 @@ const api = {
 
   // Dashboard
   dashboardGetActivity: () => ipcRenderer.invoke('dashboard:getActivity'),
+  dashboardGetDataQualityAlerts: () => ipcRenderer.invoke('dashboard:getDataQualityAlerts'),
 
   // Survey Warranties
   surveyWarrantyGetByVessel: (vesselId) => ipcRenderer.invoke('survey_warranty:getByVessel', vesselId),
@@ -601,6 +602,11 @@ const api = {
   reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),
   getUserSectionAccess: () => ipcRenderer.invoke('settings:getUserSectionAccess'),
   setUserSectionAccess: (sectionIds: string[]) => ipcRenderer.invoke('settings:setUserSectionAccess', sectionIds),
+
+  // Database Backup & Restore
+  dbBackup: () => ipcRenderer.invoke('db:backup'),
+  dbRestore: () => ipcRenderer.invoke('db:restore'),
+  dbGetLastBackupDate: () => ipcRenderer.invoke('db:getLastBackupDate'),
 }
 
 // Expose curated API to renderer via context bridge

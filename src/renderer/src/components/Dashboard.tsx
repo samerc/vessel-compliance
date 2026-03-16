@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Activity, AlertTriangle, CheckCircle, Clock, AlertCircle,
   Ship, FileText, Users, Shield, Wrench, Calendar, FileWarning,
-  RefreshCw, Building2, User, TrendingUp, ChevronRight
+  RefreshCw, Building2, User, TrendingUp, ChevronRight, Database
 } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, Entity, SurveyWarranty } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
@@ -76,6 +76,7 @@ export default function Dashboard({
   const [activeWarranties, setActiveWarranties] = useState<SurveyWarranty[]>([])
   const [endorsementsDue, setEndorsementsDue] = useState<number>(0)
   const [activity, setActivity] = useState<DashboardActivity>({ recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] })
+  const [dataQuality, setDataQuality] = useState<{ vesselsNoCustomer: number; entitiesNoEmail: number; entitiesNoPhone: number; policiesNoEndDate: number }>({ vesselsNoCustomer: 0, entitiesNoEmail: 0, entitiesNoPhone: 0, policiesNoEndDate: 0 })
   const [isLoading, setIsLoading] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
 
@@ -107,7 +108,10 @@ export default function Dashboard({
             ? (d as any)
             : { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }
         )
-      )
+      ),
+      window.api.dashboardGetDataQualityAlerts().then(d => {
+        if (d && typeof d === 'object' && !('error' in d)) setDataQuality(d)
+      })
     ])
     const failCount = secondaryResults.filter(r => r.status === 'rejected').length
     if (failCount > 0) showError(`${failCount} dashboard section${failCount > 1 ? 's' : ''} failed to load`)
@@ -458,7 +462,7 @@ export default function Dashboard({
       </div>
 
       {/* ── Activity Row ─────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
 
         {/* Recently Added Vessels */}
         <div style={cardStyle}>
@@ -615,7 +619,51 @@ export default function Dashboard({
             </div>
           )}
         </div>
+
+        {/* Data Quality */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #e6a800, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Database size={13} color="#fff" />
+            </div>
+            <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Data Quality</span>
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <DataQualityRow label="Vessels without customer" count={dataQuality.vesselsNoCustomer} isLight={isLight} />
+            <DataQualityRow label="Entities without email" count={dataQuality.entitiesNoEmail} isLight={isLight} />
+            <DataQualityRow label="Entities without phone" count={dataQuality.entitiesNoPhone} isLight={isLight} />
+            <DataQualityRow label="Policies without end date" count={dataQuality.policiesNoEndDate} isLight={isLight} />
+          </div>
+        </div>
       </div>
+    </div>
+  )
+}
+
+function DataQualityRow({ label, count, isLight }: { label: string; count: number; isLight: boolean }) {
+  const hasIssue = count > 0
+  const color = hasIssue ? '#e6a800' : '#00c864'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', borderRadius: '7px' }}>
+      <span style={{ display: 'flex', flexShrink: 0 }}>
+        {hasIssue
+          ? <AlertTriangle size={13} color={color} />
+          : <CheckCircle size={13} color={color} />
+        }
+      </span>
+      <span style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>{label}</span>
+      <span style={{
+        fontWeight: '800',
+        fontSize: '0.78rem',
+        color,
+        padding: '1px 7px',
+        borderRadius: '6px',
+        background: hasIssue
+          ? (isLight ? 'rgba(230,168,0,0.1)' : 'rgba(230,168,0,0.15)')
+          : (isLight ? 'rgba(0,200,100,0.1)' : 'rgba(0,200,100,0.15)'),
+        minWidth: '24px',
+        textAlign: 'center'
+      }}>{count}</span>
     </div>
   )
 }

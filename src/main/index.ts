@@ -1058,6 +1058,7 @@ app.whenReady().then(() => {
 
   // Dashboard
   safeHandle('dashboard:getActivity', (event) => { requireSession(event); return db.getDashboardActivity() })
+  safeHandle('dashboard:getDataQualityAlerts', (event) => { requireSession(event); return db.getDataQualityAlerts() })
 
   // Survey Warranties
   safeHandle('survey_warranty:getByVessel', (event, vesselId) => { requireSession(event); return db.getSurveyWarrantiesByVessel(vesselId) })
@@ -2193,6 +2194,55 @@ app.whenReady().then(() => {
   safeHandle('settings:setUserSectionAccess', async (event, sectionIds: string[]) => {
     await requirePermission(event, 'admin:settings')
     await db.setSetting('userSectionAccess', JSON.stringify(sectionIds))
+  })
+
+  // Database Backup & Restore
+  safeHandle('db:backup', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    const { dialog } = require('electron')
+    const result = await dialog.showSaveDialog({
+      title: 'Save Database Backup',
+      defaultPath: `vessel-compliance-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'JSON Files', extensions: ['json'] }]
+    })
+    if (result.canceled || !result.filePath) return { success: false, message: 'Cancelled' }
+
+    const backup = await db.backupDatabase()
+    writeFileSync(result.filePath, JSON.stringify(backup, null, 2), 'utf-8')
+    await db.setSetting('lastBackupDate', new Date().toISOString())
+    return { success: true, filePath: result.filePath }
+  })
+
+  safeHandle('db:restore', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      title: 'Select Backup File to Restore',
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+    if (result.canceled || !result.filePaths[0]) return { success: false, message: 'Cancelled' }
+
+    const filePath = result.filePaths[0]
+    const raw = readFileSync(filePath, 'utf-8')
+    let data: any
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      return { success: false, message: 'Invalid JSON file' }
+    }
+
+    if (!data.tables || typeof data.tables !== 'object') {
+      return { success: false, message: 'Invalid backup format: missing tables' }
+    }
+
+    await db.restoreDatabase(data)
+    return { success: true }
+  })
+
+  safeHandle('db:getLastBackupDate', async (event) => {
+    requireSession(event)
+    return db.getSetting('lastBackupDate')
   })
 
   createWindow()

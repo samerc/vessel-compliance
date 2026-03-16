@@ -193,6 +193,12 @@ export interface Api {
     recentAuditEntries: Array<{ vesselId: string; vesselName: string; fieldName: string; newValue?: string; changedAt: string }>
     weekRenewals: Array<{ vesselName: string; imoNumber: string; policyTypeName: string; policyNumber?: string; endDate: string }>
   }>
+  dashboardGetDataQualityAlerts: () => Promise<{
+    vesselsNoCustomer: number
+    entitiesNoEmail: number
+    entitiesNoPhone: number
+    policiesNoEndDate: number
+  }>
 
   // Survey Warranties
   surveyWarrantyGetByVessel: (vesselId: string) => Promise<SurveyWarranty[]>
@@ -566,6 +572,11 @@ export interface Api {
 
   getUserSectionAccess: () => Promise<string[]>
   setUserSectionAccess: (sectionIds: string[]) => Promise<void>
+
+  // Database Backup & Restore
+  dbBackup: () => Promise<{ success: boolean; filePath?: string; message?: string; error?: boolean }>
+  dbRestore: () => Promise<{ success: boolean; message?: string; error?: boolean }>
+  dbGetLastBackupDate: () => Promise<string | null>
 
   // Auto-Update
   updateCheckForUpdates: () => Promise<void>
