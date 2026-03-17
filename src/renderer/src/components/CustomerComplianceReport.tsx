@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-import { Download, FileText, Users, AlertCircle, CheckCircle } from 'lucide-react'
+import { Download, FileText, Users, AlertCircle, CheckCircle, Briefcase } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
+import { exportCustomerPortfolioPDF } from '../services/CustomerPortfolioService'
 import { formatDate } from '../utils/dateUtils'
 
 interface CustomerVesselRow {
@@ -211,6 +212,7 @@ export default function CustomerComplianceReport() {
   const [groups, setGroups] = useState<CustomerGroup[]>([])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [exportingPortfolio, setExportingPortfolio] = useState<string | null>(null)
 
   useEffect(() => { loadCustomers() }, [])
 
@@ -446,6 +448,15 @@ export default function CustomerComplianceReport() {
     XLSX.writeFile(wb, `Customer_Compliance_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
+  const handlePortfolioPDF = async (custId: string, custName: string, custType: string | null) => {
+    setExportingPortfolio(custId)
+    try {
+      await exportCustomerPortfolioPDF(custId, custName, custType)
+    } finally {
+      setExportingPortfolio(null)
+    }
+  }
+
   const border = isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
   const totalVessels = groups.reduce((s, g) => s + g.vessels.length, 0)
   const totalMissing = groups.reduce((s, g) => g.vessels.reduce((sv, v) => sv + v.missing, s), 0)
@@ -520,8 +531,21 @@ export default function CustomerComplianceReport() {
                 {group.customerType}
               </span>
             )}
-            <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              {group.vessels.length} vessel{group.vessels.length !== 1 ? 's' : ''}
+            <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                {group.vessels.length} vessel{group.vessels.length !== 1 ? 's' : ''}
+              </span>
+              {group.customerId && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePortfolioPDF(group.customerId!, group.customerName, group.customerType) }}
+                  disabled={exportingPortfolio === group.customerId}
+                  className="btn-secondary"
+                  style={{ padding: '3px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+                >
+                  <Briefcase size={13} />
+                  {exportingPortfolio === group.customerId ? 'Exporting...' : 'Portfolio PDF'}
+                </button>
+              )}
             </span>
           </div>
 
