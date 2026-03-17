@@ -531,7 +531,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                                     <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                                     <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                                                     <button onClick={() => startEdit(c)} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                                    <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+                                                    <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                                 </div>
                                             </td>
                                         </>
@@ -551,7 +551,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                         <Plus size={14} /> New Set
                     </button>
                 </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Clause sets are pre-configured combinations of conditions. When creating a quotation, you can apply a set to quickly select multiple clauses at once. Description overrides let you customize clause text per set.</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Clause sets are pre-configured combinations of conditions. When creating a quotation, you can apply a set to quickly select multiple clauses at once. Description overrides let you customize clause text per set.</p>
 
                 {clauseSets.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: showSetForm ? '16px' : '0' }}>
@@ -569,7 +569,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                     )}
                                 </span>
                                 <button onClick={() => startEditSet(s)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={() => handleDeleteSet(s.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+                                <button onClick={() => handleDeleteSet(s.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         ))}
                     </div>
@@ -800,9 +800,9 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Tag Manager */}
-            <section className="glass-card" style={{ padding: '16px' }}>
-                <h4 style={{ fontSize: '0.9rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Tag size={14} /> Warranty Tags</h4>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Tags let you categorize warranties into groups (e.g. "Cargo", "Navigation"). Tagged warranties appear under their own tab in the quotation editor.</p>
+            <section className="glass-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Tag size={14} /> Warranty Tags</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Tags let you categorize warranties into groups (e.g. "Cargo", "Navigation"). Tagged warranties appear under their own tab in the quotation editor.</p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                     {tags.map(tag => (
                         <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--glass-border)', fontSize: '0.8rem' }}>
@@ -829,12 +829,12 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
             </section>
 
             {/* Warranty Sets */}
-            <section className="glass-card" style={{ padding: '16px' }}>
+            <section className="glass-card" style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <h4 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 0 }}><Shield size={14} /> Warranty Sets</h4>
+                    <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 0 }}><Shield size={14} /> Warranty Sets</h3>
                     {!showSetForm && <button onClick={() => { setShowSetForm(true); setEditingSetId(null); setSetName(''); setSetWarrantyIds(new Set()); setSetDefaultSelected(false) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Plus size={14} /> New Set</button>}
                 </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Sets are named groups of warranties that can be quickly applied to a quotation. Sets marked "Default" are automatically selected when creating new quotations.</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Sets are named groups of warranties that can be quickly applied to a quotation. Sets marked "Default" are automatically selected when creating new quotations.</p>
                 {showSetForm && (
                     <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--accent-primary)', marginBottom: '10px' }}>
                         <input value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name (e.g. Cargo Warranties)..." style={{ width: '100%', marginBottom: '8px', padding: '6px 10px' }} />
@@ -1338,7 +1338,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
                     <button onClick={() => setShowImport(true)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Upload size={14} /> Import</button>
                 </div>
             </div>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define exclusion clauses that remove specific risks from coverage. Exclusions can be linked to vessel types to auto-apply based on the vessel in a quotation.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define exclusion clauses that remove specific risks from coverage. Exclusions can be linked to vessel types to auto-apply based on the vessel in a quotation.</p>
 
             {bulkMode && (
                 <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid var(--accent-primary)', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1479,7 +1479,7 @@ function SubLimitsTab({ showSuccess }: TabProps) {
     return (<div>
         <section className="glass-card" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Limits of Liability Templates</h3>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define sub-limit templates that cap liability for specific risk categories. Use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{amount}'}</code> and <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{currency}'}</code> as placeholders — actual values are set per quotation.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define sub-limit templates that cap liability for specific risk categories. Use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{amount}'}</code> and <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{currency}'}</code> as placeholders — actual values are set per quotation.</p>
             <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                 <input type="text" value={newTemplate} onChange={e => setNewTemplate(e.target.value)} placeholder='e.g., Liability for crew sub-limited to {currency} {amount} any one accident...' style={{ flex: 1 }} required />
                 <input type="text" value={newCurrency} onChange={e => setNewCurrency(e.target.value)} placeholder="CCY" style={{ width: '70px' }} />
@@ -1596,7 +1596,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <section className="glass-card" style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clauses</h3>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions). Clauses marked "Default" are automatically included in new quotations. Formatted as bullet points in the export.</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions). Clauses marked "Default" are automatically included in new quotations. Formatted as bullet points in the export.</p>
                 <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. Conflict Exclusion)" style={{ width: '200px', flexShrink: 0 }} />
                     <input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (e.g. JH2021-008)" style={{ width: '160px', flexShrink: 0 }} />
@@ -1639,7 +1639,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
 
             <section className="glass-card" style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clause Sets</h3>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Preset groups of additional clauses that can be applied in one click from the Conditions tab. Use the arrows within each set to control the order they appear in the export.</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Preset groups of additional clauses that can be applied in one click from the Conditions tab. Use the arrows within each set to control the order they appear in the export.</p>
                 <form onSubmit={async e => { e.preventDefault(); if (!newSetName.trim()) return; await window.api.piAddAdditionalClauseSet(newSetName.trim(), []); setNewSetName(''); showSuccess('Set created'); loadData() }} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
                     <input value={newSetName} onChange={e => setNewSetName(e.target.value)} placeholder="Set name (e.g. Standard Fleet)" style={{ flex: 1, maxWidth: '300px' }} required />
                     <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Create Set</button>
@@ -1799,8 +1799,8 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <section className="glass-card" style={{ padding: '20px' }}>
-                    <h3 style={{ fontSize: '1rem', marginBottom: '14px', color: isLight ? '#c00000' : '#ff4d4d' }}>Excluded Countries</h3>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade with these countries is prohibited.</p>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '14px', color: 'var(--danger)' }}>Excluded Countries</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade with these countries is prohibited.</p>
                     {excluded.length === 0 ? (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No excluded countries</div>
                     ) : excluded.map(c => (
@@ -1808,14 +1808,14 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
                             <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{c.iso3Code}</span>
                             <button onClick={() => handleToggleType(c.id, c.listType)} className="btn-secondary" title="Move to DDQ list" style={{ padding: '3px 6px', fontSize: '0.68rem' }}>DDQ</button>
-                            <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+                            <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                         </div>
                     ))}
                 </section>
 
                 <section className="glass-card" style={{ padding: '20px' }}>
                     <h3 style={{ fontSize: '1rem', marginBottom: '14px', color: isLight ? '#8a6d00' : '#ffc107' }}>DDQ Required Countries</h3>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade requires Due Diligence Questionnaire.</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade requires Due Diligence Questionnaire.</p>
                     {ddq.length === 0 ? (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No DDQ countries</div>
                     ) : ddq.map(c => (
@@ -1823,7 +1823,7 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
                             <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{c.iso3Code}</span>
                             <button onClick={() => handleToggleType(c.id, c.listType)} className="btn-secondary" title="Move to Excluded list" style={{ padding: '3px 6px', fontSize: '0.68rem' }}>Excl.</button>
-                            <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
+                            <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                         </div>
                     ))}
                 </section>
@@ -2261,7 +2261,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Sanctions Versions Tab ====================
 
-function SanctionsVersionsTab({ showSuccess, showError, isLight }: TabProps) {
+function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
     const [versions, setVersions] = useState<PISanctionsVersion[]>([])
     const [editedTexts, setEditedTexts] = useState<Record<string, string>>({})
     const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
@@ -2372,7 +2372,7 @@ function SanctionsVersionsTab({ showSuccess, showError, isLight }: TabProps) {
                                     <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
                                     <button onClick={() => handleMove(idx, 1)} disabled={idx === versions.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
                                     <button onClick={() => startEdit(v)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
-                                    <button onClick={async () => { if (confirm(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={14} /></button>
+                                    <button onClick={async () => { if (confirm(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                 </div>
                             </div>
                         )}
