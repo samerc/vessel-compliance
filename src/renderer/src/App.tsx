@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
@@ -11,22 +11,30 @@ import UserManager from './components/UserManager'
 import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
 import UserProfileModal from './components/UserProfileModal'
-import SanctionsSearch from './components/SanctionsSearch'
-import ReminderCenter from './components/ReminderCenter'
-import Calculators from './components/Calculators'
-import QuotationManager from './components/QuotationManager'
-import ConditionSurveyList from './components/ConditionSurveyList'
-import SurveyFollowUp from './components/SurveyFollowUp'
 import VesselFilter from './components/VesselFilter'
-import PolicyRenewals from './components/PolicyRenewals'
-import Reports from './components/Reports'
-import FleetAnalytics from './components/FleetAnalytics'
-import ActivityLog from './components/ActivityLog'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
 import ChangelogModal from './components/ChangelogModal'
 import WhatsNewModal from './components/WhatsNewModal'
+
+// Heavy components — lazy loaded to reduce initial bundle size
+const SanctionsSearch = lazy(() => import('./components/SanctionsSearch'))
+const ReminderCenter = lazy(() => import('./components/ReminderCenter'))
+const Calculators = lazy(() => import('./components/Calculators'))
+const QuotationManager = lazy(() => import('./components/QuotationManager'))
+const ConditionSurveyList = lazy(() => import('./components/ConditionSurveyList'))
+const SurveyFollowUp = lazy(() => import('./components/SurveyFollowUp'))
+const PolicyRenewals = lazy(() => import('./components/PolicyRenewals'))
+const Reports = lazy(() => import('./components/Reports'))
+const FleetAnalytics = lazy(() => import('./components/FleetAnalytics'))
+const ActivityLog = lazy(() => import('./components/ActivityLog'))
+
+const LoadingFallback = () => (
+  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+    Loading...
+  </div>
+)
 
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log'>('dashboard')
@@ -320,16 +328,16 @@ function App(): React.JSX.Element {
           {activeTab === 'users' && isAdmin && <UserManager />}
           {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} />}
           {activeTab === 'compliance' && <ComplianceCenter onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} />}
-          {activeTab === 'sanctions-search' && <SanctionsSearch />}
-          {activeTab === 'reminders' && <ReminderCenter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('documents'); setNavigateBackTab('reminders'); setActiveTab('vessels') }} />}
-          {activeTab === 'surveys' && <ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} />}
-          {activeTab === 'survey-followup' && <SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} />}
-          {activeTab === 'calculators' && <Calculators />}
-          {activeTab === 'quotations' && <QuotationManager />}
-          {activeTab === 'renewals' && <PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} />}
-          {activeTab === 'reports' && <Reports />}
-          {activeTab === 'analytics' && <FleetAnalytics />}
-          {activeTab === 'activity-log' && <ActivityLog />}
+          {activeTab === 'sanctions-search' && <Suspense fallback={<LoadingFallback />}><SanctionsSearch /></Suspense>}
+          {activeTab === 'reminders' && <Suspense fallback={<LoadingFallback />}><ReminderCenter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('documents'); setNavigateBackTab('reminders'); setActiveTab('vessels') }} /></Suspense>}
+          {activeTab === 'surveys' && <Suspense fallback={<LoadingFallback />}><ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} /></Suspense>}
+          {activeTab === 'survey-followup' && <Suspense fallback={<LoadingFallback />}><SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense>}
+          {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators /></Suspense>}
+          {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager /></Suspense>}
+          {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} /></Suspense>}
+          {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
+          {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
+          {activeTab === 'activity-log' && <Suspense fallback={<LoadingFallback />}><ActivityLog /></Suspense>}
         </main>
         <UpdateNotification />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
