@@ -918,8 +918,37 @@ app.whenReady().then(() => {
   safeHandle('db:deleteVesselCustomDocType', async (event, id: string) => { await requirePermission(event, 'documents:delete'); return db.deleteVesselCustomDocType(id) })
 
   safeHandle('db:getFleets', (event) => { requireSession(event); return db.getFleets() })
-  safeHandle('db:addFleet', async (event, fleet) => { await requirePermission(event, 'fleets:manage'); return db.addFleet(fleet) })
-  safeHandle('db:deleteFleet', async (event, id) => { await requirePermission(event, 'fleets:manage'); return db.deleteFleet(id) })
+  safeHandle('db:addFleet', async (event, fleet) => {
+    const user = await requirePermission(event, 'fleets:manage')
+    const result = await db.addFleet(fleet)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Fleets',
+      entityType: 'fleet',
+      entityName: fleet.name,
+      details: `Created fleet ${fleet.name}`
+    }).catch(() => {})
+    return result
+  })
+  safeHandle('db:deleteFleet', async (event, id) => {
+    const user = await requirePermission(event, 'fleets:manage')
+    const [fleetRows] = await (db as any).pool.query('SELECT name FROM fleets WHERE id = ?', [id])
+    const fleetName = (fleetRows as any[])[0]?.name || id
+    const result = await db.deleteFleet(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Fleets',
+      entityType: 'fleet',
+      entityId: id,
+      entityName: fleetName,
+      details: `Deleted fleet ${fleetName}`
+    }).catch(() => {})
+    return result
+  })
 
   safeHandle('db:getVessels', (event) => { requireSession(event); return db.getVessels() })
   safeHandle('db:getVesselsPaginated', (event, params) => { requireSession(event); return db.getVesselsPaginated(params) })
@@ -1127,9 +1156,38 @@ app.whenReady().then(() => {
 
   // RBAC: User Groups & Permissions
   safeHandle('rbac:getGroups', (event) => { requireSession(event); return db.getUserGroups() })
-  safeHandle('rbac:addGroup', async (event, name, description) => { await requirePermission(event, 'admin:groups'); return db.addUserGroup(name, description) })
+  safeHandle('rbac:addGroup', async (event, name, description) => {
+    const user = await requirePermission(event, 'admin:groups')
+    const result = await db.addUserGroup(name, description)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE_GROUP',
+      module: 'RBAC',
+      entityType: 'user_group',
+      entityName: name,
+      details: `Created permission group ${name}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('rbac:updateGroup', async (event, id, name, description) => { await requirePermission(event, 'admin:groups'); return db.updateUserGroup(id, name, description) })
-  safeHandle('rbac:deleteGroup', async (event, id) => { await requirePermission(event, 'admin:groups'); return db.deleteUserGroup(id) })
+  safeHandle('rbac:deleteGroup', async (event, id) => {
+    const user = await requirePermission(event, 'admin:groups')
+    const [grpRows] = await (db as any).pool.query('SELECT name FROM user_groups WHERE id = ?', [id])
+    const groupName = (grpRows as any[])[0]?.name || id
+    const result = await db.deleteUserGroup(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE_GROUP',
+      module: 'RBAC',
+      entityType: 'user_group',
+      entityId: id,
+      entityName: groupName,
+      details: `Deleted permission group ${groupName}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('rbac:getGroupPermissions', (event, groupId) => { requireSession(event); return db.getGroupPermissions(groupId) })
   safeHandle('rbac:setGroupPermissions', async (event, groupId, keys) => { await requirePermission(event, 'admin:groups'); invalidatePermissionCache(); return db.setGroupPermissions(groupId, keys) })
   safeHandle('rbac:getUserGroupIds', (event, userId) => { requireSession(event); return db.getUserGroupIds(userId) })
@@ -1142,9 +1200,53 @@ app.whenReady().then(() => {
   // Surveyors
   safeHandle('db:getSurveyors', (event) => { requireSession(event); return db.getSurveyors() })
   safeHandle('db:getSurveyorsPaginated', (event, params) => { requireSession(event); return db.getSurveyorsPaginated(params) })
-  safeHandle('db:addSurveyor', async (event, surveyor) => { await requirePermission(event, 'surveys:manage'); return db.addSurveyor(surveyor) })
-  safeHandle('db:updateSurveyor', async (event, id, updates) => { await requirePermission(event, 'surveys:manage'); return db.updateSurveyor(id, updates) })
-  safeHandle('db:deleteSurveyor', async (event, id) => { await requirePermission(event, 'surveys:manage'); return db.deleteSurveyor(id) })
+  safeHandle('db:addSurveyor', async (event, surveyor) => {
+    const user = await requirePermission(event, 'surveys:manage')
+    const result = await db.addSurveyor(surveyor)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Surveyors',
+      entityType: 'surveyor',
+      entityName: surveyor.name,
+      details: `Created surveyor ${surveyor.name}`
+    }).catch(() => {})
+    return result
+  })
+  safeHandle('db:updateSurveyor', async (event, id, updates) => {
+    const user = await requirePermission(event, 'surveys:manage')
+    const result = await db.updateSurveyor(id, updates)
+    const surveyorName = updates.name || id
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Surveyors',
+      entityType: 'surveyor',
+      entityId: id,
+      entityName: surveyorName,
+      details: `Updated surveyor ${surveyorName}`
+    }).catch(() => {})
+    return result
+  })
+  safeHandle('db:deleteSurveyor', async (event, id) => {
+    const user = await requirePermission(event, 'surveys:manage')
+    const [survRows] = await (db as any).pool.query('SELECT name FROM surveyors WHERE id = ?', [id])
+    const surveyorName = (survRows as any[])[0]?.name || id
+    const result = await db.deleteSurveyor(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Surveyors',
+      entityType: 'surveyor',
+      entityId: id,
+      entityName: surveyorName,
+      details: `Deleted surveyor ${surveyorName}`
+    }).catch(() => {})
+    return result
+  })
 
   // Condition Surveys
   safeHandle('db:getConditionSurveys', (event, vesselId) => { requireSession(event); return db.getConditionSurveys(vesselId) })
@@ -1202,10 +1304,47 @@ app.whenReady().then(() => {
     return db.deleteConditionSurveyType(id)
   })
   safeHandle('db:getSurveyDefects', (event, surveyId) => { requireSession(event); return db.getSurveyDefects(surveyId) })
-  safeHandle('db:addSurveyDefect', async (event, defect) => { await requirePermission(event, 'surveys:defects'); return db.addSurveyDefect(defect) })
+  safeHandle('db:addSurveyDefect', async (event, defect) => {
+    const user = await requirePermission(event, 'surveys:defects')
+    const result = await db.addSurveyDefect(defect)
+    const [svRows] = await (db as any).pool.query(
+      'SELECT v.name FROM condition_surveys cs JOIN vessels v ON v.id = cs.vessel_id WHERE cs.id = ?',
+      [defect.surveyId]
+    )
+    const vesselName = (svRows as any[])[0]?.name || defect.surveyId
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE_DEFECT',
+      module: 'Surveys',
+      entityType: 'defect',
+      entityName: vesselName,
+      details: `Added defect to survey on vessel ${vesselName}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:updateSurveyDefect', async (event, id, updates) => { await requirePermission(event, 'surveys:defects'); return db.updateSurveyDefect(id, updates) })
   safeHandle('db:deleteSurveyDefect', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.deleteSurveyDefect(id) })
-  safeHandle('db:closeDefect', async (event, id, closedBy, closureNotes) => { await requirePermission(event, 'surveys:defects'); return db.closeDefect(id, closedBy, closureNotes) })
+  safeHandle('db:closeDefect', async (event, id, closedBy, closureNotes) => {
+    const user = await requirePermission(event, 'surveys:defects')
+    const result = await db.closeDefect(id, closedBy, closureNotes)
+    const [dfRows] = await (db as any).pool.query(
+      'SELECT v.name FROM survey_defects sd JOIN condition_surveys cs ON cs.id = sd.survey_id JOIN vessels v ON v.id = cs.vessel_id WHERE sd.id = ?',
+      [id]
+    )
+    const vesselName = (dfRows as any[])[0]?.name || id
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CLOSE_DEFECT',
+      module: 'Surveys',
+      entityType: 'defect',
+      entityId: id,
+      entityName: vesselName,
+      details: `Closed defect on vessel ${vesselName}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:reopenDefect', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.reopenDefect(id) })
   safeHandle('db:getSurveyAttachments', (event, surveyId) => { requireSession(event); return db.getSurveyAttachments(surveyId) })
   safeHandle('db:addSurveyAttachment', async (event, attachment) => { await requirePermission(event, 'surveys:manage'); return db.addSurveyAttachment(attachment) })
@@ -1443,13 +1582,41 @@ app.whenReady().then(() => {
   })
 
   safeHandle('db:deleteUser', async (event, id) => {
-    await requirePermission(event, 'admin:users')
-    return db.deleteUser(id)
+    const user = await requirePermission(event, 'admin:users')
+    const [userRows] = await (db as any).pool.query('SELECT username FROM users WHERE id = ?', [id])
+    const targetUsername = (userRows as any[])[0]?.username || id
+    const result = await db.deleteUser(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Users',
+      entityType: 'user',
+      entityId: id,
+      entityName: targetUsername,
+      details: `Deleted user ${targetUsername}`
+    }).catch(() => {})
+    return result
   })
 
   safeHandle('db:updateUserRole', async (event, userId: string, role: 'admin' | 'user') => {
-    await requirePermission(event, 'admin:users')
-    return db.updateUserRole(userId, role)
+    const user = await requirePermission(event, 'admin:users')
+    const [roleRows] = await (db as any).pool.query('SELECT username, role FROM users WHERE id = ?', [userId])
+    const target = (roleRows as any[])[0]
+    const targetUsername = target?.username || userId
+    const oldRole = target?.role || 'unknown'
+    const result = await db.updateUserRole(userId, role)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Users',
+      entityType: 'user',
+      entityId: userId,
+      entityName: targetUsername,
+      details: `Changed role of ${targetUsername} from ${oldRole} to ${role}`
+    }).catch(() => {})
+    return result
   })
 
   safeHandle('users:updateSanctionsThreshold', async (event, threshold: number) => {
@@ -1632,12 +1799,28 @@ app.whenReady().then(() => {
   safeHandle('compliance:decideResult', async (event, resultId: string, decision: 'sanctioned' | 'cleared') => {
     const user = await requirePermission(event, 'compliance:review')
     await db.decideComplianceResult(resultId, decision, user.username)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DECIDE',
+      module: 'Compliance',
+      entityType: 'compliance_result',
+      entityId: resultId,
+      details: `Marked compliance result as ${decision}`
+    }).catch(() => {})
     return { success: true }
   })
 
   safeHandle('compliance:runManualCheck', async (event) => {
-    await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'admin:settings')
     await complianceScheduler.runComplianceCheck()
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'RUN_CHECK',
+      module: 'Compliance',
+      details: 'Triggered manual compliance check'
+    }).catch(() => {})
     return { success: true }
   })
 
@@ -2304,8 +2487,40 @@ app.whenReady().then(() => {
     }).catch(() => {})
     return result
   })
-  safeHandle('db:createQuotationRevision', async (event, sourceId) => { await requirePermission(event, 'quotations:create'); return db.createQuotationRevision(sourceId) })
-  safeHandle('db:duplicateQuotation', async (event, sourceId) => { await requirePermission(event, 'quotations:create'); return db.duplicateQuotation(sourceId) })
+  safeHandle('db:createQuotationRevision', async (event, sourceId) => {
+    const user = await requirePermission(event, 'quotations:create')
+    const source = await db.getQuotation(sourceId)
+    const sourceRef = source?.referenceNumber || sourceId
+    const result = await db.createQuotationRevision(sourceId)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE_REVISION',
+      module: 'Quotations',
+      entityType: 'quotation',
+      entityId: sourceId,
+      entityName: sourceRef,
+      details: `Created revision of quotation ${sourceRef}`
+    }).catch(() => {})
+    return result
+  })
+  safeHandle('db:duplicateQuotation', async (event, sourceId) => {
+    const user = await requirePermission(event, 'quotations:create')
+    const source = await db.getQuotation(sourceId)
+    const sourceRef = source?.referenceNumber || sourceId
+    const result = await db.duplicateQuotation(sourceId)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DUPLICATE',
+      module: 'Quotations',
+      entityType: 'quotation',
+      entityId: sourceId,
+      entityName: sourceRef,
+      details: `Duplicated quotation ${sourceRef}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:getQuotationRevisions', (event, revisionGroupId) => { requireSession(event); return db.getQuotationRevisions(revisionGroupId) })
   safeHandle('db:saveExportSnapshot', async (event, quotationId, snapshot) => { await requirePermission(event, 'quotations:export'); return db.saveExportSnapshot(quotationId, snapshot) })
   safeHandle('db:clearExportSnapshot', async (event, quotationId) => { await requirePermission(event, 'quotations:export'); return db.clearExportSnapshot(quotationId) })
@@ -2573,17 +2788,52 @@ app.whenReady().then(() => {
 
   safeHandle('email:addTemplate', async (event, template) => {
     const user = await requirePermission(event, 'email:manage')
-    return db.addEmailTemplate({ ...template, createdBy: user.id })
+    const result = await db.addEmailTemplate({ ...template, createdBy: user.id })
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Email',
+      entityType: 'email_template',
+      entityName: template.name,
+      details: `Created email template ${template.name}`
+    }).catch(() => {})
+    return result
   })
 
   safeHandle('email:updateTemplate', async (event, id: string, updates) => {
-    await requirePermission(event, 'email:manage')
-    return db.updateEmailTemplate(id, updates)
+    const user = await requirePermission(event, 'email:manage')
+    const result = await db.updateEmailTemplate(id, updates)
+    const templateName = updates.name || id
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Email',
+      entityType: 'email_template',
+      entityId: id,
+      entityName: templateName,
+      details: `Updated email template ${templateName}`
+    }).catch(() => {})
+    return result
   })
 
   safeHandle('email:deleteTemplate', async (event, id: string) => {
-    await requirePermission(event, 'email:manage')
-    return db.deleteEmailTemplate(id)
+    const user = await requirePermission(event, 'email:manage')
+    const [tmplRows] = await (db as any).pool.query('SELECT name FROM email_templates WHERE id = ?', [id])
+    const templateName = (tmplRows as any[])[0]?.name || id
+    const result = await db.deleteEmailTemplate(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Email',
+      entityType: 'email_template',
+      entityId: id,
+      entityName: templateName,
+      details: `Deleted email template ${templateName}`
+    }).catch(() => {})
+    return result
   })
 
   safeHandle('email:reorderTemplates', async (event, orderedIds: string[]) => {
