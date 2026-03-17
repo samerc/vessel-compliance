@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, Ship, FileSpreadsheet, FileText, ExternalLink, Hash, Plus, Search, X, UserMinus, Loader2 } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { ArrowLeft, Ship, FileSpreadsheet, FileText, ExternalLink, Hash, Plus, Search, X, UserMinus, Loader2, CheckSquare, Square } from 'lucide-react'
 import { Fleet, Vessel, VesselDocument, DocumentType } from '../../../shared/types'
 import JSZip from 'jszip'
 import { ReportService } from '../services/ReportService'
 import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface FleetDetailProps {
     fleet: Fleet
@@ -19,10 +20,17 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const [loading, setLoading] = useState(true)
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
     const { showSuccess, showError } = useToast()
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
 
     // Individual PDF export state
     const [exportingIndividual, setExportingIndividual] = useState(false)
     const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null)
+
+    // ZIP export vessel selection modal state
+    const [showZipModal, setShowZipModal] = useState(false)
+    const [zipSelectedIds, setZipSelectedIds] = useState<Set<string>>(new Set())
+    const [zipSearch, setZipSearch] = useState('')
 
     // Quick-add state
     const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -81,15 +89,24 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
         ).slice(0, 8)
         : []
 
-    const handleExportIndividualPDFs = async () => {
+    const handleOpenZipModal = () => {
         if (activeVessels.length === 0) return
+        setZipSelectedIds(new Set(activeVessels.map(v => v.id)))
+        setZipSearch('')
+        setShowZipModal(true)
+    }
+
+    const handleExportIndividualPDFs = async () => {
+        const selectedVessels = activeVessels.filter(v => zipSelectedIds.has(v.id))
+        if (selectedVessels.length === 0) return
+        setShowZipModal(false)
         setExportingIndividual(true)
-        setExportProgress({ current: 0, total: activeVessels.length })
+        setExportProgress({ current: 0, total: selectedVessels.length })
         const zip = new JSZip()
         let failed = 0
-        for (let i = 0; i < activeVessels.length; i++) {
-            const v = activeVessels[i]
-            setExportProgress({ current: i + 1, total: activeVessels.length })
+        for (let i = 0; i < selectedVessels.length; i++) {
+            const v = selectedVessels[i]
+            setExportProgress({ current: i + 1, total: selectedVessels.length })
             try {
                 const vesselDocs = allDocs.filter(d => d.vesselId === v.id)
                 const bytes = await ReportService.exportVesselToPDF(v, docTypes, vesselDocs, { returnBytes: true })
@@ -110,9 +127,18 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
             a.download = `${fleet.name}_Individual_Reports.zip`
             a.click()
             URL.revokeObjectURL(url)
-            showSuccess(`${activeVessels.length} PDFs zipped and downloaded`)
+            showSuccess(`${selectedVessels.length} PDFs zipped and downloaded`)
         }
     }
+
+    const filteredZipVessels = useMemo(() => {
+        if (!zipSearch.trim()) return activeVessels
+        const q = zipSearch.toLowerCase()
+        return activeVessels.filter(v =>
+            v.name.toLowerCase().includes(q) ||
+            v.imoNumber.toLowerCase().includes(q)
+        )
+    }, [activeVessels, zipSearch])
 
     const renderVesselTable = (vesselList: Vessel[], title: string, showRemove: boolean) => {
         if (vesselList.length === 0) return null
@@ -233,7 +259,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         <FileText size={18} /> Fleet PDF
                     </button>
                     <button
-                        onClick={handleExportIndividualPDFs}
+                        onClick={handleOpenZipModal}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         disabled={loading || exportingIndividual || activeVessels.length === 0}
@@ -317,6 +343,229 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* ZIP Export Vessel Selection Modal */}
+            {showZipModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000
+                    }}
+                    onClick={e => { if (e.target === e.currentTarget) setShowZipModal(false) }}
+                >
+                    <div style={{
+                        background: isLight ? '#ffffff' : '#1a1d28',
+                        borderRadius: '16px',
+                        width: '520px',
+                        maxHeight: '70vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        border: '1px solid var(--glass-border)',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '20px 24px 16px',
+                            borderBottom: '1px solid var(--glass-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexShrink: 0
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Select Vessels for Export</h2>
+                                <span style={{
+                                    background: 'var(--accent-primary)',
+                                    color: '#fff',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    padding: '2px 10px',
+                                    borderRadius: '12px'
+                                }}>
+                                    {zipSelectedIds.size} / {activeVessels.length}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setShowZipModal(false)}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: 'var(--text-secondary)',
+                                    padding: '4px'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Search */}
+                        <div style={{
+                            padding: '12px 24px',
+                            borderBottom: '1px solid var(--glass-border)',
+                            flexShrink: 0
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: isLight ? '#f0f2f5' : 'rgba(255,255,255,0.05)',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                border: '1px solid var(--input-border)'
+                            }}>
+                                <Search size={16} color="var(--text-secondary)" />
+                                <input
+                                    type="text"
+                                    value={zipSearch}
+                                    onChange={e => setZipSearch(e.target.value)}
+                                    placeholder="Search by vessel name or IMO..."
+                                    style={{
+                                        flex: 1,
+                                        background: 'transparent',
+                                        border: 'none',
+                                        outline: 'none',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '0.9rem'
+                                    }}
+                                    autoFocus
+                                />
+                                {zipSearch && (
+                                    <button
+                                        onClick={() => setZipSearch('')}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: 'var(--text-secondary)',
+                                            padding: '2px'
+                                        }}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Vessel List */}
+                        <div style={{
+                            flex: 1,
+                            overflowY: 'auto',
+                            padding: '8px 16px'
+                        }}>
+                            {filteredZipVessels.map(v => (
+                                <div
+                                    key={v.id}
+                                    onClick={() => {
+                                        setZipSelectedIds(prev => {
+                                            const next = new Set(prev)
+                                            if (next.has(v.id)) next.delete(v.id)
+                                            else next.add(v.id)
+                                            return next
+                                        })
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        padding: '10px 12px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        background: zipSelectedIds.has(v.id)
+                                            ? (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.06)')
+                                            : 'transparent',
+                                        transition: 'background 0.15s'
+                                    }}
+                                    className="hover-effect"
+                                >
+                                    {zipSelectedIds.has(v.id)
+                                        ? <CheckSquare size={18} color="var(--accent-primary)" />
+                                        : <Square size={18} color="var(--text-secondary)" />
+                                    }
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{
+                                            fontWeight: 600,
+                                            fontSize: '0.95rem',
+                                            color: 'var(--text-primary)',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                        }}>
+                                            {v.name}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '0.8rem',
+                                            color: 'var(--text-secondary)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}>
+                                            <Hash size={12} /> {v.imoNumber}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {filteredZipVessels.length === 0 && zipSearch.trim() && (
+                                <div style={{
+                                    padding: '24px',
+                                    textAlign: 'center',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.9rem'
+                                }}>
+                                    No vessels match your search.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{
+                            padding: '16px 24px',
+                            borderTop: '1px solid var(--glass-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexShrink: 0
+                        }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                                    onClick={() => setZipSelectedIds(new Set(activeVessels.map(v => v.id)))}
+                                >
+                                    Select All
+                                </button>
+                                <button
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                                    onClick={() => setZipSelectedIds(new Set())}
+                                >
+                                    Deselect All
+                                </button>
+                            </div>
+                            <button
+                                className="btn-primary"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 20px',
+                                    fontSize: '0.9rem'
+                                }}
+                                disabled={zipSelectedIds.size === 0}
+                                onClick={handleExportIndividualPDFs}
+                            >
+                                <FileText size={16} />
+                                Export {zipSelectedIds.size} Vessel{zipSelectedIds.size !== 1 ? 's' : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     )
