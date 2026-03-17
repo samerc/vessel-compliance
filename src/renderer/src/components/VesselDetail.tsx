@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, VesselDynamicPolicy, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, Entity, ClassificationSociety, VesselType } from '../../../shared/types'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import { formatDate, formatDateTime, formatDateShort, formatDateLong } from '../utils/dateUtils'
+import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import 'flag-icons/css/flag-icons.min.css'
 
 import { ReportService } from '../services/ReportService'
@@ -1217,13 +1218,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         <td style={{ padding: '16px' }}>
                                             {rowType.annualRenewal ? (
                                                 rowHasFile ? (
-                                                    vessel.policyExpiryDate ? (
+                                                    (() => {
+                                                        const piExpiry = resolveEffectivePolicyExpiry(dynamicPolicies) || vessel.policyExpiryDate
+                                                        return piExpiry ? (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                             <Calendar size={14} color="var(--text-secondary)" />
                                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                                                 Expires with P&I ·{' '}
                                                                 <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                                                                    {formatDate(vessel.policyExpiryDate)}
+                                                                    {formatDate(piExpiry)}
                                                                 </span>
                                                             </span>
                                                         </div>
@@ -1247,6 +1250,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     ) : (
                                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual — P&I date not set</span>
                                                     )
+                                                    })()
                                                 ) : (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual (P&I)</span>
                                                 )

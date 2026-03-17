@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import type { Vessel, DocumentType, VesselDocument, VesselCustomDocType, VesselDynamicPolicy } from '../../../shared/types'
-import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+import { resolveEffectivePolicyExpiry, getActivePIPolicies } from '../utils/policyUtils'
 import { formatDate } from '../utils/dateUtils'
 
 interface Props {
@@ -57,10 +57,22 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   const { showSuccess, showError } = useToast()
   const isLight = theme === 'light'
 
+  // Multi-P&I policy support: if multiple P&I policies exist, let user pick
+  const piPolicies = useMemo(() => getActivePIPolicies(dynamicPolicies || []), [dynamicPolicies])
+  const [preferredPIPolicyId, setPreferredPIPolicyId] = useState<string | undefined>(undefined)
+
+  // Auto-select first P&I policy with an end date if none selected
+  useEffect(() => {
+    if (piPolicies.length > 0 && !preferredPIPolicyId) {
+      const withDate = piPolicies.find(pp => pp.endDate)
+      if (withDate) setPreferredPIPolicyId(withDate.policy.id)
+    }
+  }, [piPolicies, preferredPIPolicyId])
+
   // Resolve P&I expiry from dynamic policies first, fall back to legacy vessel field
   const effectivePolicyExpiry = useMemo(
-    () => resolveEffectivePolicyExpiry(dynamicPolicies || []) || vessel.policyExpiryDate || undefined,
-    [dynamicPolicies, vessel.policyExpiryDate]
+    () => resolveEffectivePolicyExpiry(dynamicPolicies || [], preferredPIPolicyId) || vessel.policyExpiryDate || undefined,
+    [dynamicPolicies, vessel.policyExpiryDate, preferredPIPolicyId]
   )
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -534,6 +546,33 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileInput} />
+
+      {/* P&I policy picker when multiple P&I policies exist */}
+      {piPolicies.length > 1 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
+          background: 'rgba(0, 210, 255, 0.06)', border: '1px solid rgba(0, 210, 255, 0.15)',
+          borderRadius: '8px', fontSize: '0.85rem'
+        }}>
+          <Info size={16} color="var(--accent-primary)" />
+          <span style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>P&I policy for annual docs:</span>
+          <select
+            value={preferredPIPolicyId || ''}
+            onChange={e => setPreferredPIPolicyId(e.target.value || undefined)}
+            style={{
+              flex: 1, padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem',
+              background: 'var(--input-bg)', color: 'var(--text-primary)',
+              border: '1px solid var(--input-border)', maxWidth: '400px'
+            }}
+          >
+            {piPolicies.map(pp => (
+              <option key={pp.policy.id} value={pp.policy.id}>
+                {pp.policy.policyNumber || pp.policy.policyTypeName || 'P&I'} — {pp.endDate ? formatDate(pp.endDate) : 'No end date'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Compliance summary */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'stretch' }}>

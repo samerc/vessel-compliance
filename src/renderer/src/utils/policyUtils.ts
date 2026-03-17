@@ -1,41 +1,67 @@
 import { VesselDynamicPolicy } from '../../../shared/types'
 
+function getEndDate(policy: VesselDynamicPolicy): string | undefined {
+  const endDateVal = policy.values?.find(v => {
+    const name = v.characteristicName?.toLowerCase() || ''
+    return name.includes('end') && (name.includes('date') || name.includes('expir'))
+  })
+  return endDateVal?.valueDate || undefined
+}
+
+function isPIPolicy(p: VesselDynamicPolicy): boolean {
+  const name = p.policyTypeName?.toLowerCase() || ''
+  return name.includes('p&i') || name.includes('protection') || name.includes('p & i')
+}
+
+function isHullPolicy(p: VesselDynamicPolicy): boolean {
+  const name = p.policyTypeName?.toLowerCase() || ''
+  return name.includes('hull') || name.includes('h&m') || name.includes('h & m')
+}
+
+/**
+ * Returns all active P&I policies with their end dates (for multi-policy picker).
+ */
+export function getActivePIPolicies(policies: VesselDynamicPolicy[]): { policy: VesselDynamicPolicy; endDate: string | undefined }[] {
+  if (!policies || policies.length === 0) return []
+  return policies
+    .filter(p => p.status === 'active' && isPIPolicy(p))
+    .map(p => ({ policy: p, endDate: getEndDate(p) }))
+}
+
 /**
  * Resolves the effective policy expiry date for a vessel based on its active dynamic policies.
- * Logic:
- * 1. Look for an active P&I policy. Use its "End Date" if available.
- * 2. If no P&I, look for an active Hull policy. Use its "End Date" if available.
- * 3. Return undefined if none found.
+ * If preferredPolicyId is provided, use that specific policy.
+ * Otherwise: P&I first, then Hull, then undefined.
  */
-export function resolveEffectivePolicyExpiry(policies: VesselDynamicPolicy[]): string | undefined {
+export function resolveEffectivePolicyExpiry(
+  policies: VesselDynamicPolicy[],
+  preferredPolicyId?: string
+): string | undefined {
   if (!policies || policies.length === 0) return undefined
 
   const activePolicies = policies.filter(p => p.status === 'active')
 
-  // 1. Priority 1: P&I Policy
-  const piPolicy = activePolicies.find(p => 
-    p.policyTypeName?.toLowerCase().includes('p&i') || 
-    p.policyTypeName?.toLowerCase().includes('protection')
-  )
-  
-  if (piPolicy) {
-    const endDateVal = piPolicy.values?.find(v => 
-      v.characteristicName?.toLowerCase().includes('end date')
-    )
-    if (endDateVal?.valueDate) return endDateVal.valueDate
+  // If a preferred policy is specified, use it directly
+  if (preferredPolicyId) {
+    const preferred = activePolicies.find(p => p.id === preferredPolicyId)
+    if (preferred) {
+      const d = getEndDate(preferred)
+      if (d) return d
+    }
+  }
+
+  // 1. Priority 1: P&I Policy (try all P&I policies, not just first)
+  const piPolicies = activePolicies.filter(isPIPolicy)
+  for (const piPolicy of piPolicies) {
+    const d = getEndDate(piPolicy)
+    if (d) return d
   }
 
   // 2. Priority 2: Hull & Machinery
-  const hullPolicy = activePolicies.find(p => 
-    p.policyTypeName?.toLowerCase().includes('hull') || 
-    p.policyTypeName?.toLowerCase().includes('h&m')
-  )
-  
-  if (hullPolicy) {
-    const endDateVal = hullPolicy.values?.find(v => 
-      v.characteristicName?.toLowerCase().includes('end date')
-    )
-    if (endDateVal?.valueDate) return endDateVal.valueDate
+  const hullPolicies = activePolicies.filter(isHullPolicy)
+  for (const hullPolicy of hullPolicies) {
+    const d = getEndDate(hullPolicy)
+    if (d) return d
   }
 
   return undefined
@@ -49,29 +75,20 @@ export function resolveEffectivePolicyInception(policies: VesselDynamicPolicy[])
 
   const activePolicies = policies.filter(p => p.status === 'active')
 
-  // Priority logic matches expiry
-  const piPolicy = activePolicies.find(p => 
-    p.policyTypeName?.toLowerCase().includes('p&i') || 
-    p.policyTypeName?.toLowerCase().includes('protection')
-  )
-  
-  if (piPolicy) {
-    const inceptionDateVal = piPolicy.values?.find(v => 
-      v.characteristicName?.toLowerCase().includes('inception date')
+  const piPolicies = activePolicies.filter(isPIPolicy)
+  for (const piPolicy of piPolicies) {
+    const val = piPolicy.values?.find(v =>
+      v.characteristicName?.toLowerCase().includes('inception')
     )
-    if (inceptionDateVal?.valueDate) return inceptionDateVal.valueDate
+    if (val?.valueDate) return val.valueDate
   }
 
-  const hullPolicy = activePolicies.find(p => 
-    p.policyTypeName?.toLowerCase().includes('hull') || 
-    p.policyTypeName?.toLowerCase().includes('h&m')
-  )
-  
-  if (hullPolicy) {
-    const inceptionDateVal = hullPolicy.values?.find(v => 
-      v.characteristicName?.toLowerCase().includes('inception date')
+  const hullPolicies = activePolicies.filter(isHullPolicy)
+  for (const hullPolicy of hullPolicies) {
+    const val = hullPolicy.values?.find(v =>
+      v.characteristicName?.toLowerCase().includes('inception')
     )
-    if (inceptionDateVal?.valueDate) return inceptionDateVal.valueDate
+    if (val?.valueDate) return val.valueDate
   }
 
   return undefined
