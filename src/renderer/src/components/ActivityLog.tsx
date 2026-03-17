@@ -6,10 +6,20 @@ import { formatDateTime } from '../utils/dateUtils'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
   CREATE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+  CREATE_DEFECT: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+  CREATE_REVISION: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+  CREATE_GROUP: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
   UPDATE: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
   DELETE: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+  DELETE_GROUP: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+  UPLOAD: { bg: 'rgba(14,165,233,0.15)', color: '#0ea5e9' },
   LOGIN: { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6' },
   EXPORT: { bg: 'rgba(0,170,200,0.15)', color: '#00aac8' },
+  RESTORE: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+  DUPLICATE: { bg: 'rgba(20,184,166,0.15)', color: '#14b8a6' },
+  CLOSE_DEFECT: { bg: 'rgba(234,179,8,0.15)', color: '#eab308' },
+  DECIDE: { bg: 'rgba(249,115,22,0.15)', color: '#f97316' },
+  RUN_CHECK: { bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
 }
 
 const MODULE_COLORS: Record<string, string> = {
@@ -18,10 +28,16 @@ const MODULE_COLORS: Record<string, string> = {
   Quotations: '#f59e0b',
   Policies: '#8b5cf6',
   Surveys: '#ec4899',
+  Surveyors: '#f472b6',
   Users: '#6366f1',
-  Settings: '#64748b',
+  Auth: '#a78bfa',
+  Documents: '#0ea5e9',
+  Settings: '#94a3b8',
   Compliance: '#ef4444',
   Fleets: '#06b6d4',
+  Email: '#f97316',
+  RBAC: '#8b5cf6',
+  System: '#64748b',
 }
 
 function getActionStyle(action: string) {
@@ -244,20 +260,36 @@ export default function ActivityLog() {
       </div>
 
       {/* Table */}
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
+      <div style={{
+        borderRadius: '10px',
+        border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'var(--glass-border)'}`,
+        overflow: 'hidden',
+        background: isLight ? '#ffffff' : 'var(--bg-card)',
+      }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
-              {['Date/Time', 'User', 'Action', 'Module', 'Entity', 'Details'].map((h) => (
+            <tr style={{
+              background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.04)',
+              borderBottom: `2px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
+            }}>
+              {[
+                { label: 'Date / Time', width: '155px' },
+                { label: 'User', width: '110px' },
+                { label: 'Module', width: '110px' },
+                { label: 'Action', width: '120px' },
+                { label: 'Entity', width: 'auto' },
+                { label: 'Details', width: '35%' },
+              ].map((h) => (
                 <th
-                  key={h}
+                  key={h.label}
                   style={{
-                    padding: '10px 14px', textAlign: 'left', fontSize: '0.72rem',
-                    fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)',
+                    padding: '11px 16px', textAlign: 'left', fontSize: '0.7rem',
+                    fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px',
+                    color: isLight ? '#64748b' : 'var(--text-secondary)',
+                    width: h.width,
                   }}
                 >
-                  {h}
+                  {h.label}
                 </th>
               ))}
             </tr>
@@ -265,18 +297,18 @@ export default function ActivityLog() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                   Loading...
                 </td>
               </tr>
             ) : entries.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center' }}>
-                  <ScrollText size={40} style={{ color: 'var(--text-secondary)', opacity: 0.3, marginBottom: '12px' }} />
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 500 }}>
+                <td colSpan={6} style={{ padding: '64px 20px', textAlign: 'center' }}>
+                  <ScrollText size={36} style={{ color: 'var(--text-secondary)', opacity: 0.2, marginBottom: '12px' }} />
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 500 }}>
                     No activity entries found
                   </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', opacity: 0.7, marginTop: '4px' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', opacity: 0.6, marginTop: '4px' }}>
                     {total === 0 && !moduleFilter && !actionFilter && !userFilter && !dateFrom && !dateTo && !search
                       ? 'Activity will appear here as actions are logged across the system.'
                       : 'Try adjusting your filters to see more results.'
@@ -291,50 +323,50 @@ export default function ActivityLog() {
                 <tr
                   key={entry.id}
                   style={{
-                    borderBottom: '1px solid var(--glass-border)',
-                    background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'),
+                    borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'}`,
+                    background: idx % 2 === 0 ? 'transparent' : (isLight ? '#fafbfc' : 'rgba(255,255,255,0.015)'),
+                    transition: 'background 0.15s',
                   }}
                 >
-                  <td style={{ padding: '10px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '10px 16px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: isLight ? '#64748b' : 'var(--text-secondary)', fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
                     {formatDateTime(entry.createdAt)}
                   </td>
-                  <td style={{ padding: '10px 14px', fontSize: '0.82rem', fontWeight: 500 }}>
+                  <td style={{ padding: '10px 16px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {entry.username}
                   </td>
-                  <td style={{ padding: '10px 14px' }}>
+                  <td style={{ padding: '10px 16px' }}>
                     <span style={{
-                      display: 'inline-block', padding: '2px 8px', borderRadius: '4px',
-                      fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase',
-                      letterSpacing: '0.3px',
-                      background: actionStyle.bg, color: actionStyle.color,
-                    }}>
-                      {entry.action}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <span style={{
-                      display: 'inline-block', padding: '2px 8px', borderRadius: '4px',
-                      fontSize: '0.72rem', fontWeight: 500,
-                      background: `${moduleColor}18`, color: moduleColor,
+                      display: 'inline-block', padding: '3px 10px', borderRadius: '6px',
+                      fontSize: '0.7rem', fontWeight: 600,
+                      background: `${moduleColor}15`, color: isLight ? moduleColor : moduleColor,
                       border: `1px solid ${moduleColor}30`,
+                      whiteSpace: 'nowrap',
                     }}>
                       {entry.module}
                     </span>
                   </td>
-                  <td style={{ padding: '10px 14px', fontSize: '0.82rem' }}>
-                    {entry.entityName && (
-                      <span style={{ fontWeight: 500 }}>{entry.entityName}</span>
-                    )}
-                    {entry.entityType && !entry.entityName && (
-                      <span style={{ color: 'var(--text-secondary)' }}>{entry.entityType}</span>
-                    )}
-                    {!entry.entityName && !entry.entityType && (
-                      <span style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>--</span>
+                  <td style={{ padding: '10px 16px' }}>
+                    <span style={{
+                      display: 'inline-block', padding: '3px 10px', borderRadius: '6px',
+                      fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase',
+                      letterSpacing: '0.3px',
+                      background: actionStyle.bg, color: isLight ? actionStyle.color : actionStyle.color,
+                    }}>
+                      {entry.action.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 16px', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
+                    {entry.entityName ? (
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{entry.entityName}</span>
+                    ) : entry.entityType ? (
+                      <span style={{ color: 'var(--text-primary)', opacity: 0.7 }}>{entry.entityType}</span>
+                    ) : (
+                      <span style={{ color: 'var(--text-secondary)', opacity: 0.35 }}>&mdash;</span>
                     )}
                   </td>
                   <td style={{
-                    padding: '10px 14px', fontSize: '0.8rem', color: 'var(--text-secondary)',
-                    maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    padding: '10px 16px', fontSize: '0.8rem', color: isLight ? '#64748b' : 'var(--text-secondary)',
+                    maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}
                     title={entry.details || ''}
                   >
