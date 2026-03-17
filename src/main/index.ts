@@ -1260,15 +1260,15 @@ app.whenReady().then(() => {
     return db.getAnalyticsPresets(user.id)
   })
   safeHandle('analytics:addPreset', async (event, name: string, filters: any) => {
-    const user = requireSession(event)
+    const user = await requirePermission(event, 'analytics:presets')
     return db.addAnalyticsPreset({ userId: user.id, name, filters })
   })
   safeHandle('analytics:updatePreset', async (event, id: string, name: string, filters: any) => {
-    requireSession(event)
+    await requirePermission(event, 'analytics:presets')
     return db.updateAnalyticsPreset(id, name, filters)
   })
   safeHandle('analytics:deletePreset', async (event, id: string) => {
-    requireSession(event)
+    await requirePermission(event, 'analytics:presets')
     return db.deleteAnalyticsPreset(id)
   })
   safeHandle('analytics:getData', async (event, filters: any) => {
@@ -2414,7 +2414,7 @@ app.whenReady().then(() => {
 
   // Database Backup & Restore
   safeHandle('db:backup', async (event) => {
-    const user = await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'admin:backup')
     const { dialog } = require('electron')
     const result = await dialog.showSaveDialog({
       title: 'Save Database Backup',
@@ -2437,7 +2437,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('db:restore', async (event) => {
-    const user = await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'admin:backup')
     const { dialog } = require('electron')
     const result = await dialog.showOpenDialog({
       title: 'Select Backup File to Restore',
@@ -2477,7 +2477,7 @@ app.whenReady().then(() => {
 
   // Activity Log
   safeHandle('activity:getLog', async (event, filters) => {
-    requireSession(event)
+    await requirePermission(event, 'admin:activityLog')
     return await db.getActivityLog(filters || {})
   })
 
@@ -2508,22 +2508,22 @@ app.whenReady().then(() => {
   })
 
   safeHandle('email:addTemplate', async (event, template) => {
-    const user = await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'email:manage')
     return db.addEmailTemplate({ ...template, createdBy: user.id })
   })
 
   safeHandle('email:updateTemplate', async (event, id: string, updates) => {
-    await requirePermission(event, 'admin:settings')
+    await requirePermission(event, 'email:manage')
     return db.updateEmailTemplate(id, updates)
   })
 
   safeHandle('email:deleteTemplate', async (event, id: string) => {
-    await requirePermission(event, 'admin:settings')
+    await requirePermission(event, 'email:manage')
     return db.deleteEmailTemplate(id)
   })
 
   safeHandle('email:reorderTemplates', async (event, orderedIds: string[]) => {
-    await requirePermission(event, 'admin:settings')
+    await requirePermission(event, 'email:manage')
     return db.reorderEmailTemplates(orderedIds)
   })
 

@@ -238,6 +238,7 @@ export const PERMISSION_CATEGORIES = [
       { key: 'fleets:manage', label: 'Manage fleets' },
       { key: 'analytics:view', label: 'View fleet analytics' },
       { key: 'analytics:export', label: 'Export analytics reports' },
+      { key: 'analytics:presets', label: 'Save / delete analytics presets' },
       { key: 'renewals:view', label: 'View renewals' },
       { key: 'renewals:manage', label: 'Manage renewal statuses' },
     ],
@@ -251,6 +252,14 @@ export const PERMISSION_CATEGORIES = [
     ],
   },
   {
+    key: 'email',
+    label: 'Email Templates',
+    permissions: [
+      { key: 'email:view', label: 'View email templates' },
+      { key: 'email:manage', label: 'Create / edit / delete email templates' },
+    ],
+  },
+  {
     key: 'admin',
     label: 'Administration',
     permissions: [
@@ -258,6 +267,8 @@ export const PERMISSION_CATEGORIES = [
       { key: 'admin:groups', label: 'Manage user groups & permissions' },
       { key: 'admin:settings', label: 'System settings (doc types, roles, survey types, etc.)' },
       { key: 'admin:database', label: 'Database configuration' },
+      { key: 'admin:backup', label: 'Backup & restore database' },
+      { key: 'admin:activityLog', label: 'View activity log' },
     ],
   },
 ] as const

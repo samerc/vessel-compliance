@@ -272,7 +272,7 @@ function App(): React.JSX.Element {
               {hasPermission('surveys:view') && navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
               {navItem('calculators', <Calculator size={18} />, 'Calculators')}
               {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
-              {navItem('email-templates', <Mail size={18} />, 'Email Templates')}
+              {hasPermission('email:view') && navItem('email-templates', <Mail size={18} />, 'Email Templates')}
               {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
             </NavGroup>
 
@@ -280,7 +280,7 @@ function App(): React.JSX.Element {
               <div style={{ height: '1px', background: 'var(--glass-border)', margin: '6px 4px', opacity: 0.5 }} />
               {hasPermission('admin:settings') && navItem('admin', <Settings size={18} />, 'Settings')}
               {hasPermission('admin:users') && navItem('users', <UserCog size={18} />, 'User Management')}
-              {hasPermission('admin:settings') && navItem('activity-log', <ScrollText size={18} />, 'Activity Log')}
+              {hasPermission('admin:activityLog') && navItem('activity-log', <ScrollText size={18} />, 'Activity Log')}
             </>
           </nav>
 
