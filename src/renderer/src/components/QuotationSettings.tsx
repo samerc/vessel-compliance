@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, List } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List } from 'lucide-react'
 import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -545,12 +545,13 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
 
             {/* Clause Sets */}
             <section className="glass-card" style={{ padding: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <h3 style={{ fontSize: '1rem' }}>Clause Sets (Presets)</h3>
                     <button onClick={() => { setShowSetForm(true); setEditingSetId(null); setSetName(''); setSetClauseIds(new Set()); setSetDescOverrides({}) }} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Plus size={14} /> New Set
                     </button>
                 </div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Clause sets are pre-configured combinations of conditions. When creating a quotation, you can apply a set to quickly select multiple clauses at once. Description overrides let you customize clause text per set.</p>
 
                 {clauseSets.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: showSetForm ? '16px' : '0' }}>
@@ -563,6 +564,9 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                         const hasOverride = s.descriptionOverrides?.[cid]
                                         return num ? (hasOverride ? `${num}*` : String(num)) : null
                                     }).filter(Boolean).sort().join(', ')}
+                                    {s.descriptionOverrides && Object.keys(s.descriptionOverrides).some(cid => (s.clauseIds || []).includes(cid) && s.descriptionOverrides![cid]) && (
+                                        <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>(* = has custom description)</span>
+                                    )}
                                 </span>
                                 <button onClick={() => startEditSet(s)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                 <button onClick={() => handleDeleteSet(s.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: isLight ? '#c00' : '#ff4d4d' }}><Trash2 size={12} /></button>
@@ -573,7 +577,8 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
 
                 {showSetForm && (
                     <div style={{ padding: '16px', borderRadius: '10px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
-                        <input type="text" value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name (e.g., Restricted Cover)" style={{ width: '100%', marginBottom: '12px' }} />
+                        <input type="text" value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name (e.g., Standard Cover, Restricted Cover)" style={{ width: '100%', marginBottom: '12px' }} />
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Select which clauses to include in this set:</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
                             {clauses.map(c => (
                                 <button
@@ -597,7 +602,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                         {/* Description overrides for selected clauses */}
                         {clauses.filter(c => setClauseIds.has(c.id)).length > 0 && (
                             <div style={{ marginBottom: '12px' }}>
-                                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Description overrides (optional — applied when this set is used):</p>
+                                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Custom descriptions (optional) — override the default clause description when this set is applied:</p>
                                 {clauses.filter(c => setClauseIds.has(c.id)).map(c => (
                                     <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '50px', color: 'var(--text-secondary)' }}>Cl. {c.clauseNumber}</span>
@@ -796,7 +801,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Tag Manager */}
             <section className="glass-card" style={{ padding: '16px' }}>
-                <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}><Tag size={14} /> Warranty Tags</h4>
+                <h4 style={{ fontSize: '0.9rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Tag size={14} /> Warranty Tags</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Tags let you categorize warranties into groups (e.g. "Cargo", "Navigation"). Tagged warranties appear under their own tab in the quotation editor.</p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                     {tags.map(tag => (
                         <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--glass-border)', fontSize: '0.8rem' }}>
@@ -825,9 +831,10 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
             {/* Warranty Sets */}
             <section className="glass-card" style={{ padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <h4 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Shield size={14} /> Warranty Sets</h4>
+                    <h4 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 0 }}><Shield size={14} /> Warranty Sets</h4>
                     {!showSetForm && <button onClick={() => { setShowSetForm(true); setEditingSetId(null); setSetName(''); setSetWarrantyIds(new Set()); setSetDefaultSelected(false) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Plus size={14} /> New Set</button>}
                 </div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Sets are named groups of warranties that can be quickly applied to a quotation. Sets marked "Default" are automatically selected when creating new quotations.</p>
                 {showSetForm && (
                     <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--accent-primary)', marginBottom: '10px' }}>
                         <input value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name (e.g. Cargo Warranties)..." style={{ width: '100%', marginBottom: '8px', padding: '6px 10px' }} />
@@ -867,8 +874,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <h3 style={{ fontSize: '1rem' }}>P&I Warranties</h3>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => { setBulkMode(!bulkMode); setBulkSelected(new Set()) }} className={bulkMode ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Tag size={14} /> Bulk Tag</button>
-                        <button onClick={() => setShowImport(true)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Download size={14} /> Import</button>
+                        <button onClick={() => { setBulkMode(!bulkMode); setBulkSelected(new Set()) }} className={bulkMode ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }} title="Select multiple warranties to assign/remove tags, cargo, or default status in bulk"><Tag size={14} /> Bulk Tag</button>
+                        <button onClick={() => setShowImport(true)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Upload size={14} /> Import</button>
                     </div>
                 </div>
                 {bulkMode && (
@@ -901,7 +908,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                     </div>
                 )}
                 <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-                    <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Warranty text..." style={{ flex: 1, minHeight: '60px', resize: 'vertical' }} required />
+                    <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Enter warranty text... (e.g. Vessel to trade exclusively between safe ports and anchorages)" style={{ flex: 1, minHeight: '60px', resize: 'vertical' }} required />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'flex-end' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             <input type="checkbox" checked={newDefaultSelected} onChange={e => setNewDefaultSelected(e.target.checked)} style={ckStyle} /> Default selected
@@ -989,6 +996,9 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                             <button onClick={() => setShowImport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
                         </div>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Paste warranties below (one per line). Bullet points, dashes, and leading symbols will be stripped automatically.</p>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '10px', padding: '8px 12px', borderRadius: '6px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)' }}>
+                            <strong>Tip:</strong> Copy warranty text from a Word document or PDF and paste it here. Each line becomes a separate warranty. Bullets, dashes, and numbers at the start of lines are automatically stripped.
+                        </div>
                         <textarea
                             value={importText}
                             onChange={e => setImportText(e.target.value)}
@@ -1321,13 +1331,14 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
 
     return (
         <section className="glass-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <h3 style={{ fontSize: '1rem', margin: 0 }}>P&I Exclusions</h3>
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => { setBulkMode(!bulkMode); setBulkSelected(new Set()) }} className={bulkMode ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Tag size={14} /> Bulk Edit</button>
-                    <button onClick={() => setShowImport(true)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Download size={14} /> Import</button>
+                    <button onClick={() => setShowImport(true)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Upload size={14} /> Import</button>
                 </div>
             </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define exclusion clauses that remove specific risks from coverage. Exclusions can be linked to vessel types to auto-apply based on the vessel in a quotation.</p>
 
             {bulkMode && (
                 <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid var(--accent-primary)', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1468,7 +1479,7 @@ function SubLimitsTab({ showSuccess }: TabProps) {
     return (<div>
         <section className="glass-card" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Limits of Liability Templates</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Use {'{amount}'} and {'{currency}'} as placeholders. Amounts are set per-quotation.</p>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define sub-limit templates that cap liability for specific risk categories. Use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{amount}'}</code> and <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{currency}'}</code> as placeholders — actual values are set per quotation.</p>
             <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                 <input type="text" value={newTemplate} onChange={e => setNewTemplate(e.target.value)} placeholder='e.g., Liability for crew sub-limited to {currency} {amount} any one accident...' style={{ flex: 1 }} required />
                 <input type="text" value={newCurrency} onChange={e => setNewCurrency(e.target.value)} placeholder="CCY" style={{ width: '70px' }} />
@@ -1585,7 +1596,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <section className="glass-card" style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clauses</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions). Formatted as bullet points in the export.</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions). Clauses marked "Default" are automatically included in new quotations. Formatted as bullet points in the export.</p>
                 <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. Conflict Exclusion)" style={{ width: '200px', flexShrink: 0 }} />
                     <input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (e.g. JH2021-008)" style={{ width: '160px', flexShrink: 0 }} />
@@ -1628,7 +1639,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
 
             <section className="glass-card" style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clause Sets</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Preset groups of additional clauses that can be applied in one click from the Conditions tab. Drag the order within each set to control how they appear in the export.</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Preset groups of additional clauses that can be applied in one click from the Conditions tab. Use the arrows within each set to control the order they appear in the export.</p>
                 <form onSubmit={async e => { e.preventDefault(); if (!newSetName.trim()) return; await window.api.piAddAdditionalClauseSet(newSetName.trim(), []); setNewSetName(''); showSuccess('Set created'); loadData() }} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
                     <input value={newSetName} onChange={e => setNewSetName(e.target.value)} placeholder="Set name (e.g. Standard Fleet)" style={{ flex: 1, maxWidth: '300px' }} required />
                     <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Create Set</button>
