@@ -3,6 +3,7 @@ import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatDateTime } from '../utils/dateUtils'
 
 // ── Section definitions ────────────────────────────────────────────────────────
@@ -34,6 +35,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [fileTypeStatus, setFileTypeStatus] = useState('')
     const [configPath, setConfigPath] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
+    const { hasPermission } = useAuth()
+    const canSettings = hasPermission('admin:settings')
 
     // Compliance schedule state
     const [complianceSettings, setComplianceSettings] = useState<ComplianceScheduleSettings>({
@@ -1117,6 +1120,13 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             {/* ── Content area ── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
 
+            {/* Read-only notice when user lacks admin:settings permission */}
+            {!canSettings && sidebarSections.length > 0 && (
+                <div style={{ padding: '12px 16px', marginBottom: '16px', borderRadius: '8px', background: 'rgba(255, 180, 0, 0.1)', border: '1px solid rgba(255, 180, 0, 0.3)', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    You do not have permission to modify settings. Viewing in read-only mode.
+                </div>
+            )}
+
             {/* Empty state for regular users with no access */}
             {!isAdmin && sidebarSections.length === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: '16px', textAlign: 'center' }}>
@@ -1128,6 +1138,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                 </div>
             )}
 
+            <fieldset disabled={!canSettings} style={{ border: 'none', padding: 0, margin: 0 }}>
             {/* User Access - admin only */}
             {effectiveSection === 'userAccess' && isAdmin && (
                 <section className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
@@ -2540,6 +2551,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     </div>
                 </section>
             )}
+            </fieldset>
 
 
         </div>

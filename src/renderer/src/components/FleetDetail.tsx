@@ -6,6 +6,7 @@ import { ReportService } from '../services/ReportService'
 import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 
 interface FleetDetailProps {
     fleet: Fleet
@@ -22,6 +23,8 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
+    const { hasPermission } = useAuth()
+    const canManageFleets = hasPermission('fleets:manage')
 
     // Individual PDF export state
     const [exportingIndividual, setExportingIndividual] = useState(false)
@@ -199,7 +202,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                             >
                                                 Details <ExternalLink size={14} />
                                             </button>
-                                            {showRemove && (
+                                            {showRemove && canManageFleets && (
                                                 <button
                                                     onClick={() => handleRemoveVessel(v)}
                                                     style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center' }}
@@ -235,13 +238,15 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                    <button
-                        onClick={() => setShowQuickAdd(!showQuickAdd)}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                    >
-                        <Plus size={18} /> Add Vessel
-                    </button>
+                    {canManageFleets && (
+                        <button
+                            onClick={() => setShowQuickAdd(!showQuickAdd)}
+                            className="btn-primary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            <Plus size={18} /> Add Vessel
+                        </button>
+                    )}
                     <button
                         onClick={() => ReportService.exportFleetToExcel(fleet, vessels, docTypes, allDocs)}
                         className="btn-secondary"

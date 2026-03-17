@@ -16,7 +16,8 @@ interface DefectManagerProps {
 }
 
 export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: DefectManagerProps) {
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canManageDefects = hasPermission('surveys:defects')
   const [defects, setDefects] = useState<SurveyDefect[]>([])
   const [sortField, setSortField] = useState<'defectNumber' | 'createdAt'>('defectNumber')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -298,19 +299,21 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
               </button>
             </>
           )}
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className={showAddForm ? 'btn-secondary' : 'btn-primary'}
-            style={{
-              padding: '8px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {showAddForm ? <X size={16} /> : <Plus size={16} />}
-            {showAddForm ? 'Cancel' : 'Add Defect'}
-          </button>
+          {canManageDefects && (
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className={showAddForm ? 'btn-secondary' : 'btn-primary'}
+              style={{
+                padding: '8px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              {showAddForm ? <X size={16} /> : <Plus size={16} />}
+              {showAddForm ? 'Cancel' : 'Add Defect'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -512,16 +515,18 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                       <td style={{ padding: '12px', color: 'var(--text-primary)' }}>{defect.dueDate || 'N/A'}</td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                          <button
-                            onClick={() => handleEditDefect(defect)}
-                            className="btn-primary"
-                            style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-                            title="Edit defect"
-                          >
-                            <Edit size={14} />
-                            Edit
-                          </button>
-                          {defect.status === 'OPEN' ? (
+                          {canManageDefects && (
+                            <button
+                              onClick={() => handleEditDefect(defect)}
+                              className="btn-primary"
+                              style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                              title="Edit defect"
+                            >
+                              <Edit size={14} />
+                              Edit
+                            </button>
+                          )}
+                          {canManageDefects && defect.status === 'OPEN' && (
                             <button
                               onClick={() => setCloseModalDefect(defect)}
                               style={{ padding: '6px 12px', background: 'var(--success)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
@@ -529,7 +534,8 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                             >
                               Close
                             </button>
-                          ) : (
+                          )}
+                          {canManageDefects && defect.status !== 'OPEN' && (
                             <button
                               onClick={() => handleReopenDefect(defect)}
                               style={{ padding: '6px 12px', background: 'var(--warning)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
@@ -562,14 +568,16 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                               Notes
                             </button>
                           )}
-                          <button
-                            onClick={() => handleDeleteDefect(defect)}
-                            aria-label={`Delete defect ${defect.defectNumber}`}
-                            style={{ padding: '6px 12px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="Delete defect"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canManageDefects && (
+                            <button
+                              onClick={() => handleDeleteDefect(defect)}
+                              aria-label={`Delete defect ${defect.defectNumber}`}
+                              style={{ padding: '6px 12px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Delete defect"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

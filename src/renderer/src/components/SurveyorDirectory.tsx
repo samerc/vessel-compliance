@@ -8,6 +8,7 @@ import {
 import { Surveyor, SurveyorQueryParams, ConditionSurvey, SurveyDefect, Vessel } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatDateShort } from '../utils/dateUtils'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -23,6 +24,8 @@ export default function SurveyorDirectory() {
   const { theme } = useTheme()
   const isLight = theme === 'light'
   const { showError, showSuccess } = useToast()
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission('surveys:manage')
 
   // ── Surveyors (paginated) ────────────────────────────────────────────────────
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
@@ -232,9 +235,11 @@ export default function SurveyorDirectory() {
           <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Surveyor Directory</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Manage surveying companies, contacts, and their survey history.</p>
         </div>
-        <button className="btn-primary" onClick={openAddModal} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem', flexShrink: 0 }}>
-          <Plus size={16} /> Add Surveyor
-        </button>
+        {canManage && (
+          <button className="btn-primary" onClick={openAddModal} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem', flexShrink: 0 }}>
+            <Plus size={16} /> Add Surveyor
+          </button>
+        )}
       </header>
 
       {/* Stats row */}
@@ -456,14 +461,16 @@ export default function SurveyorDirectory() {
               )}
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: '6px', marginTop: '14px' }}>
-                <button onClick={() => openEditModal(selectedSurveyor)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Edit size={13} /> Edit
-                </button>
-                <button onClick={() => handleDelete(selectedSurveyor)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--danger)' }}>
-                  <Trash2 size={13} />
-                </button>
-              </div>
+              {canManage && (
+                <div style={{ display: 'flex', gap: '6px', marginTop: '14px' }}>
+                  <button onClick={() => openEditModal(selectedSurveyor)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Edit size={13} /> Edit
+                  </button>
+                  <button onClick={() => handleDelete(selectedSurveyor)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--danger)' }}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Survey history section */}

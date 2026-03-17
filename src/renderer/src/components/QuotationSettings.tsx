@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Gl
 import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
 import RichTextEditor from './RichTextEditor'
 
@@ -55,7 +56,9 @@ export default function QuotationSettings() {
     const [activeTab, setActiveTab] = useState<SettingsTab>('quotationTypes')
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
+    const { hasPermission } = useAuth()
     const isLight = theme === 'light'
+    const canSettings = hasPermission('quotations:settings')
 
     const handleCategoryChange = (cat: SettingsCategory) => {
         setActiveCategory(cat)
@@ -126,27 +129,34 @@ export default function QuotationSettings() {
                 ))}
             </div>
 
-            {activeTab === 'quotationTypes' && <QuotationTypesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'clauses' && <ClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'warranties' && <WarrantiesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'deductibles' && <DeductiblesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'exclusions' && <ExclusionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'subLimits' && <SubLimitsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'additionalClauses' && <AdditionalClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'subjectivities' && <MasterSubjectivitiesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'tradingCountries' && <TradingCountriesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'tradingWarranty' && <TradingWarrantyTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'tradingWarrantyTemplates' && <TradingWarrantyTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'sanctionsVersions' && <SanctionsVersionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'sectionOrder' && <SectionOrderTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {!canSettings && (
+                <div style={{ padding: '12px 16px', marginBottom: '16px', borderRadius: '8px', background: 'rgba(255, 180, 0, 0.1)', border: '1px solid rgba(255, 180, 0, 0.3)', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    You do not have permission to modify quotation settings. Viewing in read-only mode.
+                </div>
+            )}
+            <fieldset disabled={!canSettings} style={{ border: 'none', padding: 0, margin: 0 }}>
+            {activeTab === 'quotationTypes' && <QuotationTypesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'clauses' && <ClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'warranties' && <WarrantiesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'deductibles' && <DeductiblesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'exclusions' && <ExclusionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'subLimits' && <SubLimitsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'additionalClauses' && <AdditionalClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'subjectivities' && <MasterSubjectivitiesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'tradingCountries' && <TradingCountriesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'tradingWarranty' && <TradingWarrantyTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'tradingWarrantyTemplates' && <TradingWarrantyTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'sanctionsVersions' && <SanctionsVersionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'sectionOrder' && <SectionOrderTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
 
-            {activeTab === 'hullAgreedValueTexts' && <HullAgreedValueTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'hullClauses' && <HullClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'hullAdditionalConditions' && <HullAdditionalConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'warConditions' && <WarConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            {activeTab === 'warSettings' && <WarSettingsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+            {activeTab === 'hullAgreedValueTexts' && <HullAgreedValueTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'hullClauses' && <HullClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'hullAdditionalConditions' && <HullAdditionalConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'warConditions' && <WarConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'warSettings' && <WarSettingsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            </fieldset>
         </div>
     )
 }
@@ -155,6 +165,7 @@ interface TabProps {
     showSuccess: (msg: string) => void
     showError: (msg: string) => void
     isLight: boolean
+    readOnly?: boolean
 }
 
 // ==================== Collapsible Standard Texts Section (reusable) ====================

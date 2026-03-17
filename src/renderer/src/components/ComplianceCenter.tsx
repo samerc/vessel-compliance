@@ -3,6 +3,7 @@ import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, Che
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 
 interface ComplianceCenterProps {
@@ -17,7 +18,9 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [activeTab, setActiveTab] = useState<'documents' | 'policies' | 'sanctions'>('documents')
     const { showSuccess } = useToast()
     const { theme } = useTheme()
+    const { hasPermission } = useAuth()
     const isLight = theme === 'light'
+    const canReview = hasPermission('compliance:review')
 
     // Sanctions compliance state
     const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
@@ -462,22 +465,26 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                                             <Eye size={14} />
                                                             {expandedResult === result.id ? 'Hide' : 'View'}
                                                         </button>
-                                                        <button
-                                                            onClick={() => handleDecideMatch(result.id, 'cleared')}
-                                                            title="False positive - this entity is not sanctioned"
-                                                            style={{ background: 'rgba(0, 255, 136, 0.1)', border: '1px solid rgba(0, 255, 136, 0.3)', color: '#00ff88', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                                        >
-                                                            <CheckCircle size={14} />
-                                                            Cleared
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDecideMatch(result.id, 'sanctioned')}
-                                                            title="True positive - this entity is sanctioned"
-                                                            style={{ background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.3)', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                                        >
-                                                            <ShieldAlert size={14} />
-                                                            Sanctioned
-                                                        </button>
+                                                        {canReview && (
+                                                            <button
+                                                                onClick={() => handleDecideMatch(result.id, 'cleared')}
+                                                                title="False positive - this entity is not sanctioned"
+                                                                style={{ background: 'rgba(0, 255, 136, 0.1)', border: '1px solid rgba(0, 255, 136, 0.3)', color: '#00ff88', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                                            >
+                                                                <CheckCircle size={14} />
+                                                                Cleared
+                                                            </button>
+                                                        )}
+                                                        {canReview && (
+                                                            <button
+                                                                onClick={() => handleDecideMatch(result.id, 'sanctioned')}
+                                                                title="True positive - this entity is sanctioned"
+                                                                style={{ background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.3)', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                                            >
+                                                                <ShieldAlert size={14} />
+                                                                Sanctioned
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

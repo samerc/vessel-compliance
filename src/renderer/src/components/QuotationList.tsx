@@ -429,14 +429,16 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                         {formatDate(q.updatedAt)}
                                     </td>
                                     <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                        <button
-                                            onClick={(e) => handleDuplicate(q, e)}
-                                            className="btn-secondary"
-                                            style={{ padding: '5px', marginRight: '4px' }}
-                                            title="Duplicate"
-                                        >
-                                            <Copy size={14} />
-                                        </button>
+                                        {hasPermission('quotations:create') && (
+                                            <button
+                                                onClick={(e) => handleDuplicate(q, e)}
+                                                className="btn-secondary"
+                                                style={{ padding: '5px', marginRight: '4px' }}
+                                                title="Duplicate"
+                                            >
+                                                <Copy size={14} />
+                                            </button>
+                                        )}
                                         {hasPermission('quotations:delete') && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ show: true, quotation: q }) }}

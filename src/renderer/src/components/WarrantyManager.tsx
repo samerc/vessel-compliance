@@ -44,7 +44,8 @@ function formatDate(s?: string | null): string {
 }
 
 export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: WarrantyManagerProps) {
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canManage = hasPermission('surveys:manage')
   const { showSuccess, showError } = useToast()
 
   const [warranties, setWarranties] = useState<SurveyWarranty[]>([])
@@ -535,7 +536,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {isActive && (
+              {canManage && isActive && (
                 <button
                   onClick={() => openReminderModal(w.id)}
                   className="btn-secondary"
@@ -544,7 +545,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   <Bell size={13} /> Log Reminder
                 </button>
               )}
-              {w.status === 'pending' && !w.conditionSurveyId && (
+              {canManage && w.status === 'pending' && !w.conditionSurveyId && (
                 <button
                   onClick={() => handleConvertToSurvey(w)}
                   className="btn-secondary"
@@ -553,7 +554,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   <ClipboardCheck size={13} /> Convert to Survey
                 </button>
               )}
-              {w.status === 'pending' && (
+              {canManage && w.status === 'pending' && (
                 <button
                   onClick={() => handleMarkSurveyDone(w)}
                   className="btn-secondary"
@@ -562,7 +563,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   <Check size={13} /> Survey Done
                 </button>
               )}
-              {w.status === 'survey_done' && (
+              {canManage && w.status === 'survey_done' && (
                 <button
                   onClick={() => { setCompleteWarrantyId(w.id); setCompleteNotes('') }}
                   className="btn-secondary"
@@ -571,7 +572,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   <Check size={13} /> Mark Complete
                 </button>
               )}
-              {isActive && (
+              {canManage && isActive && (
                 <button
                   onClick={() => openEditModal(w)}
                   className="btn-secondary"
@@ -580,7 +581,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   Edit
                 </button>
               )}
-              {isActive && (
+              {canManage && isActive && (
                 <button
                   onClick={() => { setWaiveWarrantyId(w.id); setWaiveReason('') }}
                   className="btn-secondary"
@@ -589,16 +590,18 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   Waive
                 </button>
               )}
-              <button
-                onClick={() => handleDelete(w.id)}
-                style={{
-                  fontSize: '0.78rem', padding: '4px 12px', cursor: 'pointer',
-                  background: 'rgba(255,77,77,0.12)', border: '1px solid rgba(255,77,77,0.35)',
-                  color: 'var(--danger)', borderRadius: '8px'
-                }}
-              >
-                Delete
-              </button>
+              {canManage && (
+                <button
+                  onClick={() => handleDelete(w.id)}
+                  style={{
+                    fontSize: '0.78rem', padding: '4px 12px', cursor: 'pointer',
+                    background: 'rgba(255,77,77,0.12)', border: '1px solid rgba(255,77,77,0.35)',
+                    color: 'var(--danger)', borderRadius: '8px'
+                  }}
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -634,9 +637,11 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
             </span>
           )}
         </div>
-        <button onClick={openAddModal} className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Plus size={14} /> Add Warranty
-        </button>
+        {canManage && (
+          <button onClick={openAddModal} className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Plus size={14} /> Add Warranty
+          </button>
+        )}
       </div>
 
       {/* Content */}

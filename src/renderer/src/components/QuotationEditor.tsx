@@ -3,6 +3,7 @@ import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarS
 import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload, GitBranch, RefreshCw, Lock, History } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS, SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
@@ -147,7 +148,10 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
+    const { hasPermission } = useAuth()
     const isLight = theme === 'light'
+    const canEdit = hasPermission('quotations:edit')
+    const canExport = hasPermission('quotations:export')
 
     useEffect(() => {
         loadMasterData()
@@ -215,7 +219,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     }
 
     const updateField = async (field: string, value: any) => {
-        if (isLocked) return
+        if (isLocked || !canEdit) return
         try {
             await window.api.updateQuotation(q.id, { [field]: value } as any)
             setQ(prev => ({ ...prev, [field]: value }))
@@ -231,7 +235,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     const showPIAltBar = isPIType && piAltTabs.includes(activeTab)
 
     const handleAddPIAlternatives = async () => {
-        if (isLocked) return
+        if (isLocked || !canEdit) return
         try {
             const a1 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 1')
             const a2 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 2')
@@ -255,7 +259,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     }
 
     const handleRemoveLastPIAlternative = async () => {
-        if (isLocked || piAlternatives.length < 2) return
+        if (isLocked || !canEdit || piAlternatives.length < 2) return
         try {
             if (piAlternatives.length === 2) {
                 // Remove both — exit alternatives mode
@@ -337,7 +341,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                             onChange={e => setQ(prev => ({ ...prev, referenceNumber: e.target.value }))}
                             onBlur={e => updateField('referenceNumber', e.target.value)}
                             placeholder="Reference number"
-                            disabled={isLocked}
+                            disabled={isLocked || !canEdit}
                             style={{ padding: '6px 10px', borderRadius: '6px', width: '180px', fontSize: '0.9rem', fontWeight: 600 }}
                         />
                     </div>
@@ -347,7 +351,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                             type="date"
                             value={q.quotationDate || ''}
                             onChange={e => { setQ(prev => ({ ...prev, quotationDate: e.target.value })); updateField('quotationDate', e.target.value) }}
-                            disabled={isLocked}
+                            disabled={isLocked || !canEdit}
                             style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
                         />
                     </div>
@@ -356,7 +360,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                         <select
                             value={q.policyTypeId || ''}
                             onChange={e => { setQ(prev => ({ ...prev, policyTypeId: e.target.value })); updateField('policyTypeId', e.target.value || null) }}
-                            disabled={isLocked}
+                            disabled={isLocked || !canEdit}
                             style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
                         >
                             <option value="">Select type</option>
@@ -368,7 +372,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                         <select
                             value={q.status}
                             onChange={e => { const v = e.target.value as any; setQ(prev => ({ ...prev, status: v })); updateField('status', v) }}
-                            disabled={isLocked}
+                            disabled={isLocked || !canEdit}
                             style={{
                                 padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem',
                                 background: sc.bg, color: sc.text, border: '1px solid var(--glass-border)', fontWeight: 600
@@ -386,14 +390,14 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                             type="checkbox"
                             checked={q.isRenewal}
                             onChange={e => { setQ(prev => ({ ...prev, isRenewal: e.target.checked })); updateField('isRenewal', e.target.checked) }}
-                            disabled={isLocked}
+                            disabled={isLocked || !canEdit}
                             style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
                         />
                         Renewal
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Currency:</span>
-                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked} style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked || !canEdit} style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', flexShrink: 0 }}>Title:</span>
@@ -403,7 +407,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                             onChange={e => setQ(prev => ({ ...prev, title: e.target.value }))}
                             onBlur={e => updateField('title', e.target.value || null)}
                             placeholder="Auto from vessel/fleet name…"
-                            disabled={isLocked}
+                            disabled={isLocked || !canEdit}
                             style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
                         />
                     </div>
@@ -414,20 +418,24 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                     >
                         <LayoutList size={16} /> Section Order
                     </button>
-                    <button
-                        onClick={async () => { try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-                    >
-                        <Download size={16} /> PDF
-                    </button>
-                    <button
-                        onClick={async () => { try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-                    >
-                        <Download size={16} /> Word
-                    </button>
+                    {canExport && (
+                        <button
+                            onClick={async () => { try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }}
+                            className="btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                        >
+                            <Download size={16} /> PDF
+                        </button>
+                    )}
+                    {canExport && (
+                        <button
+                            onClick={async () => { try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }}
+                            className="btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                        >
+                            <Download size={16} /> Word
+                        </button>
+                    )}
                     {q.exportSnapshot && !isLocked && (
                         <button
                             onClick={handleClearSnapshot}
@@ -438,7 +446,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                             <RefreshCw size={16} /> Refresh Texts
                         </button>
                     )}
-                    {!isLocked && (
+                    {!isLocked && canEdit && (
                         <button
                             onClick={handleCreateRevision}
                             className="btn-secondary"

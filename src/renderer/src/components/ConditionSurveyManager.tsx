@@ -13,7 +13,8 @@ interface ConditionSurveyManagerProps {
 }
 
 export default function ConditionSurveyManager({ vessel }: ConditionSurveyManagerProps) {
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canManage = hasPermission('surveys:manage')
   const { showError, showSuccess } = useToast()
   const [surveys, setSurveys] = useState<ConditionSurvey[]>([])
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
@@ -356,14 +357,16 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
               <Download size={16} />
               Export History
             </button>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className={showAddForm ? 'btn-secondary' : 'btn-primary'}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
-            >
-              {showAddForm ? <X size={16} /> : <Plus size={16} />}
-              {showAddForm ? 'Cancel' : 'Add Survey'}
-            </button>
+            {canManage && (
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className={showAddForm ? 'btn-secondary' : 'btn-primary'}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
+              >
+                {showAddForm ? <X size={16} /> : <Plus size={16} />}
+                {showAddForm ? 'Cancel' : 'Add Survey'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -635,7 +638,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               fontWeight: 600,
                             }}>CLOSED</span>
                           )}
-                          {!survey.completedAt && (
+                          {canManage && !survey.completedAt && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setClosingSurveyId(survey.id) }}
                               style={{
@@ -651,20 +654,24 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               Close Survey
                             </button>
                           )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleEditSurvey(survey) }}
-                            className="btn-secondary"
-                            style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
-                          >
-                            <Edit size={14} />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteSurvey(survey) }}
-                            style={{ padding: '6px 12px', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title="Delete survey"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canManage && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEditSurvey(survey) }}
+                              className="btn-secondary"
+                              style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
+                            >
+                              <Edit size={14} />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteSurvey(survey) }}
+                              style={{ padding: '6px 12px', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              title="Delete survey"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                           {isExpanded ? <ChevronUp size={18} color="var(--text-secondary)" /> : <ChevronDown size={18} color="var(--text-secondary)" />}
                         </>
                       )}
@@ -769,6 +776,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                           onDelete={handleDeleteAttachment}
                           onOpenFile={handleOpenFile}
                           onImportWord={() => handleImportDefectsFromWord(survey.id)}
+                          canManage={canManage}
                         />
                       )}
 
@@ -838,7 +846,8 @@ function SurveyAttachments({
   onDrop,
   onDelete,
   onOpenFile,
-  onImportWord
+  onImportWord,
+  canManage
 }: {
   attachments: SurveyAttachment[]
   isDragOver: boolean
@@ -848,6 +857,7 @@ function SurveyAttachments({
   onDelete: (id: string) => void
   onOpenFile: (path: string) => void
   onImportWord: () => void
+  canManage: boolean
 }) {
   const [showUpload, setShowUpload] = useState(false)
 
@@ -856,40 +866,44 @@ function SurveyAttachments({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <h4 style={{ color: 'var(--text-primary)', margin: 0 }}>Attachments</h4>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => setShowUpload(!showUpload)}
-            className="btn-primary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              fontSize: '14px',
-              backgroundColor: 'var(--accent-primary)',
-              color: 'white',
-              border: 'none'
-            }}
-          >
-            <Upload size={16} />
-            {showUpload ? 'Hide Upload' : 'Upload Documents'}
-          </button>
-          <button
-            onClick={onImportWord}
-            className="btn-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              fontSize: '14px',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--accent-secondary)',
-              color: 'var(--accent-secondary)'
-            }}
-          >
-            <FileUp size={16} />
-            Import Defects
-          </button>
+          {canManage && (
+            <button
+              onClick={() => setShowUpload(!showUpload)}
+              className="btn-primary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '14px',
+                backgroundColor: 'var(--accent-primary)',
+                color: 'white',
+                border: 'none'
+              }}
+            >
+              <Upload size={16} />
+              {showUpload ? 'Hide Upload' : 'Upload Documents'}
+            </button>
+          )}
+          {canManage && (
+            <button
+              onClick={onImportWord}
+              className="btn-secondary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '14px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--accent-secondary)',
+                color: 'var(--accent-secondary)'
+              }}
+            >
+              <FileUp size={16} />
+              Import Defects
+            </button>
+          )}
         </div>
       </div>
 
@@ -935,14 +949,16 @@ function SurveyAttachments({
               >
                 {attachment.fileName}
               </span>
-              <button
-                onClick={() => onDelete(attachment.id)}
-                style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                title="Delete attachment"
-                aria-label="Delete attachment"
-              >
-                <Trash2 size={14} />
-              </button>
+              {canManage && (
+                <button
+                  onClick={() => onDelete(attachment.id)}
+                  style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Delete attachment"
+                  aria-label="Delete attachment"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
           ))}
         </div>

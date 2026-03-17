@@ -8,7 +8,8 @@ import { formatDateTime } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 
 export default function UserManager() {
-    const { resetPassword, user: currentUser } = useAuth()
+    const { resetPassword, user: currentUser, hasPermission } = useAuth()
+    const canManageUsers = hasPermission('admin:users')
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
@@ -352,7 +353,7 @@ export default function UserManager() {
             </div>
 
             {/* Create User — Collapsible Card */}
-            <div className="glass-card" style={{ padding: '0', marginBottom: '24px', overflow: 'hidden' }}>
+            {canManageUsers && <div className="glass-card" style={{ padding: '0', marginBottom: '24px', overflow: 'hidden' }}>
                 <button
                     onClick={() => setShowCreateForm(!showCreateForm)}
                     style={{
@@ -403,7 +404,7 @@ export default function UserManager() {
                         </form>
                     </div>
                 )}
-            </div>
+            </div>}
 
             {/* Temp password banner */}
             {tempPassword && (
@@ -514,39 +515,47 @@ export default function UserManager() {
                                         </td>
                                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                                                <button
-                                                    onClick={() => openGroupsModal(user.id)}
-                                                    style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
-                                                    className="hover-effect"
-                                                    title="Groups & Permissions"
-                                                >
-                                                    <Users size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleToggleRole(user)}
-                                                    style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px', opacity: user.id === currentUser?.id ? 0.3 : 1 }}
-                                                    className="hover-effect"
-                                                    title={user.id === currentUser?.id ? 'Cannot change own role' : `Change to ${user.role === 'admin' ? 'User' : 'Admin'}`}
-                                                    disabled={user.id === currentUser?.id}
-                                                >
-                                                    <ArrowLeftRight size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleResetPassword(user.username)}
-                                                    style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
-                                                    className="hover-effect"
-                                                    title="Reset Password"
-                                                >
-                                                    <KeyRound size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(user.id)}
-                                                    style={{ background: 'transparent', color: 'var(--danger)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
-                                                    className="hover-effect"
-                                                    title="Delete User"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                {canManageUsers && (
+                                                    <button
+                                                        onClick={() => openGroupsModal(user.id)}
+                                                        style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                                                        className="hover-effect"
+                                                        title="Groups & Permissions"
+                                                    >
+                                                        <Users size={16} />
+                                                    </button>
+                                                )}
+                                                {canManageUsers && (
+                                                    <button
+                                                        onClick={() => handleToggleRole(user)}
+                                                        style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px', opacity: user.id === currentUser?.id ? 0.3 : 1 }}
+                                                        className="hover-effect"
+                                                        title={user.id === currentUser?.id ? 'Cannot change own role' : `Change to ${user.role === 'admin' ? 'User' : 'Admin'}`}
+                                                        disabled={user.id === currentUser?.id}
+                                                    >
+                                                        <ArrowLeftRight size={16} />
+                                                    </button>
+                                                )}
+                                                {canManageUsers && (
+                                                    <button
+                                                        onClick={() => handleResetPassword(user.username)}
+                                                        style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                                                        className="hover-effect"
+                                                        title="Reset Password"
+                                                    >
+                                                        <KeyRound size={16} />
+                                                    </button>
+                                                )}
+                                                {canManageUsers && (
+                                                    <button
+                                                        onClick={() => handleDelete(user.id)}
+                                                        style={{ background: 'transparent', color: 'var(--danger)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                                                        className="hover-effect"
+                                                        title="Delete User"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

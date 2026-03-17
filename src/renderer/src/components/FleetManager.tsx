@@ -26,6 +26,7 @@ import FleetDetail from './FleetDetail'
 import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 
 interface CustomerGroup {
   entity: Entity
@@ -36,6 +37,8 @@ export default function FleetManager() {
   const { theme } = useTheme()
   const isLight = theme === 'light'
   const { showSuccess } = useToast()
+  const { hasPermission } = useAuth()
+  const canManageFleets = hasPermission('fleets:manage')
 
   // --- data state ---
   const [fleets, setFleets] = useState<Fleet[]>([])
@@ -632,13 +635,15 @@ export default function FleetManager() {
                   style={{ width: '100%', paddingLeft: '36px' }}
                 />
               </div>
-              <button
-                onClick={() => setShowAddForm(v => !v)}
-                className="btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap', marginLeft: 'auto' }}
-              >
-                <Plus size={15} /> Add Fleet
-              </button>
+              {canManageFleets && (
+                <button
+                  onClick={() => setShowAddForm(v => !v)}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap', marginLeft: 'auto' }}
+                >
+                  <Plus size={15} /> Add Fleet
+                </button>
+              )}
             </div>
 
             {/* Inline add form */}
@@ -872,23 +877,25 @@ export default function FleetManager() {
                               >
                                 <Eye size={12} /> View
                               </button>
-                              <button
-                                onClick={() => handleDeleteFleet(fleet)}
-                                style={{
-                                  background: 'rgba(255,77,77,0.08)',
-                                  color: 'var(--danger)',
-                                  border: '1px solid rgba(255,77,77,0.2)',
-                                  borderRadius: '7px',
-                                  cursor: 'pointer',
-                                  padding: '5px 8px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  transition: 'background 0.15s',
-                                }}
-                                title="Delete fleet"
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                              {canManageFleets && (
+                                <button
+                                  onClick={() => handleDeleteFleet(fleet)}
+                                  style={{
+                                    background: 'rgba(255,77,77,0.08)',
+                                    color: 'var(--danger)',
+                                    border: '1px solid rgba(255,77,77,0.2)',
+                                    borderRadius: '7px',
+                                    cursor: 'pointer',
+                                    padding: '5px 8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    transition: 'background 0.15s',
+                                  }}
+                                  title="Delete fleet"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -949,23 +956,25 @@ export default function FleetManager() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => handleDeleteFleet(panelFleet)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--danger)',
-                        padding: '5px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        opacity: 0.65,
-                        borderRadius: '6px',
-                      }}
-                      title="Delete fleet"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canManageFleets && (
+                      <button
+                        onClick={() => handleDeleteFleet(panelFleet)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--danger)',
+                          padding: '5px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          opacity: 0.65,
+                          borderRadius: '6px',
+                        }}
+                        title="Delete fleet"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                     <button
                       onClick={() => setPanelFleet(null)}
                       style={{
@@ -1133,28 +1142,31 @@ export default function FleetManager() {
                       >
                         <ExternalLink size={12} />
                       </button>
-                      <button
-                        onClick={() => handleRemoveVessel(vessel)}
-                        disabled={removingId === vessel.id}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--danger)',
-                          padding: '3px',
-                          opacity: removingId === vessel.id ? 0.4 : 0.7,
-                          display: 'flex',
-                          alignItems: 'center',
-                        }}
-                        title="Remove from fleet"
-                      >
-                        <UserMinus size={13} />
-                      </button>
+                      {canManageFleets && (
+                        <button
+                          onClick={() => handleRemoveVessel(vessel)}
+                          disabled={removingId === vessel.id}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--danger)',
+                            padding: '3px',
+                            opacity: removingId === vessel.id ? 0.4 : 0.7,
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title="Remove from fleet"
+                        >
+                          <UserMinus size={13} />
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
 
                 {/* Add vessels section */}
+                {canManageFleets && (
                 <div style={{ borderTop: '1px solid var(--glass-border)' }}>
                   <button
                     onClick={() => {
@@ -1339,6 +1351,7 @@ export default function FleetManager() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
             </div>
           )}

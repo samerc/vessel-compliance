@@ -26,7 +26,8 @@ export default function ReminderCenter({ onNavigateToVessel }: { onNavigateToVes
   const [searchTerm, setSearchTerm] = useState('')
   const [fleetFilter, setFleetFilter] = useState('all')
   const [showSnoozed, setShowSnoozed] = useState(false)
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canManage = hasPermission('reminders:manage')
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const isLight = theme === 'light'
@@ -304,7 +305,7 @@ export default function ReminderCenter({ onNavigateToVessel }: { onNavigateToVes
                   >
                     <Copy size={14} />
                   </button>
-                  {reminder.isSnoozed ? (
+                  {canManage && reminder.isSnoozed && (
                     <button
                       className="btn-secondary"
                       onClick={() => handleUnsnooze(reminder.vesselId)}
@@ -314,7 +315,8 @@ export default function ReminderCenter({ onNavigateToVessel }: { onNavigateToVes
                     >
                       <Bell size={14} />
                     </button>
-                  ) : (
+                  )}
+                  {canManage && !reminder.isSnoozed && (
                     <button
                       className="btn-secondary"
                       onClick={() => handleSnooze(reminder.vesselId)}
