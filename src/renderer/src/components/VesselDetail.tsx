@@ -1163,7 +1163,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                             fontWeight: '600',
                                                             background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
                                                             border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                            color: isLight ? '#c00000' : '#ff4d4d',
+                                                            color: 'var(--danger)',
                                                             textTransform: 'uppercase'
                                                         }}
                                                     >
@@ -1410,7 +1410,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         fontWeight: '600',
                                                         background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
                                                         border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                        color: isLight ? '#c00000' : '#ff4d4d',
+                                                        color: 'var(--danger)',
                                                         textTransform: 'uppercase'
                                                     }}
                                                 >
@@ -1930,7 +1930,6 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     }
 
     const openEditModal = (p: VesselDynamicPolicy) => {
-        console.log('Opening edit modal for policy:', p)
         setEditingPolicyId(p.id)
         setFormTypeId(p.policyTypeId)
         // Strip the warning suffix if present so it doesn't persist after edit
@@ -1950,7 +1949,6 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                 else vals[v.characteristicId] = v.valueText
             }
         }
-        console.log('Initial form values:', vals)
         setFormValues(vals)
 
         setShowAddModal(true)
@@ -2096,7 +2094,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     const statusColors: Record<string, { bg: string; color: string }> = {
         active: { bg: 'rgba(0, 200, 100, 0.1)', color: isLight ? '#008c46' : '#00ff88' },
         expired: { bg: 'rgba(128, 128, 128, 0.1)', color: 'var(--text-secondary)' },
-        cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: isLight ? '#c00000' : '#ff4d4d' },
+        cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)' },
         inactive: { bg: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }
     }
 

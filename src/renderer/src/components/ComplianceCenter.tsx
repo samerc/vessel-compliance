@@ -33,7 +33,6 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [resultsTotalPages, setResultsTotalPages] = useState(0)
 
     useEffect(() => {
-        console.log('ComplianceCenter: Component mounted, loading data...')
         loadData()
         loadSanctionsData()
         loadPolicyAlerts()
@@ -43,13 +42,11 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
 
     const loadData = async () => {
         try {
-            console.log('ComplianceCenter: Loading vessels, documents, and document types...')
             const [vData, dData, tData] = await Promise.all([
                 window.api.getVessels(),
                 window.api.getVesselDocuments(),
                 window.api.getDocumentTypes()
             ])
-            console.log('ComplianceCenter: Data loaded successfully', { vessels: vData.length, docs: dData.length, docTypes: tData.length })
             setVessels(Array.isArray(vData) ? vData : [])
             setDocs(Array.isArray(dData) ? dData : [])
             setDocTypes(Array.isArray(tData) ? tData : [])
@@ -63,7 +60,6 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
 
     const loadSanctionsData = async () => {
         try {
-            console.log('ComplianceCenter: Loading sanctions data...')
             const [result, logs] = await Promise.all([
                 window.api.complianceGetCheckResultsPaginated({
                     page: resultsPage,
@@ -235,10 +231,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                         role="tab"
                         aria-selected={activeTab === 'sanctions'}
                         aria-controls="panel-sanctions"
-                        onClick={() => {
-                            console.log('ComplianceCenter: Switching to sanctions tab')
-                            setActiveTab('sanctions')
-                        }}
+                        onClick={() => setActiveTab('sanctions')}
                         style={{
                             padding: '10px 24px',
                             borderRadius: '8px',
@@ -402,7 +395,6 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
             )}
 
             {activeTab === 'sanctions' && (() => {
-                console.log('ComplianceCenter: Rendering sanctions tab', { pendingResults: pendingResults.length, checkLogs: checkLogs.length })
                 return (
                     <div role="tabpanel" id="panel-sanctions" aria-labelledby="tab-sanctions" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
                         {/* Pending Reviews */}

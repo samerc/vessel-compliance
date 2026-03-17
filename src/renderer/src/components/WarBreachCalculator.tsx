@@ -684,7 +684,7 @@ export default function WarBreachCalculator() {
                 }}>
                   {([
                     { label: 'Gross Premium', value: c.grossPrem, weight: 600 },
-                    { label: 'Gov. Taxes', value: c.taxesGov, color: isLight ? '#c00000' : '#ff7070' },
+                    { label: 'Gov. Taxes', value: c.taxesGov, color: 'var(--danger)' },
                     { label: 'Net', value: c.net },
                     { label: 'Commission', value: c.commission, color: 'var(--text-secondary)' },
                     { label: 'NR Tax', value: c.nrTax, color: 'var(--text-secondary)' },
@@ -1003,7 +1003,7 @@ export default function WarBreachCalculator() {
                             <td style={num}>{(parseFloat(v.rate) || 0).toFixed(3)}%</td>
                             <td style={{ ...num, textAlign: 'center' }}>{ncbLabel}</td>
                             <td style={{ ...num, fontWeight: 700, borderLeft: `2px solid ${accentBorder}` }}>{fmt(c.grossPrem)}</td>
-                            <td style={{ ...num, color: isLight ? '#c00000' : '#ff7070' }}>{fmt(c.taxesGov)}</td>
+                            <td style={{ ...num, color: 'var(--danger)' }}>{fmt(c.taxesGov)}</td>
                             <td style={num}>{fmt(c.net)}</td>
                             <td style={{ ...num, color: 'var(--text-secondary)' }}>{fmt(c.commission)}</td>
                             <td style={{ ...num, color: 'var(--text-secondary)' }}>{fmt(c.nrTax)}</td>
@@ -1087,7 +1087,7 @@ export default function WarBreachCalculator() {
                       <td style={num}>{(parseFloat(v.rate) || 0).toFixed(3)}%</td>
                       <td style={{ ...num, textAlign: 'center' }}>{ncbLabel}</td>
                       <td style={{ ...num, fontWeight: 700, borderLeft: `2px solid ${accentBorder}` }}>{fmt(c.grossPrem)}</td>
-                      <td style={{ ...num, color: isLight ? '#c00000' : '#ff7070' }}>{fmt(c.taxesGov)}</td>
+                      <td style={{ ...num, color: 'var(--danger)' }}>{fmt(c.taxesGov)}</td>
                       <td style={num}>{fmt(c.net)}</td>
                       <td style={{ ...num, color: 'var(--text-secondary)' }}>{fmt(c.commission)}</td>
                       <td style={{ ...num, color: 'var(--text-secondary)' }}>{fmt(c.nrTax)}</td>

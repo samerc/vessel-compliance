@@ -586,7 +586,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             config = {
                 background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
                 border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                color: isLight ? '#c00000' : '#ff4d4d',
+                color: 'var(--danger)',
                 text: 'SANCTIONED',
                 icon: <ShieldAlert size={12} />
             }
@@ -1041,7 +1041,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                             <div style={{ display: 'flex', gap: '4px' }}>
                                                                                 <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.certificateOfIncorporationPath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
                                                                                 <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'certificateOfIncorporationPath', 'COI') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>}
+                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
                                                                             </div>
                                                                         </div>
                                                                     ) : (
@@ -1069,7 +1069,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                             <div style={{ display: 'flex', gap: '4px' }}>
                                                                                 <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.articlesOfAssociationPath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
                                                                                 <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'articlesOfAssociationPath', 'AOA') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>}
+                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
                                                                             </div>
                                                                         </div>
                                                                     ) : (
@@ -1097,7 +1097,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                             <div style={{ display: 'flex', gap: '4px' }}>
                                                                                 <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.kycFilePath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
                                                                                 <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'kycFilePath', 'KYC') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>}
+                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
                                                                             </div>
                                                                         </div>
                                                                     ) : (
@@ -1131,7 +1131,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                         <div style={{ display: 'flex', gap: '4px' }}>
                                                                             <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.passportFilePath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
                                                                             <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'passportFilePath', 'ID/Passport') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                            {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={10} /></button>}
+                                                                            {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
                                                                         </div>
                                                                     </div>
                                                                 ) : (
@@ -1314,7 +1314,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                     <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.passportFilePath!)}>📄 ID/Passport</span>
                                                                                     <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'passportFilePath', 'ID/Passport') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                    {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>}
+                                                                                    {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
                                                                                 </div>
                                                                             ) : (
                                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1341,7 +1341,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                         <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.certificateOfIncorporationPath!)}>📄 COI</span>
                                                                                         <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'certificateOfIncorporationPath', 'COI') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>}
+                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1365,7 +1365,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                         <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.articlesOfAssociationPath!)}>📄 AOA</span>
                                                                                         <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'articlesOfAssociationPath', 'AOA') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>}
+                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1389,7 +1389,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                         <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.kycFilePath!)}>📄 KYC</span>
                                                                                         <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'kycFilePath', 'KYC') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: isLight ? '#c00000' : '#ff4d4d' }} title="Remove"><Trash2 size={9} /></button>}
+                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

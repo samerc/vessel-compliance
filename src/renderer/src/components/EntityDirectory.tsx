@@ -542,7 +542,7 @@ export default function EntityDirectory() {
     } else if (isError) {
       config = { bg: isLight ? 'rgba(200,120,0,0.15)' : 'rgba(255,153,0,0.1)', border: isLight ? '1px solid rgba(200,120,0,0.4)' : '1px solid rgba(255,153,0,0.3)', color: isLight ? '#b36b00' : '#ff9900', text: 'CHECK FAILED', icon: <Shield size={11} /> }
     } else if (isMatch) {
-      config = { bg: isLight ? 'rgba(200,0,0,0.12)' : 'rgba(255,77,77,0.1)', border: isLight ? '1px solid rgba(200,0,0,0.35)' : '1px solid rgba(255,77,77,0.3)', color: isLight ? '#c00000' : '#ff4d4d', text: 'SANCTIONED', icon: <ShieldAlert size={11} /> }
+      config = { bg: isLight ? 'rgba(200,0,0,0.12)' : 'rgba(255,77,77,0.1)', border: isLight ? '1px solid rgba(200,0,0,0.35)' : '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)', text: 'SANCTIONED', icon: <ShieldAlert size={11} /> }
     } else if (isPotentialMatch) {
       config = { bg: isLight ? 'rgba(180,140,0,0.15)' : 'rgba(255,193,7,0.1)', border: isLight ? '1px solid rgba(180,140,0,0.4)' : '1px solid rgba(255,193,7,0.3)', color: isLight ? '#997a00' : '#ffc107', text: 'POSSIBLE MATCH', icon: <ShieldAlert size={11} /> }
     } else {

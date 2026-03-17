@@ -336,7 +336,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
             config = {
                 background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
                 border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                color: isLight ? '#c00000' : '#ff4d4d',
+                color: 'var(--danger)',
                 text: 'SANCTIONED',
                 icon: <ShieldAlert size={12} />
             }

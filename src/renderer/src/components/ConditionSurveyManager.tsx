@@ -588,7 +588,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                         <span style={{ opacity: 0.3 }}>|</span>
                         <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           {counts.open > 0 && (
-                            <span style={{ color: isLight ? '#c00000' : '#ff6b6b', fontWeight: '600' }}>
+                            <span style={{ color: 'var(--danger)', fontWeight: '600' }}>
                               {counts.open} open
                             </span>
                           )}

@@ -484,7 +484,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                               fontWeight: '600',
                               background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
                               border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                              color: isLight ? '#c00000' : '#ff4d4d',
+                              color: 'var(--danger)',
                               textTransform: 'uppercase'
                             }}
                           >
