@@ -1,19 +1,17 @@
-## Security & Access Control
+## New Features
 
-- New: **Role-Based Access Control (RBAC)** — create custom user groups with granular permissions across all modules
-- New: **User Groups** — assign users to multiple groups; permissions are the union of all group memberships
-- New: **Per-User Permission Overrides** — grant or deny specific permissions to individual users on top of their group memberships
-- New: **UI Permission Enforcement** — sidebar navigation, action buttons (Add, Edit, Delete, Upload), and pages are hidden based on user permissions
-- New: **Server-Side Enforcement** — all write operations check permissions before executing; unauthorized actions are blocked at the IPC layer
+- New: **Activity Log** — centralized audit trail showing all system actions (create, update, delete, login, export) with colored badges, filters by module/action/user/date, and pagination
+- New: **Email Template System** — create and manage email templates with 16 placeholders ({vesselName}, {customerName}, {policyEndDate}, etc.), category tabs, clickable placeholder chips, and copy to clipboard
+- New: **Database Backup & Restore** — one-click backup to JSON file and restore from backup in Admin Panel settings
+- New: **Customer Portfolio PDF** — per-customer summary report with vessels table, policy coverage matrix, compliance breakdown, and open warranties
+- New: **Renewal Pipeline Report** — new Reports tab showing upcoming renewals with premium amounts, renewal status tracking, KPI cards, sortable table, and Excel export
+- New: **Dashboard Data Quality Alerts** — new card showing vessels without customers, entities without email/phone, and policies without end dates
+- New: **Selective Vessel Export** — checkbox modal to select which vessels to include when generating individual PDF ZIP exports
 
-## Fleet Analytics Redesign
+## Improvements
 
-- New: **Professional Analytics Dashboard** — complete redesign with filter sidebar and analytics cards
-- New: **Advanced Filters** — filter by policy type, fleet, customer, flag state, vessel type, age range, and tonnage range
-- New: **Saved Presets** — save and load filter combinations for quick access to your favorite analysis views
-- New: **KPI Summary** — vessels count, average age, average tonnage, total tonnage, unique flags, and policy coverage percentage
-- New: **Distribution Tables** — vessel type distribution with avg age/tonnage per type, flag state distribution (top 15), policy coverage matrix
-- New: **Bracket Analysis** — age and tonnage bracket cards with color-coded indicators
-- New: **Customer Concentration** — top 10 customers by vessel count with type breakdown
-- New: **PDF Export** — branded multi-page analytics report with tables and company header
-- New: **Excel Export** — 8-sheet workbook with summary, distributions, and raw vessel data
+- Improved: **Performance** — 10 heavy components lazy-loaded (QuotationManager, FleetAnalytics, Reports, etc.) reducing initial bundle size
+- Improved: **RBAC Permissions** — new granular permissions for email templates, backup/restore, activity log, and analytics presets
+- Improved: **Activity Logging** — 18 IPC handlers now log actions with entity names and change details (not UUIDs)
+- Improved: **Analytics KPI Cards** — dynamic font scaling for long numbers to prevent overflow
+- Improved: **Analytics Presets** — inline name input replaces browser prompt (which was blocked in Electron)

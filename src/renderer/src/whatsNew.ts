@@ -17,6 +17,22 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '6.3.0',
+    date: 'March 2026',
+    items: [
+      { tag: 'New', text: 'Activity Log — centralized audit trail for all system actions with filters, colored badges, and pagination' },
+      { tag: 'New', text: 'Email Template System — create templates with 16 placeholders, category tabs, and copy to clipboard' },
+      { tag: 'New', text: 'Database Backup & Restore — one-click backup to JSON and restore from Admin Panel' },
+      { tag: 'New', text: 'Customer Portfolio PDF — per-customer summary with vessels, policy coverage, compliance, and open warranties' },
+      { tag: 'New', text: 'Renewal Pipeline Report — upcoming renewals with premium amounts, KPI cards, sortable table, and Excel export' },
+      { tag: 'New', text: 'Dashboard Data Quality Alerts — flags vessels without customers, entities missing contact info' },
+      { tag: 'New', text: 'Selective Vessel Export — choose which vessels to include in ZIP exports' },
+      { tag: 'Improved', text: 'Performance — 10 heavy components lazy-loaded for faster startup' },
+      { tag: 'Improved', text: 'RBAC — new permissions for email templates, backup/restore, activity log, and analytics presets' },
+      { tag: 'Improved', text: 'Activity logging across 18 operations with entity names and change details' },
+    ],
+  },
+  {
     version: '6.2.0',
     date: 'March 2026',
     items: [
