@@ -17,6 +17,20 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '6.3.1',
+    date: 'March 2026',
+    items: [
+      { tag: 'Fixed', text: 'RBAC enforcement across 14 components — write actions now properly gated by permissions' },
+      { tag: 'Improved', text: 'Activity log — 18 additional handlers, name resolution instead of UUIDs, retention setting' },
+      { tag: 'Improved', text: 'Activity log table — distinct module/action pill colors, professional design' },
+      { tag: 'Improved', text: 'Quotation Settings — section descriptions, consistent styling, glass-card Standard Texts' },
+      { tag: 'Fixed', text: 'P&I date resolution for annual documents with multi-policy picker' },
+      { tag: 'New', text: 'NumberInput component with automatic thousand separator formatting' },
+      { tag: 'Fixed', text: '19 hardcoded danger colors replaced with var(--danger) across 7 components' },
+      { tag: 'Fixed', text: 'Removed 8 debug console.log statements' },
+    ],
+  },
+  {
     version: '6.3.0',
     date: 'March 2026',
     items: [

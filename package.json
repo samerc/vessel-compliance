@@ -1,6 +1,6 @@
 {
   "name": "vessel-compliance",
-  "version": "6.3.0",
+  "version": "6.3.1",
   "description": "An application to manage compliance for vessels ",
   "main": "./out/main/index.js",
   "author": "Samer Cheaib",
