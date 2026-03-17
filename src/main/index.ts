@@ -934,7 +934,18 @@ app.whenReady().then(() => {
   })
   safeHandle('db:updateVessel', async (event, id, updates) => {
     const user = await requirePermission(event, 'vessels:edit')
+    const [vRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [id])
+    const vessel = (vRows as any[])[0]
+    const vesselName = updates.name || vessel?.name || id
     const result = await db.updateVessel(id, updates, user.username)
+    const changedFields = Object.keys(updates).filter(k => updates[k] !== undefined)
+    const changeSummary = changedFields.map(k => {
+      if (k === 'isActive' || k === 'is_active') return updates[k] ? 'Activated' : 'Deactivated'
+      if (k === 'name') return `Name → ${updates[k]}`
+      if (k === 'flagStateId') return 'Flag state changed'
+      if (k === 'customerId') return updates[k] ? 'Customer assigned' : 'Customer removed'
+      return `${k} changed`
+    }).join(', ')
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -942,14 +953,17 @@ app.whenReady().then(() => {
       module: 'Vessels',
       entityType: 'vessel',
       entityId: id,
-      entityName: updates.name,
-      details: `Updated vessel ${updates.name || id}`
+      entityName: vesselName,
+      details: changeSummary || `Updated ${vesselName}`
     }).catch(() => {})
     return result
   })
   safeHandle('db:getVesselNameHistory', (event, vesselId) => { requireSession(event); return db.getVesselNameHistory(vesselId) })
   safeHandle('db:deleteVessel', async (event, id) => {
     const user = await requirePermission(event, 'vessels:delete')
+    const [vRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [id])
+    const vessel = (vRows as any[])[0]
+    const vesselName = vessel?.name || id
     await db.deleteVessel(id)
     db.logActivity({
       userId: user.id,
@@ -958,7 +972,8 @@ app.whenReady().then(() => {
       module: 'Vessels',
       entityType: 'vessel',
       entityId: id,
-      details: `Deleted vessel ${id}`
+      entityName: vesselName,
+      details: `Deleted vessel ${vesselName}`
     }).catch(() => {})
     return { success: true }
   })
@@ -1005,12 +1020,16 @@ app.whenReady().then(() => {
   })
   safeHandle('db:updateEntity', async (event, id, updates) => {
     const user = await requirePermission(event, 'entities:edit')
+    const [eRows] = await (db as any).pool.query('SELECT name FROM entities WHERE id = ?', [id])
+    const entityName = updates.name || (eRows as any[])[0]?.name || id
     const docFields = ['passportFilePath', 'certificateOfIncorporationPath', 'articlesOfAssociationPath', 'kycFilePath']
     const hasDocChange = docFields.some(f => updates[f] !== undefined)
     await db.updateEntity(id, updates)
     if (hasDocChange) {
       await db.autoSnoozeVesselsForEntity(id)
     }
+    const fields = Object.keys(updates).filter(k => updates[k] !== undefined && !docFields.includes(k))
+    const summary = fields.length > 0 ? fields.map(k => k === 'name' ? `Name → ${updates[k]}` : `${k} changed`).join(', ') : hasDocChange ? 'Documents updated' : `Updated ${entityName}`
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -1018,12 +1037,14 @@ app.whenReady().then(() => {
       module: 'Entities',
       entityType: 'entity',
       entityId: id,
-      entityName: updates.name,
-      details: `Updated entity ${updates.name || id}`
+      entityName: entityName,
+      details: summary
     }).catch(() => {})
   })
   safeHandle('db:deleteEntity', async (event, id) => {
     const user = await requirePermission(event, 'entities:delete')
+    const [eDelRows] = await (db as any).pool.query('SELECT name FROM entities WHERE id = ?', [id])
+    const entityName = (eDelRows as any[])[0]?.name || id
     const result = await db.deleteEntity(id)
     db.logActivity({
       userId: user.id,
@@ -1032,7 +1053,8 @@ app.whenReady().then(() => {
       module: 'Entities',
       entityType: 'entity',
       entityId: id,
-      details: `Deleted entity ${id}`
+      entityName: entityName,
+      details: `Deleted entity ${entityName}`
     }).catch(() => {})
     return result
   })
@@ -2215,6 +2237,8 @@ app.whenReady().then(() => {
   })
   safeHandle('db:updateQuotation', async (event, id, updates) => {
     const user = await requirePermission(event, 'quotations:edit')
+    const existing = await db.getQuotation(id)
+    const ref = existing?.referenceNumber || id
     const result = await db.updateQuotation(id, updates)
     db.logActivity({
       userId: user.id,
@@ -2223,12 +2247,15 @@ app.whenReady().then(() => {
       module: 'Quotations',
       entityType: 'quotation',
       entityId: id,
-      details: `Updated quotation ${id}`
+      entityName: ref,
+      details: `Updated quotation ${ref}`
     }).catch(() => {})
     return result
   })
   safeHandle('db:deleteQuotation', async (event, id) => {
     const user = await requirePermission(event, 'quotations:delete')
+    const existing = await db.getQuotation(id)
+    const ref = existing?.referenceNumber || id
     const result = await db.deleteQuotation(id)
     db.logActivity({
       userId: user.id,
@@ -2237,7 +2264,8 @@ app.whenReady().then(() => {
       module: 'Quotations',
       entityType: 'quotation',
       entityId: id,
-      details: `Deleted quotation ${id}`
+      entityName: ref,
+      details: `Deleted quotation ${ref}`
     }).catch(() => {})
     return result
   })
