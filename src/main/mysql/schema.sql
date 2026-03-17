@@ -681,6 +681,19 @@ CREATE TABLE IF NOT EXISTS quotation_war_conditions (
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Email templates
+CREATE TABLE IF NOT EXISTS email_templates (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  subject VARCHAR(500) NULL,
+  body TEXT NOT NULL,
+  category VARCHAR(50) NOT NULL DEFAULT 'general',
+  is_system BOOLEAN DEFAULT FALSE,
+  created_by VARCHAR(36) NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- System-wide activity log
 CREATE TABLE IF NOT EXISTS activity_log (
   id VARCHAR(36) PRIMARY KEY,

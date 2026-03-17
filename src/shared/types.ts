@@ -1221,6 +1221,17 @@ export interface ActivityLogFilters {
   search?: string
 }
 
+export interface EmailTemplate {
+  id: string
+  name: string
+  subject?: string | null
+  body: string
+  category: string
+  isSystem: boolean
+  createdBy?: string | null
+  order: number
+}
+
 export interface ReportSettings {
   companyName: string
   companySubtitle: string
