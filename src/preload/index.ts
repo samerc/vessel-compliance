@@ -438,6 +438,7 @@ const api = {
   getExpiredActivePolicies: () => ipcRenderer.invoke('policies:getExpiredActive'),
   getPolicyRenewalsByMonth: (year: number, month: number) => ipcRenderer.invoke('policies:getRenewalsByMonth', year, month),
   setQuotationSentDate: (policyId: string, date: string | null) => ipcRenderer.invoke('policies:setQuotationSentDate', policyId, date),
+  getRenewalPipeline: (dateFrom: string, dateTo: string) => ipcRenderer.invoke('renewals:getPipeline', dateFrom, dateTo),
 
   // Renewal Status Types
   getRenewalStatusTypes: () => ipcRenderer.invoke('renewalStates:getAll'),
@@ -609,6 +610,13 @@ const api = {
   reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),
   getUserSectionAccess: () => ipcRenderer.invoke('settings:getUserSectionAccess'),
   setUserSectionAccess: (sectionIds: string[]) => ipcRenderer.invoke('settings:setUserSectionAccess', sectionIds),
+
+  // Email Templates
+  emailGetTemplates: (category?: string) => ipcRenderer.invoke('email:getTemplates', category),
+  emailAddTemplate: (template: any) => ipcRenderer.invoke('email:addTemplate', template),
+  emailUpdateTemplate: (id: string, updates: any) => ipcRenderer.invoke('email:updateTemplate', id, updates),
+  emailDeleteTemplate: (id: string) => ipcRenderer.invoke('email:deleteTemplate', id),
+  emailReorderTemplates: (orderedIds: string[]) => ipcRenderer.invoke('email:reorderTemplates', orderedIds),
 
   // Database Backup & Restore
   dbBackup: () => ipcRenderer.invoke('db:backup'),

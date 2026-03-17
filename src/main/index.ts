@@ -2180,6 +2180,7 @@ app.whenReady().then(() => {
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })
   safeHandle('policies:setQuotationSentDate', async (event, policyId: string, date: string | null) => { await requirePermission(event, 'policies:manage'); return db.setQuotationSentDate(policyId, date) })
+  safeHandle('renewals:getPipeline', (event, dateFrom: string, dateTo: string) => { requireSession(event); return db.getRenewalPipeline(dateFrom, dateTo) })
 
   // Renewal Status Types
   safeHandle('renewalStates:getAll', (event) => { requireSession(event); return db.getRenewalStatusTypes() })
@@ -2498,6 +2499,32 @@ app.whenReady().then(() => {
   safeHandle('activity:getDistinctUsers', async (event) => {
     requireSession(event)
     return await db.getActivityLogDistinctUsers()
+  })
+
+  // Email Templates
+  safeHandle('email:getTemplates', async (event, category?: string) => {
+    requireSession(event)
+    return db.getEmailTemplates(category || undefined)
+  })
+
+  safeHandle('email:addTemplate', async (event, template) => {
+    const user = await requirePermission(event, 'admin:settings')
+    return db.addEmailTemplate({ ...template, createdBy: user.id })
+  })
+
+  safeHandle('email:updateTemplate', async (event, id: string, updates) => {
+    await requirePermission(event, 'admin:settings')
+    return db.updateEmailTemplate(id, updates)
+  })
+
+  safeHandle('email:deleteTemplate', async (event, id: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.deleteEmailTemplate(id)
+  })
+
+  safeHandle('email:reorderTemplates', async (event, orderedIds: string[]) => {
+    await requirePermission(event, 'admin:settings')
+    return db.reorderEmailTemplates(orderedIds)
   })
 
   createWindow()

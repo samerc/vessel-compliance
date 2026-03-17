@@ -1949,6 +1949,40 @@ export class MySQLAdapter {
                 }
             }
 
+            // Seed default email templates if table is empty
+            {
+                const [etRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM email_templates')
+                if ((etRows as any[])[0].cnt === 0) {
+                    const seedTemplates = [
+                        {
+                            name: 'Renewal Reminder',
+                            subject: 'Policy Renewal Reminder - {vesselName}',
+                            body: 'Dear {customerName},\n\nThis is a reminder that the {policyType} policy (#{policyNumber}) for vessel {vesselName} (IMO: {imoNumber}) is due for renewal on {policyEndDate}.\n\nPlease arrange renewal at your earliest convenience.\n\nBest regards,\n{userName}\n{companyName}',
+                            category: 'renewals'
+                        },
+                        {
+                            name: 'Document Request',
+                            subject: 'Document Request - {vesselName}',
+                            body: 'Dear {customerName},\n\nWe are writing to request the following document for vessel {vesselName} (IMO: {imoNumber}):\n\n- {documentName}\n\nThe document is currently missing from our records. Please provide it at your earliest convenience.\n\nBest regards,\n{userName}\n{companyName}',
+                            category: 'documents'
+                        },
+                        {
+                            name: 'Warranty Follow-up',
+                            subject: 'Warranty Follow-up - {vesselName}',
+                            body: 'Dear {customerName},\n\nThis is a follow-up regarding the warranty for vessel {vesselName} (IMO: {imoNumber}):\n\nWarranty: {warrantyDescription}\nDeadline: {warrantyDeadline}\n\nPlease ensure compliance before the deadline.\n\nBest regards,\n{userName}\n{companyName}',
+                            category: 'warranties'
+                        }
+                    ]
+                    for (let i = 0; i < seedTemplates.length; i++) {
+                        const t = seedTemplates[i]
+                        await this.pool.execute(
+                            'INSERT INTO email_templates (id, name, subject, body, category, is_system, order_index) VALUES (?, ?, ?, ?, ?, 1, ?)',
+                            [uuidv4(), t.name, t.subject, t.body, t.category, i]
+                        )
+                    }
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -6980,6 +7014,44 @@ export class MySQLAdapter {
         return rows as any[]
     }
 
+    // --- Renewal Pipeline ---
+    async getRenewalPipeline(dateFrom: string, dateTo: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
+                    pt.name as policyTypeName, pt.id as policyTypeId,
+                    vdp.policy_number as policyNumber,
+                    vdp.status, vdp.renewal_status_id as renewalStatusId,
+                    rst.name as renewalStatusName, rst.color as renewalStatusColor,
+                    vpv.value_date as endDate,
+                    e.name as customerName, v.customer_type as customerType,
+                    f.name as fleetName,
+                    vdp.currency as currency,
+                    (SELECT vpv2.value_amount FROM vessel_policy_values vpv2
+                     JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
+                     WHERE vpv2.policy_id = vdp.id AND ptc2.field_type = 'amount'
+                       AND LOWER(ptc2.name) LIKE '%premium%'
+                     LIMIT 1) as premium
+             FROM vessel_dynamic_policies vdp
+             JOIN vessels v ON vdp.vessel_id = v.id
+             JOIN policy_types pt ON vdp.policy_type_id = pt.id
+             JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
+             JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
+             LEFT JOIN entities e ON v.customer_id = e.id
+             LEFT JOIN fleets f ON v.fleet_id = f.id
+             LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
+             WHERE v.is_active = TRUE AND vdp.status = 'active'
+               AND ptc.field_type = 'date'
+               AND LOWER(ptc.name) LIKE '%end%'
+               AND vpv.value_date IS NOT NULL
+               AND vpv.value_date >= ?
+               AND vpv.value_date <= ?
+             ORDER BY vpv.value_date ASC, v.name ASC`,
+            [dateFrom, dateTo]
+        )
+        return rows as any[]
+    }
+
     // --- Policy Renewal Notes ---
     async getPolicyRenewalNotes(policyId: string, policyNumber: string): Promise<any[]> {
         if (!this.pool) return []
@@ -7855,6 +7927,59 @@ export class MySQLAdapter {
             'INSERT INTO activity_log (id, user_id, username, action, module, entity_type, entity_id, entity_name, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [id, entry.userId, entry.username, entry.action, entry.module, entry.entityType || null, entry.entityId || null, entry.entityName || null, entry.details || null]
         )
+    }
+
+    // --- Email Templates ---
+    async getEmailTemplates(category?: string): Promise<import('../../shared/types').EmailTemplate[]> {
+        if (!this.pool) return []
+        let sql = 'SELECT id, name, subject, body, category, is_system AS isSystem, created_by AS createdBy, order_index AS `order` FROM email_templates'
+        const params: any[] = []
+        if (category) {
+            sql += ' WHERE category = ?'
+            params.push(category)
+        }
+        sql += ' ORDER BY order_index ASC, created_at ASC'
+        const [rows] = await this.pool.query(sql, params)
+        return (rows as any[]).map(r => ({ ...r, isSystem: !!r.isSystem }))
+    }
+
+    async addEmailTemplate(template: { name: string; subject?: string | null; body: string; category: string; isSystem?: boolean; createdBy?: string | null }): Promise<import('../../shared/types').EmailTemplate> {
+        if (!this.pool) throw new Error('Not connected')
+        const id = uuidv4()
+        const [countRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM email_templates')
+        const orderIndex = (countRows as any[])[0].cnt
+        await this.pool.execute(
+            'INSERT INTO email_templates (id, name, subject, body, category, is_system, created_by, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, template.name, template.subject || null, template.body, template.category || 'general', template.isSystem ? 1 : 0, template.createdBy || null, orderIndex]
+        )
+        return { id, name: template.name, subject: template.subject || null, body: template.body, category: template.category || 'general', isSystem: !!template.isSystem, createdBy: template.createdBy || null, order: orderIndex }
+    }
+
+    async updateEmailTemplate(id: string, updates: Partial<{ name: string; subject: string | null; body: string; category: string }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.subject !== undefined) { fields.push('subject = ?'); values.push(updates.subject) }
+        if (updates.body !== undefined) { fields.push('body = ?'); values.push(updates.body) }
+        if (updates.category !== undefined) { fields.push('category = ?'); values.push(updates.category) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE email_templates SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteEmailTemplate(id: string): Promise<void> {
+        if (!this.pool) return
+        const [rows] = await this.pool.query('SELECT is_system FROM email_templates WHERE id = ?', [id])
+        if ((rows as any[])[0]?.is_system) throw new Error('Cannot delete system templates')
+        await this.pool.execute('DELETE FROM email_templates WHERE id = ?', [id])
+    }
+
+    async reorderEmailTemplates(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE email_templates SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
     }
 
     async getActivityLogDistinctModules(): Promise<string[]> {

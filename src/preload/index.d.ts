@@ -426,6 +426,7 @@ export interface Api {
   getExpiredActivePolicies: () => Promise<any[]>
   getPolicyRenewalsByMonth: (year: number, month: number) => Promise<any[]>
   setQuotationSentDate: (policyId: string, date: string | null) => Promise<void>
+  getRenewalPipeline: (dateFrom: string, dateTo: string) => Promise<any[]>
 
   // Renewal Status Types
   getRenewalStatusTypes: () => Promise<any[]>
@@ -610,6 +611,13 @@ export interface Api {
   onUpdateDownloadProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => void
   onUpdateDownloaded: (callback: (info: { version: string; releaseDate?: string }) => void) => void
   onUpdateError: (callback: (error: { message: string }) => void) => void
+
+  // Email Templates
+  emailGetTemplates: (category?: string) => Promise<import('../shared/types').EmailTemplate[]>
+  emailAddTemplate: (template: Omit<import('../shared/types').EmailTemplate, 'id' | 'order' | 'isSystem' | 'createdBy'>) => Promise<import('../shared/types').EmailTemplate>
+  emailUpdateTemplate: (id: string, updates: Partial<{ name: string; subject: string | null; body: string; category: string }>) => Promise<void>
+  emailDeleteTemplate: (id: string) => Promise<void>
+  emailReorderTemplates: (orderedIds: string[]) => Promise<void>
 }
 
 declare global {
