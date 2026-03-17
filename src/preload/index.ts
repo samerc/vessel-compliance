@@ -604,6 +604,10 @@ const api = {
   activityGetDistinctModules: () => ipcRenderer.invoke('activity:getDistinctModules'),
   activityGetDistinctActions: () => ipcRenderer.invoke('activity:getDistinctActions'),
   activityGetDistinctUsers: () => ipcRenderer.invoke('activity:getDistinctUsers'),
+  activityGetRetention: () => ipcRenderer.invoke('activity:getRetention'),
+  activitySetRetention: (days: number) => ipcRenderer.invoke('activity:setRetention', days),
+  activityCleanup: () => ipcRenderer.invoke('activity:cleanup'),
+  activityGetCount: () => ipcRenderer.invoke('activity:getCount'),
 
   // Report Settings
   reportSettingsGet: () => ipcRenderer.invoke('reportSettings:get'),

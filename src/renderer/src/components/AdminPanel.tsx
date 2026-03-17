@@ -104,6 +104,12 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [groupPermissions, setGroupPermissions] = useState<string[]>([])
     const [collapsedPermCategories, setCollapsedPermCategories] = useState<Set<string>>(new Set())
 
+    // Activity Log Retention state
+    const [logRetentionDays, setLogRetentionDays] = useState<number>(365)
+    const [logEntryCount, setLogEntryCount] = useState<number>(0)
+    const [cleaningLog, setCleaningLog] = useState(false)
+    const [savingRetention, setSavingRetention] = useState(false)
+
     // Backup & Restore state
     const [backupInProgress, setBackupInProgress] = useState(false)
     const [restoreInProgress, setRestoreInProgress] = useState(false)
@@ -119,6 +125,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         loadReportSettings()
         loadUserGroups()
         loadLastBackupDate()
+        loadLogRetention()
         window.api.getUserSectionAccess().then(setUserSectionAccess).catch(() => {})
     }, [])
 
@@ -144,6 +151,50 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             const date = await window.api.dbGetLastBackupDate()
             setLastBackupDate(date || null)
         } catch { /* ignore */ }
+    }
+
+    const loadLogRetention = async () => {
+        try {
+            const days = await window.api.activityGetRetention()
+            setLogRetentionDays(typeof days === 'number' ? days : 365)
+            const count = await window.api.activityGetCount()
+            setLogEntryCount(typeof count === 'number' ? count : 0)
+        } catch { /* ignore */ }
+    }
+
+    const handleSaveRetention = async (days: number) => {
+        setSavingRetention(true)
+        try {
+            setLogRetentionDays(days)
+            const result = await window.api.activitySetRetention(days)
+            if (result?.deleted > 0) {
+                showSuccess(`Retention set to ${days === 0 ? 'never delete' : days + ' days'}. Cleaned ${result.deleted} old entries.`)
+            } else {
+                showSuccess(`Retention set to ${days === 0 ? 'never delete' : days + ' days'}`)
+            }
+            await loadLogRetention()
+        } catch (err: any) {
+            showError(err?.message || 'Failed to save retention setting')
+        } finally {
+            setSavingRetention(false)
+        }
+    }
+
+    const handleCleanNow = async () => {
+        setCleaningLog(true)
+        try {
+            const result = await window.api.activityCleanup()
+            if (result?.deleted > 0) {
+                showSuccess(`Cleaned ${result.deleted} old log entries`)
+            } else {
+                showSuccess('No old entries to clean')
+            }
+            await loadLogRetention()
+        } catch (err: any) {
+            showError(err?.message || 'Failed to clean activity log')
+        } finally {
+            setCleaningLog(false)
+        }
     }
 
     const handleBackup = async () => {
@@ -959,6 +1010,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin ? [
             { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
+            { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
             { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
         ] : []),
@@ -1859,6 +1911,68 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             )}
 
             {/* Backup & Restore */}
+            {effectiveSection === 'logRetention' && isAdmin && (
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={20} color="var(--accent-primary)" /> Activity Log Retention
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                    Automatically delete old activity log entries to keep the database lean. Cleanup runs on app startup and when saving.
+                </p>
+
+                <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={16} color="var(--accent-primary)" />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        Current entries: <strong style={{ color: 'var(--text-primary)' }}>{logEntryCount.toLocaleString()}</strong>
+                    </span>
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                        Retention Period
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {[
+                            { label: '90 days', value: 90 },
+                            { label: '180 days', value: 180 },
+                            { label: '365 days', value: 365 },
+                            { label: 'Never', value: 0 },
+                        ].map(opt => (
+                            <button
+                                key={opt.value}
+                                onClick={() => handleSaveRetention(opt.value)}
+                                disabled={savingRetention}
+                                className={logRetentionDays === opt.value ? 'btn-primary' : 'btn-secondary'}
+                                style={{
+                                    padding: '8px 20px',
+                                    fontSize: '0.85rem',
+                                    ...(logRetentionDays === opt.value ? {} : { opacity: 0.7 })
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <button
+                    onClick={handleCleanNow}
+                    disabled={cleaningLog || logRetentionDays === 0}
+                    className="btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
+                >
+                    {cleaningLog ? <Loader2 size={16} className="spin" /> : <Trash2 size={16} />}
+                    {cleaningLog ? 'Cleaning...' : 'Clean Now'}
+                </button>
+
+                {logRetentionDays === 0 && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '12px', fontStyle: 'italic' }}>
+                        Retention is set to &quot;Never&quot; — no automatic cleanup will occur.
+                    </p>
+                )}
+            </section>
+            )}
+
             {effectiveSection === 'backup' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>

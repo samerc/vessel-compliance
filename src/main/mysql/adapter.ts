@@ -7999,6 +7999,29 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query('SELECT DISTINCT al.user_id AS id, al.username FROM activity_log al ORDER BY al.username ASC')
         return rows as any[]
     }
+    async getActivityLogRetention(): Promise<number> {
+        const val = await this.getSetting('activity_log_retention_days')
+        return val ? parseInt(val, 10) : 365
+    }
+
+    async setActivityLogRetention(days: number): Promise<void> {
+        await this.setSetting('activity_log_retention_days', String(days))
+    }
+
+    async cleanupActivityLog(retentionDays: number): Promise<number> {
+        if (!this.pool || retentionDays <= 0) return 0
+        const [result] = await this.pool.execute(
+            'DELETE FROM activity_log WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+            [retentionDays]
+        )
+        return (result as any).affectedRows || 0
+    }
+
+    async getActivityLogCount(): Promise<number> {
+        if (!this.pool) return 0
+        const [rows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM activity_log')
+        return (rows as any[])[0]?.cnt || 0
+    }
 }
 
 export const db = new MySQLAdapter()

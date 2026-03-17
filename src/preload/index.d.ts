@@ -603,6 +603,10 @@ export interface Api {
   activityGetDistinctModules: () => Promise<string[]>
   activityGetDistinctActions: () => Promise<string[]>
   activityGetDistinctUsers: () => Promise<{ id: string; username: string }[]>
+  activityGetRetention: () => Promise<number>
+  activitySetRetention: (days: number) => Promise<{ deleted: number }>
+  activityCleanup: () => Promise<{ deleted: number }>
+  activityGetCount: () => Promise<number>
   updateUserAppVersion: (version: string) => Promise<void>
   updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => Promise<void>
   onUpdateChecking: (callback: () => void) => void

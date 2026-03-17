@@ -251,6 +251,16 @@ function createWindow(): void {
         } catch (schemaError) {
           console.error('Schema init error (non-fatal):', schemaError)
         }
+        // Cleanup old activity log entries based on retention setting
+        try {
+          const retentionDays = await db.getActivityLogRetention()
+          if (retentionDays > 0) {
+            const deleted = await db.cleanupActivityLog(retentionDays)
+            if (deleted > 0) console.log(`Activity log cleanup: removed ${deleted} entries older than ${retentionDays} days`)
+          }
+        } catch (cleanupErr) {
+          console.error('Activity log cleanup error (non-fatal):', cleanupErr)
+        }
         // Validate restored sessions against live DB (clears sessions for deleted users)
         await auth.validateRestoredSessions().catch(() => {})
         // Update last_login for auto-restored sessions (no password re-entry on startup)
@@ -985,6 +995,13 @@ app.whenReady().then(() => {
     if (doc.filePath) {
       await db.autoSnoozeVessel(doc.vesselId)
     }
+    const [vDocRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [doc.vesselId])
+    const vDocName = (vDocRows as any[])[0]?.name || doc.vesselId
+    const [dtRows] = await (db as any).pool.query(
+      'SELECT name FROM document_types WHERE id = ? UNION SELECT name FROM vessel_custom_doc_types WHERE id = ?',
+      [doc.docTypeId, doc.docTypeId]
+    )
+    const docTypeName = (dtRows as any[])[0]?.name || doc.docTypeId
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -992,7 +1009,8 @@ app.whenReady().then(() => {
       module: 'Documents',
       entityType: 'vessel_document',
       entityId: doc.vesselId,
-      details: `Uploaded document for vessel ${doc.vesselId}`
+      entityName: vDocName,
+      details: `Uploaded ${docTypeName} for vessel ${vDocName}`
     }).catch(() => {})
   })
   safeHandle('db:updateVesselDocumentExpiry', async (event, vesselId, docTypeId, expiryDate) => { await requirePermission(event, 'documents:upload'); return db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate) })
@@ -1133,6 +1151,8 @@ app.whenReady().then(() => {
   safeHandle('db:addConditionSurvey', async (event, survey) => {
     const user = await requirePermission(event, 'surveys:manage')
     const result = await db.addConditionSurvey(survey)
+    const [vSurvRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [survey.vesselId])
+    const vSurvName = (vSurvRows as any[])[0]?.name || survey.vesselId
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -1140,13 +1160,18 @@ app.whenReady().then(() => {
       module: 'Surveys',
       entityType: 'survey',
       entityId: result?.id || survey.id,
-      details: `Created condition survey for vessel ${survey.vesselId}`
+      entityName: vSurvName,
+      details: `Created condition survey for vessel ${vSurvName}`
     }).catch(() => {})
     return result
   })
   safeHandle('db:updateConditionSurvey', async (event, id, updates) => { await requirePermission(event, 'surveys:manage'); return db.updateConditionSurvey(id, updates) })
   safeHandle('db:deleteConditionSurvey', async (event, id) => {
     const user = await requirePermission(event, 'surveys:manage')
+    const [survDelRows] = await (db as any).pool.query(
+      'SELECT cs.id, v.name AS vesselName FROM condition_surveys cs LEFT JOIN vessels v ON cs.vessel_id = v.id WHERE cs.id = ?', [id]
+    )
+    const survVesselName = (survDelRows as any[])[0]?.vesselName || id
     const result = await db.deleteConditionSurvey(id)
     db.logActivity({
       userId: user.id,
@@ -1155,7 +1180,8 @@ app.whenReady().then(() => {
       module: 'Surveys',
       entityType: 'survey',
       entityId: id,
-      details: `Deleted condition survey ${id}`
+      entityName: survVesselName,
+      details: `Deleted condition survey for vessel ${survVesselName}`
     }).catch(() => {})
     return result
   })
@@ -2148,6 +2174,8 @@ app.whenReady().then(() => {
   safeHandle('vessels:addDynamicPolicy', async (event, policy) => {
     const user = await requirePermission(event, 'policies:manage')
     const result = await db.addVesselDynamicPolicy(policy)
+    const [vPolRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [policy.vesselId])
+    const vPolName = (vPolRows as any[])[0]?.name || policy.vesselId
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -2155,13 +2183,18 @@ app.whenReady().then(() => {
       module: 'Policies',
       entityType: 'policy',
       entityId: result || policy.id,
-      details: `Created policy for vessel ${policy.vesselId}`
+      entityName: vPolName,
+      details: `Created policy for vessel ${vPolName}`
     }).catch(() => {})
     return result
   })
   safeHandle('vessels:updateDynamicPolicy', async (event, id, updates) => { await requirePermission(event, 'policies:manage'); return db.updateVesselDynamicPolicy(id, updates) })
   safeHandle('vessels:deleteDynamicPolicy', async (event, id) => {
     const user = await requirePermission(event, 'policies:manage')
+    const [polDelRows] = await (db as any).pool.query(
+      'SELECT vdp.id, v.name AS vesselName FROM vessel_dynamic_policies vdp LEFT JOIN vessels v ON vdp.vessel_id = v.id WHERE vdp.id = ?', [id]
+    )
+    const polVesselName = (polDelRows as any[])[0]?.vesselName || id
     const result = await db.deleteVesselDynamicPolicy(id)
     db.logActivity({
       userId: user.id,
@@ -2170,7 +2203,8 @@ app.whenReady().then(() => {
       module: 'Policies',
       entityType: 'policy',
       entityId: id,
-      details: `Deleted policy ${id}`
+      entityName: polVesselName,
+      details: `Deleted policy for vessel ${polVesselName}`
     }).catch(() => {})
     return result
   })
@@ -2499,6 +2533,36 @@ app.whenReady().then(() => {
   safeHandle('activity:getDistinctUsers', async (event) => {
     requireSession(event)
     return await db.getActivityLogDistinctUsers()
+  })
+
+  safeHandle('activity:getRetention', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    return await db.getActivityLogRetention()
+  })
+
+  safeHandle('activity:setRetention', async (event, days: number) => {
+    await requirePermission(event, 'admin:settings')
+    await db.setActivityLogRetention(days)
+    if (days > 0) {
+      const deleted = await db.cleanupActivityLog(days)
+      return { deleted }
+    }
+    return { deleted: 0 }
+  })
+
+  safeHandle('activity:cleanup', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    const retention = await db.getActivityLogRetention()
+    if (retention > 0) {
+      const deleted = await db.cleanupActivityLog(retention)
+      return { deleted }
+    }
+    return { deleted: 0 }
+  })
+
+  safeHandle('activity:getCount', async (event) => {
+    requireSession(event)
+    return await db.getActivityLogCount()
   })
 
   // Email Templates
