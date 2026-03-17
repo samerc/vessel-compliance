@@ -195,23 +195,23 @@ function CollapsibleStandardTexts({ fields, showSuccess }: {
     }
 
     return (
-        <section style={{ marginTop: '16px', border: '1px solid var(--table-border)', borderRadius: '8px', overflow: 'hidden' }}>
+        <section className="glass-card" style={{ marginTop: '16px', padding: '20px' }}>
             <div
                 onClick={() => setOpen(!open)}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', cursor: 'pointer', background: 'var(--table-header-bg)', userSelect: 'none' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', marginBottom: open ? '14px' : 0 }}
             >
                 {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Standard Texts</span>
+                <h3 style={{ fontSize: '1rem', margin: 0 }}>Standard Texts</h3>
             </div>
             {open && (
-                <div style={{ padding: '14px' }}>
+                <div>
                     {!loaded ? (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Loading...</div>
                     ) : (
                         <>
                             {fields.map(field => (
                                 <div key={field.key} style={{ marginBottom: '12px' }}>
-                                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{field.label}</label>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{field.label}</label>
                                     <RichTextEditor
                                         value={String(texts[field.key] || '')}
                                         onChange={val => setTexts(prev => ({ ...prev, [field.key]: val }))}
