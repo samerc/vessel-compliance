@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileText, Settings, List } from 'lucide-react'
 import { Quotation } from '../../../shared/types'
+import { useAuth } from '../contexts/AuthContext'
 import QuotationSettings from './QuotationSettings'
 import QuotationList from './QuotationList'
 import QuotationEditor from './QuotationEditor'
@@ -8,6 +9,8 @@ import QuotationEditor from './QuotationEditor'
 type QuotationView = 'list' | 'settings' | 'editor'
 
 export default function QuotationManager() {
+    const { hasPermission } = useAuth()
+    const canSettings = hasPermission('quotations:settings')
     const [view, setView] = useState<QuotationView>('list')
     const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
     const [listKey, setListKey] = useState(0)
@@ -50,31 +53,33 @@ export default function QuotationManager() {
                         >
                             <List size={16} /> Quotations
                         </button>
-                        <button
-                            onClick={() => setView('settings')}
-                            style={{
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                fontWeight: view === 'settings' ? '600' : '400',
-                                background: view === 'settings' ? 'var(--accent-primary)' : 'transparent',
-                                color: view === 'settings' ? '#fff' : 'var(--text-secondary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <Settings size={16} /> Settings
-                        </button>
+                        {canSettings && (
+                            <button
+                                onClick={() => setView('settings')}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: view === 'settings' ? '600' : '400',
+                                    background: view === 'settings' ? 'var(--accent-primary)' : 'transparent',
+                                    color: view === 'settings' ? '#fff' : 'var(--text-secondary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <Settings size={16} /> Settings
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
 
             {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} />}
-            {view === 'settings' && <QuotationSettings />}
+            {view === 'settings' && canSettings && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
                 <QuotationEditor quotation={editingQuotation} onBack={handleBackToList} onOpenQuotation={handleOpenEditor} />
             )}

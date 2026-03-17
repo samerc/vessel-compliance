@@ -33,7 +33,8 @@ function formatPremium(value: number | null, currency: string | null): string {
 
 export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsProps) {
     const { theme } = useTheme()
-    const { user } = useAuth()
+    const { user, hasPermission } = useAuth()
+    const canManage = hasPermission('renewals:manage')
     const isLight = theme === 'light'
     const now = new Date()
     const [selectedYear, setSelectedYear] = useState(now.getFullYear())
@@ -395,6 +396,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 <select
                     value={r.renewalStatusId || ''}
                     onChange={e => handleSetStatus(r.id, e.target.value || null)}
+                    disabled={!canManage}
                     style={{
                         padding: '4px 8px',
                         borderRadius: '12px',
@@ -524,13 +526,15 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                     Group by Fleet
                 </button>
 
-                <button
-                    onClick={() => setShowStatusManager(v => !v)}
-                    className={showStatusManager ? 'btn-primary' : 'btn-secondary'}
-                    style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                    <Edit3 size={14} /> Manage Statuses
-                </button>
+                {canManage && (
+                    <button
+                        onClick={() => setShowStatusManager(v => !v)}
+                        className={showStatusManager ? 'btn-primary' : 'btn-secondary'}
+                        style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        <Edit3 size={14} /> Manage Statuses
+                    </button>
+                )}
 
                 {renewals.length > 0 && (
                     <button onClick={exportToExcel} className="btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
