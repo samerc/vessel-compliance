@@ -145,7 +145,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
             v.name.toLowerCase().includes(q) ||
             v.imoNumber.toLowerCase().includes(q)
         )
-    }, [activeVessels, zipSearch])
+    }, [activeVessels, vessels, zipSearch, exportMode])
 
     const renderVesselTable = (vesselList: Vessel[], title: string, showRemove: boolean) => {
         if (vesselList.length === 0) return null

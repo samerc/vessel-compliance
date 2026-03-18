@@ -102,6 +102,9 @@ export default function FleetManager() {
     e.preventDefault()
     if (!newFleetName.trim()) return
     const fleet = await window.api.addFleet({ name: newFleetName })
+    if (!fleet || (fleet as any).error) {
+      return
+    }
     setNewFleetName('')
     setShowAddForm(false)
     await loadData()
