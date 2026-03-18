@@ -2109,10 +2109,11 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
         const result: { set: PIWarrantySet; startIdx: number; endIdx: number; idsInSelected: string[] }[] = []
         for (const ws of warrantySets) {
             if (!ws.warrantyIds?.length) continue
-            const setIdsInSelected = ws.warrantyIds.filter(wid => selectedIds.includes(wid))
+            // Order by position in selectedIds, not set order
+            const setIdsInSelected = selectedIds.filter(wid => ws.warrantyIds!.includes(wid))
             if (setIdsInSelected.length === 0) continue
-            const firstIdx = Math.min(...setIdsInSelected.map(wid => selectedIds.indexOf(wid)))
-            const lastIdx = Math.max(...setIdsInSelected.map(wid => selectedIds.indexOf(wid)))
+            const firstIdx = selectedIds.indexOf(setIdsInSelected[0])
+            const lastIdx = selectedIds.indexOf(setIdsInSelected[setIdsInSelected.length - 1])
             result.push({ set: ws, startIdx: firstIdx, endIdx: lastIdx, idsInSelected: setIdsInSelected })
         }
         return result.sort((a, b) => a.startIdx - b.startIdx)
@@ -2137,26 +2138,27 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
     }
 
     const moveSetGroup = async (setId: string, direction: 'up' | 'down') => {
+        // Build a lookup: warrantyId → setId for all applied sets
+        const idToSet = new Map<string, string>()
+        for (const as of appliedSets) {
+            for (const wid of as.idsInSelected) idToSet.set(wid, as.set.id)
+        }
+
         // Build block list: each entry is a set block or a single loose item
         const blocks: { ids: string[]; setId?: string }[] = []
-        const processed = new Set<string>()
-        for (let i = 0; i < selectedIds.length; i++) {
-            const id = selectedIds[i]
-            if (processed.has(id)) continue
-            let foundSet = false
-            for (const s of appliedSets) {
-                if (s.idsInSelected[0] === id) {
-                    blocks.push({ ids: [...s.idsInSelected], setId: s.set.id })
-                    s.idsInSelected.forEach(sid => processed.add(sid))
-                    foundSet = true
-                    break
-                }
-            }
-            if (!foundSet) {
+        const processedSets = new Set<string>()
+        for (const id of selectedIds) {
+            const belongsToSet = idToSet.get(id)
+            if (belongsToSet) {
+                if (processedSets.has(belongsToSet)) continue // Already added this set's block
+                processedSets.add(belongsToSet)
+                const as = appliedSets.find(s => s.set.id === belongsToSet)
+                if (as) blocks.push({ ids: [...as.idsInSelected], setId: belongsToSet })
+            } else {
                 blocks.push({ ids: [id] })
-                processed.add(id)
             }
         }
+
         const blockIdx = blocks.findIndex(b => b.setId === setId)
         if (blockIdx < 0) return
         const swapIdx = direction === 'up' ? blockIdx - 1 : blockIdx + 1
