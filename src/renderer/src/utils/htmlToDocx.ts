@@ -6,6 +6,7 @@ interface TextSegment {
   italic?: boolean
   underline?: boolean
   fontSize?: number  // in half-points (docx twips)
+  fontFamily?: string
 }
 
 /** Convert CSS pt/px to docx half-points (twips). Default fallback = opts.size */
@@ -71,7 +72,7 @@ export function parseHtmlToParagraphs(
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
 
-  function extractSegments(node: Node, inherited: { bold?: boolean; italic?: boolean; underline?: boolean; fontSize?: number } = {}): TextSegment[] {
+  function extractSegments(node: Node, inherited: { bold?: boolean; italic?: boolean; underline?: boolean; fontSize?: number; fontFamily?: string } = {}): TextSegment[] {
     const segments: TextSegment[] = []
 
     for (const child of Array.from(node.childNodes)) {
@@ -91,6 +92,11 @@ export function parseHtmlToParagraphs(
         const elFontSize = el.style?.fontSize
         if (elFontSize) {
           style.fontSize = parseFontSize(elFontSize, inherited.fontSize || size)
+        }
+        // Parse inline font-family from style attribute
+        const elFontFamily = el.style?.fontFamily
+        if (elFontFamily) {
+          style.fontFamily = elFontFamily.replace(/['"]/g, '').split(',')[0].trim()
         }
 
         segments.push(...extractSegments(el, style))
@@ -116,7 +122,7 @@ export function parseHtmlToParagraphs(
     children.push(...segments.map(seg => new TextRun({
       text: seg.text,
       size: seg.fontSize || size,
-      font,
+      font: seg.fontFamily || font,
       color,
       bold: seg.bold,
       italics: seg.italic,

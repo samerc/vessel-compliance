@@ -376,8 +376,9 @@ function vesselName(data: QuotationData): string {
 
 function getFileName(data: QuotationData, ext: string): string {
   const ref = data.quotation.referenceNumber || 'Quotation'
+  const rev = data.quotation.revisionNumber ? `-R${data.quotation.revisionNumber}` : ''
   const name = (data.quotationVessels.length > 0 ? getVesselInfo(data.quotationVessels[0], data.allVessels).name : 'Quotation').replace(/[^a-zA-Z0-9]/g, '_')
-  return `${ref}_${name}.${ext}`
+  return `${ref}${rev}_${name}.${ext}`
 }
 
 function getExclusionTexts(data: QuotationData): string[] {
@@ -1549,7 +1550,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
-          children: [...(content.length > 0 ? content : [emptyP()]), emptyP()]
+          children: content.length > 0 ? content : [emptyP()]
         })
       ]
     })
