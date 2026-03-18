@@ -354,8 +354,8 @@ const api = {
   piReorderAdditionalClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderAdditionalClauses', orderedIds),
   piToggleAdditionalClauseDefault: (id: string, defaultSelected: boolean) => ipcRenderer.invoke('pi:toggleAdditionalClauseDefault', id, defaultSelected),
   piGetAdditionalClauseSets: () => ipcRenderer.invoke('pi:getAdditionalClauseSets'),
-  piAddAdditionalClauseSet: (name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:addAdditionalClauseSet', name, clauseIds),
-  piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[]) => ipcRenderer.invoke('pi:updateAdditionalClauseSet', id, name, clauseIds),
+  piAddAdditionalClauseSet: (name: string, clauseIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:addAdditionalClauseSet', name, clauseIds, defaultSelected),
+  piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:updateAdditionalClauseSet', id, name, clauseIds, defaultSelected),
   piDeleteAdditionalClauseSet: (id: string) => ipcRenderer.invoke('pi:deleteAdditionalClauseSet', id),
 
   piGetTradingExcludedCountries: () => ipcRenderer.invoke('pi:getTradingExcludedCountries'),

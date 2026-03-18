@@ -697,6 +697,7 @@ export interface PIAdditionalClauseSet {
   id: string
   name: string
   clauseIds?: string[]
+  defaultSelected?: boolean
 }
 
 export interface TradingExcludedCountry {

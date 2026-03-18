@@ -342,8 +342,8 @@ export interface Api {
   piReorderAdditionalClauses: (orderedIds: string[]) => Promise<void>
   piToggleAdditionalClauseDefault: (id: string, defaultSelected: boolean) => Promise<void>
   piGetAdditionalClauseSets: () => Promise<PIAdditionalClauseSet[]>
-  piAddAdditionalClauseSet: (name: string, clauseIds: string[]) => Promise<PIAdditionalClauseSet>
-  piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[]) => Promise<void>
+  piAddAdditionalClauseSet: (name: string, clauseIds: string[], defaultSelected?: boolean) => Promise<PIAdditionalClauseSet>
+  piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[], defaultSelected?: boolean) => Promise<void>
   piDeleteAdditionalClauseSet: (id: string) => Promise<void>
 
   piGetTradingExcludedCountries: () => Promise<TradingExcludedCountry[]>

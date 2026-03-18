@@ -875,6 +875,8 @@ function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: 
     const [showAddForm, setShowAddForm] = useState(false)
     const [addMode, setAddMode] = useState<'existing' | 'new'>('existing')
     const [selectedVesselId, setSelectedVesselId] = useState('')
+    const [vesselSearch, setVesselSearch] = useState('')
+    const [vesselDropdownOpen, setVesselDropdownOpen] = useState(false)
     const [newData, setNewData] = useState(EMPTY_NEW_VESSEL)
 
     useEffect(() => { loadData() }, [])
@@ -908,14 +910,18 @@ function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: 
                 callSign: v?.callSign
             })
 
-            // Auto-load vessel assureds into the quotation
-            const [vassureds, allEntities, existingQAssureds] = await Promise.all([
+            // Auto-load vessel assureds into the quotation, sorted by role order from settings
+            const [vassureds, allEntities, existingQAssureds, assuredRoles] = await Promise.all([
                 window.api.getVesselAssureds(selectedVesselId),
                 window.api.getEntities(),
-                window.api.getQuotationAssureds(quotation.id)
+                window.api.getQuotationAssureds(quotation.id),
+                window.api.getAssuredRoles()
             ])
+            const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
             const existingEntityIds = new Set(existingQAssureds.map(a => a.entityId).filter(Boolean))
-            const toAdd = vassureds.filter(va => !existingEntityIds.has(va.entityId))
+            const toAdd = vassureds
+                .filter(va => !existingEntityIds.has(va.entityId))
+                .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
             for (let i = 0; i < toAdd.length; i++) {
                 const va = toAdd[i]
                 const entity = allEntities.find(e => e.id === va.entityId)
@@ -989,16 +995,35 @@ function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: 
                     </div>
                     {addMode === 'existing' ? (
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            <select
-                                value={selectedVesselId}
-                                onChange={e => setSelectedVesselId(e.target.value)}
-                                style={{ flex: 1, maxWidth: '400px', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
-                            >
-                                <option value="">Select vessel from registry…</option>
-                                {availableVessels.map(v => <option key={v.id} value={v.id}>{v.name} (IMO: {v.imoNumber})</option>)}
-                            </select>
+                            <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+                                <input
+                                    type="text"
+                                    value={vesselSearch}
+                                    onChange={e => { setVesselSearch(e.target.value); setVesselDropdownOpen(true); setSelectedVesselId('') }}
+                                    onFocus={() => setVesselDropdownOpen(true)}
+                                    placeholder="Search vessel by name or IMO..."
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
+                                />
+                                {vesselDropdownOpen && (() => {
+                                    const q = vesselSearch.toLowerCase()
+                                    const filtered = q ? availableVessels.filter(v => v.name.toLowerCase().includes(q) || v.imoNumber.toLowerCase().includes(q)) : availableVessels
+                                    return filtered.length > 0 ? (
+                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: 'var(--bg-primary)', border: '1px solid var(--input-border)', borderRadius: '8px', zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                                            {filtered.slice(0, 20).map(v => (
+                                                <div key={v.id} onClick={() => { setSelectedVesselId(v.id); setVesselSearch(`${v.name} (IMO: ${v.imoNumber})`); setVesselDropdownOpen(false) }}
+                                                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
+                                                    className="hover-effect"
+                                                >
+                                                    <span style={{ fontWeight: 600 }}>{v.name}</span>
+                                                    <span style={{ color: 'var(--text-secondary)', marginLeft: '8px', fontSize: '0.8rem' }}>IMO: {v.imoNumber}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : null
+                                })()}
+                            </div>
                             <button onClick={handleAddExisting} disabled={!selectedVesselId} className="btn-primary" style={{ fontSize: '0.82rem' }}>Add</button>
-                            <button onClick={() => setShowAddForm(false)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                            <button onClick={() => { setShowAddForm(false); setVesselSearch(''); setVesselDropdownOpen(false) }} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
                         </div>
                     ) : (
                         <div>
@@ -1254,11 +1279,34 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
         // Auto-add default additional clauses on first load if none exist
         if (!additionalDefaultsApplied.current && safeAddCl.length === 0 && safeAllAdd.length > 0) {
             additionalDefaultsApplied.current = true
-            const defaults = safeAllAdd.filter(c => c.defaultSelected)
-            for (let i = 0; i < defaults.length; i++) {
-                await window.api.addQuotationAdditionalClause({ quotationId: quotation.id, piAdditionalClauseId: defaults[i].id, order: i })
+            // Collect clause IDs from default sets + individually default-selected clauses
+            const defaultSetClauseIds = new Set<string>()
+            const safeAddSets = Array.isArray(addSets) ? addSets : []
+            for (const s of safeAddSets) {
+                if (s.defaultSelected && s.clauseIds) {
+                    for (const cid of s.clauseIds) defaultSetClauseIds.add(cid)
+                }
             }
-            if (defaults.length > 0) {
+            const defaults = safeAllAdd.filter(c => c.defaultSelected || defaultSetClauseIds.has(c.id))
+            // Deduplicate (set clauses first, then individually selected)
+            const seen = new Set<string>()
+            const ordered: typeof defaults = []
+            // Add set clauses in set order first
+            for (const s of safeAddSets) {
+                if (s.defaultSelected && s.clauseIds) {
+                    for (const cid of s.clauseIds) {
+                        if (!seen.has(cid)) { seen.add(cid); const c = safeAllAdd.find(x => x.id === cid); if (c) ordered.push(c) }
+                    }
+                }
+            }
+            // Then individually default-selected clauses not in any set
+            for (const c of defaults) {
+                if (!seen.has(c.id)) { seen.add(c.id); ordered.push(c) }
+            }
+            for (let i = 0; i < ordered.length; i++) {
+                await window.api.addQuotationAdditionalClause({ quotationId: quotation.id, piAdditionalClauseId: ordered[i].id, order: i })
+            }
+            if (ordered.length > 0) {
                 const freshAdd = await window.api.getQuotationAdditionalClauses(quotation.id)
                 setAdditionalClauses(Array.isArray(freshAdd) ? freshAdd : [])
             }

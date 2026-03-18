@@ -757,6 +757,14 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Add default_selected to pi_additional_clause_sets
+            {
+                const [acsDefCol] = await this.pool.query("SHOW COLUMNS FROM pi_additional_clause_sets LIKE 'default_selected'")
+                if ((acsDefCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE pi_additional_clause_sets ADD COLUMN default_selected BOOLEAN DEFAULT FALSE')
+                }
+            }
+
             // Vessel insurance policies (imported from Excel)
             // --- Migrate legacy vessel_insurance_policies → vessel_dynamic_policies ---
             try {
@@ -5021,7 +5029,7 @@ export class MySQLAdapter {
 
     async piGetAdditionalClauseSets(): Promise<PIAdditionalClauseSet[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name FROM pi_additional_clause_sets ORDER BY name ASC')
+        const [rows] = await this.pool.query('SELECT id, name, default_selected as defaultSelected FROM pi_additional_clause_sets ORDER BY name ASC')
         const sets = rows as PIAdditionalClauseSet[]
         for (const s of sets) {
             const [items] = await this.pool.query('SELECT clause_id FROM pi_additional_clause_set_items WHERE set_id = ? ORDER BY order_index ASC', [s.id])
@@ -5030,19 +5038,19 @@ export class MySQLAdapter {
         return sets
     }
 
-    async piAddAdditionalClauseSet(name: string, clauseIds: string[]): Promise<PIAdditionalClauseSet> {
+    async piAddAdditionalClauseSet(name: string, clauseIds: string[], defaultSelected?: boolean): Promise<PIAdditionalClauseSet> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.execute('INSERT INTO pi_additional_clause_sets (id, name) VALUES (?, ?)', [id, name])
+        await this.pool.execute('INSERT INTO pi_additional_clause_sets (id, name, default_selected) VALUES (?, ?, ?)', [id, name, defaultSelected || false])
         for (let i = 0; i < clauseIds.length; i++) {
             await this.pool.execute('INSERT INTO pi_additional_clause_set_items (id, set_id, clause_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, clauseIds[i], i])
         }
         return { id, name, clauseIds }
     }
 
-    async piUpdateAdditionalClauseSet(id: string, name: string, clauseIds: string[]): Promise<void> {
+    async piUpdateAdditionalClauseSet(id: string, name: string, clauseIds: string[], defaultSelected?: boolean): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE pi_additional_clause_sets SET name = ? WHERE id = ?', [name, id])
+        await this.pool.execute('UPDATE pi_additional_clause_sets SET name = ?, default_selected = ? WHERE id = ?', [name, defaultSelected || false, id])
         await this.pool.execute('DELETE FROM pi_additional_clause_set_items WHERE set_id = ?', [id])
         for (let i = 0; i < clauseIds.length; i++) {
             await this.pool.execute('INSERT INTO pi_additional_clause_set_items (id, set_id, clause_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, clauseIds[i], i])

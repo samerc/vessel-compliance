@@ -1971,8 +1971,8 @@ app.whenReady().then(() => {
   safeHandle('pi:reorderAdditionalClauses', async (event, orderedIds) => { await requirePermission(event, 'quotations:settings'); return db.reorderPIAdditionalClauses(orderedIds) })
   safeHandle('pi:toggleAdditionalClauseDefault', async (event, id, defaultSelected) => { await requirePermission(event, 'quotations:settings'); return db.togglePIAdditionalClauseDefault(id, defaultSelected) })
   safeHandle('pi:getAdditionalClauseSets', (event) => { requireSession(event); return db.piGetAdditionalClauseSets() })
-  safeHandle('pi:addAdditionalClauseSet', async (event, name, clauseIds) => { await requirePermission(event, 'quotations:settings'); return db.piAddAdditionalClauseSet(name, clauseIds) })
-  safeHandle('pi:updateAdditionalClauseSet', async (event, id, name, clauseIds) => { await requirePermission(event, 'quotations:settings'); return db.piUpdateAdditionalClauseSet(id, name, clauseIds) })
+  safeHandle('pi:addAdditionalClauseSet', async (event, name, clauseIds, defaultSelected) => { await requirePermission(event, 'quotations:settings'); return db.piAddAdditionalClauseSet(name, clauseIds, defaultSelected) })
+  safeHandle('pi:updateAdditionalClauseSet', async (event, id, name, clauseIds, defaultSelected) => { await requirePermission(event, 'quotations:settings'); return db.piUpdateAdditionalClauseSet(id, name, clauseIds, defaultSelected) })
   safeHandle('pi:deleteAdditionalClauseSet', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.piDeleteAdditionalClauseSet(id) })
 
   // Trading Excluded Countries

@@ -1539,6 +1539,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
     const [editSetId, setEditSetId] = useState<string | null>(null)
     const [editSetName, setEditSetName] = useState('')
     const [editSetOrder, setEditSetOrder] = useState<string[]>([]) // ordered IDs of clauses in the set
+    const [editSetDefault, setEditSetDefault] = useState(false)
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
@@ -1568,6 +1569,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
         setEditSetId(s.id)
         setEditSetName(s.name)
         setEditSetOrder(s.clauseIds || [])
+        setEditSetDefault(s.defaultSelected || false)
     }
 
     const toggleSetClause = (id: string) => {
@@ -1586,7 +1588,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
 
     const saveSet = async () => {
         if (!editSetId) return
-        await window.api.piUpdateAdditionalClauseSet(editSetId, editSetName.trim(), editSetOrder)
+        await window.api.piUpdateAdditionalClauseSet(editSetId, editSetName.trim(), editSetOrder, editSetDefault)
         setEditSetId(null)
         showSuccess('Set saved')
         loadData()
@@ -1649,7 +1651,12 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                     <div key={s.id} style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '10px' }}>
                         {editSetId === s.id ? (
                             <div>
-                                <input value={editSetName} onChange={e => setEditSetName(e.target.value)} style={{ width: '100%', marginBottom: '12px' }} />
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px' }}>
+                                    <input value={editSetName} onChange={e => setEditSetName(e.target.value)} style={{ flex: 1 }} />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                        <input type="checkbox" checked={editSetDefault} onChange={e => setEditSetDefault(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} /> Auto-apply
+                                    </label>
+                                </div>
 
                                 {/* Selected clauses — sortable */}
                                 {editSetOrder.length > 0 && (
@@ -1698,7 +1705,10 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</div>
+                                    <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {s.name}
+                                        {s.defaultSelected && <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)', fontWeight: 700 }}>DEFAULT</span>}
+                                    </div>
                                     <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                         {(s.clauseIds?.length || 0)} clause{(s.clauseIds?.length || 0) !== 1 ? 's' : ''}
                                         {s.clauseIds && s.clauseIds.length > 0 && (
