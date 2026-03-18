@@ -416,14 +416,28 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                         {formatCurrency(q.premiumAmount, q.premiumCurrency)}
                                     </td>
                                     <td style={{ padding: '12px 14px' }}>
-                                        <span style={{
-                                            padding: '3px 9px', borderRadius: '10px',
-                                            fontSize: '0.7rem', fontWeight: 600,
-                                            textTransform: 'uppercase',
-                                            background: sc.bg, color: sc.text
-                                        }}>
-                                            {q.status}
-                                        </span>
+                                        {q.workflowStepName ? (
+                                            <span style={{
+                                                padding: '3px 9px', borderRadius: '10px',
+                                                fontSize: '0.7rem', fontWeight: 600,
+                                                background: (q.workflowStepColor || '#6b7280') + '22',
+                                                color: q.workflowStepColor || '#6b7280',
+                                                border: `1px solid ${q.workflowStepColor || '#6b7280'}40`,
+                                                display: 'inline-flex', alignItems: 'center', gap: '4px'
+                                            }}>
+                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: q.workflowStepColor || '#6b7280' }} />
+                                                {q.workflowStepName}
+                                            </span>
+                                        ) : (
+                                            <span style={{
+                                                padding: '3px 9px', borderRadius: '10px',
+                                                fontSize: '0.7rem', fontWeight: 600,
+                                                textTransform: 'uppercase',
+                                                background: sc.bg, color: sc.text
+                                            }}>
+                                                {q.status}
+                                            </span>
+                                        )}
                                     </td>
                                     <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                                         {formatDate(q.updatedAt)}

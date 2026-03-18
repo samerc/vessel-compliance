@@ -4,7 +4,7 @@ import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWar
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload, GitBranch, RefreshCw, Lock, History, Search, Check } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload, GitBranch, RefreshCw, Lock, Search, Check, MoreHorizontal } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS, SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import RichTextEditor from './RichTextEditor'
@@ -144,6 +144,12 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     const [showSectionOrder, setShowSectionOrder] = useState(false)
     const [revisions, setRevisions] = useState<Quotation[]>([])
     const [showRevisionHistory, setShowRevisionHistory] = useState(false)
+    const [reachableSteps, setReachableSteps] = useState<import('../../../shared/types').WorkflowStep[]>([])
+    const [showStepMenu, setShowStepMenu] = useState(false)
+    const [showActionsMenu, setShowActionsMenu] = useState(false)
+    const [stepComment, setStepComment] = useState('')
+    const [showStepCommentModal, setShowStepCommentModal] = useState<string | null>(null)
+    const [_workflowLog, setWorkflowLog] = useState<import('../../../shared/types').QuotationWorkflowLog[]>([])
     const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
     const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
@@ -177,6 +183,16 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
             const groupId = fullQ.revisionGroupId || fullQ.id
             const revs = await window.api.getQuotationRevisions(groupId)
             setRevisions(Array.isArray(revs) ? revs : [])
+            // Load reachable workflow steps
+            try {
+                const steps = await window.api.workflowGetReachableSteps(fullQ.id)
+                setReachableSteps(Array.isArray(steps) ? steps : [])
+            } catch { setReachableSteps([]) }
+            // Load workflow log
+            try {
+                const log = await window.api.workflowGetQuotationLog(fullQ.id)
+                setWorkflowLog(Array.isArray(log) ? log : [])
+            } catch { setWorkflowLog([]) }
             // Load PI alternatives
             if (fullQ.quotationTypeCode === 'P') {
                 const piAlts = await window.api.piGetQuotationAlternatives(fullQ.id)
@@ -205,6 +221,29 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
             if (onOpenQuotation) onOpenQuotation(newRev)
         } catch (err: any) {
             showError(err.message || 'Failed to create revision')
+        }
+    }
+
+    const handleMoveToStep = async (stepId: string, comment?: string) => {
+        try {
+            const result = await window.api.workflowMoveQuotation(q.id, stepId, comment)
+            if ((result as any)?.error) { showError((result as any).message || 'Failed to move'); return }
+            showSuccess('Workflow step updated')
+            setShowStepMenu(false)
+            setShowStepCommentModal(null)
+            setStepComment('')
+            // Reload quotation to get updated step
+            const fullQ = await window.api.getQuotation(q.id)
+            if (fullQ && !(fullQ as any).error) {
+                setQ(fullQ)
+                // Reload reachable steps
+                const steps = await window.api.workflowGetReachableSteps(fullQ.id)
+                setReachableSteps(Array.isArray(steps) ? steps : [])
+                const log = await window.api.workflowGetQuotationLog(fullQ.id)
+                setWorkflowLog(Array.isArray(log) ? log : [])
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to move to step')
         }
     }
 
@@ -285,7 +324,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     }
     void _handleRenamePIAlternative
 
-    const sc = statusColors[q.status] || statusColors.draft
+    // statusColors used for future status display
+    void statusColors
 
     return (
         <div className="fade-in">
@@ -304,182 +344,102 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                 </div>
             )}
 
-            {/* Header */}
-            <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Header — Row 1: Identity + Badges + Actions */}
+            <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    {/* Reference number */}
+                    <input
+                        type="text"
+                        value={q.referenceNumber || ''}
+                        onChange={e => setQ(prev => ({ ...prev, referenceNumber: e.target.value }))}
+                        onBlur={e => updateField('referenceNumber', e.target.value)}
+                        placeholder="Reference"
+                        disabled={isLocked || !canEdit}
+                        style={{ padding: '6px 10px', borderRadius: '6px', width: '150px', fontSize: '1rem', fontWeight: 700 }}
+                    />
+                    {/* Type badge */}
                     {q.quotationTypeName && (
-                        <span style={{
-                            padding: '5px 12px',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            background: 'rgba(0, 170, 200, 0.15)',
-                            color: isLight ? '#007a91' : '#00aac8',
-                            letterSpacing: '0.03em'
-                        }}>
+                        <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(0,170,200,0.15)', color: isLight ? '#007a91' : '#00aac8' }}>
                             {q.quotationTypeName}
                         </span>
                     )}
-                    {revisions.length > 1 && (
-                        <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            background: (q.revisionNumber || 0) > 0 ? 'rgba(180, 100, 255, 0.15)' : 'rgba(0, 200, 100, 0.15)',
-                            color: (q.revisionNumber || 0) > 0 ? (isLight ? '#7a3db8' : '#b464ff') : (isLight ? '#008c46' : '#00c864'),
-                            letterSpacing: '0.03em'
-                        }}>
-                            {(q.revisionNumber || 0) > 0 ? `R${q.revisionNumber}` : 'Original'}
-                            {isLocked && ' (locked)'}
-                        </span>
+                    {/* Workflow step badge */}
+                    {q.workflowStepName && (
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                onClick={() => reachableSteps.length > 0 && setShowStepMenu(!showStepMenu)}
+                                style={{
+                                    padding: '4px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700,
+                                    background: (q.workflowStepColor || '#6b7280') + '22',
+                                    color: q.workflowStepColor || '#6b7280',
+                                    border: `1.5px solid ${q.workflowStepColor || '#6b7280'}`,
+                                    cursor: reachableSteps.length > 0 ? 'pointer' : 'default',
+                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                }}
+                            >
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: q.workflowStepColor || '#6b7280' }} />
+                                {q.workflowStepName}
+                                {reachableSteps.length > 0 && <ChevronDown size={12} />}
+                            </button>
+                            {showStepMenu && (
+                                <>
+                                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowStepMenu(false)} />
+                                    <div style={{
+                                        position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 100,
+                                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                                        borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                                    }}>
+                                        <div style={{ padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Move to...</div>
+                                        {reachableSteps.map(step => (
+                                            <button
+                                                key={step.id}
+                                                onClick={() => { setShowStepMenu(false); setShowStepCommentModal(step.id) }}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                                                    padding: '8px 12px', border: 'none', borderRadius: '6px',
+                                                    background: 'transparent', color: 'var(--text-primary)',
+                                                    cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left'
+                                                }}
+                                                className="hover-effect"
+                                            >
+                                                <span style={{ width: 10, height: 10, borderRadius: '50%', background: step.color, flexShrink: 0 }} />
+                                                {step.name}
+                                                {step.isLockPoint && <Lock size={12} style={{ opacity: 0.4, marginLeft: 'auto' }} />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ref:</span>
-                        <input
-                            type="text"
-                            value={q.referenceNumber || ''}
-                            onChange={e => setQ(prev => ({ ...prev, referenceNumber: e.target.value }))}
-                            onBlur={e => updateField('referenceNumber', e.target.value)}
-                            placeholder="Reference number"
-                            disabled={isLocked || !canEdit}
-                            style={{ padding: '6px 10px', borderRadius: '6px', width: '180px', fontSize: '0.9rem', fontWeight: 600 }}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Date:</span>
-                        <input
-                            type="date"
-                            value={q.quotationDate || ''}
-                            onChange={e => { setQ(prev => ({ ...prev, quotationDate: e.target.value })); updateField('quotationDate', e.target.value) }}
-                            disabled={isLocked || !canEdit}
-                            style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Type:</span>
-                        <select
-                            value={q.policyTypeId || ''}
-                            onChange={e => { setQ(prev => ({ ...prev, policyTypeId: e.target.value })); updateField('policyTypeId', e.target.value || null) }}
-                            disabled={isLocked || !canEdit}
-                            style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
-                        >
-                            <option value="">Select type</option>
-                            {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
-                        </select>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Status:</span>
-                        <select
-                            value={q.status}
-                            onChange={e => { const v = e.target.value as any; setQ(prev => ({ ...prev, status: v })); updateField('status', v) }}
-                            disabled={isLocked || !canEdit}
-                            style={{
-                                padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem',
-                                background: sc.bg, color: sc.text, border: '1px solid var(--glass-border)', fontWeight: 600
-                            }}
-                        >
-                            <option value="draft">Draft</option>
-                            <option value="sent">Sent</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="converted">Converted</option>
-                        </select>
-                    </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
-                        <input
-                            type="checkbox"
-                            checked={q.isRenewal}
-                            onChange={e => { setQ(prev => ({ ...prev, isRenewal: e.target.checked })); updateField('isRenewal', e.target.checked) }}
-                            disabled={isLocked || !canEdit}
-                            style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
-                        />
-                        Renewal
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Currency:</span>
-                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked || !canEdit} style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }} />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', flexShrink: 0 }}>Title:</span>
-                        <input
-                            type="text"
-                            value={q.title || ''}
-                            onChange={e => setQ(prev => ({ ...prev, title: e.target.value }))}
-                            onBlur={e => updateField('title', e.target.value || null)}
-                            placeholder="Auto from vessel/fleet name…"
-                            disabled={isLocked || !canEdit}
-                            style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                        />
-                    </div>
-                    <button
-                        onClick={() => setShowSectionOrder(true)}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-                    >
-                        <LayoutList size={16} /> Section Order
-                    </button>
-                    {canExport && (
-                        <button
-                            onClick={async () => { try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-                        >
-                            <Download size={16} /> PDF
-                        </button>
-                    )}
-                    {canExport && (
-                        <button
-                            onClick={async () => { try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-                        >
-                            <Download size={16} /> Word
-                        </button>
-                    )}
-                    {q.exportSnapshot && !isLocked && (
-                        <button
-                            onClick={handleClearSnapshot}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-                            title="Clear saved export snapshot — next export will use current settings"
-                        >
-                            <RefreshCw size={16} /> Refresh Texts
-                        </button>
-                    )}
-                    {!isLocked && canEdit && (
-                        <button
-                            onClick={handleCreateRevision}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: isLight ? '#7a3db8' : '#b464ff' }}
-                        >
-                            <GitBranch size={16} /> Create Revision
-                        </button>
-                    )}
+                    {/* Revision badge */}
                     {revisions.length > 1 && (
                         <div style={{ position: 'relative' }}>
                             <button
                                 onClick={() => setShowRevisionHistory(!showRevisionHistory)}
-                                className="btn-secondary"
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                                style={{
+                                    padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700,
+                                    background: (q.revisionNumber || 0) > 0 ? 'rgba(180,100,255,0.15)' : 'rgba(0,200,100,0.15)',
+                                    color: (q.revisionNumber || 0) > 0 ? (isLight ? '#7a3db8' : '#b464ff') : (isLight ? '#008c46' : '#00c864'),
+                                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                }}
                             >
-                                <History size={16} /> Revisions ({revisions.length})
+                                {(q.revisionNumber || 0) > 0 ? `R${q.revisionNumber}` : 'Original'}
+                                {isLocked && <Lock size={11} />}
+                                <ChevronDown size={12} />
                             </button>
                             {showRevisionHistory && (
                                 <>
                                     <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowRevisionHistory(false)} />
                                     <div style={{
-                                        position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100,
+                                        position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 100,
                                         background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
                                         borderRadius: '10px', padding: '6px', minWidth: '260px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                     }}>
                                         {revisions.map(rev => (
                                             <button
                                                 key={rev.id}
-                                                onClick={() => {
-                                                    setShowRevisionHistory(false)
-                                                    if (rev.id !== q.id && onOpenQuotation) onOpenQuotation(rev)
-                                                }}
+                                                onClick={() => { setShowRevisionHistory(false); if (rev.id !== q.id && onOpenQuotation) onOpenQuotation(rev) }}
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
                                                     padding: '10px 14px', border: 'none', borderRadius: '6px',
@@ -489,12 +449,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                                                 }}
                                                 className={rev.id !== q.id ? 'hover-effect' : undefined}
                                             >
-                                                <span style={{ fontWeight: 600, minWidth: '70px' }}>
-                                                    {rev.revisionNumber === 0 ? 'Original' : `R${rev.revisionNumber}`}
-                                                </span>
-                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', flex: 1 }}>
-                                                    {rev.referenceNumber}
-                                                </span>
+                                                <span style={{ fontWeight: 600, minWidth: '70px' }}>{rev.revisionNumber === 0 ? 'Original' : `R${rev.revisionNumber}`}</span>
+                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', flex: 1 }}>{rev.referenceNumber}</span>
                                                 {rev.isLocked && <Lock size={13} style={{ opacity: 0.4 }} />}
                                                 {rev.id === q.id && <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 700 }}>CURRENT</span>}
                                             </button>
@@ -504,8 +460,82 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                             )}
                         </div>
                     )}
+                    {/* Spacer */}
+                    <div style={{ flex: 1 }} />
+                    {/* Actions dropdown */}
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setShowActionsMenu(!showActionsMenu)}
+                            className="btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                        >
+                            <MoreHorizontal size={16} /> Actions
+                        </button>
+                        {showActionsMenu && (
+                            <>
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowActionsMenu(false)} />
+                                <div style={{
+                                    position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100,
+                                    background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                                    borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                                }}>
+                                    {canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
+                                    {canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
+                                    <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
+                                    {q.exportSnapshot && !isLocked && <button onClick={() => { setShowActionsMenu(false); handleClearSnapshot() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Refresh Texts</button>}
+                                    {!isLocked && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+                {/* Row 2: Fields */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Date:</span>
+                        <input type="date" value={q.quotationDate || ''} onChange={e => { setQ(prev => ({ ...prev, quotationDate: e.target.value })); updateField('quotationDate', e.target.value) }} disabled={isLocked || !canEdit} style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Policy:</span>
+                        <select value={q.policyTypeId || ''} onChange={e => { setQ(prev => ({ ...prev, policyTypeId: e.target.value })); updateField('policyTypeId', e.target.value || null) }} disabled={isLocked || !canEdit} style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}>
+                            <option value="">Select type</option>
+                            {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
+                        </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Currency:</span>
+                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked || !canEdit} style={{ width: '60px', padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem' }} />
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={q.isRenewal} onChange={e => { setQ(prev => ({ ...prev, isRenewal: e.target.checked })); updateField('isRenewal', e.target.checked) }} disabled={isLocked || !canEdit} style={{ width: '15px', height: '15px', accentColor: 'var(--accent-primary)' }} />
+                        Renewal
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: '180px' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flexShrink: 0 }}>Title:</span>
+                        <input type="text" value={q.title || ''} onChange={e => setQ(prev => ({ ...prev, title: e.target.value }))} onBlur={e => updateField('title', e.target.value || null)} placeholder="Auto from vessel/fleet…" disabled={isLocked || !canEdit} style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem' }} />
+                    </div>
                 </div>
             </div>
+
+            {/* Step comment modal */}
+            {showStepCommentModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => { setShowStepCommentModal(null); setStepComment('') }}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '400px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 16px', fontSize: '1rem' }}>Move to {reachableSteps.find(s => s.id === showStepCommentModal)?.name}</h3>
+                        <textarea
+                            value={stepComment}
+                            onChange={e => setStepComment(e.target.value)}
+                            placeholder="Add a comment (optional)..."
+                            rows={3}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                            <button className="btn-secondary" onClick={() => { setShowStepCommentModal(null); setStepComment('') }}>Cancel</button>
+                            <button className="btn-primary" onClick={() => handleMoveToStep(showStepCommentModal, stepComment || undefined)}>Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', marginBottom: '20px' }}>
