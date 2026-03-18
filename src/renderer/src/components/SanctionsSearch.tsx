@@ -76,6 +76,7 @@ export default function SanctionsSearch() {
             case 'ofac': return '#ff6b6b'
             case 'eu': return '#4dabf7'
             case 'un': return '#69db7c'
+            case 'isf': return '#e599f7'
             default: return '#ffd43b'
         }
     }
@@ -167,7 +168,7 @@ export default function SanctionsSearch() {
                                 SANCTIONS LISTS
                             </label>
                             <div style={{ display: 'flex', gap: '12px' }}>
-                                {['OFAC', 'UN', 'EU'].map(source => (
+                                {['OFAC', 'UN', 'EU', 'ISF'].map(source => (
                                     <button
                                         key={source}
                                         type="button"

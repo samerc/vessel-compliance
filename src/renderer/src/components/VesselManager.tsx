@@ -358,9 +358,10 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
             }
         }
 
+        const isClickable = isPotentialMatch || isMatch
         const handleBadgeClick = (e: React.MouseEvent) => {
             e.stopPropagation()
-            if (isPotentialMatch) {
+            if (isClickable) {
                 handleViewPotentialMatch(vessel)
             }
         }
@@ -377,7 +378,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     background: config.background,
                     border: config.border,
                     color: config.color,
-                    cursor: isPotentialMatch ? 'pointer' : 'default'
+                    cursor: isClickable ? 'pointer' : 'default'
                 }}
                 title={
                     isError ? 'API request failed. Click refresh to try again.' :

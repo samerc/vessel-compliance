@@ -608,9 +608,10 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             }
         }
 
+        const isClickable = isPotentialMatch || isMatch
         const handleBadgeClick = (e: React.MouseEvent) => {
             e.stopPropagation()
-            if (isPotentialMatch) {
+            if (isClickable) {
                 handleViewPotentialMatch(entity)
             }
         }
@@ -627,7 +628,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                     background: config.background,
                     border: config.border,
                     color: config.color,
-                    cursor: isPotentialMatch ? 'pointer' : 'default'
+                    cursor: isClickable ? 'pointer' : 'default'
                 }}
                 title={
                     isError ? 'API request failed. Click refresh to try again.' :

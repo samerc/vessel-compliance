@@ -551,9 +551,9 @@ export default function EntityDirectory() {
 
     return (
       <div
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '4px', fontSize: '0.68rem', background: config.bg, border: config.border, color: config.color, cursor: isPotentialMatch ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
-        title={isError ? 'API request failed. Click refresh to retry.' : isPotentialMatch ? 'Click to review potential matches' : `Last checked: ${target?.ofacCheckedAt ? formatDateTime(target.ofacCheckedAt) : 'Never'}`}
-        onClick={e => { e.stopPropagation(); if (isPotentialMatch) handleViewPotentialMatch(entity, vessel) }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '4px', fontSize: '0.68rem', background: config.bg, border: config.border, color: config.color, cursor: (isPotentialMatch || isMatch) ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
+        title={isError ? 'API request failed. Click refresh to retry.' : (isPotentialMatch || isMatch) ? 'Click to review matches' : `Last checked: ${target?.ofacCheckedAt ? formatDateTime(target.ofacCheckedAt) : 'Never'}`}
+        onClick={e => { e.stopPropagation(); if (isPotentialMatch || isMatch) handleViewPotentialMatch(entity, vessel) }}
       >
         {config.icon}
         {config.text}
