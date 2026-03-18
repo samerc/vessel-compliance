@@ -38,6 +38,7 @@ const FONT_FAMILIES = [
   { label: 'Courier New', value: 'Courier New, monospace' },
   { label: 'Verdana', value: 'Verdana, sans-serif' },
   { label: 'Calibri', value: 'Calibri, sans-serif' },
+  { label: 'Aptos', value: 'Aptos, sans-serif' },
 ]
 
 // Custom FontSize extension using TextStyle marks
