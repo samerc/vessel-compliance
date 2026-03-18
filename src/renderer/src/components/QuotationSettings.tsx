@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings } from '../../../shared/types'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check } from 'lucide-react'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,7 +9,7 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
 
 type SettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -31,6 +31,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
         { id: 'sectionOrder', label: 'Section Order', icon: <List size={15} /> },
+        { id: 'workflow', label: 'Workflow', icon: <GitBranch size={15} /> },
     ],
     pi: [
         { id: 'clauses', label: 'Conditions', icon: <BookOpen size={15} /> },
@@ -150,6 +151,7 @@ export default function QuotationSettings() {
             {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'sectionOrder' && <SectionOrderTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'workflow' && <WorkflowDesignerTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
 
             {activeTab === 'hullAgreedValueTexts' && <HullAgreedValueTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'hullClauses' && <HullClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
@@ -3512,5 +3514,493 @@ function WarSettingsTab({ showSuccess, showError }: TabProps) {
                 <Save size={14} /> Save Settings
             </button>
         </section>
+    )
+}
+
+// ==================== Workflow Designer Tab ====================
+
+const STEP_COLOR_PRESETS = [
+    { label: 'Gray', value: '#6b7280' },
+    { label: 'Amber', value: '#f59e0b' },
+    { label: 'Blue', value: '#3b82f6' },
+    { label: 'Purple', value: '#8b5cf6' },
+    { label: 'Green', value: '#22c55e' },
+    { label: 'Red', value: '#ef4444' },
+    { label: 'Teal', value: '#14b8a6' },
+    { label: 'Pink', value: '#ec4899' },
+]
+
+const ALL_PERMISSIONS: { key: string; label: string }[] = PERMISSION_CATEGORIES.flatMap(c =>
+    c.permissions.map(p => ({ key: p.key, label: `${c.label}: ${p.label}` }))
+)
+
+function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
+    const [steps, setSteps] = useState<WorkflowStep[]>([])
+    const [transitions, setTransitions] = useState<WorkflowTransition[]>([])
+    const [editingStep, setEditingStep] = useState<string | null>(null)
+    const [editForm, setEditForm] = useState<{ name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }>({ name: '', color: '#6b7280', canEdit: true, canExport: false, isLockPoint: false, isInitial: false })
+    const [addingStep, setAddingStep] = useState(false)
+    const [newStep, setNewStep] = useState<{ name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }>({ name: '', color: '#6b7280', canEdit: true, canExport: false, isLockPoint: false, isInitial: false })
+    const [addingTransition, setAddingTransition] = useState(false)
+    const [newTransition, setNewTransition] = useState<{ fromStepId: string; toStepId: string; permissionKey: string | null; autoCreateRevision: boolean }>({ fromStepId: '', toStepId: '', permissionKey: null, autoCreateRevision: false })
+
+    useEffect(() => { loadAll() }, [])
+
+    const loadAll = async () => {
+        try {
+            const [s, t] = await Promise.all([
+                window.api.workflowGetSteps(),
+                window.api.workflowGetTransitions()
+            ])
+            setSteps(Array.isArray(s) ? s : [])
+            setTransitions(Array.isArray(t) ? t : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to load workflow')
+        }
+    }
+
+    const handleAddStep = async () => {
+        if (!newStep.name.trim()) return
+        try {
+            await window.api.workflowAddStep(newStep)
+            showSuccess('Step added')
+            setAddingStep(false)
+            setNewStep({ name: '', color: '#6b7280', canEdit: true, canExport: false, isLockPoint: false, isInitial: false })
+            loadAll()
+        } catch (err: any) { showError(err.message || 'Failed to add step') }
+    }
+
+    const handleUpdateStep = async (id: string) => {
+        if (!editForm.name.trim()) return
+        try {
+            await window.api.workflowUpdateStep(id, editForm)
+            showSuccess('Step updated')
+            setEditingStep(null)
+            loadAll()
+        } catch (err: any) { showError(err.message || 'Failed to update step') }
+    }
+
+    const handleDeleteStep = async (id: string) => {
+        try {
+            await window.api.workflowDeleteStep(id)
+            showSuccess('Step deleted')
+            loadAll()
+        } catch (err: any) { showError(err.message || 'Failed to delete step') }
+    }
+
+    const moveStep = async (index: number, dir: -1 | 1) => {
+        const arr = [...steps]
+        const target = index + dir
+        if (target < 0 || target >= arr.length) return
+        ;[arr[index], arr[target]] = [arr[target], arr[index]]
+        setSteps(arr)
+        await window.api.workflowReorderSteps(arr.map(s => s.id))
+    }
+
+    const handleAddTransition = async () => {
+        if (!newTransition.fromStepId || !newTransition.toStepId) return
+        if (newTransition.fromStepId === newTransition.toStepId) {
+            showError('From and To steps must be different')
+            return
+        }
+        try {
+            await window.api.workflowAddTransition(newTransition)
+            showSuccess('Transition added')
+            setAddingTransition(false)
+            setNewTransition({ fromStepId: '', toStepId: '', permissionKey: null, autoCreateRevision: false })
+            loadAll()
+        } catch (err: any) { showError(err.message || 'Failed to add transition') }
+    }
+
+    const handleDeleteTransition = async (id: string) => {
+        try {
+            await window.api.workflowDeleteTransition(id)
+            showSuccess('Transition deleted')
+            loadAll()
+        } catch (err: any) { showError(err.message || 'Failed to delete transition') }
+    }
+
+    const startEdit = (step: WorkflowStep) => {
+        setEditingStep(step.id)
+        setEditForm({
+            name: step.name,
+            color: step.color,
+            canEdit: step.canEdit,
+            canExport: step.canExport,
+            isLockPoint: step.isLockPoint,
+            isInitial: step.isInitial
+        })
+    }
+
+    const thStyle: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }
+    const tdStyle: React.CSSProperties = { padding: '10px 12px', fontSize: '0.85rem' }
+
+    const ColorPicker = ({ value, onChange }: { value: string; onChange: (c: string) => void }) => (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {STEP_COLOR_PRESETS.map(c => (
+                <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => onChange(c.value)}
+                    title={c.label}
+                    style={{
+                        width: 24, height: 24, borderRadius: '50%',
+                        background: c.value,
+                        border: value === c.value ? '3px solid var(--text-primary)' : '2px solid transparent',
+                        cursor: 'pointer',
+                        outline: value === c.value ? '2px solid var(--accent-primary)' : 'none',
+                        outlineOffset: '1px'
+                    }}
+                />
+            ))}
+        </div>
+    )
+
+    const ToggleCheckbox = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+            {label}
+        </label>
+    )
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Section 1: Steps */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <GitBranch size={18} /> Workflow Steps
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Define the stages a quotation moves through. The initial step is automatically assigned to new quotations.
+                </p>
+
+                {/* Visual flow */}
+                {steps.length > 0 && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '16px 20px', marginBottom: '20px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        borderRadius: '10px', overflowX: 'auto'
+                    }}>
+                        {steps.map((step, i) => (
+                            <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{
+                                        width: 28, height: 28, borderRadius: '50%',
+                                        background: step.color,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: `0 0 0 3px ${step.color}33`
+                                    }}>
+                                        {step.isInitial && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />}
+                                        {step.isLockPoint && <Check size={14} color="#fff" strokeWidth={3} />}
+                                    </div>
+                                    <span style={{
+                                        fontSize: '0.72rem', fontWeight: 600, color: step.color,
+                                        whiteSpace: 'nowrap', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis'
+                                    }}>
+                                        {step.name}
+                                    </span>
+                                </div>
+                                {i < steps.length - 1 && (
+                                    <ArrowRight size={16} style={{ color: 'var(--text-secondary)', opacity: 0.5, flexShrink: 0 }} />
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Steps table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                            <th style={thStyle}>Order</th>
+                            <th style={thStyle}>Step</th>
+                            <th style={thStyle}>Color</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Can Edit</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Can Export</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Lock Point</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Initial</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {steps.map((step, i) => (
+                            <tr key={step.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                <td style={tdStyle}>
+                                    <div style={{ display: 'flex', gap: '2px' }}>
+                                        <button onClick={() => moveStep(i, -1)} disabled={i === 0} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                        <button onClick={() => moveStep(i, 1)} disabled={i === steps.length - 1} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === steps.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                    </div>
+                                </td>
+                                <td style={tdStyle}>
+                                    {editingStep === step.id ? (
+                                        <input
+                                            type="text" value={editForm.name}
+                                            onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                            style={{ padding: '4px 8px', borderRadius: '4px', width: '100%' }}
+                                        />
+                                    ) : (
+                                        <span style={{ fontWeight: 500 }}>{step.name}</span>
+                                    )}
+                                </td>
+                                <td style={tdStyle}>
+                                    {editingStep === step.id ? (
+                                        <ColorPicker value={editForm.color} onChange={c => setEditForm({ ...editForm, color: c })} />
+                                    ) : (
+                                        <div style={{
+                                            width: 20, height: 20, borderRadius: '50%',
+                                            background: step.color, border: '2px solid rgba(255,255,255,0.2)'
+                                        }} />
+                                    )}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {editingStep === step.id ? (
+                                        <input type="checkbox" checked={editForm.canEdit} onChange={e => setEditForm({ ...editForm, canEdit: e.target.checked })} />
+                                    ) : (
+                                        step.canEdit ? <Check size={16} style={{ color: '#22c55e' }} /> : <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
+                                    )}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {editingStep === step.id ? (
+                                        <input type="checkbox" checked={editForm.canExport} onChange={e => setEditForm({ ...editForm, canExport: e.target.checked })} />
+                                    ) : (
+                                        step.canExport ? <Check size={16} style={{ color: '#22c55e' }} /> : <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
+                                    )}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {editingStep === step.id ? (
+                                        <input type="checkbox" checked={editForm.isLockPoint} onChange={e => setEditForm({ ...editForm, isLockPoint: e.target.checked })} />
+                                    ) : (
+                                        step.isLockPoint ? <Check size={16} style={{ color: '#3b82f6' }} /> : <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
+                                    )}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {editingStep === step.id ? (
+                                        <input type="checkbox" checked={editForm.isInitial} onChange={e => setEditForm({ ...editForm, isInitial: e.target.checked })} />
+                                    ) : (
+                                        step.isInitial ? (
+                                            <span style={{
+                                                padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                                                background: 'rgba(0, 170, 200, 0.12)', color: 'var(--accent-primary)'
+                                            }}>INITIAL</span>
+                                        ) : null
+                                    )}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                                        {editingStep === step.id ? (
+                                            <>
+                                                <button onClick={() => handleUpdateStep(step.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                                                    <Save size={13} />
+                                                </button>
+                                                <button onClick={() => setEditingStep(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                                                    <X size={13} />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => startEdit(step)} className="btn-secondary" style={{ padding: '4px 8px' }}>
+                                                    <Pencil size={13} />
+                                                </button>
+                                                <button onClick={() => handleDeleteStep(step.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}>
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                {/* Add step form */}
+                {addingStep ? (
+                    <div style={{
+                        marginTop: '16px', padding: '16px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        borderRadius: '8px', border: '1px solid var(--glass-border)'
+                    }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                <input
+                                    type="text" value={newStep.name}
+                                    onChange={e => setNewStep({ ...newStep, name: e.target.value })}
+                                    placeholder="Step name"
+                                    style={{ flex: 1, padding: '8px 12px', borderRadius: '6px' }}
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Color</label>
+                                <ColorPicker value={newStep.color} onChange={c => setNewStep({ ...newStep, color: c })} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                                <ToggleCheckbox checked={newStep.canEdit} onChange={v => setNewStep({ ...newStep, canEdit: v })} label="Can Edit" />
+                                <ToggleCheckbox checked={newStep.canExport} onChange={v => setNewStep({ ...newStep, canExport: v })} label="Can Export" />
+                                <ToggleCheckbox checked={newStep.isLockPoint} onChange={v => setNewStep({ ...newStep, isLockPoint: v })} label="Lock Point" />
+                                <ToggleCheckbox checked={newStep.isInitial} onChange={v => setNewStep({ ...newStep, isInitial: v })} label="Initial Step" />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={handleAddStep} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Plus size={14} /> Add Step
+                                </button>
+                                <button onClick={() => setAddingStep(false)} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <button onClick={() => setAddingStep(true)} className="btn-secondary" style={{ marginTop: '12px', padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Plus size={14} /> Add Step
+                    </button>
+                )}
+            </div>
+
+            {/* Section 2: Transitions */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ArrowRight size={18} /> Transitions
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Define which step changes are allowed and what permissions are required. &quot;Any user&quot; means no special permission is needed.
+                </p>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                            <th style={thStyle}>From</th>
+                            <th style={{ ...thStyle, textAlign: 'center', width: '40px' }}></th>
+                            <th style={thStyle}>To</th>
+                            <th style={thStyle}>Permission</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Auto-Revision</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {transitions.map(t => {
+                            const fromStep = steps.find(s => s.id === t.fromStepId)
+                            const toStep = steps.find(s => s.id === t.toStepId)
+                            return (
+                                <tr key={t.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                    <td style={tdStyle}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: fromStep?.color || '#6b7280', flexShrink: 0 }} />
+                                            {t.fromStepName || fromStep?.name || '—'}
+                                        </span>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                        <ArrowRight size={14} style={{ color: 'var(--text-secondary)' }} />
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: toStep?.color || '#6b7280', flexShrink: 0 }} />
+                                            {t.toStepName || toStep?.name || '—'}
+                                        </span>
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <span style={{
+                                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem',
+                                            background: t.permissionKey ? 'rgba(139, 92, 246, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                                            color: t.permissionKey ? '#8b5cf6' : 'var(--text-secondary)'
+                                        }}>
+                                            {t.permissionKey
+                                                ? (ALL_PERMISSIONS.find(p => p.key === t.permissionKey)?.label || t.permissionKey)
+                                                : 'Any user'}
+                                        </span>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                        {t.autoCreateRevision ? <Check size={16} style={{ color: '#22c55e' }} /> : <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                        <button onClick={() => handleDeleteTransition(t.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}>
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            )
+                        })}
+                        {transitions.length === 0 && (
+                            <tr>
+                                <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-secondary)', padding: '24px 12px' }}>
+                                    No transitions defined. Add steps first, then create transitions between them.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+
+                {/* Add transition form */}
+                {addingTransition ? (
+                    <div style={{
+                        marginTop: '16px', padding: '16px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        borderRadius: '8px', border: '1px solid var(--glass-border)'
+                    }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>From Step</label>
+                                    <select
+                                        value={newTransition.fromStepId}
+                                        onChange={e => setNewTransition({ ...newTransition, fromStepId: e.target.value })}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px' }}
+                                    >
+                                        <option value="">Select step...</option>
+                                        {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                </div>
+                                <ArrowRight size={18} style={{ color: 'var(--text-secondary)', marginTop: '18px' }} />
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>To Step</label>
+                                    <select
+                                        value={newTransition.toStepId}
+                                        onChange={e => setNewTransition({ ...newTransition, toStepId: e.target.value })}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px' }}
+                                    >
+                                        <option value="">Select step...</option>
+                                        {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Permission Required</label>
+                                <select
+                                    value={newTransition.permissionKey || ''}
+                                    onChange={e => setNewTransition({ ...newTransition, permissionKey: e.target.value || null })}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px' }}
+                                >
+                                    <option value="">Any user</option>
+                                    {ALL_PERMISSIONS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+                                </select>
+                            </div>
+                            <ToggleCheckbox
+                                checked={newTransition.autoCreateRevision}
+                                onChange={v => setNewTransition({ ...newTransition, autoCreateRevision: v })}
+                                label="Auto-create revision when this transition occurs"
+                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={handleAddTransition} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Plus size={14} /> Add Transition
+                                </button>
+                                <button onClick={() => setAddingTransition(false)} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setAddingTransition(true)}
+                        className="btn-secondary"
+                        disabled={steps.length < 2}
+                        style={{ marginTop: '12px', padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', opacity: steps.length < 2 ? 0.5 : 1 }}
+                    >
+                        <Plus size={14} /> Add Transition
+                    </button>
+                )}
+            </div>
+        </div>
     )
 }
