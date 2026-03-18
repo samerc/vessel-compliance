@@ -30,10 +30,11 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const [exportingIndividual, setExportingIndividual] = useState(false)
     const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null)
 
-    // ZIP export vessel selection modal state
+    // Export vessel selection modal state
     const [showZipModal, setShowZipModal] = useState(false)
     const [zipSelectedIds, setZipSelectedIds] = useState<Set<string>>(new Set())
     const [zipSearch, setZipSearch] = useState('')
+    const [exportMode, setExportMode] = useState<'zip' | 'pdf' | 'excel'>('zip')
 
     // Quick-add state
     const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -92,10 +93,12 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
         ).slice(0, 8)
         : []
 
-    const handleOpenZipModal = () => {
-        if (activeVessels.length === 0) return
-        setZipSelectedIds(new Set(activeVessels.map(v => v.id)))
+    const handleOpenExportModal = (mode: 'zip' | 'pdf' | 'excel') => {
+        const vList = mode === 'zip' ? activeVessels : vessels
+        if (vList.length === 0) return
+        setZipSelectedIds(new Set(vList.map(v => v.id)))
         setZipSearch('')
+        setExportMode(mode)
         setShowZipModal(true)
     }
 
@@ -135,9 +138,10 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     }
 
     const filteredZipVessels = useMemo(() => {
-        if (!zipSearch.trim()) return activeVessels
+        const base = exportMode === 'zip' ? activeVessels : vessels
+        if (!zipSearch.trim()) return base
         const q = zipSearch.toLowerCase()
-        return activeVessels.filter(v =>
+        return base.filter(v =>
             v.name.toLowerCase().includes(q) ||
             v.imoNumber.toLowerCase().includes(q)
         )
@@ -248,23 +252,23 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         </button>
                     )}
                     <button
-                        onClick={() => ReportService.exportFleetToExcel(fleet, vessels, docTypes, allDocs)}
+                        onClick={() => handleOpenExportModal('excel')}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                        disabled={loading}
+                        disabled={loading || vessels.length === 0}
                     >
                         <FileSpreadsheet size={18} /> Excel
                     </button>
                     <button
-                        onClick={() => ReportService.exportFleetToPDF(fleet, vessels, docTypes, allDocs)}
+                        onClick={() => handleOpenExportModal('pdf')}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                        disabled={loading}
+                        disabled={loading || vessels.length === 0}
                     >
                         <FileText size={18} /> Fleet PDF
                     </button>
                     <button
-                        onClick={handleOpenZipModal}
+                        onClick={() => handleOpenExportModal('zip')}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         disabled={loading || exportingIndividual || activeVessels.length === 0}
@@ -384,7 +388,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                             flexShrink: 0
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Select Vessels for Export</h2>
+                                <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Select Vessels for {exportMode === 'excel' ? 'Excel' : exportMode === 'pdf' ? 'Fleet PDF' : 'Individual PDFs'}</h2>
                                 <span style={{
                                     background: 'var(--accent-primary)',
                                     color: '#fff',
@@ -393,7 +397,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                     padding: '2px 10px',
                                     borderRadius: '12px'
                                 }}>
-                                    {zipSelectedIds.size} / {activeVessels.length}
+                                    {zipSelectedIds.size} / {exportMode === 'zip' ? activeVessels.length : vessels.length}
                                 </span>
                             </div>
                             <button
@@ -541,7 +545,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                 <button
                                     className="btn-secondary"
                                     style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-                                    onClick={() => setZipSelectedIds(new Set(activeVessels.map(v => v.id)))}
+                                    onClick={() => setZipSelectedIds(new Set((exportMode === 'zip' ? activeVessels : vessels).map(v => v.id)))}
                                 >
                                     Select All
                                 </button>
@@ -563,10 +567,23 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                     fontSize: '0.9rem'
                                 }}
                                 disabled={zipSelectedIds.size === 0}
-                                onClick={handleExportIndividualPDFs}
+                                onClick={() => {
+                                    const selectedVessels = vessels.filter(v => zipSelectedIds.has(v.id))
+                                    if (selectedVessels.length === 0) return
+                                    setShowZipModal(false)
+                                    if (exportMode === 'excel') {
+                                        const selectedDocs = allDocs.filter(d => zipSelectedIds.has(d.vesselId))
+                                        ReportService.exportFleetToExcel(fleet, selectedVessels, docTypes, selectedDocs)
+                                    } else if (exportMode === 'pdf') {
+                                        const selectedDocs = allDocs.filter(d => zipSelectedIds.has(d.vesselId))
+                                        ReportService.exportFleetToPDF(fleet, selectedVessels, docTypes, selectedDocs)
+                                    } else {
+                                        handleExportIndividualPDFs()
+                                    }
+                                }}
                             >
-                                <FileText size={16} />
-                                Export {zipSelectedIds.size} Vessel{zipSelectedIds.size !== 1 ? 's' : ''}
+                                {exportMode === 'excel' ? <FileSpreadsheet size={16} /> : <FileText size={16} />}
+                                {exportMode === 'zip' ? 'Export' : exportMode === 'pdf' ? 'Fleet PDF' : 'Excel'} {zipSelectedIds.size} Vessel{zipSelectedIds.size !== 1 ? 's' : ''}
                             </button>
                         </div>
                     </div>
