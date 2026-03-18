@@ -94,6 +94,8 @@ const FONT_SIZES = [
 ]
 
 const LINE_SPACINGS = [
+  { label: 'Tight', value: '0.7' },
+  { label: 'Compact', value: '0.85' },
   { label: 'None', value: '0.9' },
   { label: '1.0', value: '1' },
   { label: '1.15', value: '1.15' },

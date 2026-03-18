@@ -1549,7 +1549,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           width: { size: BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          margins: { top: 60, bottom: 60, left: 80, right: 80 },
+          margins: { top: 60, bottom: 100, left: 80, right: 80 },
           children: content.length > 0 ? content : [emptyP()]
         })
       ]
@@ -2082,7 +2082,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wDdqListStr = ddqCountries.map(c => c.name).join(', ')
     const numP = (text: string, level: number) => new Paragraph({
       numbering: { reference: 'trading-numbered', level },
-      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+      spacing: { before: level === 0 ? 120 : 0, after: 80, line: 240, lineRule: 'auto' as any },
       children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
     })
     if (wq.tradingWarrantyIntro) tradContent.push(...mp(wq.tradingWarrantyIntro))
@@ -2125,7 +2125,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
     }
     if (wq.tradingShowIsrael && st(data, 'tradingIsrael')) {
-      tradContent.push(emptyP())
       tradContent.push(numP(stripHtml(st(data, 'tradingIsrael')), 0))
     }
     if (tradContent.length > 0) rowMap.set('trading', makeRow('Trading Warranty', tradContent))
@@ -2692,7 +2691,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           format: LevelFormat.BULLET,
           text: '-',
           alignment: AlignmentType.LEFT,
-          style: { paragraph: { indent: { left: 140, hanging: 140 } } }
+          style: { paragraph: { indent: { left: 280, hanging: 200 } } }
         }]
       }, {
         reference: 'trading-numbered',
