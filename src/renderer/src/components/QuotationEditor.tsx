@@ -890,11 +890,22 @@ function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: 
         if (!selectedVesselId) return
         try {
             const vLabel = nextLabel(qVessels)
+            const v = vessels.find(vv => vv.id === selectedVesselId)
+            const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
+            const flagName = v?.flagStateId ? (flagStates.find((f: any) => f.id === v.flagStateId)?.name || '') : ''
             await window.api.addQuotationVessel({
                 quotationId: quotation.id,
                 vesselId: selectedVesselId,
                 vesselLabel: vLabel,
-                order: qVessels.length
+                order: qVessels.length,
+                name: v?.name,
+                imoNumber: v?.imoNumber,
+                builtYear: v?.builtYear,
+                grossTonnage: v?.grossTonnage,
+                flag: flagName,
+                vesselType: v?.vesselType,
+                classification: v?.classificationSociety,
+                callSign: v?.callSign
             })
 
             // Auto-load vessel assureds into the quotation
