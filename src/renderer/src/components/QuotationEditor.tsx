@@ -3046,6 +3046,24 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
                     }
                 }
 
+                // Also check assured entity documents
+                try {
+                    const qAssureds = await window.api.getQuotationAssureds(quotation.id)
+                    const allEntities = await window.api.getEntities()
+                    for (const qa of (Array.isArray(qAssureds) ? qAssureds : [])) {
+                        if (!qa.entityId) continue
+                        const entity = allEntities.find((e: any) => e.id === qa.entityId)
+                        if (!entity) continue
+                        if (entity.type === 'company') {
+                            if (!entity.certificateOfIncorporationPath) missingDocTypeIds.add('entity:coi')
+                            if (!entity.articlesOfAssociationPath) missingDocTypeIds.add('entity:aoa')
+                            if (!entity.kycFilePath) missingDocTypeIds.add('entity:kyc')
+                        } else {
+                            if (!entity.passportFilePath) missingDocTypeIds.add('entity:passport')
+                        }
+                    }
+                } catch { /* ignore entity doc check errors */ }
+
                 // Add master subjectivities whose linked doc types overlap with missing/expiring
                 for (const m of masters) {
                     const shouldAdd = !m.docTypeIds || m.docTypeIds.length === 0 ||

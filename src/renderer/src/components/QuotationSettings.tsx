@@ -2121,13 +2121,20 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
 
     useEffect(() => { loadData() }, [])
+    const ENTITY_DOC_TYPES: DocumentType[] = [
+        { id: 'entity:coi', name: 'Certificate of Incorporation (Assured)', description: '', order: 900, annualRenewal: false, required: false },
+        { id: 'entity:aoa', name: 'Articles of Association (Assured)', description: '', order: 901, annualRenewal: false, required: false },
+        { id: 'entity:kyc', name: 'KYC (Assured)', description: '', order: 902, annualRenewal: false, required: false },
+        { id: 'entity:passport', name: 'ID/Passport (Assured)', description: '', order: 903, annualRenewal: false, required: false },
+    ]
+
     const loadData = async () => {
         const [subjs, dts] = await Promise.all([
             window.api.getPISubjectivities(),
             window.api.getDocumentTypes()
         ])
         setItems(Array.isArray(subjs) ? subjs : [])
-        setDocTypes(Array.isArray(dts) ? dts : [])
+        setDocTypes([...(Array.isArray(dts) ? dts : []), ...ENTITY_DOC_TYPES])
     }
 
     const handleAdd = async () => {
