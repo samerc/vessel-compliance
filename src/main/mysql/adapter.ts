@@ -5597,8 +5597,8 @@ export class MySQLAdapter {
 
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
-            // Lock the source quotation
-            await this.pool.execute('UPDATE quotations SET is_locked = TRUE WHERE id = ?', [sourceId])
+            // Lock the source quotation and ensure it has the revision_group_id set
+            await this.pool.execute('UPDATE quotations SET is_locked = TRUE, revision_group_id = ? WHERE id = ?', [revisionGroupId, sourceId])
 
             // Clone the main quotation row
             await this.pool.execute(`

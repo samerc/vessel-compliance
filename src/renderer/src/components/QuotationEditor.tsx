@@ -320,17 +320,18 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                             {q.quotationTypeName}
                         </span>
                     )}
-                    {(q.revisionNumber || 0) > 0 && (
+                    {revisions.length > 1 && (
                         <span style={{
                             padding: '4px 10px',
                             borderRadius: '6px',
                             fontSize: '0.75rem',
                             fontWeight: 700,
-                            background: 'rgba(180, 100, 255, 0.15)',
-                            color: isLight ? '#7a3db8' : '#b464ff',
+                            background: (q.revisionNumber || 0) > 0 ? 'rgba(180, 100, 255, 0.15)' : 'rgba(0, 200, 100, 0.15)',
+                            color: (q.revisionNumber || 0) > 0 ? (isLight ? '#7a3db8' : '#b464ff') : (isLight ? '#008c46' : '#00c864'),
                             letterSpacing: '0.03em'
                         }}>
-                            R{q.revisionNumber}
+                            {(q.revisionNumber || 0) > 0 ? `R${q.revisionNumber}` : 'Original'}
+                            {isLocked && ' (locked)'}
                         </span>
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
