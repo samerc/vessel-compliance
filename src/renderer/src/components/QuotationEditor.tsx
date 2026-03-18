@@ -2137,28 +2137,32 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
     }
 
     const moveSetGroup = async (setId: string, direction: 'up' | 'down') => {
-        const ws = warrantySets.find(s => s.id === setId)
-        if (!ws?.warrantyIds) return
-        const setIdsInSelected = ws.warrantyIds.filter(wid => selectedIds.includes(wid))
-        if (setIdsInSelected.length === 0) return
-
-        const newIds = selectedIds.filter(id => !setIdsInSelected.includes(id))
-        const firstIdx = Math.min(...setIdsInSelected.map(wid => selectedIds.indexOf(wid)))
-
-        // Find insertion point
-        let insertAt: number
-        if (direction === 'up') {
-            insertAt = Math.max(0, firstIdx - 1)
-            // Adjust for items already removed
-            const removedBefore = setIdsInSelected.filter(id => selectedIds.indexOf(id) < insertAt).length
-            insertAt = Math.max(0, insertAt - removedBefore)
-        } else {
-            const lastIdx = Math.max(...setIdsInSelected.map(wid => selectedIds.indexOf(wid)))
-            insertAt = Math.min(newIds.length, lastIdx - setIdsInSelected.length + 2)
+        // Build block list: each entry is a set block or a single loose item
+        const blocks: { ids: string[]; setId?: string }[] = []
+        const processed = new Set<string>()
+        for (let i = 0; i < selectedIds.length; i++) {
+            const id = selectedIds[i]
+            if (processed.has(id)) continue
+            let foundSet = false
+            for (const s of appliedSets) {
+                if (s.idsInSelected[0] === id) {
+                    blocks.push({ ids: [...s.idsInSelected], setId: s.set.id })
+                    s.idsInSelected.forEach(sid => processed.add(sid))
+                    foundSet = true
+                    break
+                }
+            }
+            if (!foundSet) {
+                blocks.push({ ids: [id] })
+                processed.add(id)
+            }
         }
-
-        newIds.splice(insertAt, 0, ...setIdsInSelected)
-        await saveSelected(newIds)
+        const blockIdx = blocks.findIndex(b => b.setId === setId)
+        if (blockIdx < 0) return
+        const swapIdx = direction === 'up' ? blockIdx - 1 : blockIdx + 1
+        if (swapIdx < 0 || swapIdx >= blocks.length) return
+        ;[blocks[blockIdx], blocks[swapIdx]] = [blocks[swapIdx], blocks[blockIdx]]
+        await saveSelected(blocks.flatMap(b => b.ids))
     }
 
     return (
