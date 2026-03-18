@@ -11,7 +11,7 @@ export default function SanctionsSearch() {
 
     const [query, setQuery] = useState('')
     const [threshold, setThreshold] = useState(user?.sanctionsThreshold || 60)
-    const [sources, setSources] = useState<string[]>(['ofac', 'un', 'eu'])
+    const [sources, setSources] = useState<string[]>(['ofac', 'un', 'eu', 'isf'])
     const [results, setResults] = useState<SanctionsMatch[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [hasSearched, setHasSearched] = useState(false)
