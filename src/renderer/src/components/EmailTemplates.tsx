@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Mail, Plus, Trash2, Save, Copy, ChevronUp, ChevronDown, Lock, Tag } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import RichTextEditor from './RichTextEditor'
 import type { EmailTemplate } from '../../../shared/types'
 
 const CATEGORIES = [
@@ -49,7 +50,7 @@ export default function EmailTemplates(): React.JSX.Element {
   const [editBody, setEditBody] = useState('')
   const [editCategory, setEditCategory] = useState('general')
   const [dirty, setDirty] = useState(false)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  // bodyRef removed — now using RichTextEditor
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -153,24 +154,35 @@ export default function EmailTemplates(): React.JSX.Element {
   }
 
   const insertPlaceholder = (placeholder: string) => {
-    const ta = bodyRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const before = editBody.slice(0, start)
-    const after = editBody.slice(end)
-    setEditBody(before + placeholder + after)
+    // Insert into RichTextEditor via execCommand on the contenteditable
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      // Check if selection is inside our editor
+      const editorEl = document.querySelector('[contenteditable="true"]')
+      if (editorEl && editorEl.contains(range.commonAncestorContainer)) {
+        range.deleteContents()
+        range.insertNode(document.createTextNode(placeholder))
+        range.collapse(false)
+        sel.removeAllRanges()
+        sel.addRange(range)
+        // Trigger change by dispatching input event
+        editorEl.dispatchEvent(new Event('input', { bubbles: true }))
+        setDirty(true)
+        return
+      }
+    }
+    // Fallback: append to end
+    setEditBody(editBody + placeholder)
     setDirty(true)
-    setTimeout(() => {
-      ta.focus()
-      const pos = start + placeholder.length
-      ta.setSelectionRange(pos, pos)
-    }, 0)
   }
 
   const handleCopyToClipboard = () => {
     if (!selected) return
-    const text = `Subject: ${editSubject || '(no subject)'}\n\n${editBody}`
+    const tmp = document.createElement('div')
+    tmp.innerHTML = editBody
+    const plainBody = tmp.textContent || tmp.innerText || ''
+    const text = `Subject: ${editSubject || '(no subject)'}\n\n${plainBody}`
     navigator.clipboard.writeText(text)
     showSuccess('Template copied to clipboard')
   }
@@ -542,20 +554,15 @@ export default function EmailTemplates(): React.JSX.Element {
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Body
                   </label>
-                  <textarea
-                    ref={bodyRef}
+                  <RichTextEditor
                     value={editBody}
-                    onChange={(e) => { setEditBody(e.target.value); markDirty() }}
-                    disabled={!canManage}
-                    rows={14}
-                    style={{
-                      width: '100%', padding: '10px 12px', borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : 'rgba(255,255,255,0.05)',
-                      color: 'var(--text-primary)', fontSize: '0.83rem',
-                      fontFamily: 'monospace', resize: 'vertical',
-                      outline: 'none', lineHeight: '1.5'
-                    }}
+                    onChange={(html) => { setEditBody(html); markDirty() }}
+                    placeholder="Write your email template body here..."
+                    minHeight={250}
+                    showFontSize
+                    showFontFamily
+                    showAlignment
+                    showLineSpacing
                   />
                 </div>
 
