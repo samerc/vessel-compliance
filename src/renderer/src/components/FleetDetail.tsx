@@ -77,21 +77,32 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
         }
     }
 
-    if (selectedVessel) {
-        return <VesselDetail vessel={selectedVessel} backLabel="Back to Fleet" onBack={() => { setSelectedVessel(null); loadData(); }} />
-    }
+    const activeVessels = useMemo(() => vessels.filter(v => v.isActive), [vessels])
+    const inactiveVessels = useMemo(() => vessels.filter(v => !v.isActive), [vessels])
 
-    const activeVessels = vessels.filter(v => v.isActive)
-    const inactiveVessels = vessels.filter(v => !v.isActive)
+    const filteredZipVessels = useMemo(() => {
+        const base = exportMode === 'zip' ? activeVessels : vessels
+        if (!zipSearch.trim()) return base
+        const q = zipSearch.toLowerCase()
+        return base.filter(v =>
+            v.name.toLowerCase().includes(q) ||
+            v.imoNumber.toLowerCase().includes(q)
+        )
+    }, [activeVessels, vessels, zipSearch, exportMode])
 
     // Filter vessels not already in this fleet for quick-add
-    const availableVessels = quickAddSearch.trim()
+    const availableVessels = useMemo(() => quickAddSearch.trim()
         ? allVessels.filter(v =>
             v.fleetId !== fleet.id &&
             (v.name.toLowerCase().includes(quickAddSearch.toLowerCase()) ||
                 v.imoNumber.toLowerCase().includes(quickAddSearch.toLowerCase()))
         ).slice(0, 8)
         : []
+    , [quickAddSearch, allVessels, fleet.id])
+
+    if (selectedVessel) {
+        return <VesselDetail vessel={selectedVessel} backLabel="Back to Fleet" onBack={() => { setSelectedVessel(null); loadData(); }} />
+    }
 
     const handleOpenExportModal = (mode: 'zip' | 'pdf' | 'excel') => {
         const vList = mode === 'zip' ? activeVessels : vessels
@@ -136,16 +147,6 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
             showSuccess(`${selectedVessels.length} PDFs zipped and downloaded`)
         }
     }
-
-    const filteredZipVessels = useMemo(() => {
-        const base = exportMode === 'zip' ? activeVessels : vessels
-        if (!zipSearch.trim()) return base
-        const q = zipSearch.toLowerCase()
-        return base.filter(v =>
-            v.name.toLowerCase().includes(q) ||
-            v.imoNumber.toLowerCase().includes(q)
-        )
-    }, [activeVessels, vessels, zipSearch, exportMode])
 
     const renderVesselTable = (vesselList: Vessel[], title: string, showRemove: boolean) => {
         if (vesselList.length === 0) return null
