@@ -1495,7 +1495,7 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
                     ))}
                 </div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
                 {allClauses.map(c => {
                     const checked = isClauseCheckedForAlt(c.id)
                     return (
@@ -4498,7 +4498,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
     const selectedCount = selectedItems.length
 
     return (
-        <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
                 {label}
             </label>
