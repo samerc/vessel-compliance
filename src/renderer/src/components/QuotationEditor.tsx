@@ -594,7 +594,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
             {/* Tab Content */}
             <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
                 {activeTab === 'insured' && <InsuredTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
-                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
                 {activeTab === 'agreedValue' && <AgreedValueTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />}
@@ -870,7 +870,7 @@ function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateFie
 
 const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
 
-function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean }) {
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [showAddForm, setShowAddForm] = useState(false)
     const [addMode, setAddMode] = useState<'existing' | 'new'>('existing')
@@ -1001,6 +1001,7 @@ function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: 
                                     value={vesselSearch}
                                     onChange={e => { setVesselSearch(e.target.value); setVesselDropdownOpen(true); setSelectedVesselId('') }}
                                     onFocus={() => setVesselDropdownOpen(true)}
+                                    onBlur={() => setTimeout(() => setVesselDropdownOpen(false), 200)}
                                     placeholder="Search vessel by name or IMO..."
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
                                 />
@@ -1008,11 +1009,12 @@ function VesselTab({ quotation, vessels, showSuccess, showError }: { quotation: 
                                     const q = vesselSearch.toLowerCase()
                                     const filtered = q ? availableVessels.filter(v => v.name.toLowerCase().includes(q) || v.imoNumber.toLowerCase().includes(q)) : availableVessels
                                     return filtered.length > 0 ? (
-                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: 'var(--bg-primary)', border: '1px solid var(--input-border)', borderRadius: '8px', zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '220px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '8px', zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
                                             {filtered.slice(0, 20).map(v => (
                                                 <div key={v.id} onClick={() => { setSelectedVesselId(v.id); setVesselSearch(`${v.name} (IMO: ${v.imoNumber})`); setVesselDropdownOpen(false) }}
-                                                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                                                    className="hover-effect"
+                                                    style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', transition: 'background 0.15s' }}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                                 >
                                                     <span style={{ fontWeight: 600 }}>{v.name}</span>
                                                     <span style={{ color: 'var(--text-secondary)', marginLeft: '8px', fontSize: '0.8rem' }}>IMO: {v.imoNumber}</span>
