@@ -866,6 +866,41 @@ export interface QuotationType {
 
 export type QuotationStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'converted'
 
+export interface WorkflowStep {
+  id: string
+  name: string
+  color: string
+  order: number
+  canEdit: boolean
+  canExport: boolean
+  isLockPoint: boolean
+  isInitial: boolean
+  createdAt?: string
+}
+
+export interface WorkflowTransition {
+  id: string
+  fromStepId: string
+  toStepId: string
+  permissionKey: string | null
+  autoCreateRevision: boolean
+  fromStepName?: string
+  toStepName?: string
+}
+
+export interface QuotationWorkflowLog {
+  id: string
+  quotationId: string
+  fromStepId?: string | null
+  toStepId: string
+  userId: string
+  username: string
+  comment?: string | null
+  createdAt: string
+  fromStepName?: string
+  toStepName?: string
+}
+
 export interface Quotation {
   id: string
   referenceNumber: string
@@ -926,6 +961,9 @@ export interface Quotation {
   revisionGroupId?: string
   isLocked?: boolean
   exportSnapshot?: string
+  workflowStepId?: string | null
+  workflowStepName?: string
+  workflowStepColor?: string
   createdAt?: string
   updatedAt?: string
   createdBy?: string

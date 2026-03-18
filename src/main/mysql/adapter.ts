@@ -1991,6 +1991,57 @@ export class MySQLAdapter {
                 }
             }
 
+            // Add workflow columns to quotations
+            {
+                const [qCols] = await this.pool.query('SHOW COLUMNS FROM quotations')
+                const qColNames = (qCols as any[]).map((c: any) => c.Field)
+                if (!qColNames.includes('workflow_step_id')) await this.pool.query('ALTER TABLE quotations ADD COLUMN workflow_step_id VARCHAR(36) NULL')
+                if (!qColNames.includes('revision_number')) await this.pool.query('ALTER TABLE quotations ADD COLUMN revision_number INT DEFAULT 0')
+                if (!qColNames.includes('revision_group_id')) await this.pool.query('ALTER TABLE quotations ADD COLUMN revision_group_id VARCHAR(36) NULL')
+                if (!qColNames.includes('is_locked')) await this.pool.query('ALTER TABLE quotations ADD COLUMN is_locked BOOLEAN DEFAULT FALSE')
+                if (!qColNames.includes('export_snapshot')) await this.pool.query('ALTER TABLE quotations ADD COLUMN export_snapshot MEDIUMTEXT NULL')
+                if (!qColNames.includes('created_by')) await this.pool.query('ALTER TABLE quotations ADD COLUMN created_by VARCHAR(36) NULL')
+            }
+
+            // Seed default workflow steps if table is empty
+            {
+                const [wsRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM quotation_workflow_steps')
+                if ((wsRows as any[])[0].cnt === 0) {
+                    const draftId = uuidv4(), reviewId = uuidv4(), approvedId = uuidv4(), sentId = uuidv4()
+                    const seedSteps = [
+                        { id: draftId, name: 'Draft', color: '#6b7280', order: 0, canEdit: true, canExport: false, isLockPoint: false, isInitial: true },
+                        { id: reviewId, name: 'Under Review', color: '#f59e0b', order: 1, canEdit: true, canExport: true, isLockPoint: false, isInitial: false },
+                        { id: approvedId, name: 'Approved', color: '#3b82f6', order: 2, canEdit: true, canExport: true, isLockPoint: false, isInitial: false },
+                        { id: sentId, name: 'Sent', color: '#8b5cf6', order: 3, canEdit: false, canExport: true, isLockPoint: true, isInitial: false },
+                    ]
+                    for (const s of seedSteps) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_workflow_steps (id, name, color, order_index, can_edit, can_export, is_lock_point, is_initial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                            [s.id, s.name, s.color, s.order, s.canEdit, s.canExport, s.isLockPoint, s.isInitial]
+                        )
+                    }
+                    // Seed transitions
+                    const seedTransitions = [
+                        { from: draftId, to: reviewId, perm: null, autoRev: false },
+                        { from: draftId, to: approvedId, perm: 'quotations:approve', autoRev: false },
+                        { from: draftId, to: sentId, perm: 'quotations:send', autoRev: false },
+                        { from: reviewId, to: approvedId, perm: 'quotations:approve', autoRev: false },
+                        { from: reviewId, to: draftId, perm: null, autoRev: false },
+                        { from: approvedId, to: sentId, perm: null, autoRev: false },
+                        { from: approvedId, to: draftId, perm: null, autoRev: false },
+                        { from: sentId, to: draftId, perm: null, autoRev: true },
+                    ]
+                    for (const t of seedTransitions) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_workflow_transitions (id, from_step_id, to_step_id, permission_key, auto_create_revision) VALUES (?, ?, ?, ?, ?)',
+                            [uuidv4(), t.from, t.to, t.perm, t.autoRev]
+                        )
+                    }
+                    // Set existing quotations to Draft step
+                    await this.pool.query('UPDATE quotations SET workflow_step_id = ? WHERE workflow_step_id IS NULL', [draftId])
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -5265,10 +5316,12 @@ export class MySQLAdapter {
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
                 (SELECT GROUP_CONCAT(pc.name ORDER BY pc.order_index SEPARATOR ', ') FROM quotation_clauses qc JOIN pi_clauses pc ON CONVERT(pc.id USING utf8mb4) = CONVERT(qc.pi_clause_id USING utf8mb4) WHERE qc.quotation_id = q.id) as piClauseNames,
                 (SELECT GROUP_CONCAT(DISTINCT hc.code ORDER BY qha.order_index SEPARATOR ', ') FROM quotation_hull_alternatives qha JOIN hull_clauses hc ON CONVERT(hc.id USING utf8mb4) = CONVERT(qha.hull_clause_id USING utf8mb4) WHERE qha.quotation_id = q.id) as hullClauseCodes,
-                q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
+                q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy,
+                q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
+            LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
             WHERE q.id = (
                 SELECT q2.id FROM quotations q2
                 WHERE q2.revision_group_id = q.revision_group_id
@@ -5321,10 +5374,12 @@ export class MySQLAdapter {
                 q.co_name as coName, q.title as title,
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride, q.section_order as sectionOrderRaw,
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked, q.export_snapshot as exportSnapshotRaw,
+                q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
+            LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
             WHERE q.id = ?
         `, [id])
         const arr = rows as any[]
@@ -8029,6 +8084,161 @@ export class MySQLAdapter {
         if (!this.pool) return 0
         const [rows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM activity_log')
         return (rows as any[])[0]?.cnt || 0
+    }
+
+    // --- Workflow Steps ---
+    async getWorkflowSteps(): Promise<import('../../shared/types').WorkflowStep[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, color, order_index AS `order`, can_edit AS canEdit, can_export AS canExport, is_lock_point AS isLockPoint, is_initial AS isInitial, created_at AS createdAt FROM quotation_workflow_steps ORDER BY order_index ASC')
+        return (rows as any[]).map(r => ({ ...r, canEdit: Boolean(r.canEdit), canExport: Boolean(r.canExport), isLockPoint: Boolean(r.isLockPoint), isInitial: Boolean(r.isInitial) }))
+    }
+
+    async addWorkflowStep(step: { name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }): Promise<import('../../shared/types').WorkflowStep> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRows] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_workflow_steps')
+        const order = (maxRows as any[])[0].nextOrder
+        await this.pool.execute(
+            'INSERT INTO quotation_workflow_steps (id, name, color, order_index, can_edit, can_export, is_lock_point, is_initial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, step.name, step.color, order, step.canEdit, step.canExport, step.isLockPoint, step.isInitial]
+        )
+        return { id, ...step, order }
+    }
+
+    async updateWorkflowStep(id: string, updates: Partial<{ name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }>): Promise<void> {
+        if (!this.pool) return
+        const sets: string[] = []
+        const params: any[] = []
+        if (updates.name !== undefined) { sets.push('name = ?'); params.push(updates.name) }
+        if (updates.color !== undefined) { sets.push('color = ?'); params.push(updates.color) }
+        if (updates.canEdit !== undefined) { sets.push('can_edit = ?'); params.push(updates.canEdit) }
+        if (updates.canExport !== undefined) { sets.push('can_export = ?'); params.push(updates.canExport) }
+        if (updates.isLockPoint !== undefined) { sets.push('is_lock_point = ?'); params.push(updates.isLockPoint) }
+        if (updates.isInitial !== undefined) { sets.push('is_initial = ?'); params.push(updates.isInitial) }
+        if (sets.length === 0) return
+        params.push(id)
+        await this.pool.execute(`UPDATE quotation_workflow_steps SET ${sets.join(', ')} WHERE id = ?`, params)
+    }
+
+    async deleteWorkflowStep(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_workflow_transitions WHERE from_step_id = ? OR to_step_id = ?', [id, id])
+        await this.pool.execute('DELETE FROM quotation_workflow_steps WHERE id = ?', [id])
+    }
+
+    async reorderWorkflowSteps(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_workflow_steps SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // --- Workflow Transitions ---
+    async getWorkflowTransitions(): Promise<import('../../shared/types').WorkflowTransition[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT t.id, t.from_step_id AS fromStepId, t.to_step_id AS toStepId,
+                    t.permission_key AS permissionKey, t.auto_create_revision AS autoCreateRevision,
+                    fs.name AS fromStepName, ts.name AS toStepName
+             FROM quotation_workflow_transitions t
+             LEFT JOIN quotation_workflow_steps fs ON t.from_step_id = fs.id
+             LEFT JOIN quotation_workflow_steps ts ON t.to_step_id = ts.id
+             ORDER BY fs.order_index, ts.order_index`
+        )
+        return (rows as any[]).map(r => ({ ...r, autoCreateRevision: Boolean(r.autoCreateRevision) }))
+    }
+
+    async addWorkflowTransition(t: { fromStepId: string; toStepId: string; permissionKey: string | null; autoCreateRevision: boolean }): Promise<import('../../shared/types').WorkflowTransition> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO quotation_workflow_transitions (id, from_step_id, to_step_id, permission_key, auto_create_revision) VALUES (?, ?, ?, ?, ?)',
+            [id, t.fromStepId, t.toStepId, t.permissionKey, t.autoCreateRevision]
+        )
+        return { id, ...t }
+    }
+
+    async updateWorkflowTransition(id: string, updates: Partial<{ permissionKey: string | null; autoCreateRevision: boolean }>): Promise<void> {
+        if (!this.pool) return
+        const sets: string[] = []
+        const params: any[] = []
+        if (updates.permissionKey !== undefined) { sets.push('permission_key = ?'); params.push(updates.permissionKey) }
+        if (updates.autoCreateRevision !== undefined) { sets.push('auto_create_revision = ?'); params.push(updates.autoCreateRevision) }
+        if (sets.length === 0) return
+        params.push(id)
+        await this.pool.execute(`UPDATE quotation_workflow_transitions SET ${sets.join(', ')} WHERE id = ?`, params)
+    }
+
+    async deleteWorkflowTransition(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_workflow_transitions WHERE id = ?', [id])
+    }
+
+    // --- Quotation Workflow Actions ---
+    async moveQuotationToStep(quotationId: string, toStepId: string, userId: string, username: string, comment?: string): Promise<void> {
+        if (!this.pool) return
+        const [qRows] = await this.pool.query('SELECT workflow_step_id FROM quotations WHERE id = ?', [quotationId])
+        const fromStepId = (qRows as any[])[0]?.workflow_step_id || null
+        const [stepRows] = await this.pool.query('SELECT is_lock_point FROM quotation_workflow_steps WHERE id = ?', [toStepId])
+        const isLockPoint = Boolean((stepRows as any[])[0]?.is_lock_point)
+        const updates: string[] = ['workflow_step_id = ?']
+        const params: any[] = [toStepId]
+        if (isLockPoint) { updates.push('is_locked = TRUE'); }
+        params.push(quotationId)
+        await this.pool.execute(`UPDATE quotations SET ${updates.join(', ')} WHERE id = ?`, params)
+        // Log workflow action
+        await this.pool.execute(
+            'INSERT INTO quotation_workflow_log (id, quotation_id, from_step_id, to_step_id, user_id, username, comment) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [uuidv4(), quotationId, fromStepId, toStepId, userId, username, comment || null]
+        )
+    }
+
+    async getQuotationWorkflowLog(quotationId: string): Promise<import('../../shared/types').QuotationWorkflowLog[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT l.id, l.quotation_id AS quotationId, l.from_step_id AS fromStepId, l.to_step_id AS toStepId,
+                    l.user_id AS userId, l.username, l.comment, l.created_at AS createdAt,
+                    fs.name AS fromStepName, ts.name AS toStepName
+             FROM quotation_workflow_log l
+             LEFT JOIN quotation_workflow_steps fs ON l.from_step_id = fs.id
+             LEFT JOIN quotation_workflow_steps ts ON l.to_step_id = ts.id
+             WHERE l.quotation_id = ?
+             ORDER BY l.created_at DESC`,
+            [quotationId]
+        )
+        return rows as any[]
+    }
+
+    async getReachableSteps(currentStepId: string | null, userPermissions: string[]): Promise<import('../../shared/types').WorkflowStep[]> {
+        if (!this.pool) return []
+        if (!currentStepId) {
+            // No current step — return the initial step
+            const steps = await this.getWorkflowSteps()
+            return steps.filter(s => s.isInitial)
+        }
+        const transitions = await this.getWorkflowTransitions()
+        const steps = await this.getWorkflowSteps()
+        const stepMap = new Map(steps.map(s => [s.id, s]))
+
+        // BFS: find all steps reachable from currentStepId checking permissions at each hop
+        const reachable = new Set<string>()
+        const queue: string[] = [currentStepId]
+        const visited = new Set<string>([currentStepId])
+
+        while (queue.length > 0) {
+            const fromId = queue.shift()!
+            const outgoing = transitions.filter(t => t.fromStepId === fromId)
+            for (const t of outgoing) {
+                if (visited.has(t.toStepId)) continue
+                // Check permission
+                if (t.permissionKey && !userPermissions.includes(t.permissionKey)) continue
+                visited.add(t.toStepId)
+                reachable.add(t.toStepId)
+                queue.push(t.toStepId)
+            }
+        }
+
+        return Array.from(reachable).map(id => stepMap.get(id)!).filter(Boolean).sort((a, b) => a.order - b.order)
     }
 }
 

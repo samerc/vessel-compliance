@@ -710,3 +710,38 @@ CREATE TABLE IF NOT EXISTS activity_log (
   INDEX idx_activity_module (module),
   INDEX idx_activity_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Quotation workflow steps
+CREATE TABLE IF NOT EXISTS quotation_workflow_steps (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  color VARCHAR(20) NOT NULL DEFAULT '#6b7280',
+  order_index INT NOT NULL DEFAULT 0,
+  can_edit BOOLEAN DEFAULT TRUE,
+  can_export BOOLEAN DEFAULT FALSE,
+  is_lock_point BOOLEAN DEFAULT FALSE,
+  is_initial BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Quotation workflow transitions
+CREATE TABLE IF NOT EXISTS quotation_workflow_transitions (
+  id VARCHAR(36) PRIMARY KEY,
+  from_step_id VARCHAR(36) NOT NULL,
+  to_step_id VARCHAR(36) NOT NULL,
+  permission_key VARCHAR(100) NULL,
+  auto_create_revision BOOLEAN DEFAULT FALSE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Quotation workflow audit log
+CREATE TABLE IF NOT EXISTS quotation_workflow_log (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  from_step_id VARCHAR(36) NULL,
+  to_step_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  username VARCHAR(100) NOT NULL,
+  comment TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_qwl_quotation (quotation_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

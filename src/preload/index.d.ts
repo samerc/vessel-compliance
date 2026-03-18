@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -622,6 +622,20 @@ export interface Api {
   emailUpdateTemplate: (id: string, updates: Partial<{ name: string; subject: string | null; body: string; category: string }>) => Promise<void>
   emailDeleteTemplate: (id: string) => Promise<void>
   emailReorderTemplates: (orderedIds: string[]) => Promise<void>
+
+  // Workflow
+  workflowGetSteps: () => Promise<WorkflowStep[]>
+  workflowAddStep: (step: { name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }) => Promise<WorkflowStep>
+  workflowUpdateStep: (id: string, updates: Partial<{ name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }>) => Promise<void>
+  workflowDeleteStep: (id: string) => Promise<void>
+  workflowReorderSteps: (orderedIds: string[]) => Promise<void>
+  workflowGetTransitions: () => Promise<WorkflowTransition[]>
+  workflowAddTransition: (t: { fromStepId: string; toStepId: string; permissionKey: string | null; autoCreateRevision: boolean }) => Promise<WorkflowTransition>
+  workflowUpdateTransition: (id: string, updates: Partial<{ permissionKey: string | null; autoCreateRevision: boolean }>) => Promise<void>
+  workflowDeleteTransition: (id: string) => Promise<void>
+  workflowMoveQuotation: (quotationId: string, toStepId: string, comment?: string) => Promise<{ success: boolean }>
+  workflowGetQuotationLog: (quotationId: string) => Promise<QuotationWorkflowLog[]>
+  workflowGetReachableSteps: (quotationId: string) => Promise<WorkflowStep[]>
 }
 
 declare global {

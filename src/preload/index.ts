@@ -622,6 +622,20 @@ const api = {
   emailDeleteTemplate: (id: string) => ipcRenderer.invoke('email:deleteTemplate', id),
   emailReorderTemplates: (orderedIds: string[]) => ipcRenderer.invoke('email:reorderTemplates', orderedIds),
 
+  // Workflow Steps & Transitions
+  workflowGetSteps: () => ipcRenderer.invoke('workflow:getSteps'),
+  workflowAddStep: (step: any) => ipcRenderer.invoke('workflow:addStep', step),
+  workflowUpdateStep: (id: string, updates: any) => ipcRenderer.invoke('workflow:updateStep', id, updates),
+  workflowDeleteStep: (id: string) => ipcRenderer.invoke('workflow:deleteStep', id),
+  workflowReorderSteps: (orderedIds: string[]) => ipcRenderer.invoke('workflow:reorderSteps', orderedIds),
+  workflowGetTransitions: () => ipcRenderer.invoke('workflow:getTransitions'),
+  workflowAddTransition: (t: any) => ipcRenderer.invoke('workflow:addTransition', t),
+  workflowUpdateTransition: (id: string, updates: any) => ipcRenderer.invoke('workflow:updateTransition', id, updates),
+  workflowDeleteTransition: (id: string) => ipcRenderer.invoke('workflow:deleteTransition', id),
+  workflowMoveQuotation: (quotationId: string, toStepId: string, comment?: string) => ipcRenderer.invoke('workflow:moveQuotation', quotationId, toStepId, comment),
+  workflowGetQuotationLog: (quotationId: string) => ipcRenderer.invoke('workflow:getQuotationLog', quotationId),
+  workflowGetReachableSteps: (quotationId: string) => ipcRenderer.invoke('workflow:getReachableSteps', quotationId),
+
   // Database Backup & Restore
   dbBackup: () => ipcRenderer.invoke('db:backup'),
   dbRestore: () => ipcRenderer.invoke('db:restore'),

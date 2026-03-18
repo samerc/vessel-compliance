@@ -2841,6 +2841,88 @@ app.whenReady().then(() => {
     return db.reorderEmailTemplates(orderedIds)
   })
 
+  // ── Workflow Steps & Transitions ──
+  safeHandle('workflow:getSteps', async (event) => {
+    requireSession(event)
+    return db.getWorkflowSteps()
+  })
+
+  safeHandle('workflow:addStep', async (event, step) => {
+    await requirePermission(event, 'admin:settings')
+    return db.addWorkflowStep(step)
+  })
+
+  safeHandle('workflow:updateStep', async (event, id: string, updates) => {
+    await requirePermission(event, 'admin:settings')
+    return db.updateWorkflowStep(id, updates)
+  })
+
+  safeHandle('workflow:deleteStep', async (event, id: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.deleteWorkflowStep(id)
+  })
+
+  safeHandle('workflow:reorderSteps', async (event, orderedIds: string[]) => {
+    await requirePermission(event, 'admin:settings')
+    return db.reorderWorkflowSteps(orderedIds)
+  })
+
+  safeHandle('workflow:getTransitions', async (event) => {
+    requireSession(event)
+    return db.getWorkflowTransitions()
+  })
+
+  safeHandle('workflow:addTransition', async (event, t) => {
+    await requirePermission(event, 'admin:settings')
+    return db.addWorkflowTransition(t)
+  })
+
+  safeHandle('workflow:updateTransition', async (event, id: string, updates) => {
+    await requirePermission(event, 'admin:settings')
+    return db.updateWorkflowTransition(id, updates)
+  })
+
+  safeHandle('workflow:deleteTransition', async (event, id: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.deleteWorkflowTransition(id)
+  })
+
+  safeHandle('workflow:moveQuotation', async (event, quotationId: string, toStepId: string, comment?: string) => {
+    const user = requireSession(event)
+    // Get current step
+    const transitions = await db.getWorkflowTransitions()
+    const [qRows] = await (db as any).pool.query('SELECT workflow_step_id FROM quotations WHERE id = ?', [quotationId])
+    const currentStepId = (qRows as any[])[0]?.workflow_step_id
+    // Find valid path (BFS)
+    const userPerms = await db.resolveUserPermissions(user.id)
+    const reachable = await db.getReachableSteps(currentStepId, userPerms)
+    if (!reachable.some(s => s.id === toStepId)) throw new Error('Cannot transition to this step')
+    // Check if any transition in the path requires auto-revision
+    const directTransition = transitions.find(t => t.fromStepId === currentStepId && t.toStepId === toStepId)
+    if (directTransition?.autoCreateRevision) {
+      await db.createQuotationRevision(quotationId)
+    }
+    await db.moveQuotationToStep(quotationId, toStepId, user.id, user.username, comment)
+    // Log activity
+    const steps = await db.getWorkflowSteps()
+    const toStep = steps.find(s => s.id === toStepId)
+    db.logActivity({ userId: user.id, username: user.username, action: 'WORKFLOW', module: 'Quotations', entityType: 'quotation', entityId: quotationId, entityName: '', details: `Moved to ${toStep?.name || 'unknown'}${comment ? ': ' + comment : ''}` }).catch(() => {})
+    return { success: true }
+  })
+
+  safeHandle('workflow:getQuotationLog', async (event, quotationId: string) => {
+    requireSession(event)
+    return db.getQuotationWorkflowLog(quotationId)
+  })
+
+  safeHandle('workflow:getReachableSteps', async (event, quotationId: string) => {
+    const user = requireSession(event)
+    const [qRows] = await (db as any).pool.query('SELECT workflow_step_id FROM quotations WHERE id = ?', [quotationId])
+    const currentStepId = (qRows as any[])[0]?.workflow_step_id || null
+    const userPerms = await db.resolveUserPermissions(user.id)
+    return db.getReachableSteps(currentStepId, userPerms)
+  })
+
   createWindow()
 
   // Start the compliance scheduler after window is created
