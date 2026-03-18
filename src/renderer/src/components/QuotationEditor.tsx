@@ -1152,7 +1152,7 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveT
             </div>
 
             {/* Standard text preview + override */}
-            <div style={{ marginBottom: '24px' }}>
+            <div style={{ marginBottom: '14px' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Standard Text Preview:</div>
                 <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'var(--table-header-bg)', fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '8px' }}
                     dangerouslySetInnerHTML={{ __html: resolvedStandardText || '<em style="color:var(--text-secondary)">No standard text configured</em>' }}
@@ -3302,6 +3302,24 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
         }
         await window.api.setQuotationInstalments(quotation.id, insts)
         loadInstalments()
+
+        // Auto-set non-refundable default based on instalment count
+        if (!quotation.nonRefundableType) {
+            if (count > 1) {
+                setQ(p => ({ ...p, nonRefundableType: 'first_instalment', nonRefundablePercent: undefined }))
+                updateField('nonRefundableType', 'first_instalment')
+                updateField('nonRefundablePercent', null)
+            } else {
+                setQ(p => ({ ...p, nonRefundableType: 'percentage', nonRefundablePercent: 25 }))
+                updateField('nonRefundableType', 'percentage')
+                updateField('nonRefundablePercent', 25)
+            }
+        } else if (quotation.nonRefundableType === 'first_instalment' && count <= 1) {
+            // Switch to percentage if only 1 instalment
+            setQ(p => ({ ...p, nonRefundableType: 'percentage', nonRefundablePercent: 25 }))
+            updateField('nonRefundableType', 'percentage')
+            updateField('nonRefundablePercent', 25)
+        }
     }
 
     const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled
@@ -3618,7 +3636,21 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                 </div>
             </div>
 
-            {/* Non-refundable option */}
+            {/* Instalment Schedule */}
+            {instalments.length > 0 && (
+                <div style={{ marginBottom: '20px', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <h4 style={{ fontSize: '0.9rem', marginBottom: '8px' }}>Instalment Schedule</h4>
+                    {instalments.map((inst, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, width: '30px' }}>#{inst.instalmentNumber}</span>
+                            <input type="number" value={inst.daysFromInception} onChange={e => updateInstalment(i, 'daysFromInception', parseInt(e.target.value) || 0)} style={{ width: '80px', padding: '4px 6px' }} />
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>days from inception</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Non-refundable option — below instalment schedule */}
             <div style={{ marginBottom: '20px', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
                 <h4 style={{ fontSize: '0.9rem', marginBottom: '10px' }}>Non-Refundable</h4>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -3626,24 +3658,27 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                         <input type="radio" name="nonRefundable" checked={!quotation.nonRefundableType} onChange={() => { setQ(p => ({ ...p, nonRefundableType: null, nonRefundablePercent: undefined })); updateField('nonRefundableType', null); updateField('nonRefundablePercent', null) }} style={{ accentColor: 'var(--accent-primary)' }} />
                         None
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
-                        <input type="radio" name="nonRefundable" checked={quotation.nonRefundableType === 'first_instalment'} onChange={() => {
-                            const defaultText = quotation.sectionTextsOverride?.nonRefundableFirstText ?? getEffectiveText('nonRefundableFirstText')
-                            setQ(p => ({ ...p, nonRefundableType: 'first_instalment', nonRefundablePercent: undefined, sectionTextsOverride: { ...(p.sectionTextsOverride || {}), nonRefundableFirstText: p.sectionTextsOverride?.nonRefundableFirstText || defaultText } }))
-                            updateField('nonRefundableType', 'first_instalment')
-                            updateField('nonRefundablePercent', null)
-                            if (!quotation.sectionTextsOverride?.nonRefundableFirstText) {
-                                const override = { ...(quotation.sectionTextsOverride || {}), nonRefundableFirstText: defaultText }
-                                updateField('sectionTextsOverride', override)
-                            }
-                        }} style={{ accentColor: 'var(--accent-primary)' }} />
-                        1st instalment is non-refundable
-                    </label>
+                    {(quotation.numInstalments || 1) > 1 && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
+                            <input type="radio" name="nonRefundable" checked={quotation.nonRefundableType === 'first_instalment'} onChange={() => {
+                                const defaultText = quotation.sectionTextsOverride?.nonRefundableFirstText ?? getEffectiveText('nonRefundableFirstText')
+                                setQ(p => ({ ...p, nonRefundableType: 'first_instalment', nonRefundablePercent: undefined, sectionTextsOverride: { ...(p.sectionTextsOverride || {}), nonRefundableFirstText: p.sectionTextsOverride?.nonRefundableFirstText || defaultText } }))
+                                updateField('nonRefundableType', 'first_instalment')
+                                updateField('nonRefundablePercent', null)
+                                if (!quotation.sectionTextsOverride?.nonRefundableFirstText) {
+                                    const override = { ...(quotation.sectionTextsOverride || {}), nonRefundableFirstText: defaultText }
+                                    updateField('sectionTextsOverride', override)
+                                }
+                            }} style={{ accentColor: 'var(--accent-primary)' }} />
+                            1st instalment is non-refundable
+                        </label>
+                    )}
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
                         <input type="radio" name="nonRefundable" checked={quotation.nonRefundableType === 'percentage'} onChange={() => {
                             const defaultText = quotation.sectionTextsOverride?.nonRefundablePercentText ?? getEffectiveText('nonRefundablePercentText')
-                            setQ(p => ({ ...p, nonRefundableType: 'percentage', sectionTextsOverride: { ...(p.sectionTextsOverride || {}), nonRefundablePercentText: p.sectionTextsOverride?.nonRefundablePercentText || defaultText } }))
+                            setQ(p => ({ ...p, nonRefundableType: 'percentage', nonRefundablePercent: quotation.nonRefundablePercent || 25, sectionTextsOverride: { ...(p.sectionTextsOverride || {}), nonRefundablePercentText: p.sectionTextsOverride?.nonRefundablePercentText || defaultText } }))
                             updateField('nonRefundableType', 'percentage')
+                            if (!quotation.nonRefundablePercent) updateField('nonRefundablePercent', 25)
                             if (!quotation.sectionTextsOverride?.nonRefundablePercentText) {
                                 const override = { ...(quotation.sectionTextsOverride || {}), nonRefundablePercentText: defaultText }
                                 updateField('sectionTextsOverride', override)
@@ -3684,20 +3719,6 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                     </div>
                 )}
             </div>
-
-            {/* Instalment Schedule */}
-            {instalments.length > 0 && (
-                <div style={{ marginBottom: '20px' }}>
-                    <h4 style={{ fontSize: '0.9rem', marginBottom: '8px' }}>Instalment Schedule</h4>
-                    {instalments.map((inst, i) => (
-                        <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 600, width: '30px' }}>#{inst.instalmentNumber}</span>
-                            <input type="number" value={inst.daysFromInception} onChange={e => updateInstalment(i, 'daysFromInception', parseInt(e.target.value) || 0)} style={{ width: '80px', padding: '4px 6px' }} />
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>days from inception</span>
-                        </div>
-                    ))}
-                </div>
-            )}
 
             {/* Additional premium instructions */}
             <div style={{ marginBottom: '20px' }}>
