@@ -17,6 +17,20 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '6.4.3',
+    date: 'March 2026',
+    items: [
+      { tag: 'Fixed', text: 'Hull conditions export now filtered by selected clause — no more conditions from other clauses' },
+      { tag: 'Fixed', text: 'Additional clauses in both P&I alternatives correctly appear in "Applicable to both" section' },
+      { tag: 'Fixed', text: 'DDQ countries sorted alphabetically, non-refundable text stripped of HTML tags' },
+      { tag: 'Fixed', text: 'Hull premium spacing — removed extra empty lines between Technical and Payable' },
+      { tag: 'Improved', text: 'NCB/UPCC editors larger (120px), template selector always visible with helpful empty state' },
+      { tag: 'New', text: 'Document status left borders — expired (red), expiring soon (amber), missing (red) in both table and card views' },
+      { tag: 'Improved', text: 'RichTextEditor sharper rendering — fixed font stack, antialiased smoothing, consistent borders' },
+      { tag: 'New', text: 'Tab instructions added to Exclusions, Deductibles, Subjectivities, Survey Warranties, Information' },
+    ],
+  },
+  {
     version: '6.3.1',
     date: 'March 2026',
     items: [
