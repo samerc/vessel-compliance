@@ -68,12 +68,16 @@ body {
 
 /* Sharpen SVG icons — prevent sub-pixel blur on Lucide/icon strokes */
 svg {
-  shape-rendering: geometricPrecision;
-  transform: translateZ(0);
+  shape-rendering: crispEdges;
 }
 
 /* Ensure buttons and interactive elements render crisply */
 button, input, select, textarea {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force crisp rendering for Remote Desktop / software rendering */
+* {
+  image-rendering: -webkit-optimize-contrast;
 }

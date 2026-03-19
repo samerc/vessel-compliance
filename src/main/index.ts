@@ -12,6 +12,13 @@ import { formatDateForMySQL } from './mysql/utils'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 
+// Force hardware acceleration even over Remote Desktop (RDP)
+// RDP disables GPU by default, causing fuzzy SVG/text rendering
+app.commandLine.appendSwitch('enable-gpu-rasterization')
+app.commandLine.appendSwitch('enable-zero-copy')
+app.commandLine.appendSwitch('ignore-gpu-blocklist')
+app.commandLine.appendSwitch('force-device-scale-factor', '1')
+
 // Global error handlers - prevent silent crashes
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason)
