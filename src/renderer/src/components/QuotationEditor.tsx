@@ -3838,7 +3838,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                         ))}
                                     </select>
                                 </div>
-                            <RichTextEditor value={quotation.ncbText || ''} onChange={val => { setQ(p => ({ ...p, ncbText: val })); updateField('ncbText', val) }} placeholder="NCB terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />
+                            <RichTextEditor value={quotation.ncbText || ''} onChange={val => { setQ(p => ({ ...p, ncbText: val })); updateField('ncbText', val) }} placeholder="NCB terms text..." minHeight={120} showFontSize showFontFamily showAlignment showLineSpacing />
                         </div>
                     )}
                 </div>
@@ -3898,7 +3898,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                         ))}
                                     </select>
                                 </div>
-                            <RichTextEditor value={quotation.upccText || ''} onChange={val => { setQ(p => ({ ...p, upccText: val })); updateField('upccText', val) }} placeholder="UPCC terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />
+                            <RichTextEditor value={quotation.upccText || ''} onChange={val => { setQ(p => ({ ...p, upccText: val })); updateField('upccText', val) }} placeholder="UPCC terms text..." minHeight={120} showFontSize showFontFamily showAlignment showLineSpacing />
                         </div>
                     )}
                 </div>
