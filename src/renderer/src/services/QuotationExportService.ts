@@ -95,6 +95,8 @@ interface QuotationData {
   hullAdditionalConditions: QuotationHullAdditionalCondition[]
   allHullAdditionalConditions: HullAdditionalCondition[]
   hullAlternatives: QuotationHullAlternative[]
+  // Survey warranties
+  surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   // War-specific data
   warConditions: QuotationWarCondition[]
   allWarConditions: WarCondition[]
@@ -113,7 +115,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
     hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw,
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
-    flagStatesRaw
+    flagStatesRaw, surveyWarrantiesRaw
   ] = await Promise.all([
     window.api.getQuotationVessels(quotation.id),
     window.api.getVessels(),
@@ -153,7 +155,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     window.api.warGetQuotationWarConditions(quotation.id),
     window.api.warGetConditions(),
     window.api.warGetSettings(),
-    window.api.getFlagStates()
+    window.api.getFlagStates(),
+    window.api.quotationSurveyWarrantyGetAll(quotation.id)
   ])
 
   // Extract IDs and vessel scope / alternative maps from new object return format
@@ -277,6 +280,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
     allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
+    surveyWarranties: Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) : [],
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: resolvedAllWarConditions,
     warSettings: resolvedWarSettings
@@ -1033,22 +1037,39 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         return t
       }
 
+      // Render survey warranties as bullet items
+      const renderSurveyWarranties = (items: typeof data.surveyWarranties) => {
+        let t = ''
+        for (const sw of items) {
+          const scope = vesselScopeSuffix(sw.vesselScope, data.quotationVessels)
+          t += `- ${sw.text}${scope}\n`
+        }
+        return t
+      }
+
       if (piMultiAltW) {
         // Shared warranties first
         const sharedWarIds = data.selectedWarrantyIds.filter(id => !data.warrantyAltIds[id])
         const sharedCustom = sortedCustom.filter(cw => !cw.alternativeId)
         warText += renderWarrantyList(sharedWarIds, sharedCustom)
         // Per-alternative warranties
-        for (const alt of data.piAlternatives) {
+        for (let altIdx = 0; altIdx < data.piAlternatives.length; altIdx++) {
+          const alt = data.piAlternatives[altIdx]
           const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
           const altCustom = sortedCustom.filter(cw => cw.alternativeId === alt.id)
-          if (altWarIds.length > 0 || altCustom.length > 0) {
-            warText += `\nAdditional Warranties Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
+          const altSurveyW = altIdx === 0 ? data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id) : data.surveyWarranties.filter(sw => sw.alternativeId === alt.id)
+          if (altWarIds.length > 0 || altCustom.length > 0 || altSurveyW.length > 0) {
+            warText += `\nAdditional Warranties Applicable to ${alt.label || `Alternative ${altIdx + 1}`}:\n`
             warText += renderWarrantyList(altWarIds, altCustom)
+            warText += renderSurveyWarranties(altSurveyW)
           }
         }
       } else {
         warText += renderWarrantyList(data.selectedWarrantyIds, sortedCustom)
+        // Survey warranties after regular warranties
+        if (data.surveyWarranties.length > 0) {
+          warText += renderSurveyWarranties(data.surveyWarranties)
+        }
       }
 
       if (st(data, 'warrantiesAdditionalText')) warText += '\n' + stripHtml(st(data, 'warrantiesAdditionalText')) + '\n'
@@ -2223,21 +2244,33 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       return paras
     }
 
+    // Render survey warranties as bullet paragraphs
+    const renderSurveyWarBullets = (items: typeof data.surveyWarranties) => {
+      return items.map(sw => bulletP(sw.text + vesselScopeSuffix(sw.vesselScope, data.quotationVessels)))
+    }
+
     if (dPiMultiAltW) {
       const sharedWarIds = data.selectedWarrantyIds.filter(id => !data.warrantyAltIds[id])
       const sharedCustom = sortedWordCustom.filter(cw => !cw.alternativeId)
       warContent.push(...renderWarBullets(sharedWarIds, sharedCustom))
-      for (const alt of data.piAlternatives) {
+      for (let altIdx = 0; altIdx < data.piAlternatives.length; altIdx++) {
+        const alt = data.piAlternatives[altIdx]
         const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
         const altCustom = sortedWordCustom.filter(cw => cw.alternativeId === alt.id)
-        if (altWarIds.length > 0 || altCustom.length > 0) {
+        const altSurveyW = altIdx === 0 ? data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id) : data.surveyWarranties.filter(sw => sw.alternativeId === alt.id)
+        if (altWarIds.length > 0 || altCustom.length > 0 || altSurveyW.length > 0) {
           warContent.push(emptyP())
-          warContent.push(bup(`Additional Warranties Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
+          warContent.push(bup(`Additional Warranties Applicable to ${alt.label || `Alternative ${altIdx + 1}`}:`))
           warContent.push(...renderWarBullets(altWarIds, altCustom))
+          warContent.push(...renderSurveyWarBullets(altSurveyW))
         }
       }
     } else {
       warContent.push(...renderWarBullets(data.selectedWarrantyIds, sortedWordCustom))
+      // Survey warranties after regular warranties
+      if (data.surveyWarranties.length > 0) {
+        warContent.push(...renderSurveyWarBullets(data.surveyWarranties))
+      }
     }
 
     if (st(data, 'warrantiesAdditionalText')) {
