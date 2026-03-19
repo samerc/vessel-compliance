@@ -755,3 +755,38 @@ CREATE TABLE IF NOT EXISTS quotation_workflow_log (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_qwl_quotation (quotation_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Survey Warranty Templates (for quotations)
+CREATE TABLE IF NOT EXISTS survey_warranty_templates (
+  id VARCHAR(36) PRIMARY KEY,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS survey_warranty_template_sets (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  order_index INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS survey_warranty_template_set_items (
+  set_id VARCHAR(36) NOT NULL,
+  template_id VARCHAR(36) NOT NULL,
+  PRIMARY KEY (set_id, template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotation_survey_warranties (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  template_id VARCHAR(36) DEFAULT NULL,
+  text TEXT NOT NULL,
+  deadline_value VARCHAR(255) DEFAULT NULL,
+  days_value VARCHAR(50) DEFAULT NULL,
+  event_value VARCHAR(255) DEFAULT NULL,
+  custom_text TEXT DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  vessel_scope TEXT DEFAULT NULL,
+  alternative_id VARCHAR(36) DEFAULT NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -5650,6 +5650,7 @@ export class MySQLAdapter {
             { table: 'quotation_text_deductibles', cols: 'quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_exclusions', cols: 'quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id' },
             { table: 'quotation_custom_exclusions', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_survey_warranties', cols: 'quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id' },
         ]
 
         for (const { table, cols } of altScopeTables) {
@@ -8301,6 +8302,202 @@ export class MySQLAdapter {
         }
 
         return Array.from(reachable).map(id => stepMap.get(id)!).filter(Boolean).sort((a, b) => a.order - b.order)
+    }
+
+    // ==================== Survey Warranty Templates (Quotations) ====================
+
+    async getSurveyWarrantyTemplates(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT * FROM survey_warranty_templates ORDER BY order_index, created_at')
+        return (rows as any[]).map(r => ({
+            id: r.id,
+            text: r.text,
+            placeholders: this.extractPlaceholders(r.text),
+            order: r.order_index
+        }))
+    }
+
+    private extractPlaceholders(text: string): string[] {
+        const matches = text.match(/\{[^}]+\}/g)
+        return matches ? [...new Set(matches)] : []
+    }
+
+    async addSurveyWarrantyTemplate(text: string): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM survey_warranty_templates')
+        const order = (maxRow as any[])[0].next_order
+        await this.pool.execute(
+            'INSERT INTO survey_warranty_templates (id, text, order_index) VALUES (?, ?, ?)',
+            [id, text, order]
+        )
+        return { id, text, placeholders: this.extractPlaceholders(text), order }
+    }
+
+    async updateSurveyWarrantyTemplate(id: string, text: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE survey_warranty_templates SET text = ? WHERE id = ?', [text, id])
+    }
+
+    async deleteSurveyWarrantyTemplate(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM survey_warranty_templates WHERE id = ?', [id])
+    }
+
+    async reorderSurveyWarrantyTemplates(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE survey_warranty_templates SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
+    async getSurveyWarrantyTemplateSets(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT * FROM survey_warranty_template_sets ORDER BY order_index')
+        const sets: any[] = []
+        for (const r of rows as any[]) {
+            const [items] = await this.pool.query(
+                'SELECT template_id FROM survey_warranty_template_set_items WHERE set_id = ?',
+                [r.id]
+            )
+            sets.push({
+                id: r.id,
+                name: r.name,
+                templateIds: (items as any[]).map(i => i.template_id),
+                order: r.order_index
+            })
+        }
+        return sets
+    }
+
+    async addSurveyWarrantyTemplateSet(name: string, templateIds: string[]): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM survey_warranty_template_sets')
+        const order = (maxRow as any[])[0].next_order
+        await this.pool.execute(
+            'INSERT INTO survey_warranty_template_sets (id, name, order_index) VALUES (?, ?, ?)',
+            [id, name, order]
+        )
+        for (const tid of templateIds) {
+            await this.pool.execute(
+                'INSERT INTO survey_warranty_template_set_items (set_id, template_id) VALUES (?, ?)',
+                [id, tid]
+            )
+        }
+        return { id, name, templateIds, order }
+    }
+
+    async updateSurveyWarrantyTemplateSet(id: string, name: string, templateIds: string[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE survey_warranty_template_sets SET name = ? WHERE id = ?', [name, id])
+        await this.pool.execute('DELETE FROM survey_warranty_template_set_items WHERE set_id = ?', [id])
+        for (const tid of templateIds) {
+            await this.pool.execute(
+                'INSERT INTO survey_warranty_template_set_items (set_id, template_id) VALUES (?, ?)',
+                [id, tid]
+            )
+        }
+    }
+
+    async deleteSurveyWarrantyTemplateSet(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM survey_warranty_template_set_items WHERE set_id = ?', [id])
+        await this.pool.execute('DELETE FROM survey_warranty_template_sets WHERE id = ?', [id])
+    }
+
+    async getQuotationSurveyWarranties(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT * FROM quotation_survey_warranties WHERE quotation_id = ? ORDER BY order_index',
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({
+            id: r.id,
+            quotationId: r.quotation_id,
+            templateId: r.template_id,
+            text: r.text,
+            deadlineValue: r.deadline_value,
+            daysValue: r.days_value,
+            eventValue: r.event_value,
+            customText: r.custom_text,
+            order: r.order_index,
+            vesselScope: r.vessel_scope ? JSON.parse(r.vessel_scope) : null,
+            alternativeId: r.alternative_id
+        }))
+    }
+
+    async setQuotationSurveyWarranties(quotationId: string, items: any[]): Promise<void> {
+        if (!this.pool) return
+        try {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+            await this.pool.execute('DELETE FROM quotation_survey_warranties WHERE quotation_id = ?', [quotationId])
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i]
+                await this.pool.execute(
+                    `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        item.id || uuidv4(), quotationId, item.templateId || null,
+                        item.text, item.deadlineValue || null, item.daysValue || null,
+                        item.eventValue || null, item.customText || null, i,
+                        item.vesselScope ? JSON.stringify(item.vesselScope) : null,
+                        item.alternativeId || null
+                    ]
+                )
+            }
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+    }
+
+    async addQuotationSurveyWarranty(data: any): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query(
+            'SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM quotation_survey_warranties WHERE quotation_id = ?',
+            [data.quotationId]
+        )
+        const order = (maxRow as any[])[0].next_order
+        try {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+            await this.pool.execute(
+                `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    id, data.quotationId, data.templateId || null,
+                    data.text, data.deadlineValue || null, data.daysValue || null,
+                    data.eventValue || null, data.customText || null, order,
+                    data.vesselScope ? JSON.stringify(data.vesselScope) : null,
+                    data.alternativeId || null
+                ]
+            )
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+        return { id, ...data, order }
+    }
+
+    async updateQuotationSurveyWarranty(id: string, data: any): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (data.text !== undefined) { fields.push('text = ?'); values.push(data.text) }
+        if (data.deadlineValue !== undefined) { fields.push('deadline_value = ?'); values.push(data.deadlineValue) }
+        if (data.daysValue !== undefined) { fields.push('days_value = ?'); values.push(data.daysValue) }
+        if (data.eventValue !== undefined) { fields.push('event_value = ?'); values.push(data.eventValue) }
+        if (data.customText !== undefined) { fields.push('custom_text = ?'); values.push(data.customText) }
+        if (data.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(data.vesselScope ? JSON.stringify(data.vesselScope) : null) }
+        if (data.alternativeId !== undefined) { fields.push('alternative_id = ?'); values.push(data.alternativeId) }
+        if (data.order !== undefined) { fields.push('order_index = ?'); values.push(data.order) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_survey_warranties SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationSurveyWarranty(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_survey_warranties WHERE id = ?', [id])
     }
 }
 

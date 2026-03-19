@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -580,6 +580,24 @@ export interface Api {
 
   getUserSectionAccess: () => Promise<string[]>
   setUserSectionAccess: (sectionIds: string[]) => Promise<void>
+
+  // Survey Warranty Templates (Quotation Settings)
+  surveyWarrantyTemplateGetAll: () => Promise<SurveyWarrantyTemplate[]>
+  surveyWarrantyTemplateAdd: (text: string) => Promise<SurveyWarrantyTemplate>
+  surveyWarrantyTemplateUpdate: (id: string, text: string) => Promise<void>
+  surveyWarrantyTemplateDelete: (id: string) => Promise<void>
+  surveyWarrantyTemplateReorder: (ids: string[]) => Promise<void>
+
+  surveyWarrantyTemplateSetGetAll: () => Promise<SurveyWarrantyTemplateSet[]>
+  surveyWarrantyTemplateSetAdd: (name: string, templateIds: string[]) => Promise<SurveyWarrantyTemplateSet>
+  surveyWarrantyTemplateSetUpdate: (id: string, name: string, templateIds: string[]) => Promise<void>
+  surveyWarrantyTemplateSetDelete: (id: string) => Promise<void>
+
+  quotationSurveyWarrantyGetAll: (quotationId: string) => Promise<QuotationSurveyWarranty[]>
+  quotationSurveyWarrantySet: (quotationId: string, items: QuotationSurveyWarranty[]) => Promise<void>
+  quotationSurveyWarrantyAdd: (data: Partial<QuotationSurveyWarranty>) => Promise<QuotationSurveyWarranty>
+  quotationSurveyWarrantyUpdate: (id: string, data: Partial<QuotationSurveyWarranty>) => Promise<void>
+  quotationSurveyWarrantyDelete: (id: string) => Promise<void>
 
   // Database Backup & Restore
   dbBackup: () => Promise<{ success: boolean; filePath?: string; message?: string; error?: boolean }>

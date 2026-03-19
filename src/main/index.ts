@@ -2930,6 +2930,26 @@ app.whenReady().then(() => {
     return db.getReachableSteps(currentStepId, userPerms)
   })
 
+  // Survey Warranty Templates (Quotation Settings)
+  safeHandle('surveyWarrantyTemplate:getAll', (event) => { requireSession(event); return db.getSurveyWarrantyTemplates() })
+  safeHandle('surveyWarrantyTemplate:add', async (event, text: string) => { await requirePermission(event, 'quotations:settings'); return db.addSurveyWarrantyTemplate(text) })
+  safeHandle('surveyWarrantyTemplate:update', async (event, id: string, text: string) => { await requirePermission(event, 'quotations:settings'); return db.updateSurveyWarrantyTemplate(id, text) })
+  safeHandle('surveyWarrantyTemplate:delete', async (event, id: string) => { await requirePermission(event, 'quotations:settings'); return db.deleteSurveyWarrantyTemplate(id) })
+  safeHandle('surveyWarrantyTemplate:reorder', async (event, ids: string[]) => { await requirePermission(event, 'quotations:settings'); return db.reorderSurveyWarrantyTemplates(ids) })
+
+  // Survey Warranty Template Sets
+  safeHandle('surveyWarrantyTemplateSet:getAll', (event) => { requireSession(event); return db.getSurveyWarrantyTemplateSets() })
+  safeHandle('surveyWarrantyTemplateSet:add', async (event, name: string, templateIds: string[]) => { await requirePermission(event, 'quotations:settings'); return db.addSurveyWarrantyTemplateSet(name, templateIds) })
+  safeHandle('surveyWarrantyTemplateSet:update', async (event, id: string, name: string, templateIds: string[]) => { await requirePermission(event, 'quotations:settings'); return db.updateSurveyWarrantyTemplateSet(id, name, templateIds) })
+  safeHandle('surveyWarrantyTemplateSet:delete', async (event, id: string) => { await requirePermission(event, 'quotations:settings'); return db.deleteSurveyWarrantyTemplateSet(id) })
+
+  // Quotation Survey Warranties
+  safeHandle('quotationSurveyWarranty:getAll', (event, quotationId: string) => { requireSession(event); return db.getQuotationSurveyWarranties(quotationId) })
+  safeHandle('quotationSurveyWarranty:set', async (event, quotationId: string, items: any[]) => { requireSession(event); return db.setQuotationSurveyWarranties(quotationId, items) })
+  safeHandle('quotationSurveyWarranty:add', async (event, data: any) => { requireSession(event); return db.addQuotationSurveyWarranty(data) })
+  safeHandle('quotationSurveyWarranty:update', async (event, id: string, data: any) => { requireSession(event); return db.updateQuotationSurveyWarranty(id, data) })
+  safeHandle('quotationSurveyWarranty:delete', async (event, id: string) => { requireSession(event); return db.deleteQuotationSurveyWarranty(id) })
+
   createWindow()
 
   // Start the compliance scheduler after window is created

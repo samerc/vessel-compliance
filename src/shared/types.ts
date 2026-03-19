@@ -1299,3 +1299,33 @@ export interface ReportSettings {
   footerText: string
   primaryColor: [number, number, number]
 }
+
+// ==================== Survey Warranty Templates (Quotations) ====================
+
+export interface SurveyWarrantyTemplate {
+  id: string
+  text: string
+  placeholders: string[] // e.g. ['{deadline}', '{days}']
+  order: number
+}
+
+export interface SurveyWarrantyTemplateSet {
+  id: string
+  name: string
+  templateIds: string[]
+  order: number
+}
+
+export interface QuotationSurveyWarranty {
+  id: string
+  quotationId: string
+  templateId?: string
+  text: string // resolved text with placeholders filled
+  deadlineValue?: string
+  daysValue?: string
+  eventValue?: string
+  customText?: string // for fully custom entries
+  order: number
+  vesselScope?: string[] | null
+  alternativeId?: string | null
+}

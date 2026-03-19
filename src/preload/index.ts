@@ -643,6 +643,24 @@ const api = {
   workflowGetQuotationLog: (quotationId: string) => ipcRenderer.invoke('workflow:getQuotationLog', quotationId),
   workflowGetReachableSteps: (quotationId: string) => ipcRenderer.invoke('workflow:getReachableSteps', quotationId),
 
+  // Survey Warranty Templates (Quotation Settings)
+  surveyWarrantyTemplateGetAll: () => ipcRenderer.invoke('surveyWarrantyTemplate:getAll'),
+  surveyWarrantyTemplateAdd: (text: string) => ipcRenderer.invoke('surveyWarrantyTemplate:add', text),
+  surveyWarrantyTemplateUpdate: (id: string, text: string) => ipcRenderer.invoke('surveyWarrantyTemplate:update', id, text),
+  surveyWarrantyTemplateDelete: (id: string) => ipcRenderer.invoke('surveyWarrantyTemplate:delete', id),
+  surveyWarrantyTemplateReorder: (ids: string[]) => ipcRenderer.invoke('surveyWarrantyTemplate:reorder', ids),
+
+  surveyWarrantyTemplateSetGetAll: () => ipcRenderer.invoke('surveyWarrantyTemplateSet:getAll'),
+  surveyWarrantyTemplateSetAdd: (name: string, templateIds: string[]) => ipcRenderer.invoke('surveyWarrantyTemplateSet:add', name, templateIds),
+  surveyWarrantyTemplateSetUpdate: (id: string, name: string, templateIds: string[]) => ipcRenderer.invoke('surveyWarrantyTemplateSet:update', id, name, templateIds),
+  surveyWarrantyTemplateSetDelete: (id: string) => ipcRenderer.invoke('surveyWarrantyTemplateSet:delete', id),
+
+  quotationSurveyWarrantyGetAll: (quotationId: string) => ipcRenderer.invoke('quotationSurveyWarranty:getAll', quotationId),
+  quotationSurveyWarrantySet: (quotationId: string, items: any[]) => ipcRenderer.invoke('quotationSurveyWarranty:set', quotationId, items),
+  quotationSurveyWarrantyAdd: (data: any) => ipcRenderer.invoke('quotationSurveyWarranty:add', data),
+  quotationSurveyWarrantyUpdate: (id: string, data: any) => ipcRenderer.invoke('quotationSurveyWarranty:update', id, data),
+  quotationSurveyWarrantyDelete: (id: string) => ipcRenderer.invoke('quotationSurveyWarranty:delete', id),
+
   // Database Backup & Restore
   dbBackup: () => ipcRenderer.invoke('db:backup'),
   dbRestore: () => ipcRenderer.invoke('db:restore'),

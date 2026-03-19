@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate } from '../../../shared/types'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck } from 'lucide-react'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,7 +9,7 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'premiumTexts' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'premiumTexts' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings' | 'surveyWarrantyTemplates'
 
 type SettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -32,6 +32,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'premiumTexts', label: 'NCB / UPCC', icon: <DollarSign size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
         { id: 'sectionOrder', label: 'Section Order', icon: <List size={15} /> },
+        { id: 'surveyWarrantyTemplates', label: 'Survey Warranties', icon: <ClipboardCheck size={15} /> },
         { id: 'workflow', label: 'Workflow', icon: <GitBranch size={15} /> },
     ],
     pi: [
@@ -154,6 +155,7 @@ export default function QuotationSettings() {
             {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'sectionOrder' && <SectionOrderTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'workflow' && <WorkflowDesignerTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'surveyWarrantyTemplates' && <SurveyWarrantyTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
 
             {activeTab === 'hullAgreedValueTexts' && <HullAgreedValueTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'hullClauses' && <HullClausesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
@@ -4227,6 +4229,279 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                     </button>
                 )}
             </div>
+        </div>
+    )
+}
+
+// ==================== Survey Warranty Templates Tab ====================
+
+function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly }: TabProps) {
+    const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
+    const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
+    const [newText, setNewText] = useState('')
+    const [editId, setEditId] = useState<string | null>(null)
+    const [editText, setEditText] = useState('')
+    const [addingSet, setAddingSet] = useState(false)
+    const [editSetId, setEditSetId] = useState<string | null>(null)
+    const [setName, setSetName] = useState('')
+    const [setTemplateIds, setSetTemplateIds] = useState<string[]>([])
+
+    useEffect(() => { loadData() }, [])
+
+    const loadData = async () => {
+        try {
+            const [t, s] = await Promise.all([
+                window.api.surveyWarrantyTemplateGetAll(),
+                window.api.surveyWarrantyTemplateSetGetAll()
+            ])
+            if (Array.isArray(t)) setTemplates(t)
+            if (Array.isArray(s)) setSets(s)
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const placeholderColor = (p: string) => {
+        if (p === '{deadline}') return { bg: 'rgba(0,170,200,0.15)', text: '#00aac8' }
+        if (p === '{days}') return { bg: 'rgba(100,100,255,0.15)', text: '#6464ff' }
+        if (p === '{event}') return { bg: 'rgba(255,100,200,0.15)', text: '#ff64c8' }
+        return { bg: 'rgba(180,180,180,0.15)', text: 'var(--text-secondary)' }
+    }
+
+    const handleAdd = async () => {
+        if (!newText.trim()) return
+        try {
+            const result = await window.api.surveyWarrantyTemplateAdd(newText.trim()) as any
+            if (result?.error) { showError(result.message); return }
+            setNewText('')
+            showSuccess('Template added')
+            loadData()
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const handleUpdate = async () => {
+        if (!editId || !editText.trim()) return
+        try {
+            await window.api.surveyWarrantyTemplateUpdate(editId, editText.trim())
+            setEditId(null)
+            showSuccess('Template updated')
+            loadData()
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const handleDelete = async (id: string) => {
+        try {
+            await window.api.surveyWarrantyTemplateDelete(id)
+            showSuccess('Template deleted')
+            loadData()
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const handleReorder = async (idx: number, dir: -1 | 1) => {
+        const arr = [...templates]
+        const [item] = arr.splice(idx, 1)
+        arr.splice(idx + dir, 0, item)
+        setTemplates(arr)
+        await window.api.surveyWarrantyTemplateReorder(arr.map(t => t.id))
+    }
+
+    const handleAddSet = async () => {
+        if (!setName.trim() || setTemplateIds.length === 0) return
+        try {
+            const result = await window.api.surveyWarrantyTemplateSetAdd(setName.trim(), setTemplateIds) as any
+            if (result?.error) { showError(result.message); return }
+            setAddingSet(false)
+            setSetName('')
+            setSetTemplateIds([])
+            showSuccess('Set created')
+            loadData()
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const handleUpdateSet = async () => {
+        if (!editSetId || !setName.trim()) return
+        try {
+            await window.api.surveyWarrantyTemplateSetUpdate(editSetId, setName.trim(), setTemplateIds)
+            setEditSetId(null)
+            setSetName('')
+            setSetTemplateIds([])
+            showSuccess('Set updated')
+            loadData()
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const handleDeleteSet = async (id: string) => {
+        try {
+            await window.api.surveyWarrantyTemplateSetDelete(id)
+            showSuccess('Set deleted')
+            loadData()
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const toggleSetTemplate = (tid: string) => {
+        setSetTemplateIds(prev => prev.includes(tid) ? prev.filter(x => x !== tid) : [...prev, tid])
+    }
+
+    return (
+        <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)' }}>
+                Survey Warranty Templates
+            </h3>
+
+            {/* Section 1: Templates */}
+            <div style={{ marginBottom: '32px' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.5 }}>
+                    Define reusable survey warranty text templates. Use placeholders: <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#00aac8' }}>{'{deadline}'}</code> (e.g. &quot;prior inception&quot;, &quot;within 30 days&quot;), <code style={{ background: 'rgba(100,100,255,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#6464ff' }}>{'{days}'}</code> (number), <code style={{ background: 'rgba(255,100,200,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#ff64c8' }}>{'{event}'}</code> (e.g. &quot;prior sailing&quot;).
+                </div>
+
+                {/* Template list */}
+                {templates.map((t, idx) => (
+                    <div key={t.id} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 12px', marginBottom: '4px',
+                        background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+                        borderRadius: '8px', border: '1px solid var(--glass-border)'
+                    }}>
+                        {!readOnly && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                                <button disabled={idx === 0} onClick={() => handleReorder(idx, -1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === 0 ? 'default' : 'pointer', padding: '1px', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button disabled={idx === templates.length - 1} onClick={() => handleReorder(idx, 1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === templates.length - 1 ? 'default' : 'pointer', padding: '1px', opacity: idx === templates.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                            </div>
+                        )}
+                        <div style={{ flex: 1 }}>
+                            {editId === t.id ? (
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                    <textarea
+                                        value={editText}
+                                        onChange={e => setEditText(e.target.value)}
+                                        rows={2}
+                                        style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }}
+                                    />
+                                    <button onClick={handleUpdate} style={{ background: 'none', border: 'none', color: '#00aac8', cursor: 'pointer' }}><Save size={15} /></button>
+                                    <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={15} /></button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{t.text}</div>
+                                    {t.placeholders.length > 0 && (
+                                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                            {t.placeholders.map(p => {
+                                                const pc = placeholderColor(p)
+                                                return (
+                                                    <span key={p} style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: pc.bg, color: pc.text, fontWeight: 500 }}>{p}</span>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                        {!readOnly && editId !== t.id && (
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                <button onClick={() => { setEditId(t.id); setEditText(t.text) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
+                                <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                            </div>
+                        )}
+                    </div>
+                ))}
+
+                {/* Add template */}
+                {!readOnly && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <textarea
+                            value={newText}
+                            onChange={e => setNewText(e.target.value)}
+                            placeholder="Enter survey warranty template text..."
+                            rows={2}
+                            style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }}
+                        />
+                        <button onClick={handleAdd} disabled={!newText.trim()} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px', opacity: !newText.trim() ? 0.5 : 1 }}>
+                            <Plus size={14} /> Add
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Section 2: Sets */}
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)' }}>
+                Template Sets
+            </h3>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Named groups of templates that can be applied at once in the quotation editor.
+            </div>
+
+            {sets.map(s => (
+                <div key={s.id} style={{
+                    padding: '10px 12px', marginBottom: '6px',
+                    background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+                    borderRadius: '8px', border: '1px solid var(--glass-border)'
+                }}>
+                    {editSetId === s.id ? (
+                        <div>
+                            <input
+                                value={setName}
+                                onChange={e => setSetName(e.target.value)}
+                                placeholder="Set name"
+                                style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.85rem', marginBottom: '8px' }}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+                                {templates.map(t => (
+                                    <label key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.82rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                                        <input type="checkbox" checked={setTemplateIds.includes(t.id)} onChange={() => toggleSetTemplate(t.id)} style={{ marginTop: '3px' }} />
+                                        <span style={{ lineHeight: 1.4 }}>{t.text.length > 80 ? t.text.slice(0, 80) + '...' : t.text}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                                <button onClick={handleUpdateSet} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>Save</button>
+                                <button onClick={() => { setEditSetId(null); setSetName(''); setSetTemplateIds([]) }} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{s.name}</div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                    {s.templateIds.length} template{s.templateIds.length !== 1 ? 's' : ''}
+                                </div>
+                            </div>
+                            {!readOnly && (
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button onClick={() => { setEditSetId(s.id); setSetName(s.name); setSetTemplateIds(s.templateIds) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
+                                    <button onClick={() => handleDeleteSet(s.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            ))}
+
+            {!readOnly && !addingSet && (
+                <button onClick={() => { setAddingSet(true); setSetName(''); setSetTemplateIds([]) }} className="btn-secondary" style={{ marginTop: '8px', padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Plus size={14} /> Add Set
+                </button>
+            )}
+            {!readOnly && addingSet && (
+                <div style={{ marginTop: '8px', padding: '12px', background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                    <input
+                        value={setName}
+                        onChange={e => setSetName(e.target.value)}
+                        placeholder="Set name"
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.85rem', marginBottom: '8px' }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+                        {templates.map(t => (
+                            <label key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.82rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={setTemplateIds.includes(t.id)} onChange={() => toggleSetTemplate(t.id)} style={{ marginTop: '3px' }} />
+                                <span style={{ lineHeight: 1.4 }}>{t.text.length > 80 ? t.text.slice(0, 80) + '...' : t.text}</span>
+                            </label>
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                        <button onClick={handleAddSet} disabled={!setName.trim() || setTemplateIds.length === 0} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', opacity: (!setName.trim() || setTemplateIds.length === 0) ? 0.5 : 1 }}>
+                            <Plus size={14} /> Create Set
+                        </button>
+                        <button onClick={() => setAddingSet(false)} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>Cancel</button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
