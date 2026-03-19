@@ -278,8 +278,10 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                 </tr>
                             </thead>
                             <tbody>
-                                {alerts.map(alert => (
-                                    <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                {alerts.map(alert => {
+                                    const rowBorder = alert.type === 'expired' ? 'var(--danger)' : alert.type === 'missing' ? 'var(--danger)' : alert.type === 'soon' ? '#e6a800' : 'transparent'
+                                    return (
+                                    <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}` }}>
                                         <td style={{ padding: '16px', fontWeight: '600' }}>{alert.vessel}</td>
                                         <td style={{ padding: '16px' }}>{alert.document}</td>
                                         <td style={{ padding: '16px' }}>
@@ -310,7 +312,8 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                             </span>
                                         </td>
                                     </tr>
-                                ))}
+                                    )
+                                })}
                                 {alerts.length === 0 && (
                                     <tr>
                                         <td colSpan={5} style={{ padding: '64px', textAlign: 'center' }}>
