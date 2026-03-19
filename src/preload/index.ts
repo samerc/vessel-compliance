@@ -264,7 +264,7 @@ const api = {
   hullReorderClauseConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderClauseConditions', ids),
 
   hullGetAdditionalConditions: () => ipcRenderer.invoke('hull:getAdditionalConditions'),
-  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[]) => ipcRenderer.invoke('hull:addAdditionalCondition', title, text, defaultSelected, hullClauseIds),
+  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[], hasAmount?: boolean, amountPlaceholder?: string) => ipcRenderer.invoke('hull:addAdditionalCondition', title, text, defaultSelected, hullClauseIds, hasAmount, amountPlaceholder),
   hullUpdateAdditionalCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateAdditionalCondition', id, updates),
   hullDeleteAdditionalCondition: (id: string) => ipcRenderer.invoke('hull:deleteAdditionalCondition', id),
   hullReorderAdditionalConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAdditionalConditions', ids),

@@ -797,7 +797,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           if (!filterFn(belonging)) continue
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) continue
-          const condText = qa.textOverride || def.text
+          let condText = qa.textOverride || def.text
+          if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+            const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
+          }
+          condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
           text += `- ${condText}${scope}\n`
         }
@@ -862,7 +867,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         for (const qa of ha) {
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) continue
-          const condText = qa.textOverride || def.text
+          let condText = qa.textOverride || def.text
+          if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+            const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
+          }
+          condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
           addl += `- ${condText}${scope}\n`
         }
@@ -1891,7 +1901,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           if (!filterFn(belonging)) continue
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) continue
-          const condText = qa.textOverride || def.text
+          let condText = qa.textOverride || def.text
+          if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+            const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
+          }
+          condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
           paras.push(dAddlBullet(condText + scope))
         }
@@ -2024,7 +2039,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           for (const qa of ha) {
             const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
             if (!def) continue
-            const condText = qa.textOverride || def.text
+            let condText = qa.textOverride || def.text
+            if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
+            }
+            condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
             const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
             hcContent.push(dAddlBullet(condText + scope))
           }

@@ -252,8 +252,8 @@ export interface Api {
   hullReorderClauseConditions: (ids: string[]) => Promise<void>
 
   hullGetAdditionalConditions: () => Promise<HullAdditionalCondition[]>
-  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[]) => Promise<HullAdditionalCondition>
-  hullUpdateAdditionalCondition: (id: string, updates: { title?: string | null; text?: string; defaultSelected?: boolean; hullClauseIds?: string[] }) => Promise<void>
+  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[], hasAmount?: boolean, amountPlaceholder?: string) => Promise<HullAdditionalCondition>
+  hullUpdateAdditionalCondition: (id: string, updates: { title?: string | null; text?: string; defaultSelected?: boolean; hullClauseIds?: string[]; hasAmount?: boolean; amountPlaceholder?: string }) => Promise<void>
   hullDeleteAdditionalCondition: (id: string) => Promise<void>
   hullReorderAdditionalConditions: (ids: string[]) => Promise<void>
 
@@ -276,7 +276,7 @@ export interface Api {
   hullGetQuotationHullConditions: (qId: string) => Promise<QuotationHullCondition[]>
   hullSetQuotationHullConditions: (qId: string, items: { hullConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
   hullGetQuotationHullAdditionalConditions: (qId: string) => Promise<QuotationHullAdditionalCondition[]>
-  hullSetQuotationHullAdditionalConditions: (qId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
+  hullSetQuotationHullAdditionalConditions: (qId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null; amount?: number | null }[]) => Promise<void>
 
   warGetConditions: () => Promise<WarCondition[]>
   warAddCondition: (text: string, defaultSelected: boolean) => Promise<WarCondition>

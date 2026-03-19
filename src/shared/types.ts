@@ -777,6 +777,8 @@ export interface HullAdditionalCondition {
   defaultSelected: boolean
   order: number
   hullClauseIds?: string[]
+  hasAmount?: boolean
+  amountPlaceholder?: string
 }
 
 export interface QuotationAgreedValueItem {
@@ -826,6 +828,7 @@ export interface QuotationHullAdditionalCondition {
   order: number
   vesselScope?: string[] | null
   alternativeId?: string | null
+  amount?: number | null
 }
 
 // ==================== War Risk ====================

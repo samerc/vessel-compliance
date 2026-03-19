@@ -3121,9 +3121,13 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
     const [newText, setNewText] = useState('')
     const [newDefault, setNewDefault] = useState(false)
     const [newClauseIds, setNewClauseIds] = useState<string[]>([])
+    const [newHasAmount, setNewHasAmount] = useState(false)
+    const [newAmountPlaceholder, setNewAmountPlaceholder] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editTitle, setEditTitle] = useState('')
     const [editText, setEditText] = useState('')
+    const [editHasAmount, setEditHasAmount] = useState(false)
+    const [editAmountPlaceholder, setEditAmountPlaceholder] = useState('')
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
@@ -3138,15 +3142,15 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newText.trim()) return
-        const result = await window.api.hullAddAdditionalCondition(newTitle.trim() || null, newText.trim(), newDefault, newClauseIds) as any
+        const result = await window.api.hullAddAdditionalCondition(newTitle.trim() || null, newText.trim(), newDefault, newClauseIds, newHasAmount, newAmountPlaceholder.trim() || undefined) as any
         if (result?.error) { showError(result.message || 'Failed to add condition'); return }
-        setNewTitle(''); setNewText(''); setNewDefault(false); setNewClauseIds([])
+        setNewTitle(''); setNewText(''); setNewDefault(false); setNewClauseIds([]); setNewHasAmount(false); setNewAmountPlaceholder('')
         showSuccess('Condition added')
         loadData()
     }
 
     const handleSaveEdit = async (id: string) => {
-        await window.api.hullUpdateAdditionalCondition(id, { title: editTitle.trim() || null, text: editText.trim() })
+        await window.api.hullUpdateAdditionalCondition(id, { title: editTitle.trim() || null, text: editText.trim(), hasAmount: editHasAmount, amountPlaceholder: editAmountPlaceholder.trim() || undefined })
         setEditingId(null)
         showSuccess('Condition updated')
         loadData()
@@ -3207,6 +3211,10 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                     )}
                     <div style={{ flex: 1 }} />
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input type="checkbox" checked={newHasAmount} onChange={e => setNewHasAmount(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Amount
+                    </label>
+                    {newHasAmount && <input type="text" value={newAmountPlaceholder} onChange={e => setNewAmountPlaceholder(e.target.value)} placeholder="Placeholder e.g. {deductible}" style={{ width: '160px', fontSize: '0.8rem' }} />}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input type="checkbox" checked={newDefault} onChange={e => setNewDefault(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                     </label>
                     <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
@@ -3222,10 +3230,11 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                             <button onClick={() => handleMove(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                         </div>
                         <span style={{ flex: 1, fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)' }}>{c.title || 'Untitled Condition'}</span>
+                        {c.hasAmount && <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', background: '#f59e0b22', color: '#f59e0b', border: '1px solid #f59e0b44' }}>{c.amountPlaceholder || 'AMT'}</span>}
                         <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             <input type="checkbox" checked={c.defaultSelected} onChange={() => handleToggleDefault(c.id, c.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                         </label>
-                        <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                        <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditText(c.text); setEditHasAmount(!!c.hasAmount); setEditAmountPlaceholder(c.amountPlaceholder || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                         <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                     </div>
                     {/* Body: text or edit form */}
@@ -3234,7 +3243,11 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '240px' }} />
                                 <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ width: '100%', minHeight: '100px', fontSize: '0.82rem', padding: '8px', resize: 'vertical' }} />
-                                <div style={{ display: 'flex', gap: '6px' }}>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                        <input type="checkbox" checked={editHasAmount} onChange={e => setEditHasAmount(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Amount
+                                    </label>
+                                    {editHasAmount && <input type="text" value={editAmountPlaceholder} onChange={e => setEditAmountPlaceholder(e.target.value)} placeholder="{placeholder}" style={{ width: '130px', fontSize: '0.78rem', padding: '4px 6px' }} />}
                                     <button onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '5px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Save size={12} /> Save</button>
                                     <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '5px 12px', fontSize: '0.78rem' }}>Cancel</button>
                                 </div>

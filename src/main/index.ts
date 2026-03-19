@@ -1867,7 +1867,7 @@ app.whenReady().then(() => {
 
   // Hull Additional Conditions
   safeHandle('hull:getAdditionalConditions', (event) => { requireSession(event); return db.getHullAdditionalConditions() })
-  safeHandle('hull:addAdditionalCondition', async (event, title, text, defaultSelected, hullClauseIds) => { await requirePermission(event, 'quotations:settings'); return db.addHullAdditionalCondition(title, text, defaultSelected, hullClauseIds) })
+  safeHandle('hull:addAdditionalCondition', async (event, title, text, defaultSelected, hullClauseIds, hasAmount, amountPlaceholder) => { await requirePermission(event, 'quotations:settings'); return db.addHullAdditionalCondition(title, text, defaultSelected, hullClauseIds, hasAmount, amountPlaceholder) })
   safeHandle('hull:updateAdditionalCondition', async (event, id, updates) => { await requirePermission(event, 'quotations:settings'); return db.updateHullAdditionalCondition(id, updates) })
   safeHandle('hull:deleteAdditionalCondition', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteHullAdditionalCondition(id) })
   safeHandle('hull:reorderAdditionalConditions', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderHullAdditionalConditions(ids) })

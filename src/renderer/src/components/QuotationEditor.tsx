@@ -5470,16 +5470,19 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     const selectedAddIds = new Set(qAdditional.map(c => c.hullAdditionalConditionId))
     const additionalScopes: Record<string, string[] | null> = {}
     const additionalOverrides: Record<string, string> = {}
+    const additionalAmounts: Record<string, number | undefined> = {}
     qAdditional.forEach(c => {
         if (c.vesselScope) additionalScopes[c.hullAdditionalConditionId] = c.vesselScope
         if (c.textOverride) additionalOverrides[c.hullAdditionalConditionId] = c.textOverride
+        if (c.amount != null) additionalAmounts[c.hullAdditionalConditionId] = c.amount
     })
 
     const mapAddForSave = (c: QuotationHullAdditionalCondition) => ({
         hullAdditionalConditionId: c.hullAdditionalConditionId,
         textOverride: c.textOverride,
         vesselScope: c.vesselScope,
-        alternativeId: c.alternativeId
+        alternativeId: c.alternativeId,
+        amount: c.amount
     })
 
     const toggleAdditional = async (addId: string) => {
@@ -5508,6 +5511,14 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     const saveAdditionalOverrides = async () => {
         try {
             await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, qAdditional.map(mapAddForSave))
+        } catch {}
+    }
+
+    const updateAdditionalAmount = async (addId: string, amount: number | null) => {
+        const updated = qAdditional.map(c => c.hullAdditionalConditionId === addId ? { ...c, amount } : c)
+        setQAdditional(updated)
+        try {
+            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave))
         } catch {}
     }
 
@@ -5574,7 +5585,8 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                     hullAdditionalConditionId: a.hullAdditionalConditionId,
                     textOverride: a.textOverride,
                     vesselScope: a.vesselScope,
-                    alternativeId: a.alternativeId
+                    alternativeId: a.alternativeId,
+                    amount: a.amount
                 })), ...newAdds.map(a => ({
                     hullAdditionalConditionId: a.id
                 }))]
@@ -5731,7 +5743,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
             {/* Additional Conditions */}
             <HullConditionPicker
                 label="Additional Conditions"
-                items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text }))}
+                items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
                 selectedIds={selectedAddIds}
                 onToggle={toggleAdditional}
                 overrides={additionalOverrides}
@@ -5741,6 +5753,9 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                 onScopeChange={updateAdditionalScope}
                 vessels={qVessels}
                 emptyText="No additional conditions for the selected clause. Add them in Quotation Settings → Hull Additional Conditions."
+                amounts={additionalAmounts}
+                onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
+                onAmountBlur={saveAdditionalOverrides}
             />
         </div>
     )
