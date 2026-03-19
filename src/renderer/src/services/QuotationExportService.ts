@@ -723,11 +723,13 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       sectionMap.set('agreedValue', ['Agreed Insured Value', avText.trim()])
     } else if (avItems.length > 0 || hasHm) {
       // Standard agreed value — value not bold (body column), spacing between value and texts
+      // Filter out IV items when IV is disabled
+      const hmItems = avItems.filter(it => (it.section || 'hm') !== 'iv')
       let avText = ''
       if (hasHm) {
         avText += formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD') + '\n\n'
       }
-      for (const it of avItems) {
+      for (const it of hmItems) {
         avText += it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels) + '\n'
       }
       sectionMap.set('agreedValue', ['Agreed Insured Value', avText.trim()])
@@ -863,10 +865,28 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       } else {
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
+        // Deduplicate conditions by hullConditionId (prefer alt-specific over null)
+        const condMap = new Map<string, typeof hc[0]>()
+        for (const qc of hc) {
+          const existing = condMap.get(qc.hullConditionId)
+          if (!existing || (qc.alternativeId && !existing.alternativeId)) {
+            condMap.set(qc.hullConditionId, qc)
+          }
+        }
+        const dedupedConds = Array.from(condMap.values())
+        dedupedConds.sort((a, b) => {
+          const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+          const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+          return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+        })
         let addl = ''
         for (const qa of ha) {
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) continue
+          // Filter: only include additional conditions linked to the selected clause (or unlinked)
+          const linkedIds = def.hullClauseIds || []
+          const clauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
+          if (linkedIds.length > 0 && clauseId && !linkedIds.includes(clauseId)) continue
           let condText = qa.textOverride || def.text
           if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
             const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -876,7 +896,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
           addl += `- ${condText}${scope}\n`
         }
-        hcBlocks.push({ desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hc), addl })
+        hcBlocks.push({ desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(dedupedConds), addl })
       }
 
       // Render as text for sectionMap — condition pairs as sub-table rendered inline
@@ -1229,8 +1249,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           const totalTech = pdfPremLines.reduce((s, l) => s + l.tech, 0)
           premText += `Total:  ${fc(totalTech)}${pa}\n`
         }
-        premText += '\n'
-        if (pdfPremLines.length > 1) premText += 'Payable Premium\n'
+        if (pdfPremLines.length > 1) premText += '\nPayable Premium\n'
         for (const l of pdfPremLines) {
           premText += `${l.label || 'Payable Premium'}:  ${fc(computePayable(l.tech))}${pa}\n`
         }
@@ -1810,12 +1829,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       rowMap.set('agreedValue', makeRow('Agreed Insured Value', avContent))
     } else if (avItems.length > 0 || dHasHm) {
       // Standard agreed value — value not bold, spacing between value and texts
+      // Filter out IV items when IV is disabled
+      const dHmItems = avItems.filter(it => (it.section || 'hm') !== 'iv')
       const avContent: Paragraph[] = []
       if (dHasHm) {
         avContent.push(np(formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')))
         avContent.push(emptyP())
       }
-      for (const it of avItems) {
+      for (const it of dHmItems) {
         avContent.push(np(it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels)))
       }
       rowMap.set('agreedValue', makeRow('Agreed Insured Value', avContent))
@@ -2033,10 +2054,32 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           hcContent.push(np(selectedClause.description || selectedClause.name))
           hcContent.push(emptyP())
         }
-        if (hc.length > 0) hcContent.push(makeCondTable(hc))
-        if (ha.length > 0) {
+        // Deduplicate conditions by hullConditionId (prefer alt-specific over null)
+        const dCondMap = new Map<string, typeof hc[0]>()
+        for (const qc of hc) {
+          const existing = dCondMap.get(qc.hullConditionId)
+          if (!existing || (qc.alternativeId && !existing.alternativeId)) {
+            dCondMap.set(qc.hullConditionId, qc)
+          }
+        }
+        const dDedupedConds = Array.from(dCondMap.values())
+        dDedupedConds.sort((a, b) => {
+          const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+          const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+          return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+        })
+        if (dDedupedConds.length > 0) hcContent.push(makeCondTable(dDedupedConds))
+        // Filter additional conditions by clause linkage
+        const clauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
+        const filteredHa = ha.filter(qa => {
+          const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+          if (!def) return false
+          const linkedIds = def.hullClauseIds || []
+          return linkedIds.length === 0 || !clauseId || linkedIds.includes(clauseId)
+        })
+        if (filteredHa.length > 0) {
           hcContent.push(emptyP())
-          for (const qa of ha) {
+          for (const qa of filteredHa) {
             const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
             if (!def) continue
             let condText = qa.textOverride || def.text
@@ -2457,7 +2500,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           for (const l of lines) {
             rows.push(premRow(l.label || 'Technical Premium', `${formatCurrency(l.tech, wq.premiumCurrency)} per annum`))
           }
-          rows.push(premRow('', '')) // spacer
+          if (lines.length > 1) rows.push(premRow('', '')) // spacer only for multi-line
           rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', '', true))
           for (const l of lines) {
             rows.push(premRow(l.label || 'Payable Premium', `${formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)} per annum`))
