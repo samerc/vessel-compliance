@@ -56,6 +56,7 @@ interface QuotationData {
   quotation: Quotation
   quotationVessels: QuotationVessel[]
   allVessels: Vessel[]
+  flagStates: { id: string; name: string }[]
   assureds: QuotationAssured[]
   subLimits: QuotationSubLimit[]
   selectedClauseIds: string[]
@@ -111,7 +112,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     sectionTexts, sanctionsVersions, clauseOverridesArr, logoPath,
     hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
     hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw,
-    warConditionsRaw, allWarConditionsRaw, warSettingsRaw
+    warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
+    flagStatesRaw
   ] = await Promise.all([
     window.api.getQuotationVessels(quotation.id),
     window.api.getVessels(),
@@ -150,7 +152,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     // War-specific data
     window.api.warGetQuotationWarConditions(quotation.id),
     window.api.warGetConditions(),
-    window.api.warGetSettings()
+    window.api.warGetSettings(),
+    window.api.getFlagStates()
   ])
 
   // Extract IDs and vessel scope / alternative maps from new object return format
@@ -247,7 +250,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   }
 
   return {
-    quotation, quotationVessels, allVessels, assureds, subLimits,
+    quotation, quotationVessels, allVessels, flagStates: Array.isArray(flagStatesRaw) ? flagStatesRaw : [], assureds, subLimits,
     selectedClauseIds, clauseVesselScopes, clauseAltIds,
     allClauses: resolvedAllClauses,
     additionalClauses,
@@ -322,9 +325,13 @@ function formatAmountOnly(amount: number | undefined): string {
 
 interface VesselInfo { imo?: string; built?: number; gt?: number; type?: string; flag?: string; classification?: string; callSign?: string; name: string }
 
-function getVesselInfo(qv: QuotationVessel, allVessels: Vessel[]): VesselInfo {
+function getVesselInfo(qv: QuotationVessel, allVessels: Vessel[], flagStates?: { id: string; name: string }[]): VesselInfo {
   const reg = qv.vesselId ? allVessels.find(v => v.id === qv.vesselId) : null
-  if (reg) return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, gt: reg.grossTonnage, type: reg.vesselType, flag: undefined, classification: reg.classificationSociety, callSign: reg.callSign }
+  if (reg) {
+    // Resolve flag name from system vessel's flagStateId
+    const flagName = reg.flagStateId && flagStates ? (flagStates.find(f => f.id === reg.flagStateId)?.name || qv.flag) : qv.flag
+    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, classification: reg.classificationSociety, callSign: reg.callSign }
+  }
   return { name: qv.name || 'Unknown', imo: qv.imoNumber, built: qv.builtYear, gt: qv.grossTonnage, type: qv.vesselType, flag: qv.flag, classification: qv.classification, callSign: qv.callSign }
 }
 
@@ -370,14 +377,14 @@ function resolveIacsWarranty(
 
 function vesselName(data: QuotationData): string {
   if (data.quotationVessels.length === 0) return 'Unknown Vessel'
-  if (data.quotationVessels.length === 1) return getVesselInfo(data.quotationVessels[0], data.allVessels).name
-  return data.quotationVessels.map(qv => `${qv.vesselLabel} ${getVesselInfo(qv, data.allVessels).name}`).join(' / ')
+  if (data.quotationVessels.length === 1) return getVesselInfo(data.quotationVessels[0], data.allVessels, data.flagStates).name
+  return data.quotationVessels.map(qv => `${qv.vesselLabel} ${getVesselInfo(qv, data.allVessels, data.flagStates).name}`).join(' / ')
 }
 
 function getFileName(data: QuotationData, ext: string): string {
   const ref = data.quotation.referenceNumber || 'Quotation'
   const rev = data.quotation.revisionNumber ? `-R${data.quotation.revisionNumber}` : ''
-  const name = (data.quotationVessels.length > 0 ? getVesselInfo(data.quotationVessels[0], data.allVessels).name : 'Quotation').replace(/[^a-zA-Z0-9]/g, '_')
+  const name = (data.quotationVessels.length > 0 ? getVesselInfo(data.quotationVessels[0], data.allVessels, data.flagStates).name : 'Quotation').replace(/[^a-zA-Z0-9]/g, '_')
   return `${ref}${rev}_${name}.${ext}`
 }
 
@@ -585,7 +592,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   // Insured Vessel(s)
   {
     const vesselLines = data.quotationVessels.map(qv => {
-      const vi = getVesselInfo(qv, data.allVessels)
+      const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
       const prefix = data.quotationVessels.length > 1 ? `${qv.vesselLabel}: ` : ''
       return `${prefix}${vi.name}  |  IMO: ${vi.imo || '-'}  |  Built: ${vi.built || '-'}  |  GT: ${vi.gt ? Number(vi.gt).toLocaleString() : '-'}  |  Type: ${vi.type || '-'}  |  Class: ${vi.classification || '-'}`
     })
@@ -1655,7 +1662,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           children: vesselHeaders.map(h => makeVCell(h, true))
         }),
         ...data.quotationVessels.map(qv => {
-          const vi = getVesselInfo(qv, data.allVessels)
+          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
           const cells = showVesselLabel
             ? [qv.vesselLabel, vi.name, vi.imo || '-', vi.built ? String(vi.built) : '-', vi.gt ? Number(vi.gt).toLocaleString() : '-', vi.flag || '-', vi.type || '-', vi.classification || '-']
             : [vi.name, vi.imo || '-', vi.built ? String(vi.built) : '-', vi.gt ? Number(vi.gt).toLocaleString() : '-', vi.flag || '-', vi.type || '-', vi.classification || '-']
