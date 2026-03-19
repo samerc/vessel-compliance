@@ -1037,8 +1037,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         return t
       }
 
-      // Render survey warranties as bullet items
+      // Render survey warranties as bullet items (not for War quotations)
+      const isWar = data.quotation.quotationTypeCode === 'W'
       const renderSurveyWarranties = (items: typeof data.surveyWarranties) => {
+        if (isWar) return ''
         let t = ''
         for (const sw of items) {
           const scope = vesselScopeSuffix(sw.vesselScope, data.quotationVessels)
@@ -2244,8 +2246,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       return paras
     }
 
-    // Render survey warranties as bullet paragraphs
-    const renderSurveyWarBullets = (items: typeof data.surveyWarranties) => {
+    // Render survey warranties as bullet paragraphs (not for War quotations)
+    const dIsWar = data.quotation.quotationTypeCode === 'W'
+    const renderSurveyWarBullets = (items: typeof data.surveyWarranties): Paragraph[] => {
+      if (dIsWar) return []
       return items.map(sw => bulletP(sw.text + vesselScopeSuffix(sw.vesselScope, data.quotationVessels)))
     }
 
