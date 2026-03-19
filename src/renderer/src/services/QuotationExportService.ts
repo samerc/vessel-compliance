@@ -876,9 +876,16 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       } else {
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
-        // Deduplicate conditions by hullConditionId (prefer alt-specific over null)
+        // Filter conditions to selected clause only, then deduplicate
+        const clauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
+        const clauseFilteredConds = clauseId
+          ? hc.filter(qc => {
+              const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
+              return def && def.hullClauseId === clauseId
+            })
+          : hc
         const condMap = new Map<string, typeof hc[0]>()
-        for (const qc of hc) {
+        for (const qc of clauseFilteredConds) {
           const existing = condMap.get(qc.hullConditionId)
           if (!existing || (qc.alternativeId && !existing.alternativeId)) {
             condMap.set(qc.hullConditionId, qc)
@@ -2084,9 +2091,16 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           hcContent.push(np(selectedClause.description || selectedClause.name))
           hcContent.push(emptyP())
         }
-        // Deduplicate conditions by hullConditionId (prefer alt-specific over null)
+        // Filter conditions to selected clause only, then deduplicate
+        const dClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
+        const dClauseFilteredConds = dClauseId
+          ? hc.filter(qc => {
+              const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
+              return def && def.hullClauseId === dClauseId
+            })
+          : hc
         const dCondMap = new Map<string, typeof hc[0]>()
-        for (const qc of hc) {
+        for (const qc of dClauseFilteredConds) {
           const existing = dCondMap.get(qc.hullConditionId)
           if (!existing || (qc.alternativeId && !existing.alternativeId)) {
             dCondMap.set(qc.hullConditionId, qc)
@@ -2100,7 +2114,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         })
         if (dDedupedConds.length > 0) hcContent.push(makeCondTable(dDedupedConds))
         // Filter additional conditions by clause linkage
-        const clauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
+        const clauseId = dClauseId
         const filteredHa = ha.filter(qa => {
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) return false
