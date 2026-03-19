@@ -5290,32 +5290,27 @@ function HullConditionsTab({ quotation, updateField, showError }: {
             try { updateField('ivClauseId', ivClauses[0].id) } catch {}
         }
 
-        // Auto-apply default conditions on first load
-        if (!condDefaultsApplied.current && safeExistCond.length === 0 && safeConds.length > 0) {
+        // Auto-apply default conditions when none exist yet
+        if (safeExistCond.length === 0 && safeConds.length > 0 && !condDefaultsApplied.current) {
             condDefaultsApplied.current = true
-            const defaults = safeConds.filter(c => c.defaultSelected)
+            const defaults = safeConds.filter((c: any) => c.defaultSelected)
             if (defaults.length > 0) {
-                // Determine the first alternative ID for H&M conditions
-                const firstAltId = safeAlts.length > 0 ? safeAlts[0].id : undefined
-                const firstAltClauseId = safeAlts.length > 0 ? safeAlts[0].hullClauseId : quotation.hullClauseId
                 try {
+                    // For new quotations, insert defaults without alternative mapping
+                    // (alternatives are added later by the user)
                     await window.api.hullSetQuotationHullConditions(
                         quotation.id,
-                        defaults.map(c => {
-                            // Determine which alternative this condition belongs to
-                            const belongsToAlt = firstAltClauseId && c.hullClauseId === firstAltClauseId
-                            return {
-                                hullConditionId: c.id,
-                                conditionSection: c.conditionSection || 'both',
-                                alternativeId: belongsToAlt ? firstAltId : null
-                            }
-                        })
+                        defaults.map((c: any) => ({
+                            hullConditionId: c.id,
+                            conditionSection: c.conditionSection || 'both',
+                            alternativeId: null
+                        }))
                     )
                     const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
                     setQConditions(Array.isArray(fresh) ? fresh : [])
                 } catch {}
             }
-        } else {
+        } else if (safeExistCond.length > 0) {
             condDefaultsApplied.current = true
         }
 
@@ -5333,7 +5328,7 @@ function HullConditionsTab({ quotation, updateField, showError }: {
                     setQAdditional(Array.isArray(fresh) ? fresh : [])
                 } catch {}
             }
-        } else {
+        } else if (safeExistAdd.length > 0) {
             addDefaultsApplied.current = true
         }
     }
