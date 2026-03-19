@@ -1084,12 +1084,27 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             const renderDocRow = (rowDoc: VesselDocument | undefined, rowType: DocumentType, isExtra: boolean, key: string) => {
                                 const rowHasFile = !!(rowDoc?.filePath)
                                 const rowExists = fileStatus[rowType.id]
+                                // Determine left border color based on document status
+                                const getRowBorderColor = () => {
+                                    if (isExtra) return 'transparent'
+                                    if (isRequired && (!rowHasFile || !rowExists)) return 'var(--danger)' // missing
+                                    if (rowDoc?.expiryDate) {
+                                        const exp = new Date(rowDoc.expiryDate)
+                                        const now = new Date()
+                                        if (exp < now) return 'var(--danger)' // expired
+                                        const soon = new Date()
+                                        soon.setDate(soon.getDate() + 30)
+                                        if (exp < soon) return '#e6a800' // expiring soon
+                                    }
+                                    return 'transparent' // compliant
+                                }
 
                                 return (
                                     <tr
                                         key={key}
                                         style={{
                                             borderBottom: '1px solid var(--table-border)',
+                                            borderLeft: `4px solid ${getRowBorderColor()}`,
                                             background: dragOverId === rowType.id
                                                 ? 'rgba(0, 210, 255, 0.2)'
                                                 : (isRequired && !rowHasFile && !isExtra) ? 'rgba(255, 77, 77, 0.1)' : 'transparent',
