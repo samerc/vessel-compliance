@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList } from 'lucide-react'
-import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings } from '../../../shared/types'
+import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, PremiumTextTemplate } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -3467,11 +3467,18 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
     const [hullAlternatives, setHullAlternatives] = useState<QuotationHullAlternative[]>([])
     const [hullClauses, setHullClauses] = useState<HullClause[]>([])
     const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
+    const [ncbTemplates, setNcbTemplates] = useState<PremiumTextTemplate[]>([])
+    const [upccTemplates, setUpccTemplates] = useState<PremiumTextTemplate[]>([])
 
     useEffect(() => {
         loadInstalments()
         loadVessels()
         window.api.piGetInstalmentDefaults().then(d => setInstalmentDefaults(d || {}))
+        window.api.premiumGetTextTemplates().then(res => {
+            const all = Array.isArray(res) ? res : []
+            setNcbTemplates(all.filter(t => t.type === 'ncb'))
+            setUpccTemplates(all.filter(t => t.type === 'upcc'))
+        })
         if (quotation.quotationTypeCode === 'H') {
             window.api.hullGetQuotationAlternatives(quotation.id).then(a => setHullAlternatives(Array.isArray(a) ? a : []))
             window.api.hullGetClauses().then(c => setHullClauses(Array.isArray(c) ? c : []))
@@ -3807,6 +3814,26 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                     <input type="number" min={0} step={0.01} value={quotation.ncbDiscountAmount || ''} onChange={e => setQ(p => ({ ...p, ncbDiscountAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ncbDiscountAmount', parseFloat(e.target.value) || null)} style={{ width: '120px', padding: '3px 6px' }} />
                                 </div>
                             )}
+                            {ncbTemplates.length > 0 && (
+                                <div style={{ marginBottom: '6px' }}>
+                                    <select
+                                        value=""
+                                        onChange={e => {
+                                            const tpl = ncbTemplates.find(t => t.id === e.target.value)
+                                            if (tpl) {
+                                                setQ(p => ({ ...p, ncbText: tpl.text }))
+                                                updateField('ncbText', tpl.text)
+                                            }
+                                        }}
+                                        style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
+                                    >
+                                        <option value="">Load from template...</option>
+                                        {ncbTemplates.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <RichTextEditor value={quotation.ncbText || ''} onChange={val => { setQ(p => ({ ...p, ncbText: val })); updateField('ncbText', val) }} placeholder="NCB terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />
                         </div>
                     )}
@@ -3847,6 +3874,26 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                     <span style={{ fontSize: '0.8rem' }}>Amount:</span>
                                     <span style={{ fontSize: '0.8rem' }}>{currency}</span>
                                     <input type="number" min={0} step={0.01} value={quotation.upccDiscountAmount || ''} onChange={e => setQ(p => ({ ...p, upccDiscountAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('upccDiscountAmount', parseFloat(e.target.value) || null)} style={{ width: '120px', padding: '3px 6px' }} />
+                                </div>
+                            )}
+                            {upccTemplates.length > 0 && (
+                                <div style={{ marginBottom: '6px' }}>
+                                    <select
+                                        value=""
+                                        onChange={e => {
+                                            const tpl = upccTemplates.find(t => t.id === e.target.value)
+                                            if (tpl) {
+                                                setQ(p => ({ ...p, upccText: tpl.text }))
+                                                updateField('upccText', tpl.text)
+                                            }
+                                        }}
+                                        style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
+                                    >
+                                        <option value="">Load from template...</option>
+                                        {upccTemplates.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             )}
                             <RichTextEditor value={quotation.upccText || ''} onChange={val => { setQ(p => ({ ...p, upccText: val })); updateField('upccText', val) }} placeholder="UPCC terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES } from '../../../shared/types'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign } from 'lucide-react'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,7 +9,7 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'premiumTexts' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings'
 
 type SettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -29,6 +29,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'tradingWarrantyTemplates', label: 'Trading Templates', icon: <FileText size={15} /> },
         { id: 'sanctionsVersions', label: 'Sanctions Versions', icon: <Shield size={15} /> },
         { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
+        { id: 'premiumTexts', label: 'NCB / UPCC', icon: <DollarSign size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
         { id: 'sectionOrder', label: 'Section Order', icon: <List size={15} /> },
         { id: 'workflow', label: 'Workflow', icon: <GitBranch size={15} /> },
@@ -147,6 +148,7 @@ export default function QuotationSettings() {
             {activeTab === 'tradingCountries' && <TradingCountriesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'tradingWarranty' && <TradingWarrantyTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'tradingWarrantyTemplates' && <TradingWarrantyTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'premiumTexts' && <PremiumTextTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'sanctionsVersions' && <SanctionsVersionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'instalmentDefaults' && <InstalmentDefaultsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
@@ -2105,6 +2107,191 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
                     )}
                 </div>
             ))}
+        </section>
+    )
+}
+
+// ==================== Premium Text Templates Tab (NCB / UPCC) ====================
+
+function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
+    const [ncbTemplates, setNcbTemplates] = useState<PremiumTextTemplate[]>([])
+    const [upccTemplates, setUpccTemplates] = useState<PremiumTextTemplate[]>([])
+    const [showAddNcb, setShowAddNcb] = useState(false)
+    const [showAddUpcc, setShowAddUpcc] = useState(false)
+    const [newName, setNewName] = useState('')
+    const [newText, setNewText] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editText, setEditText] = useState('')
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+
+    useEffect(() => { loadData() }, [])
+
+    const loadData = async () => {
+        const res = await window.api.premiumGetTextTemplates()
+        const all = Array.isArray(res) ? res : []
+        setNcbTemplates(all.filter(t => t.type === 'ncb'))
+        setUpccTemplates(all.filter(t => t.type === 'upcc'))
+    }
+
+    const handleAdd = async (type: 'ncb' | 'upcc') => {
+        if (!newName.trim()) return
+        try {
+            await window.api.premiumAddTextTemplate({ name: newName.trim(), text: newText, type })
+            setNewName('')
+            setNewText('')
+            if (type === 'ncb') setShowAddNcb(false)
+            else setShowAddUpcc(false)
+            showSuccess('Template added')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add') }
+    }
+
+    const handleUpdate = async () => {
+        if (!editingId || !editName.trim()) return
+        try {
+            await window.api.premiumUpdateTextTemplate(editingId, { name: editName.trim(), text: editText })
+            setEditingId(null)
+            showSuccess('Template updated')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to update') }
+    }
+
+    const handleDelete = async (id: string) => {
+        try {
+            await window.api.premiumDeleteTextTemplate(id)
+            showSuccess('Template deleted')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to delete') }
+    }
+
+    const move = async (templates: PremiumTextTemplate[], idx: number, dir: -1 | 1) => {
+        const newIdx = idx + dir
+        if (newIdx < 0 || newIdx >= templates.length) return
+        const reordered = [...templates]
+        ;[reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]]
+        if (reordered[0]?.type === 'ncb') setNcbTemplates(reordered)
+        else setUpccTemplates(reordered)
+        await window.api.premiumReorderTextTemplates(reordered.map(t => t.id))
+    }
+
+    const startEdit = (t: PremiumTextTemplate) => {
+        setEditingId(t.id)
+        setEditName(t.name)
+        setEditText(t.text)
+    }
+
+    const openAdd = (type: 'ncb' | 'upcc') => {
+        setNewName('')
+        setNewText('')
+        setEditingId(null)
+        if (type === 'ncb') { setShowAddNcb(true); setShowAddUpcc(false) }
+        else { setShowAddUpcc(true); setShowAddNcb(false) }
+    }
+
+    const renderTemplateList = (templates: PremiumTextTemplate[], type: 'ncb' | 'upcc', showAdd: boolean, setShowAdd: (v: boolean) => void) => {
+        const placeholders = type === 'ncb'
+            ? '{ncb_percent}, {ncb_amount}, {currency}'
+            : '{upcc_percent}, {upcc_amount}, {currency}'
+
+        return (
+            <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div>
+                        <h4 style={{ fontSize: '0.95rem', marginBottom: '2px' }}>{type === 'ncb' ? 'NCB Templates' : 'UPCC Templates'}</h4>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Available placeholders: <code style={{ fontSize: '0.76rem', background: isLight ? '#eef1f6' : 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>{placeholders}</code></p>
+                    </div>
+                    <button onClick={() => openAdd(type)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                        <Plus size={14} /> Add Template
+                    </button>
+                </div>
+
+                {showAdd && (
+                    <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0,170,200,0.06)', marginBottom: '16px' }}>
+                        <input
+                            type="text"
+                            value={newName}
+                            onChange={e => setNewName(e.target.value)}
+                            placeholder={`Template name (e.g. Standard ${type === 'ncb' ? 'NCB' : 'UPCC'} Text)`}
+                            style={{ width: '100%', marginBottom: '8px' }}
+                        />
+                        <RichTextEditor
+                            value={newText}
+                            onChange={setNewText}
+                            placeholder={`${type === 'ncb' ? 'NCB' : 'UPCC'} text...`}
+                            minHeight={80}
+                        />
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                            <button onClick={() => handleAdd(type)} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save</button>
+                            <button onClick={() => { setShowAdd(false); setNewName(''); setNewText('') }} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                        </div>
+                    </div>
+                )}
+
+                {templates.length === 0 && !showAdd && (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
+                        No {type === 'ncb' ? 'NCB' : 'UPCC'} templates yet. Add one to get started.
+                    </div>
+                )}
+
+                {templates.map((t, idx) => (
+                    <div key={t.id} style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        border: `1px solid ${editingId === t.id ? 'var(--accent-primary)' : 'var(--table-border)'}`,
+                        marginBottom: '8px',
+                        background: editingId === t.id ? (isLight ? '#f0faff' : 'rgba(0,170,200,0.06)') : 'transparent'
+                    }}>
+                        {editingId === t.id ? (
+                            <>
+                                <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={e => setEditName(e.target.value)}
+                                    style={{ width: '100%', marginBottom: '8px' }}
+                                />
+                                <RichTextEditor
+                                    value={editText}
+                                    onChange={setEditText}
+                                    minHeight={80}
+                                />
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                                    <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save</button>
+                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{t.name}</div>
+                                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
+                                        {t.text.replace(/<[^>]*>/g, '').substring(0, 120) || '(empty)'}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                    <button onClick={() => move(templates, idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronUp size={14} /></button>
+                                    <button onClick={() => move(templates, idx, 1)} disabled={idx === templates.length - 1} style={{ background: 'none', border: 'none', cursor: idx === templates.length - 1 ? 'default' : 'pointer', opacity: idx === templates.length - 1 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronDown size={14} /></button>
+                                    <button onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}><Pencil size={14} /></button>
+                                    <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>NCB / UPCC Text Templates</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Reusable templates for NCB and UPCC text fields in the Premium tab. Select one in a quotation or write custom text.</p>
+            </div>
+
+            {renderTemplateList(ncbTemplates, 'ncb', showAddNcb, setShowAddNcb)}
+            {renderTemplateList(upccTemplates, 'upcc', showAddUpcc, setShowAddUpcc)}
         </section>
     )
 }

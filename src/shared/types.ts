@@ -714,6 +714,14 @@ export interface TradingWarrantyTemplate {
   order: number
 }
 
+export interface PremiumTextTemplate {
+  id: string
+  name: string
+  text: string
+  type: 'ncb' | 'upcc'
+  order: number
+}
+
 // ==================== Fleet Analytics ====================
 
 export interface AnalyticsPreset {

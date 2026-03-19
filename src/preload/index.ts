@@ -370,6 +370,13 @@ const api = {
   piDeleteTradingWarrantyTemplate: (id: string) => ipcRenderer.invoke('pi:deleteTradingWarrantyTemplate', id),
   piReorderTradingWarrantyTemplates: (ids: string[]) => ipcRenderer.invoke('pi:reorderTradingWarrantyTemplates', ids),
 
+  // Premium Text Templates (NCB / UPCC)
+  premiumGetTextTemplates: (type?: string) => ipcRenderer.invoke('premium:getTextTemplates', type),
+  premiumAddTextTemplate: (data: { name: string; text: string; type: string }) => ipcRenderer.invoke('premium:addTextTemplate', data),
+  premiumUpdateTextTemplate: (id: string, updates: any) => ipcRenderer.invoke('premium:updateTextTemplate', id, updates),
+  premiumDeleteTextTemplate: (id: string) => ipcRenderer.invoke('premium:deleteTextTemplate', id),
+  premiumReorderTextTemplates: (ids: string[]) => ipcRenderer.invoke('premium:reorderTextTemplates', ids),
+
   // P&I Section Texts
   piGetSectionTexts: () => ipcRenderer.invoke('pi:getSectionTexts'),
   piSetSectionTexts: (texts: any) => ipcRenderer.invoke('pi:setSectionTexts', texts),

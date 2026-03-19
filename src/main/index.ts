@@ -1988,6 +1988,13 @@ app.whenReady().then(() => {
   safeHandle('pi:deleteTradingWarrantyTemplate', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteTradingWarrantyTemplate(id) })
   safeHandle('pi:reorderTradingWarrantyTemplates', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderTradingWarrantyTemplates(ids) })
 
+  // Premium Text Templates (NCB / UPCC)
+  safeHandle('premium:getTextTemplates', (event, type) => { requireSession(event); return db.getPremiumTextTemplates(type) })
+  safeHandle('premium:addTextTemplate', async (event, data) => { await requirePermission(event, 'quotations:settings'); return db.addPremiumTextTemplate(data) })
+  safeHandle('premium:updateTextTemplate', async (event, id, updates) => { await requirePermission(event, 'quotations:settings'); return db.updatePremiumTextTemplate(id, updates) })
+  safeHandle('premium:deleteTextTemplate', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deletePremiumTextTemplate(id) })
+  safeHandle('premium:reorderTextTemplates', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderPremiumTextTemplates(ids) })
+
   // P&I Section Texts
   safeHandle('pi:getSectionTexts', (event) => { requireSession(event); return db.getPISectionTexts() })
   safeHandle('pi:setSectionTexts', async (event, texts) => { await requirePermission(event, 'quotations:settings'); return db.setPISectionTexts(texts) })

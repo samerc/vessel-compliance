@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -5264,6 +5264,53 @@ export class MySQLAdapter {
         if (!this.pool) return
         for (let i = 0; i < ids.length; i++) {
             await this.pool.execute('UPDATE trading_warranty_templates SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
+    // ==================== Premium Text Templates (NCB / UPCC) ====================
+
+    async getPremiumTextTemplates(type?: string): Promise<PremiumTextTemplate[]> {
+        if (!this.pool) return []
+        if (type) {
+            const [rows] = await this.pool.query('SELECT id, name, text, type, order_index AS `order` FROM premium_text_templates WHERE type = ? ORDER BY order_index ASC', [type])
+            return rows as PremiumTextTemplate[]
+        }
+        const [rows] = await this.pool.query('SELECT id, name, text, type, order_index AS `order` FROM premium_text_templates ORDER BY type ASC, order_index ASC')
+        return rows as PremiumTextTemplate[]
+    }
+
+    async addPremiumTextTemplate(data: { name: string; text: string; type: string }): Promise<PremiumTextTemplate> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM premium_text_templates WHERE type = ?', [data.type])
+        const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+        await this.pool.execute(
+            'INSERT INTO premium_text_templates (id, name, text, type, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, data.name, data.text, data.type, nextOrder]
+        )
+        return { id, name: data.name, text: data.text, type: data.type as 'ncb' | 'upcc', order: nextOrder }
+    }
+
+    async updatePremiumTextTemplate(id: string, updates: Partial<{ name: string; text: string }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE premium_text_templates SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deletePremiumTextTemplate(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM premium_text_templates WHERE id = ?', [id])
+    }
+
+    async reorderPremiumTextTemplates(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE premium_text_templates SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
     }
 
