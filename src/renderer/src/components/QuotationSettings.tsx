@@ -2193,7 +2193,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
     }
 
     const renderTemplateList = (templates: PremiumTextTemplate[], type: 'ncb' | 'upcc', showAdd: boolean, setShowAdd: (v: boolean) => void) => {
-        const placeholders = type === 'ncb'
+        const autoPlaceholders = type === 'ncb'
             ? '{ncb_percent}, {ncb_amount}, {currency}'
             : '{upcc_percent}, {upcc_amount}, {currency}'
 
@@ -2202,7 +2202,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div>
                         <h4 style={{ fontSize: '0.95rem', marginBottom: '2px' }}>{type === 'ncb' ? 'NCB Templates' : 'UPCC Templates'}</h4>
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Available placeholders: <code style={{ fontSize: '0.76rem', background: isLight ? '#eef1f6' : 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>{placeholders}</code></p>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Auto-filled: <code style={{ fontSize: '0.76rem', background: isLight ? '#eef1f6' : 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>{autoPlaceholders}</code> — You can also add custom placeholders like <code style={{ fontSize: '0.76rem', background: isLight ? '#eef1f6' : 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>{'{'+'date'+'}'}, {'{'+'name'+'}'}</code> (replace manually in quotation)</p>
                     </div>
                     <button onClick={() => openAdd(type)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
                         <Plus size={14} /> Add Template

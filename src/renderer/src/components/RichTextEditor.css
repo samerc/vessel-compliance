@@ -59,8 +59,11 @@
 .rte-content {
   padding: 8px 10px;
   color: var(--text-primary);
-  font-size: 0.82rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Aptos', 'Arial', sans-serif;
+  font-size: 13px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .rte-content .tiptap {
