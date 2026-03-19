@@ -5215,7 +5215,7 @@ function WarTradingTab({ quotation, updateField, setQ }: {
 
 // ==================== Hull Conditions Tab ====================
 
-function HullConditionsTab({ quotation, updateField, showError }: {
+function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     quotation: Quotation
     updateField: (f: string, v: any) => void
     showSuccess: (m: string) => void
@@ -5543,9 +5543,63 @@ function HullConditionsTab({ quotation, updateField, showError }: {
         ac.hullClauseIds.some(id => allRelevantClauseIds.includes(id))
     )
 
+    const handleSyncFromSettings = async () => {
+        // Add new default conditions/additional from settings that aren't already in this quotation
+        const existingCondIds = new Set(qConditions.map(c => c.hullConditionId))
+        const existingAddIds = new Set(qAdditional.map(a => a.hullAdditionalConditionId))
+        const newConds = allConditions.filter(c => c.defaultSelected && !existingCondIds.has(c.id))
+        const newAdds = allAdditional.filter(a => a.defaultSelected && !existingAddIds.has(a.id))
+        if (newConds.length === 0 && newAdds.length === 0) {
+            showError('No new default items to add from settings')
+            return
+        }
+        try {
+            if (newConds.length > 0) {
+                const merged = [...qConditions.map(c => ({
+                    hullConditionId: c.hullConditionId,
+                    conditionSection: c.conditionSection || 'both',
+                    textOverride: c.textOverride,
+                    amount: c.amount,
+                    vesselScope: c.vesselScope,
+                    alternativeId: c.alternativeId
+                })), ...newConds.map((c: any) => ({
+                    hullConditionId: c.id,
+                    conditionSection: c.conditionSection || 'both',
+                    alternativeId: null
+                }))]
+                await window.api.hullSetQuotationHullConditions(quotation.id, merged)
+            }
+            if (newAdds.length > 0) {
+                const merged = [...qAdditional.map(a => ({
+                    hullAdditionalConditionId: a.hullAdditionalConditionId,
+                    textOverride: a.textOverride,
+                    vesselScope: a.vesselScope,
+                    alternativeId: a.alternativeId
+                })), ...newAdds.map(a => ({
+                    hullAdditionalConditionId: a.id
+                }))]
+                await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, merged)
+            }
+            await loadData()
+            showSuccess?.(`Added ${newConds.length} conditions and ${newAdds.length} additional conditions from settings`)
+        } catch (err: any) {
+            showError(err.message || 'Failed to sync from settings')
+        }
+    }
+
     return (
         <div>
-            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Hull Conditions</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>Hull Conditions</h3>
+                <button
+                    onClick={handleSyncFromSettings}
+                    className="btn-secondary"
+                    style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    title="Add new default items from settings without replacing existing selections"
+                >
+                    <RefreshCw size={12} /> Sync from Settings
+                </button>
+            </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
                 Select hull clause{multiAlt ? ' alternatives' : ''}, configure clause conditions, and additional conditions.
             </p>
