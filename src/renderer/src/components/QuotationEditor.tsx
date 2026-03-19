@@ -3484,7 +3484,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
             const all = Array.isArray(res) ? res : []
             setNcbTemplates(all.filter(t => t.type === 'ncb'))
             setUpccTemplates(all.filter(t => t.type === 'upcc'))
-        })
+        }).catch(() => {})
         if (quotation.quotationTypeCode === 'H') {
             window.api.hullGetQuotationAlternatives(quotation.id).then(a => setHullAlternatives(Array.isArray(a) ? a : []))
             window.api.hullGetClauses().then(c => setHullClauses(Array.isArray(c) ? c : []))
@@ -3820,8 +3820,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                     <input type="number" min={0} step={0.01} value={quotation.ncbDiscountAmount || ''} onChange={e => setQ(p => ({ ...p, ncbDiscountAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ncbDiscountAmount', parseFloat(e.target.value) || null)} style={{ width: '120px', padding: '3px 6px' }} />
                                 </div>
                             )}
-                            {ncbTemplates.length > 0 && (
-                                <div style={{ marginBottom: '6px' }}>
+                            <div style={{ marginBottom: '6px' }}>
                                     <select
                                         value=""
                                         onChange={e => {
@@ -3833,13 +3832,12 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                         }}
                                         style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
                                     >
-                                        <option value="">Load from template...</option>
+                                        <option value="">{ncbTemplates.length > 0 ? 'Load from template...' : 'No templates — create in Quotation Settings → NCB / UPCC'}</option>
                                         {ncbTemplates.map(t => (
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
                                     </select>
                                 </div>
-                            )}
                             <RichTextEditor value={quotation.ncbText || ''} onChange={val => { setQ(p => ({ ...p, ncbText: val })); updateField('ncbText', val) }} placeholder="NCB terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />
                         </div>
                     )}
@@ -3882,8 +3880,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                     <input type="number" min={0} step={0.01} value={quotation.upccDiscountAmount || ''} onChange={e => setQ(p => ({ ...p, upccDiscountAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('upccDiscountAmount', parseFloat(e.target.value) || null)} style={{ width: '120px', padding: '3px 6px' }} />
                                 </div>
                             )}
-                            {upccTemplates.length > 0 && (
-                                <div style={{ marginBottom: '6px' }}>
+                            <div style={{ marginBottom: '6px' }}>
                                     <select
                                         value=""
                                         onChange={e => {
@@ -3895,13 +3892,12 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                                         }}
                                         style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
                                     >
-                                        <option value="">Load from template...</option>
+                                        <option value="">{upccTemplates.length > 0 ? 'Load from template...' : 'No templates — create in Quotation Settings → NCB / UPCC'}</option>
                                         {upccTemplates.map(t => (
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
                                     </select>
                                 </div>
-                            )}
                             <RichTextEditor value={quotation.upccText || ''} onChange={val => { setQ(p => ({ ...p, upccText: val })); updateField('upccText', val) }} placeholder="UPCC terms text..." minHeight={50} maxWidth="500px" showFontSize showAlignment showLineSpacing />
                         </div>
                     )}
