@@ -65,3 +65,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Sharpen SVG icons — prevent sub-pixel blur on Lucide/icon strokes */
+svg {
+  shape-rendering: geometricPrecision;
+  transform: translateZ(0);
+}
+
+/* Ensure buttons and interactive elements render crisply */
+button, input, select, textarea {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
