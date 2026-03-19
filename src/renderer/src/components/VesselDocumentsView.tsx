@@ -227,8 +227,8 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   // ── Color helpers ──────────────────────────────────────────────────────────
   const statusMeta: Record<DocStatus, { border: string; bg: string; badge: string; label: string }> = {
     compliant: {
-      border: isLight ? '#008c46' : '#00c264',
-      bg: isLight ? 'rgba(0,140,70,0.04)' : 'rgba(0,194,100,0.04)',
+      border: 'transparent',
+      bg: 'transparent',
       badge: isLight ? 'rgba(0,140,70,0.12)' : 'rgba(0,194,100,0.12)',
       label: 'COMPLIANT',
     },
@@ -251,7 +251,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
       label: 'MISSING',
     },
     optional: {
-      border: isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
+      border: 'transparent',
       bg: 'transparent',
       badge: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
       label: 'OPTIONAL',
