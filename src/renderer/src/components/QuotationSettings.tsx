@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy } from 'lucide-react'
 import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -2908,6 +2908,31 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
         loadData()
     }
 
+    const handleDuplicateClause = async (clause: HullClause) => {
+        try {
+            const result = await window.api.hullAddClause(
+                clause.name + ' (Copy)',
+                clause.code + '-COPY',
+                clause.description || undefined,
+                clause.conditionSection || 'hm'
+            ) as any
+            if (result?.error) { showError(result.message || 'Failed to duplicate'); return }
+            // Copy all conditions from original clause
+            const srcConds = await window.api.hullGetClauseConditions(clause.id)
+            if (Array.isArray(srcConds)) {
+                for (const cond of srcConds) {
+                    await window.api.hullAddClauseCondition(
+                        result.id, cond.conditionNumber, cond.text,
+                        cond.defaultSelected, 'both',
+                        cond.hasAmount || false, cond.amountPlaceholder || undefined
+                    )
+                }
+            }
+            showSuccess(`Duplicated "${clause.name}" with ${Array.isArray(srcConds) ? srcConds.length : 0} conditions`)
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to duplicate clause') }
+    }
+
     const handleDeleteClause = async (id: string) => {
         await window.api.hullDeleteClause(id)
         if (selectedClauseId === id) { setSelectedClauseId(null); setConditions([]) }
@@ -3018,6 +3043,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                                     <span style={{ fontSize: '0.82rem', flex: 1 }}>{c.name}</span>
                                     <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', background: c.conditionSection === 'iv' ? '#6464ff22' : '#ff64c822', color: c.conditionSection === 'iv' ? '#6464ff' : '#ff64c8', border: `1px solid ${c.conditionSection === 'iv' ? '#6464ff44' : '#ff64c844'}` }}>{c.conditionSection === 'iv' ? 'IV' : 'Hull'}</span>
                                     <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '4px' }}>
+                                        <button onClick={() => handleDuplicateClause(c)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }} title="Duplicate clause with conditions"><Copy size={12} /></button>
                                         <button onClick={() => { setEditingId(c.id); setEditCode(c.code); setEditName(c.name); setEditDesc(c.description || ''); setEditClauseSection(c.conditionSection || 'hm') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                         <button onClick={() => handleDeleteClause(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                     </div>

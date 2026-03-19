@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Mail, Plus, Trash2, Save, Copy, ChevronUp, ChevronDown, Lock, Tag } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -50,6 +50,7 @@ export default function EmailTemplates(): React.JSX.Element {
   const [editBody, setEditBody] = useState('')
   const [editCategory, setEditCategory] = useState('general')
   const [dirty, setDirty] = useState(false)
+  const skipDirtyRef = useRef(false)
   // bodyRef removed — now using RichTextEditor
 
   const loadTemplates = useCallback(async () => {
@@ -74,6 +75,7 @@ export default function EmailTemplates(): React.JSX.Element {
   // Sync editor fields when selection changes
   useEffect(() => {
     if (selected) {
+      skipDirtyRef.current = true
       setEditName(selected.name)
       setEditSubject(selected.subject || '')
       setEditBody(selected.body)
@@ -187,7 +189,10 @@ export default function EmailTemplates(): React.JSX.Element {
     showSuccess('Template copied to clipboard')
   }
 
-  const markDirty = () => { if (!dirty) setDirty(true) }
+  const markDirty = () => {
+    if (skipDirtyRef.current) { skipDirtyRef.current = false; return }
+    if (!dirty) setDirty(true)
+  }
 
   const filteredTemplates = templates
 
