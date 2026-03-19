@@ -685,18 +685,36 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       // Additional clauses grouped by alternative
       const scopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
       const sharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
-      if (scopedAddls.length > 0) {
+      // Detect addl clauses that appear in ALL alternatives — treat as "both"
+      const allAltIds = new Set(data.piAlternatives.map(a => a.id))
+      const addlInAllAlts = new Set<string>()
+      for (const ac of scopedAddls) {
+        if (!ac.piAdditionalClauseId) continue
+        const altsForThis = new Set(scopedAddls.filter(a => a.piAdditionalClauseId === ac.piAdditionalClauseId).map(a => a.alternativeId).filter(Boolean))
+        if (allAltIds.size > 0 && [...allAltIds].every(id => altsForThis.has(id))) addlInAllAlts.add(ac.piAdditionalClauseId)
+      }
+      const trueScopedAddls = scopedAddls.filter(ac => !ac.piAdditionalClauseId || !addlInAllAlts.has(ac.piAdditionalClauseId))
+      const promotedBothAddls = scopedAddls.filter(ac => ac.piAdditionalClauseId && addlInAllAlts.has(ac.piAdditionalClauseId))
+      // Deduplicate promoted (keep first occurrence per piAdditionalClauseId)
+      const seenPromoted = new Set<string>()
+      const dedupedPromoted = promotedBothAddls.filter(ac => {
+        if (seenPromoted.has(ac.piAdditionalClauseId!)) return false
+        seenPromoted.add(ac.piAdditionalClauseId!)
+        return true
+      })
+      if (trueScopedAddls.length > 0) {
         for (const alt of data.piAlternatives) {
-          const altAddls = scopedAddls.filter(ac => ac.alternativeId === alt.id)
+          const altAddls = trueScopedAddls.filter(ac => ac.alternativeId === alt.id)
           if (altAddls.length > 0) {
             condText += `Applicable to Alternative ${data.piAlternatives.indexOf(alt) + 1}:\n`
             condText += renderAddlList(altAddls) + '\n'
           }
         }
       }
-      if (sharedAddls.length > 0) {
+      const combinedBothAddls = [...sharedAddls, ...dedupedPromoted]
+      if (combinedBothAddls.length > 0) {
         condText += `Applicable to both alternatives:\n`
-        condText += renderAddlList(sharedAddls)
+        condText += renderAddlList(combinedBothAddls)
       }
     } else {
       condText += renderClauseList(selectedClauses.map(c => c.id))
@@ -976,7 +994,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const q = data.quotation
     let tradingText = ''
     const excCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
-    const ddqListStr = ddqCountries.map(c => c.name).join(', ')
+    const ddqListStr = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
 
     if (q.tradingWarrantyIntro) {
       tradingText += stripHtml(q.tradingWarrantyIntro) + '\n\n'
@@ -1316,9 +1334,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       if (q.nonRefundableType) {
         let nrText = ''
         if (q.nonRefundableType === 'first_instalment') {
-          nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+          nrText = stripHtml(st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.')
         } else if (q.nonRefundableType === 'percentage' && q.nonRefundablePercent) {
-          nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(q.nonRefundablePercent!))
+          nrText = stripHtml((st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(q.nonRefundablePercent!)))
         }
         if (nrText) premText += nrText + '\n\n'
       }
@@ -1332,9 +1350,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         if (inst.instalmentNumber === 1 && q.nonRefundableType) {
           let nrText = ''
           if (q.nonRefundableType === 'first_instalment') {
-            nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+            nrText = stripHtml(st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.')
           } else if (q.nonRefundableType === 'percentage' && q.nonRefundablePercent) {
-            nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(q.nonRefundablePercent!))
+            nrText = stripHtml((st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(q.nonRefundablePercent!)))
           }
           if (nrText) instLine += ' \u2014 ' + nrText
         }
@@ -1813,9 +1831,25 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       // Additional clauses grouped by alternative
       const dScopedAddls = data.additionalClauses.filter(ac => ac.alternativeId)
       const dSharedAddls = data.additionalClauses.filter(ac => !ac.alternativeId)
-      if (dScopedAddls.length > 0) {
+      // Detect addl clauses that appear in ALL alternatives — treat as "both"
+      const dAllAltIds = new Set(data.piAlternatives.map(a => a.id))
+      const dAddlInAllAlts = new Set<string>()
+      for (const ac of dScopedAddls) {
+        if (!ac.piAdditionalClauseId) continue
+        const altsForThis = new Set(dScopedAddls.filter(a => a.piAdditionalClauseId === ac.piAdditionalClauseId).map(a => a.alternativeId).filter(Boolean))
+        if (dAllAltIds.size > 0 && [...dAllAltIds].every(id => altsForThis.has(id))) dAddlInAllAlts.add(ac.piAdditionalClauseId)
+      }
+      const dTrueScopedAddls = dScopedAddls.filter(ac => !ac.piAdditionalClauseId || !dAddlInAllAlts.has(ac.piAdditionalClauseId))
+      const dPromotedBothAddls = dScopedAddls.filter(ac => ac.piAdditionalClauseId && dAddlInAllAlts.has(ac.piAdditionalClauseId))
+      const dSeenPromoted = new Set<string>()
+      const dDedupedPromoted = dPromotedBothAddls.filter(ac => {
+        if (dSeenPromoted.has(ac.piAdditionalClauseId!)) return false
+        dSeenPromoted.add(ac.piAdditionalClauseId!)
+        return true
+      })
+      if (dTrueScopedAddls.length > 0) {
         for (const alt of data.piAlternatives) {
-          const altAddls = dScopedAddls.filter(ac => ac.alternativeId === alt.id)
+          const altAddls = dTrueScopedAddls.filter(ac => ac.alternativeId === alt.id)
           if (altAddls.length > 0) {
             condContent.push(bup(`Applicable to Alternative ${data.piAlternatives.indexOf(alt) + 1}:`))
             condContent.push(...makeAddlBullets(altAddls))
@@ -1823,9 +1857,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           }
         }
       }
-      if (dSharedAddls.length > 0) {
+      const dCombinedBothAddls = [...dSharedAddls, ...dDedupedPromoted]
+      if (dCombinedBothAddls.length > 0) {
         condContent.push(bup('Applicable to both alternatives:'))
-        condContent.push(...makeAddlBullets(dSharedAddls))
+        condContent.push(...makeAddlBullets(dCombinedBothAddls))
       }
     } else {
       if (selectedClauses.length > 0) condContent.push(makeClauseTable(selectedClauses))
@@ -2186,7 +2221,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wq = data.quotation
     const tradContent: (Paragraph | Table)[] = []
     const wExcCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
-    const wDdqListStr = ddqCountries.map(c => c.name).join(', ')
+    const wDdqListStr = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
     const numP = (text: string, level: number) => new Paragraph({
       numbering: { reference: 'trading-numbered', level },
       spacing: { before: level === 0 ? 120 : 0, after: 80, line: 240, lineRule: 'auto' as any },
@@ -2507,7 +2542,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.piAlternatives.length > 1) {
       const wMultiAlt = data.hullAlternatives.length > 1
       const wPiMultiAlt = data.piAlternatives.length > 1
-      const premLabelW = Math.round(BODY_W * 0.30)
+      const premLabelW = Math.round(BODY_W * 0.25)
       const premAmtW = BODY_W - premLabelW
       const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT, w?: number) => new TableCell({
         borders: noBorders(),
@@ -2516,7 +2551,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       })
       const premRow = (label: string, amount: string, boldLabel = false) => new TableRow({
         children: [
-          premCell(label, boldLabel, undefined, premLabelW),
+          premCell(label, boldLabel || label.startsWith('Alternative'), undefined, premLabelW),
           premCell(amount, true, undefined, premAmtW)
         ]
       })
@@ -2558,7 +2593,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           for (const l of lines) {
             rows.push(premRow(l.label || 'Technical Premium', `${formatCurrency(l.tech, wq.premiumCurrency)} per annum`))
           }
-          if (lines.length > 1) rows.push(premRow('', '')) // spacer only for multi-line
           rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', '', true))
           for (const l of lines) {
             rows.push(premRow(l.label || 'Payable Premium', `${formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)} per annum`))
@@ -2590,9 +2624,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       if (wq.nonRefundableType) {
         let nrText = ''
         if (wq.nonRefundableType === 'first_instalment') {
-          nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+          nrText = stripHtml(st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.')
         } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
-          nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(wq.nonRefundablePercent!))
+          nrText = stripHtml((st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(wq.nonRefundablePercent!)))
         }
         if (nrText) { premContent.push(np(nrText)); premContent.push(emptyP()) }
       }
@@ -2609,9 +2643,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           if (inst.instalmentNumber === 1 && wq.nonRefundableType) {
             let nrText = ''
             if (wq.nonRefundableType === 'first_instalment') {
-              nrText = st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.'
+              nrText = stripHtml(st(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.')
             } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
-              nrText = (st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(wq.nonRefundablePercent!))
+              nrText = stripHtml((st(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, fmtPct(wq.nonRefundablePercent!)))
             }
             if (nrText) instText += ' \u2014 ' + nrText
           }

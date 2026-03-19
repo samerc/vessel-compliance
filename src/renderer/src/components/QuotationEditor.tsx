@@ -2203,6 +2203,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Warranties</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Select survey warranty conditions from templates. Fill in placeholder values for each selected warranty.</p>
 
             {allWarranties.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '16px' }}>No warranties defined. Add them in Settings.</p>}
 
@@ -2672,6 +2673,7 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Deductibles</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Configure deductible amounts and text deductibles. Each deductible can be scoped to a specific alternative.</p>
 
             {/* Add from settings dropdown */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
@@ -3010,6 +3012,7 @@ function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPI
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Exclusions</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Select exclusions for this quotation. If an exclusion applies to multiple alternatives, select it separately for each alternative.</p>
 
             {hiddenCargoCount > 0 && (
                 <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(255, 180, 0, 0.08)', border: '1px solid rgba(255, 180, 0, 0.3)', marginBottom: '12px', fontSize: '0.82rem', color: '#ffb400', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3401,6 +3404,7 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
                     </button>
                 </div>
             </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Add subjectivities that must be met for this quotation to be valid.</p>
 
             {/* Master picker dropdown */}
             {showMasterPicker && availableMasters.length > 0 && (
@@ -4018,6 +4022,7 @@ function InformationTab({ quotation, updateField, setQ, showSuccess }: { quotati
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Information</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Add additional information items and validity period for this quotation.</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', maxWidth: '300px' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Validity (days):</span>
                 <input type="number" value={quotation.validityDays} onChange={e => { setQ(p => ({ ...p, validityDays: parseInt(e.target.value) || 14 })) }} onBlur={e => updateField('validityDays', parseInt(e.target.value) || 14)} style={{ width: '80px' }} />
