@@ -55,7 +55,7 @@ export interface BlueCardData {
 // ==================== Blue Card Helpers ====================
 
 const BC_FONT = 'Arial'
-const BC_SIZE = 22 // 11pt
+let BC_SIZE = 20 // 10pt default, configurable via same setting as policy
 
 function bcNoBorders() {
   const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
@@ -506,6 +506,7 @@ export async function exportBlueCardDocx(
   data: BlueCardData,
   cardType: BlueCardType
 ): Promise<void> {
+  await loadPolicyFontSize()
   const children = buildBlueCardPage(data, cardType, true)
 
   const document = new Document({
@@ -541,42 +542,12 @@ export async function exportBlueCardsDocx(
   cardTypes: BlueCardType[]
 ): Promise<void> {
   if (cardTypes.length === 0) return
+  await loadPolicyFontSize()
 
-  // Single card — use single-card naming
-  if (cardTypes.length === 1) {
-    return exportBlueCardDocx(data, cardTypes[0])
+  // Export each card as a separate file
+  for (const cardType of cardTypes) {
+    await exportBlueCardDocx(data, cardType)
   }
-
-  const allChildren: Paragraph[] = []
-  cardTypes.forEach((cardType, idx) => {
-    const isLast = idx === cardTypes.length - 1
-    const pageChildren = buildBlueCardPage(data, cardType, isLast)
-    allChildren.push(...pageChildren)
-  })
-
-  const document = new Document({
-    sections: [{
-      properties: {
-        page: {
-          margin: {
-            top: 1200,
-            bottom: 1000,
-            left: 1200,
-            right: 1200,
-          },
-        },
-      },
-      children: allChildren as any[],
-    }],
-  })
-
-  const blob = await Packer.toBlob(document)
-  const url = URL.createObjectURL(blob)
-  const a = window.document.createElement('a')
-  a.href = url
-  a.download = `${data.policyNumber}-BlueCards.docx`
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 // ==================== Policy Document / Debit Advice / Credit Advice ====================
@@ -1000,7 +971,10 @@ async function loadPolicyFontSize(): Promise<void> {
     const raw = await window.api.getSetting('policy_font_size')
     if (raw) {
       const pt = parseInt(raw, 10)
-      if (pt >= 8 && pt <= 16) POL_FONT_SIZE = pt * 2
+      if (pt >= 8 && pt <= 16) {
+        POL_FONT_SIZE = pt * 2
+        BC_SIZE = pt * 2
+      }
     }
   } catch { /* use default */ }
 }
