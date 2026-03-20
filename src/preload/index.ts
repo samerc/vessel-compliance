@@ -370,6 +370,13 @@ const api = {
   piDeleteTradingWarrantyTemplate: (id: string) => ipcRenderer.invoke('pi:deleteTradingWarrantyTemplate', id),
   piReorderTradingWarrantyTemplates: (ids: string[]) => ipcRenderer.invoke('pi:reorderTradingWarrantyTemplates', ids),
 
+  // Trading Custom Texts
+  piGetTradingCustomTexts: () => ipcRenderer.invoke('pi:getTradingCustomTexts'),
+  piAddTradingCustomText: (name: string, text: string) => ipcRenderer.invoke('pi:addTradingCustomText', name, text),
+  piUpdateTradingCustomText: (id: string, updates: any) => ipcRenderer.invoke('pi:updateTradingCustomText', id, updates),
+  piDeleteTradingCustomText: (id: string) => ipcRenderer.invoke('pi:deleteTradingCustomText', id),
+  piReorderTradingCustomTexts: (ids: string[]) => ipcRenderer.invoke('pi:reorderTradingCustomTexts', ids),
+
   // Premium Text Templates (NCB / UPCC)
   premiumGetTextTemplates: (type?: string) => ipcRenderer.invoke('premium:getTextTemplates', type),
   premiumAddTextTemplate: (data: { name: string; text: string; type: string }) => ipcRenderer.invoke('premium:addTextTemplate', data),

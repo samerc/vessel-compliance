@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -640,6 +640,12 @@ export class MySQLAdapter {
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_show_ddq_warranties BOOLEAN DEFAULT TRUE')
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_show_israel BOOLEAN DEFAULT TRUE')
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_custom_text TEXT NULL')
+            }
+            // Migration: Add trading_custom_mode + trading_custom_wording
+            const [tCustModeCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'trading_custom_mode'")
+            if ((tCustModeCol as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_custom_mode BOOLEAN DEFAULT FALSE')
+                await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_custom_wording TEXT NULL')
             }
             // Migration: Add co_name to quotations
             const [qCoNameCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'co_name'")
@@ -5285,6 +5291,49 @@ export class MySQLAdapter {
         }
     }
 
+    // ==================== Trading Custom Texts ====================
+
+    async getTradingCustomTexts(): Promise<TradingCustomText[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, text, order_index AS `order` FROM trading_custom_texts ORDER BY order_index ASC')
+        return rows as TradingCustomText[]
+    }
+
+    async addTradingCustomText(name: string, text: string): Promise<TradingCustomText> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM trading_custom_texts')
+        const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+        await this.pool.execute(
+            'INSERT INTO trading_custom_texts (id, name, text, order_index) VALUES (?, ?, ?, ?)',
+            [id, name, text, nextOrder]
+        )
+        return { id, name, text, order: nextOrder }
+    }
+
+    async updateTradingCustomText(id: string, updates: Partial<{ name: string; text: string }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE trading_custom_texts SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteTradingCustomText(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM trading_custom_texts WHERE id = ?', [id])
+    }
+
+    async reorderTradingCustomTexts(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE trading_custom_texts SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
     // ==================== Premium Text Templates (NCB / UPCC) ====================
 
     async getPremiumTextTemplates(type?: string): Promise<PremiumTextTemplate[]> {
@@ -5437,6 +5486,8 @@ export class MySQLAdapter {
                 q.trading_show_ddq_warranties as tradingShowDdqWarranties,
                 q.trading_show_israel as tradingShowIsrael,
                 q.trading_custom_text as tradingCustomText,
+                q.trading_custom_mode as tradingCustomMode,
+                q.trading_custom_wording as tradingCustomWording,
                 q.sanctions_clause_version as sanctionsClauseVersion,
                 q.vdr_deductible_enabled as vdrDeductibleEnabled,
                 q.deductible_aggregate_enabled as deductibleAggregateEnabled,
@@ -5472,6 +5523,7 @@ export class MySQLAdapter {
             tradingShowDdqList: r.tradingShowDdqList == null ? true : Boolean(r.tradingShowDdqList),
             tradingShowDdqWarranties: r.tradingShowDdqWarranties == null ? true : Boolean(r.tradingShowDdqWarranties),
             tradingShowIsrael: r.tradingShowIsrael == null ? true : Boolean(r.tradingShowIsrael),
+            tradingCustomMode: Boolean(r.tradingCustomMode),
             limitOfLiabilityAmount: r.limitOfLiabilityAmount ? Number(r.limitOfLiabilityAmount) : undefined,
             premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
             ncbDiscountType: r.ncbDiscountType || 'percentage',
@@ -5532,6 +5584,7 @@ export class MySQLAdapter {
             numInstalments: 'num_instalments', tradingWarrantyIntro: 'trading_warranty_intro',
             tradingShowDdqList: 'trading_show_ddq_list', tradingShowDdqWarranties: 'trading_show_ddq_warranties',
             tradingShowIsrael: 'trading_show_israel', tradingCustomText: 'trading_custom_text',
+            tradingCustomMode: 'trading_custom_mode', tradingCustomWording: 'trading_custom_wording',
             sanctionsClauseVersion: 'sanctions_clause_version', vdrDeductibleEnabled: 'vdr_deductible_enabled',
             deductibleAggregateEnabled: 'deductible_aggregate_enabled', deductibleAggregateText: 'deductible_aggregate_text', validityDays: 'validity_days',
             premiumAdditionalText: 'premium_additional_text',

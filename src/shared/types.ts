@@ -716,6 +716,13 @@ export interface TradingWarrantyTemplate {
   order: number
 }
 
+export interface TradingCustomText {
+  id: string
+  name: string
+  text: string
+  order: number
+}
+
 export interface PremiumTextTemplate {
   id: string
   name: string
@@ -939,6 +946,8 @@ export interface Quotation {
   tradingShowDdqWarranties: boolean
   tradingShowIsrael: boolean
   tradingCustomText?: string
+  tradingCustomMode?: boolean
+  tradingCustomWording?: string | null
   sanctionsClauseVersion: string
   vdrDeductibleEnabled: boolean
   deductibleAggregateEnabled: boolean

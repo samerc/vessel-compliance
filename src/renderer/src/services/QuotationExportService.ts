@@ -999,37 +999,43 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     if (q.tradingWarrantyIntro) {
       tradingText += stripHtml(q.tradingWarrantyIntro) + '\n\n'
     }
-    if (q.tradingCustomText) {
-      tradingText += stripHtml(q.tradingCustomText) + '\n\n'
-    }
-    if (excCountries.length > 0) {
-      tradingText += 'Excluding ' + excCountries.map(c => c.name).join(', ') + '.\n\n'
-    }
-    let sectionNum = 1
-    if (q.tradingShowDdqList && ddqCountries.length > 0) {
-      const ddqIntro = stripHtml(st(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
-      const hasPh = ddqIntro.includes('{ddq_countries}')
-      if (hasPh) {
-        tradingText += sectionNum + ') ' + ddqIntro.replace(/\{ddq_countries\}/g, ddqListStr) + '\n\n'
-      } else {
-        tradingText += sectionNum + ') ' + ddqIntro + '\n\tExcluding ' + ddqListStr + '.\n\n'
+    if (q.tradingCustomMode && q.tradingCustomWording) {
+      // Custom mode: output custom wording instead of numbered paragraphs
+      tradingText += stripHtml(q.tradingCustomWording) + '\n\n'
+    } else {
+      // Standard mode: numbered paragraphs
+      if (q.tradingCustomText) {
+        tradingText += stripHtml(q.tradingCustomText) + '\n\n'
       }
-      sectionNum++
-    }
-    if (q.tradingShowDdqWarranties) {
-      const intro = st(data, 'tradingConditionA')
-      if (intro) tradingText += sectionNum + ') ' + stripHtml(intro) + '\n\n'
-      sectionNum++
-      const condKeys: (keyof PISectionTexts)[] = ['tradingConditionB', 'tradingConditionC', 'tradingConditionD', 'tradingConditionE', 'tradingConditionF', 'tradingConditionG']
-      const labels = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)']
-      for (let i = 0; i < condKeys.length; i++) {
-        const txt = st(data, condKeys[i])
-        if (txt) tradingText += '   ' + labels[i] + ' ' + stripHtml(txt) + '\n'
+      if (excCountries.length > 0) {
+        tradingText += 'Excluding ' + excCountries.map(c => c.name).join(', ') + '.\n\n'
       }
-      tradingText += '\n'
-    }
-    if (q.tradingShowIsrael && st(data, 'tradingIsrael')) {
-      tradingText += '\n' + sectionNum + ') ' + stripHtml(st(data, 'tradingIsrael')) + '\n\n'
+      let sectionNum = 1
+      if (q.tradingShowDdqList && ddqCountries.length > 0) {
+        const ddqIntro = stripHtml(st(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
+        const hasPh = ddqIntro.includes('{ddq_countries}')
+        if (hasPh) {
+          tradingText += sectionNum + ') ' + ddqIntro.replace(/\{ddq_countries\}/g, ddqListStr) + '\n\n'
+        } else {
+          tradingText += sectionNum + ') ' + ddqIntro + '\n\tExcluding ' + ddqListStr + '.\n\n'
+        }
+        sectionNum++
+      }
+      if (q.tradingShowDdqWarranties) {
+        const intro = st(data, 'tradingConditionA')
+        if (intro) tradingText += sectionNum + ') ' + stripHtml(intro) + '\n\n'
+        sectionNum++
+        const condKeys: (keyof PISectionTexts)[] = ['tradingConditionB', 'tradingConditionC', 'tradingConditionD', 'tradingConditionE', 'tradingConditionF', 'tradingConditionG']
+        const labels = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)']
+        for (let i = 0; i < condKeys.length; i++) {
+          const txt = st(data, condKeys[i])
+          if (txt) tradingText += '   ' + labels[i] + ' ' + stripHtml(txt) + '\n'
+        }
+        tradingText += '\n'
+      }
+      if (q.tradingShowIsrael && st(data, 'tradingIsrael')) {
+        tradingText += '\n' + sectionNum + ') ' + stripHtml(st(data, 'tradingIsrael')) + '\n\n'
+      }
     }
     if (tradingText.trim()) {
       sectionMap.set('trading', ['Trading Warranty', tradingText.trim()])
@@ -2228,46 +2234,53 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
     })
     if (wq.tradingWarrantyIntro) tradContent.push(...mp(wq.tradingWarrantyIntro))
-    if (wq.tradingCustomText) {
+    if (wq.tradingCustomMode && wq.tradingCustomWording) {
+      // Custom mode: output custom wording instead of numbered paragraphs
       tradContent.push(emptyP())
-      tradContent.push(...mp(wq.tradingCustomText))
-    }
-    if (wExcCountries.length > 0) {
-      tradContent.push(emptyP())
-      tradContent.push(np('Excluding ' + wExcCountries.map(c => c.name).join(', ') + '.'))
-    }
-    if (wq.tradingShowDdqList && ddqCountries.length > 0) {
-      let ddqIntroText = stripHtml(st(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
-      const hasPh = ddqIntroText.includes('{ddq_countries}')
-      if (hasPh) {
-        ddqIntroText = ddqIntroText.replace(/\{ddq_countries\}/g, wDdqListStr)
+      tradContent.push(...mp(wq.tradingCustomWording))
+    } else {
+      // Standard mode: numbered paragraphs
+      if (wq.tradingCustomText) {
         tradContent.push(emptyP())
-        tradContent.push(numP(ddqIntroText, 0))
-      } else {
+        tradContent.push(...mp(wq.tradingCustomText))
+      }
+      if (wExcCountries.length > 0) {
         tradContent.push(emptyP())
-        tradContent.push(numP(ddqIntroText, 0))
-        tradContent.push(new Paragraph({
-          spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-          indent: { left: 720 },
-          children: [new TextRun({ text: 'Excluding ' + wDdqListStr + '.', size: 22, font: 'Arial', color: '000000' })]
-        }))
+        tradContent.push(np('Excluding ' + wExcCountries.map(c => c.name).join(', ') + '.'))
       }
-    }
-    if (wq.tradingShowDdqWarranties) {
-      const intro = st(data, 'tradingConditionA')
-      if (intro) tradContent.push(numP(stripHtml(intro), 0))
-      const condKeys: (keyof PISectionTexts)[] = ['tradingConditionB', 'tradingConditionC', 'tradingConditionD', 'tradingConditionE', 'tradingConditionF', 'tradingConditionG']
-      for (const key of condKeys) {
-        const txt = st(data, key)
-        if (txt) tradContent.push(new Paragraph({
-          numbering: { reference: 'trading-numbered', level: 1 },
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-          children: [new TextRun({ text: stripHtml(txt), size: 22, font: 'Arial', color: '000000' })]
-        }))
+      if (wq.tradingShowDdqList && ddqCountries.length > 0) {
+        let ddqIntroText = stripHtml(st(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
+        const hasPh = ddqIntroText.includes('{ddq_countries}')
+        if (hasPh) {
+          ddqIntroText = ddqIntroText.replace(/\{ddq_countries\}/g, wDdqListStr)
+          tradContent.push(emptyP())
+          tradContent.push(numP(ddqIntroText, 0))
+        } else {
+          tradContent.push(emptyP())
+          tradContent.push(numP(ddqIntroText, 0))
+          tradContent.push(new Paragraph({
+            spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+            indent: { left: 720 },
+            children: [new TextRun({ text: 'Excluding ' + wDdqListStr + '.', size: 22, font: 'Arial', color: '000000' })]
+          }))
+        }
       }
-    }
-    if (wq.tradingShowIsrael && st(data, 'tradingIsrael')) {
-      tradContent.push(numP(stripHtml(st(data, 'tradingIsrael')), 0))
+      if (wq.tradingShowDdqWarranties) {
+        const intro = st(data, 'tradingConditionA')
+        if (intro) tradContent.push(numP(stripHtml(intro), 0))
+        const condKeys: (keyof PISectionTexts)[] = ['tradingConditionB', 'tradingConditionC', 'tradingConditionD', 'tradingConditionE', 'tradingConditionF', 'tradingConditionG']
+        for (const key of condKeys) {
+          const txt = st(data, key)
+          if (txt) tradContent.push(new Paragraph({
+            numbering: { reference: 'trading-numbered', level: 1 },
+            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            children: [new TextRun({ text: stripHtml(txt), size: 22, font: 'Arial', color: '000000' })]
+          }))
+        }
+      }
+      if (wq.tradingShowIsrael && st(data, 'tradingIsrael')) {
+        tradContent.push(numP(stripHtml(st(data, 'tradingIsrael')), 0))
+      }
     }
     if (tradContent.length > 0) rowMap.set('trading', makeRow('Trading Warranty', tradContent))
   }

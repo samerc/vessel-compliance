@@ -1995,6 +1995,13 @@ app.whenReady().then(() => {
   safeHandle('pi:deleteTradingWarrantyTemplate', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteTradingWarrantyTemplate(id) })
   safeHandle('pi:reorderTradingWarrantyTemplates', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderTradingWarrantyTemplates(ids) })
 
+  // Trading Custom Texts
+  safeHandle('pi:getTradingCustomTexts', (event) => { requireSession(event); return db.getTradingCustomTexts() })
+  safeHandle('pi:addTradingCustomText', async (event, name, text) => { await requirePermission(event, 'quotations:settings'); return db.addTradingCustomText(name, text) })
+  safeHandle('pi:updateTradingCustomText', async (event, id, updates) => { await requirePermission(event, 'quotations:settings'); return db.updateTradingCustomText(id, updates) })
+  safeHandle('pi:deleteTradingCustomText', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteTradingCustomText(id) })
+  safeHandle('pi:reorderTradingCustomTexts', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderTradingCustomTexts(ids) })
+
   // Premium Text Templates (NCB / UPCC)
   safeHandle('premium:getTextTemplates', (event, type) => { requireSession(event); return db.getPremiumTextTemplates(type) })
   safeHandle('premium:addTextTemplate', async (event, data) => { await requirePermission(event, 'quotations:settings'); return db.addPremiumTextTemplate(data) })

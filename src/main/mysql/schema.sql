@@ -286,6 +286,15 @@ CREATE TABLE IF NOT EXISTS trading_warranty_templates (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Trading Custom Texts (replaces standard paragraphs)
+CREATE TABLE IF NOT EXISTS trading_custom_texts (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  text TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Premium Text Templates (NCB / UPCC)
 CREATE TABLE IF NOT EXISTS premium_text_templates (
   id VARCHAR(36) PRIMARY KEY,

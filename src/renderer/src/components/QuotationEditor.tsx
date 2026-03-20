@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList, ClipboardCheck } from 'lucide-react'
-import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty } from '../../../shared/types'
+import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -1820,6 +1820,7 @@ function PeriodTab({ quotation, updateField, setQ }: { quotation: Quotation; upd
 function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [countries, setCountries] = useState<QuotationExcludedCountry[]>([])
     const [templates, setTemplates] = useState<TradingWarrantyTemplate[]>([])
+    const [customTexts, setCustomTexts] = useState<TradingCustomText[]>([])
     const initRef = useRef(false)
     const [newCountryName, setNewCountryName] = useState('')
     const [newCountryType, setNewCountryType] = useState<'excluded' | 'ddq'>('excluded')
@@ -1827,11 +1828,13 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [qc, masterCountries, tpls] = await Promise.all([
+        const [qc, masterCountries, tpls, custTexts] = await Promise.all([
             window.api.getQuotationExcludedCountries(quotation.id),
             window.api.piGetTradingExcludedCountries(),
-            window.api.piGetTradingWarrantyTemplates()
+            window.api.piGetTradingWarrantyTemplates(),
+            window.api.piGetTradingCustomTexts()
         ])
+        setCustomTexts(Array.isArray(custTexts) ? custTexts : [])
         setTemplates(Array.isArray(tpls) ? tpls : [])
         // Deduplicate by name+listType (legacy data may have duplicates)
         const seen = new Set<string>()
@@ -1893,6 +1896,55 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                 Configure trading warranties including excluded countries and DDQ requirements.
             </p>
 
+            {/* Custom Mode Toggle */}
+            <div style={{ ...sectionStyle, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                    type="checkbox"
+                    checked={!!quotation.tradingCustomMode}
+                    onChange={e => { toggle('tradingCustomMode', e.target.checked) }}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+                />
+                <div>
+                    <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Use custom wording</span>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                        Replaces standard numbered paragraphs (excluded countries, DDQ, Israel) with custom text
+                    </p>
+                </div>
+            </div>
+
+            {quotation.tradingCustomMode && (
+                <div style={sectionStyle}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Custom Trading Wording</label>
+                    {customTexts.length > 0 && (
+                        <div style={{ marginBottom: '10px' }}>
+                            <select
+                                value=""
+                                onChange={e => {
+                                    const ct = customTexts.find(t => t.id === e.target.value)
+                                    if (ct) {
+                                        setQ(p => ({ ...p, tradingCustomWording: ct.text }))
+                                        updateField('tradingCustomWording', ct.text)
+                                    }
+                                }}
+                                style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
+                            >
+                                <option value="">Load from template...</option>
+                                {customTexts.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <RichTextEditor
+                        value={quotation.tradingCustomWording || ''}
+                        onChange={val => { setQ(p => ({ ...p, tradingCustomWording: val })); updateField('tradingCustomWording', val) }}
+                        placeholder="Enter custom trading warranty wording..."
+                        minHeight={100}
+                        showFontSize showAlignment showLineSpacing
+                    />
+                </div>
+            )}
+
             {/* Section A: Trading Warranty Text (per-quotation) */}
             <div style={sectionStyle}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Trading Warranty Text</label>
@@ -1925,6 +1977,7 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                 />
             </div>
 
+            {!quotation.tradingCustomMode && <>
             {/* Section B: DDQ Countries List */}
             <div style={sectionStyle}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', marginBottom: '10px' }}>
@@ -2042,6 +2095,7 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                     ))}
                 </div>
             </div>
+            </>}
         </div>
     )
 }

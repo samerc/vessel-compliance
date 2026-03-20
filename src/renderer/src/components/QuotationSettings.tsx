@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, QuotationTypeScope, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet } from '../../../shared/types'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, QuotationTypeScope, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,7 +9,7 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'premiumTexts' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings' | 'surveyWarrantyTemplates'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'premiumTexts' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings' | 'surveyWarrantyTemplates' | 'tradingCustomTexts'
 
 type SettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -27,6 +27,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
         { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
         { id: 'tradingWarrantyTemplates', label: 'Trading Templates', icon: <FileText size={15} /> },
+        { id: 'tradingCustomTexts', label: 'Trading Custom', icon: <FileText size={15} /> },
         { id: 'sanctionsVersions', label: 'Sanctions Versions', icon: <Shield size={15} /> },
         { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
         { id: 'premiumTexts', label: 'NCB / UPCC', icon: <DollarSign size={15} /> },
@@ -149,6 +150,7 @@ export default function QuotationSettings() {
             {activeTab === 'tradingCountries' && <TradingCountriesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'tradingWarranty' && <TradingWarrantyTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'tradingWarrantyTemplates' && <TradingWarrantyTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'tradingCustomTexts' && <TradingCustomTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'premiumTexts' && <PremiumTextTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'sanctionsVersions' && <SanctionsVersionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'standardTexts' && <StandardTextsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
@@ -2128,6 +2130,129 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
                     )}
                 </div>
             ))}
+        </section>
+    )
+}
+
+// ==================== Trading Custom Texts Tab ====================
+
+function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
+    const [items, setItems] = useState<TradingCustomText[]>([])
+    const [newName, setNewName] = useState('')
+    const [newText, setNewText] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editText, setEditText] = useState('')
+    const [showAdd, setShowAdd] = useState(false)
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+
+    useEffect(() => { loadData() }, [])
+
+    const loadData = async () => {
+        const res = await window.api.piGetTradingCustomTexts()
+        setItems(Array.isArray(res) ? res : [])
+    }
+
+    const handleAdd = async () => {
+        if (!newName.trim()) return
+        try {
+            await window.api.piAddTradingCustomText(newName.trim(), newText)
+            setNewName(''); setNewText(''); setShowAdd(false)
+            showSuccess('Custom text added')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add') }
+    }
+
+    const handleUpdate = async () => {
+        if (!editingId || !editName.trim()) return
+        try {
+            await window.api.piUpdateTradingCustomText(editingId, { name: editName.trim(), text: editText })
+            setEditingId(null)
+            showSuccess('Custom text updated')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to update') }
+    }
+
+    const handleDelete = async (id: string) => {
+        try {
+            await window.api.piDeleteTradingCustomText(id)
+            showSuccess('Custom text deleted')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to delete') }
+    }
+
+    const move = async (idx: number, dir: -1 | 1) => {
+        const newIdx = idx + dir
+        if (newIdx < 0 || newIdx >= items.length) return
+        const reordered = [...items]
+        ;[reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]]
+        setItems(reordered)
+        await window.api.piReorderTradingCustomTexts(reordered.map(t => t.id))
+    }
+
+    const startEdit = (t: TradingCustomText) => {
+        setEditingId(t.id); setEditName(t.name); setEditText(t.text)
+    }
+
+    return (
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Trading Custom Texts</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Custom wordings that replace the standard numbered paragraphs (excluded countries, DDQ, Israel). Used for tankers or other vessel types with non-standard trading clauses.</p>
+                </div>
+                <button onClick={() => { setShowAdd(!showAdd); setEditingId(null) }} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                    <Plus size={14} /> Add Custom Text
+                </button>
+            </div>
+
+            {showAdd && (
+                <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0,170,200,0.06)', marginBottom: '16px' }}>
+                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Template name (e.g. Tanker Trading)" style={{ width: '100%', marginBottom: '8px' }} />
+                    <RichTextEditor value={newText} onChange={setNewText} />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button onClick={handleAdd} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save</button>
+                        <button onClick={() => { setShowAdd(false); setNewName(''); setNewText('') }} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {items.map((t, idx) => (
+                <div key={t.id} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)' }}>
+                    {editingId === t.id ? (
+                        <>
+                            <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', marginBottom: '8px' }} />
+                            <RichTextEditor value={editText} onChange={setEditText} />
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.82rem' }}>Save</button>
+                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <button onClick={() => move(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>{t.name}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxHeight: '40px', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: t.text }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                                <button onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}><Pencil size={14} /></button>
+                                <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ))}
+
+            {items.length === 0 && !showAdd && (
+                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    No custom texts created yet. Add one to replace standard trading paragraphs for specific vessel types.
+                </div>
+            )}
         </section>
     )
 }
