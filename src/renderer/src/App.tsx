@@ -340,7 +340,7 @@ function App(): React.JSX.Element {
           {activeTab === 'surveys' && <Suspense fallback={<LoadingFallback />}><ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'survey-followup' && <Suspense fallback={<LoadingFallback />}><SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators /></Suspense>}
-          {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager /></Suspense>}
+          {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager onNavigateToPolicy={(policyId) => { setSelectedPolicyId(policyId); setActiveTab('policy-detail') }} /></Suspense>}
           {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}

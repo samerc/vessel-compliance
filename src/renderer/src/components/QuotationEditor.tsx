@@ -133,9 +133,10 @@ interface QuotationEditorProps {
     quotation: Quotation
     onBack: () => void
     onOpenQuotation?: (quotation: Quotation) => void
+    onNavigateToPolicy?: (policyId: string) => void
 }
 
-export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: QuotationEditorProps) {
+export default function QuotationEditor({ quotation, onBack, onOpenQuotation, onNavigateToPolicy }: QuotationEditorProps) {
     const [activeTab, setActiveTab] = useState<EditorTab>('vessel')
     const [q, setQ] = useState<Quotation>(quotation)
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
@@ -664,7 +665,10 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
             {showConvertModal && (
                 <ConvertToPolicyModal
                     quotation={q}
-                    onClose={() => setShowConvertModal(false)}
+                    onClose={(policyId) => {
+                        setShowConvertModal(false)
+                        if (policyId && onNavigateToPolicy) onNavigateToPolicy(policyId)
+                    }}
                     showSuccess={showSuccess}
                     showError={showError}
                     isLight={isLight}
@@ -678,16 +682,20 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
 
 const TIMEZONE_OPTIONS = [
     'Lebanon Standard Time',
+    'Lebanon Local Standard Time',
     'GMT',
     'UTC',
     'CET',
+    'EET',
     'EST',
-    'PST'
+    'PST',
+    'GST',
+    'IST'
 ]
 
 function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLight }: {
     quotation: Quotation
-    onClose: () => void
+    onClose: (createdPolicyId?: string) => void
     showSuccess: (m: string) => void
     showError: (m: string) => void
     isLight: boolean
@@ -901,7 +909,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             }
             const policies = Array.isArray(result) ? result : []
             showSuccess(`${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} created successfully`)
-            onClose()
+            onClose(policies[0]?.id)
         } catch (err: any) {
             showError(err.message || 'Failed to convert to policy')
         } finally {
@@ -922,7 +930,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
     }
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => onClose()}>
             <div style={{
                 background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '28px',
                 width: '600px', maxWidth: '95vw', maxHeight: '80vh', overflowY: 'auto',
@@ -933,7 +941,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                     <h3 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <FileText size={20} color="var(--accent-primary)" /> Convert to Policy
                     </h3>
-                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+                    <button onClick={() => onClose()} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
                 </div>
 
                 {loading ? (
@@ -1033,9 +1041,17 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                             </div>
                             <div>
                                 <label style={labelStyle}>Timezone</label>
-                                <select value={timezone} onChange={e => setTimezone(e.target.value)} style={inputStyle}>
-                                    {TIMEZONE_OPTIONS.map(tz => <option key={tz} value={tz}>{tz}</option>)}
-                                </select>
+                                <input
+                                    type="text"
+                                    list="tz-options"
+                                    value={timezone}
+                                    onChange={e => setTimezone(e.target.value)}
+                                    style={inputStyle}
+                                    placeholder="Type or select..."
+                                />
+                                <datalist id="tz-options">
+                                    {TIMEZONE_OPTIONS.map(tz => <option key={tz} value={tz} />)}
+                                </datalist>
                             </div>
                         </div>
 
@@ -1165,7 +1181,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
 
                         {/* Create Policies button */}
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
-                            <button onClick={onClose} className="btn-secondary" style={{ padding: '8px 20px' }}>Cancel</button>
+                            <button onClick={() => onClose()} className="btn-secondary" style={{ padding: '8px 20px' }}>Cancel</button>
                             <button
                                 onClick={handleConvert}
                                 disabled={converting || !inceptionDate || !expiryDate || selectedVesselIds.length === 0}

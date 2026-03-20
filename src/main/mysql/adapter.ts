@@ -7378,13 +7378,15 @@ export class MySQLAdapter {
         // Get quotation type code for policy number generation
         const typeCode = quotation.quotationTypeCode || 'P'
 
-        // Generate policy numbers: type + inverted year + serial
-        const year = new Date().getFullYear()
-        const invertedYear = String(year).split('').reverse().join('').slice(0, 4)
+        // Generate policy numbers: type + inverted year (swap pairs) + 4-digit serial
+        // 2026 → swap "20" and "26" → "2620"
+        const yearStr = String(new Date().getFullYear())
+        const invertedYear = yearStr.slice(2) + yearStr.slice(0, 2)
 
         // Get next serial number (global across all types)
+        // Policy number format: {type}{4-digit year}{4-digit serial} = 9 chars min
         const [serialRow] = await this.pool.query(
-            'SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 5) AS UNSIGNED)), 0) + 1 as nextSerial FROM policy_documents'
+            'SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 6) AS UNSIGNED)), 0) + 1 as nextSerial FROM policy_documents'
         )
         let nextSerial = (serialRow as any[])[0]?.nextSerial || 1
 

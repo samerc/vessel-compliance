@@ -8,7 +8,7 @@ import QuotationEditor from './QuotationEditor'
 
 type QuotationView = 'list' | 'settings' | 'editor'
 
-export default function QuotationManager() {
+export default function QuotationManager({ onNavigateToPolicy }: { onNavigateToPolicy?: (policyId: string) => void }) {
     const { hasPermission } = useAuth()
     const canSettings = hasPermission('quotations:settings')
     const [view, setView] = useState<QuotationView>('list')
@@ -81,7 +81,7 @@ export default function QuotationManager() {
             {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} />}
             {view === 'settings' && canSettings && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
-                <QuotationEditor quotation={editingQuotation} onBack={handleBackToList} onOpenQuotation={handleOpenEditor} />
+                <QuotationEditor quotation={editingQuotation} onBack={handleBackToList} onOpenQuotation={handleOpenEditor} onNavigateToPolicy={onNavigateToPolicy} />
             )}
         </div>
     )
