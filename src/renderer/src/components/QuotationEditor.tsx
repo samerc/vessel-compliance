@@ -1912,6 +1912,38 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                 </div>
             </div>
 
+            {/* Section A: Trading Warranty Text (per-quotation) */}
+            <div style={sectionStyle}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Trading Warranty Text</label>
+                {templates.length > 0 && (
+                    <div style={{ marginBottom: '10px' }}>
+                        <select
+                            value=""
+                            onChange={e => {
+                                const tpl = templates.find(t => t.id === e.target.value)
+                                if (tpl) {
+                                    setQ(p => ({ ...p, tradingWarrantyIntro: tpl.text }))
+                                    updateField('tradingWarrantyIntro', tpl.text)
+                                }
+                            }}
+                            style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
+                        >
+                            <option value="">Load from template...</option>
+                            {templates.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                <RichTextEditor
+                    value={quotation.tradingWarrantyIntro || ''}
+                    onChange={val => { setQ(p => ({ ...p, tradingWarrantyIntro: val })); updateField('tradingWarrantyIntro', val) }}
+                    placeholder="Enter the trading warranty text..."
+                    minHeight={80}
+                    showFontSize showAlignment showLineSpacing
+                />
+            </div>
+
             {quotation.tradingCustomMode && (
                 <div style={sectionStyle}>
                     <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Custom Trading Wording</label>
@@ -1944,38 +1976,6 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                     />
                 </div>
             )}
-
-            {/* Section A: Trading Warranty Text (per-quotation) */}
-            <div style={sectionStyle}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Trading Warranty Text</label>
-                {templates.length > 0 && (
-                    <div style={{ marginBottom: '10px' }}>
-                        <select
-                            value=""
-                            onChange={e => {
-                                const tpl = templates.find(t => t.id === e.target.value)
-                                if (tpl) {
-                                    setQ(p => ({ ...p, tradingWarrantyIntro: tpl.text }))
-                                    updateField('tradingWarrantyIntro', tpl.text)
-                                }
-                            }}
-                            style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
-                        >
-                            <option value="">Load from template...</option>
-                            {templates.map(t => (
-                                <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-                <RichTextEditor
-                    value={quotation.tradingWarrantyIntro || ''}
-                    onChange={val => { setQ(p => ({ ...p, tradingWarrantyIntro: val })); updateField('tradingWarrantyIntro', val) }}
-                    placeholder="Enter the trading warranty text..."
-                    minHeight={80}
-                    showFontSize showAlignment showLineSpacing
-                />
-            </div>
 
             {!quotation.tradingCustomMode && <>
             {/* Section B: DDQ Countries List */}
