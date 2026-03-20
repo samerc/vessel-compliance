@@ -837,7 +837,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
         loadAndCalc()
     }, [inceptionDate])
 
-    // Recalculate instalment amounts when premium changes
+    // Recalculate instalment amounts when premium changes (on blur, not on every keystroke)
     const recalcInstalments = (newPremium: number) => {
         setTotalPremium(newPremium)
         const count = instalmentAmounts.length
@@ -848,6 +848,13 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             return perInstalment
         })
         setInstalmentAmounts(amounts)
+    }
+
+    // Recalculate total premium when an instalment amount changes
+    const recalcPremiumFromInstalments = (amounts: number[]) => {
+        setInstalmentAmounts(amounts)
+        const sum = amounts.reduce((s, a) => s + (a || 0), 0)
+        setTotalPremium(Math.round(sum * 100) / 100)
     }
 
     // When alternative changes, update premium
@@ -1041,8 +1048,9 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <input
                                     type="number"
-                                    value={totalPremium || ''}
-                                    onChange={e => recalcInstalments(parseFloat(e.target.value) || 0)}
+                                    defaultValue={totalPremium || ''}
+                                    key={`prem-${totalPremium}`}
+                                    onBlur={e => recalcInstalments(parseFloat(e.target.value) || 0)}
                                     style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
                                     placeholder="Premium amount"
                                 />
@@ -1116,7 +1124,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                                                 onChange={e => {
                                                     const updated = [...instalmentAmounts]
                                                     updated[i] = parseFloat(e.target.value) || 0
-                                                    setInstalmentAmounts(updated)
+                                                    recalcPremiumFromInstalments(updated)
                                                 }}
                                                 placeholder="Amount"
                                                 style={{ ...inputStyle, width: '120px', flex: 'none', textAlign: 'right' }}
