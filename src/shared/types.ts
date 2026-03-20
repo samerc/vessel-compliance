@@ -574,10 +574,11 @@ export interface PIClauseSet {
 export interface PIWarrantyTag {
   id: string
   name: string
+  typeScope: QuotationTypeScope
   order: number
 }
 
-export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'both'
+export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'all'
 
 export interface PIWarranty {
   id: string
@@ -595,6 +596,7 @@ export interface PIWarrantySet {
   warrantyIds?: string[]
   defaultSelected?: boolean
   alternativeScope?: string | null
+  typeScope?: QuotationTypeScope
 }
 
 export interface QuotationCustomWarranty {

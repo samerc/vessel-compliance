@@ -1647,6 +1647,23 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: add type_scope to warranty tags and sets, rename 'both' → 'all'
+            {
+                const [tsCol] = await this.pool.query("SHOW COLUMNS FROM pi_warranty_tags LIKE 'type_scope'") as any[]
+                if ((tsCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE pi_warranty_tags ADD COLUMN type_scope VARCHAR(10) DEFAULT 'all'")
+                }
+                const [ssCol2] = await this.pool.query("SHOW COLUMNS FROM pi_warranty_sets LIKE 'type_scope'") as any[]
+                if ((ssCol2 as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE pi_warranty_sets ADD COLUMN type_scope VARCHAR(10) DEFAULT 'all'")
+                }
+                // Rename 'both' → 'all' across all tables
+                await this.pool.query("UPDATE pi_warranties SET type_scope = 'all' WHERE type_scope = 'both'")
+                await this.pool.query("UPDATE pi_subjectivities SET type_scope = 'all' WHERE type_scope = 'both'")
+                await this.pool.query("UPDATE pi_warranty_tags SET type_scope = 'all' WHERE type_scope = 'both'")
+                await this.pool.query("UPDATE pi_warranty_sets SET type_scope = 'all' WHERE type_scope = 'both'")
+            }
+
             // Migration: Hull IV extension — condition_section, iv_value, iv_currency, iv_premium_amount
             {
                 const [cs1] = await this.pool.query("SHOW COLUMNS FROM hull_clause_conditions LIKE 'condition_section'") as any[]
@@ -4689,12 +4706,12 @@ export class MySQLAdapter {
 
     async getPIWarranties(): Promise<PIWarranty[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query("SELECT id, text, is_cargo_related as isCargoRelated, default_selected as defaultSelected, COALESCE(type_scope, 'both') as typeScope, order_index as `order` FROM pi_warranties ORDER BY order_index ASC")
+        const [rows] = await this.pool.query("SELECT id, text, is_cargo_related as isCargoRelated, default_selected as defaultSelected, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_warranties ORDER BY order_index ASC")
         const warranties = (rows as any[]).map(r => ({
             ...r,
             isCargoRelated: Boolean(r.isCargoRelated),
             defaultSelected: Boolean(r.defaultSelected),
-            typeScope: r.typeScope || 'both',
+            typeScope: r.typeScope || 'all',
             tagIds: [] as string[]
         }))
         // Load tag assignments
@@ -4715,7 +4732,7 @@ export class MySQLAdapter {
         const order = maxRow[0].nextOrder
         await this.pool.execute(
             'INSERT INTO pi_warranties (id, text, is_cargo_related, default_selected, type_scope, order_index) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, warranty.text, warranty.isCargoRelated || false, warranty.defaultSelected || false, warranty.typeScope || 'both', order]
+            [id, warranty.text, warranty.isCargoRelated || false, warranty.defaultSelected || false, warranty.typeScope || 'all', order]
         )
         // Save tag assignments
         if (warranty.tagIds && warranty.tagIds.length > 0) {
@@ -4763,11 +4780,12 @@ export class MySQLAdapter {
 
     async getPIWarrantySets(): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, default_selected as defaultSelected, alternative_scope as alternativeScope FROM pi_warranty_sets ORDER BY name ASC')
+        const [rows] = await this.pool.query("SELECT id, name, default_selected as defaultSelected, alternative_scope as alternativeScope, COALESCE(type_scope, 'all') as typeScope FROM pi_warranty_sets ORDER BY name ASC")
         const sets = rows as any[]
         for (const set of sets) {
             set.defaultSelected = !!set.defaultSelected
             set.alternativeScope = set.alternativeScope || null
+            set.typeScope = set.typeScope || 'all'
             const [items] = await this.pool.query('SELECT warranty_id FROM pi_warranty_set_items WHERE set_id = ?', [set.id])
             set.warrantyIds = (items as any[]).map(i => i.warranty_id)
         }
@@ -6390,7 +6408,7 @@ export class MySQLAdapter {
     async getPISubjectivities(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            "SELECT id, text, COALESCE(type_scope, 'both') as typeScope, order_index as `order` FROM pi_subjectivities ORDER BY order_index ASC")
+            "SELECT id, text, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_subjectivities ORDER BY order_index ASC")
         const subjs = rows as any[]
         // Load doc type links
         for (const s of subjs) {
@@ -6405,14 +6423,14 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute('INSERT INTO pi_subjectivities (id, text, type_scope, order_index) VALUES (?, ?, ?, ?)',
-            [id, data.text, data.typeScope || 'both', data.order || 0])
+            [id, data.text, data.typeScope || 'all', data.order || 0])
         if (data.docTypeIds && data.docTypeIds.length > 0) {
             for (const dtId of data.docTypeIds) {
                 await this.pool.execute('INSERT INTO pi_subjectivity_doc_types (id, subjectivity_id, doc_type_id) VALUES (?, ?, ?)',
                     [uuidv4(), id, dtId])
             }
         }
-        return { id, text: data.text, docTypeIds: data.docTypeIds || [], typeScope: data.typeScope || 'both', order: data.order || 0 }
+        return { id, text: data.text, docTypeIds: data.docTypeIds || [], typeScope: data.typeScope || 'all', order: data.order || 0 }
     }
 
     async updatePISubjectivity(id: string, data: { text: string; docTypeIds?: string[]; typeScope?: string }): Promise<void> {
@@ -6562,8 +6580,8 @@ export class MySQLAdapter {
 
     async getPIWarrantyTags(): Promise<PIWarrantyTag[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, order_index as `order` FROM pi_warranty_tags ORDER BY order_index ASC')
-        return rows as PIWarrantyTag[]
+        const [rows] = await this.pool.query("SELECT id, name, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_warranty_tags ORDER BY order_index ASC")
+        return (rows as any[]).map(r => ({ ...r, typeScope: r.typeScope || 'all' })) as PIWarrantyTag[]
     }
 
     async addPIWarrantyTag(name: string): Promise<PIWarrantyTag> {
@@ -6571,8 +6589,8 @@ export class MySQLAdapter {
         const id = uuidv4()
         const [maxRow]: any[] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_warranty_tags')
         const order = maxRow[0].nextOrder
-        await this.pool.execute('INSERT INTO pi_warranty_tags (id, name, order_index) VALUES (?, ?, ?)', [id, name, order])
-        return { id, name, order }
+        await this.pool.execute("INSERT INTO pi_warranty_tags (id, name, type_scope, order_index) VALUES (?, ?, ?, ?)", [id, name, 'all', order])
+        return { id, name, typeScope: 'all' as const, order }
     }
 
     async updatePIWarrantyTag(id: string, name: string): Promise<void> {

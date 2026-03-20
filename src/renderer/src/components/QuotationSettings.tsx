@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet } from '../../../shared/types'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, QuotationTypeScope, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -32,12 +32,12 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
         { id: 'premiumTexts', label: 'NCB / UPCC', icon: <DollarSign size={15} /> },
         { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
         { id: 'sectionOrder', label: 'Section Order', icon: <List size={15} /> },
+        { id: 'warranties', label: 'Warranties', icon: <Shield size={15} /> },
         { id: 'surveyWarrantyTemplates', label: 'Survey Warranties', icon: <ClipboardCheck size={15} /> },
         { id: 'workflow', label: 'Workflow', icon: <GitBranch size={15} /> },
     ],
     pi: [
         { id: 'clauses', label: 'Conditions', icon: <BookOpen size={15} /> },
-        { id: 'warranties', label: 'Warranties', icon: <Shield size={15} /> },
         { id: 'deductibles', label: 'Deductibles', icon: <Scale size={15} /> },
         { id: 'exclusions', label: 'Exclusions', icon: <AlertTriangle size={15} /> },
         { id: 'subLimits', label: 'Limits of Liability', icon: <FileText size={15} /> },
@@ -651,13 +651,14 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     const [newDefaultSelected, setNewDefaultSelected] = useState(false)
     const [newCargoRelated, setNewCargoRelated] = useState(false)
     const [newTagIds, setNewTagIds] = useState<string[]>([])
-    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
+    const [newTypeScope, setNewTypeScope] = useState<QuotationTypeScope>('all')
+    const [warrantyTypeFilter, setWarrantyTypeFilter] = useState<'show_all' | 'pi' | 'hull' | 'war'>('show_all')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDefaultSelected, setEditDefaultSelected] = useState(false)
     const [editCargoRelated, setEditCargoRelated] = useState(false)
     const [editTagIds, setEditTagIds] = useState<string[]>([])
-    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
+    const [editTypeScope, setEditTypeScope] = useState<QuotationTypeScope>('all')
     // Tag management
     const [newTagName, setNewTagName] = useState('')
     const [editingTagId, setEditingTagId] = useState<string | null>(null)
@@ -689,7 +690,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
         e.preventDefault()
         if (!newText.trim()) return
         await window.api.piAddWarranty({ text: newText, isCargoRelated: newCargoRelated, defaultSelected: newDefaultSelected, tagIds: newTagIds, typeScope: newTypeScope, order: 0 })
-        setNewText(''); setNewDefaultSelected(false); setNewCargoRelated(false); setNewTagIds([]); setNewTypeScope('both')
+        setNewText(''); setNewDefaultSelected(false); setNewCargoRelated(false); setNewTagIds([]); setNewTypeScope('all')
         showSuccess('Warranty added'); loadData()
     }
 
@@ -759,7 +760,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
             .filter(l => l.length > 0)
         if (lines.length === 0) return
         for (const line of lines) {
-            await window.api.piAddWarranty({ text: line, isCargoRelated: false, defaultSelected: false, tagIds: [], typeScope: 'both', order: 0 })
+            await window.api.piAddWarranty({ text: line, isCargoRelated: false, defaultSelected: false, tagIds: [], typeScope: 'all', order: 0 })
         }
         showSuccess(`Imported ${lines.length} warranties`)
         setImportText(''); setShowImport(false); loadData()
@@ -802,6 +803,10 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     }
 
     const ckStyle = { width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }
+
+    const filteredWarranties = warrantyTypeFilter === 'show_all'
+        ? warranties
+        : warranties.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === warrantyTypeFilter)
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -878,7 +883,19 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
             {/* Warranties List */}
             <section className="glass-card" style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <h3 style={{ fontSize: '1rem' }}>P&I Warranties</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <h3 style={{ fontSize: '1rem', margin: 0 }}>Warranties</h3>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                            {(['show_all', 'pi', 'hull', 'war'] as const).map(f => (
+                                <button key={f} onClick={() => setWarrantyTypeFilter(f)} style={{
+                                    padding: '3px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+                                    border: warrantyTypeFilter === f ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                                    background: warrantyTypeFilter === f ? 'rgba(0,170,200,0.12)' : 'transparent',
+                                    color: warrantyTypeFilter === f ? (isLight ? '#007a91' : '#00aac8') : 'var(--text-secondary)'
+                                }}>{f === 'show_all' ? 'All' : f === 'pi' ? 'P&I' : f === 'hull' ? 'Hull' : 'War'}</button>
+                            ))}
+                        </div>
+                    </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => { setBulkMode(!bulkMode); setBulkSelected(new Set()) }} className={bulkMode ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }} title="Select multiple warranties to assign/remove tags, cargo, or default status in bulk"><Tag size={14} /> Bulk Tag</button>
                         <button onClick={() => setShowImport(true)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Upload size={14} /> Import</button>
@@ -925,7 +942,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>Scope:</span>
                             <select value={newTypeScope} onChange={e => setNewTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
-                                <option value="both">Both</option>
+                                <option value="all">All</option>
+                                <option value="war">War</option>
                                 <option value="pi">P&I only</option>
                                 <option value="hull">Hull only</option>
                                 <option value="war">War only</option>
@@ -940,7 +958,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                     </div>
                 </form>
 
-                {warranties.map((w, i) => (
+                {filteredWarranties.map((w, i) => (
                     <div key={w.id} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(w.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(w.id) ? 'rgba(0, 210, 255, 0.04)' : 'transparent' }}>
                         {bulkMode && (
                             <input type="checkbox" checked={bulkSelected.has(w.id)} onChange={() => toggleBulkSelect(w.id)} style={{ ...ckStyle, marginTop: '3px', flexShrink: 0 }} />
@@ -956,7 +974,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                         <input type="checkbox" checked={editCargoRelated} onChange={e => setEditCargoRelated(e.target.checked)} style={ckStyle} /> Cargo
                                     </label>
                                     <select value={editTypeScope} onChange={e => setEditTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
-                                        <option value="both">Both</option>
+                                        <option value="all">All</option>
+                                <option value="war">War</option>
                                         <option value="pi">P&I</option>
                                         <option value="hull">Hull</option>
                                         <option value="war">War</option>
@@ -974,7 +993,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                                         {w.defaultSelected && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864' }}>Default</span>}
                                         {w.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
-                                        {w.typeScope && w.typeScope !== 'both' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: w.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : 'rgba(255, 100, 200, 0.15)', color: w.typeScope === 'pi' ? '#6464ff' : '#ff64c8' }}>{w.typeScope === 'pi' ? 'P&I' : 'Hull'}</span>}
+                                        {w.typeScope && w.typeScope !== 'all' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: w.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : w.typeScope === 'hull' ? 'rgba(255, 100, 200, 0.15)' : 'rgba(255, 176, 32, 0.15)', color: w.typeScope === 'pi' ? '#6464ff' : w.typeScope === 'hull' ? '#ff64c8' : '#ffb020' }}>{w.typeScope === 'pi' ? 'P&I' : w.typeScope === 'hull' ? 'Hull' : 'War'}</span>}
                                         {(w.tagIds || []).map(tid => {
                                             const tag = tags.find(t => t.id === tid)
                                             return tag ? <span key={tid} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
@@ -984,7 +1003,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
                                     <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                     <button onClick={() => handleMove(i, 'down')} disabled={i === warranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === warranties.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                    <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []); setEditTypeScope(w.typeScope || 'both') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []); setEditTypeScope(w.typeScope || 'all') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                     <button onClick={async () => { await window.api.piDeleteWarranty(w.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
                             </>
@@ -2305,11 +2324,11 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newText, setNewText] = useState('')
     const [newDocTypeIds, setNewDocTypeIds] = useState<string[]>([])
-    const [newTypeScope, setNewTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
+    const [newTypeScope, setNewTypeScope] = useState<QuotationTypeScope>('all')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
-    const [editTypeScope, setEditTypeScope] = useState<'pi' | 'hull' | 'war' | 'both'>('both')
+    const [editTypeScope, setEditTypeScope] = useState<QuotationTypeScope>('all')
 
     useEffect(() => { loadData() }, [])
     const ENTITY_DOC_TYPES: DocumentType[] = [
@@ -2332,13 +2351,13 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
         if (!newText.trim()) return
         try {
             await window.api.addPISubjectivity({ text: newText.trim(), docTypeIds: newDocTypeIds, typeScope: newTypeScope, order: items.length })
-            setNewText(''); setNewDocTypeIds([]); setNewTypeScope('both')
+            setNewText(''); setNewDocTypeIds([]); setNewTypeScope('all')
             showSuccess('Subjectivity added'); loadData()
         } catch (err: any) { showError(err.message || 'Failed to add') }
     }
 
     const startEdit = (s: PISubjectivity) => {
-        setEditingId(s.id); setEditText(s.text); setEditDocTypeIds(s.docTypeIds || []); setEditTypeScope(s.typeScope || 'both')
+        setEditingId(s.id); setEditText(s.text); setEditDocTypeIds(s.docTypeIds || []); setEditTypeScope(s.typeScope || 'all')
     }
 
     const handleUpdate = async () => {
@@ -2421,7 +2440,8 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
                                     <select value={editTypeScope} onChange={e => setEditTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
-                                        <option value="both">Both</option>
+                                        <option value="all">All</option>
+                                <option value="war">War</option>
                                         <option value="pi">P&I only</option>
                                         <option value="hull">Hull only</option>
                                 <option value="war">War only</option>
@@ -2444,7 +2464,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                    {s.typeScope && s.typeScope !== 'both' && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: s.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : 'rgba(255, 100, 200, 0.15)', color: s.typeScope === 'pi' ? '#6464ff' : '#ff64c8' }}>{s.typeScope === 'pi' ? 'P&I' : 'Hull'}</span>}
+                                    {s.typeScope && s.typeScope !== 'all' && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: s.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : s.typeScope === 'hull' ? 'rgba(255, 100, 200, 0.15)' : 'rgba(255, 176, 32, 0.15)', color: s.typeScope === 'pi' ? '#6464ff' : s.typeScope === 'hull' ? '#ff64c8' : '#ffb020' }}>{s.typeScope === 'pi' ? 'P&I' : s.typeScope === 'hull' ? 'Hull' : 'War'}</span>}
                                     {(s.docTypeIds || []).map(dtId => {
                                         const dt = docTypes.find(d => d.id === dtId)
                                         return dt ? <span key={dtId} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0, 210, 255, 0.2)' }}>{dt.name}</span> : null

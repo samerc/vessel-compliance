@@ -2100,7 +2100,7 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
 
     // Filter warranties by quotation type scope
     const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
-    const visibleWarranties = allWarranties.filter(w => !w.typeScope || w.typeScope === 'both' || w.typeScope === typeCode)
+    const visibleWarranties = allWarranties.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === typeCode)
 
     const getTabWarranties = () => {
         if (activeTab === 'all') return visibleWarranties
@@ -3216,7 +3216,7 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
         const safeDts = Array.isArray(dts) ? dts : []
         // Filter masters by quotation type scope
         const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
-        const filteredMasters = safeMasters.filter(m => !m.typeScope || m.typeScope === 'both' || m.typeScope === typeCode)
+        const filteredMasters = safeMasters.filter(m => !m.typeScope || m.typeScope === 'all' || m.typeScope === typeCode)
         setItems(safeSubjs)
         setMasterList(filteredMasters)
         setDocTypes(safeDts)
