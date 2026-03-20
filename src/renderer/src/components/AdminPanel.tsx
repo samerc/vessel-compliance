@@ -2117,6 +2117,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     </p>
                     <TimezoneManager />
                 </div>
+
+                <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
+                {/* Total Pages & Footer */}
+                <PolicyExportSettings />
             </section>
             )}
 
@@ -2883,6 +2888,65 @@ function PolicyFontSizeSetting() {
                     {pt}pt
                 </button>
             ))}
+        </div>
+    )
+}
+
+function PolicyExportSettings() {
+    const [totalPages, setTotalPages] = useState(31)
+    const [footerText, setFooterText] = useState('')
+    const [loading, setLoading] = useState(true)
+    const { showSuccess } = useToast()
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const raw = await window.api.getSetting('policyExportSettings')
+                if (raw) {
+                    const parsed = JSON.parse(raw)
+                    if (parsed.totalPages) setTotalPages(parsed.totalPages)
+                    if (parsed.footerText) setFooterText(parsed.footerText)
+                }
+            } catch { /* default */ }
+            finally { setLoading(false) }
+        })()
+    }, [])
+
+    const save = async () => {
+        await window.api.setSetting('policyExportSettings', JSON.stringify({ totalPages, footerText }))
+        showSuccess('Policy export settings saved')
+    }
+
+    if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+    return (
+        <div>
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Page Numbering</h4>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                Total pages including attached terms & conditions. Used in footer &quot;Page X of Y&quot;.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total pages:</label>
+                <input
+                    type="number"
+                    value={totalPages}
+                    onChange={e => setTotalPages(parseInt(e.target.value, 10) || 0)}
+                    min={1}
+                    style={{ width: '80px' }}
+                />
+            </div>
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Footer Text</h4>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                Optional text displayed above the page number in the footer of policy documents.
+            </p>
+            <input
+                type="text"
+                value={footerText}
+                onChange={e => setFooterText(e.target.value)}
+                placeholder="e.g., Confidential — For Insured Use Only"
+                style={{ width: '100%', marginBottom: '12px' }}
+            />
+            <button className="btn-primary" onClick={save} style={{ padding: '6px 20px' }}>Save</button>
         </div>
     )
 }

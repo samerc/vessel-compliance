@@ -1696,7 +1696,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
-            spacing: { before: 60, after: 60 },
+            spacing: { before: 0, after: 0 },
             children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
         }),
@@ -1755,7 +1755,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
 
   // SANCTIONS
   const sanctionsText = polGetSanctionsText(data)
-  if (sanctionsText) rows.push(makeRow('Sanctions', polMp(sanctionsText)))
+  if (sanctionsText) rows.push(makeRow('Sanctions\nClause', polMp(sanctionsText)))
 
   // EXCLUSIONS
   const exclusionsContent: Paragraph[] = []
@@ -1786,7 +1786,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
 
   // PREMIUM PAYMENT
   const premiumContent = polBuildPremiumPaymentSection(data)
-  if (premiumContent.length > 0) rows.push(makeRow('Premium Payment', premiumContent))
+  if (premiumContent.length > 0) rows.push(makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
 
   // Build main table
   const mainTable = new Table({
@@ -1855,26 +1855,55 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     children.push(polNp(cancelText))
   }
 
-  // Build header from section texts
+  // Build header — company details (Times New Roman) + policy number & vessel (Arial)
   const headerHtml = polSt(data, 'docHeader')
   const headerSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
   const headerParas = headerHtml
-    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Arial', color: '666666', lineSpacing: headerSpacing })
+    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing })
     : []
+  // Add policy number + vessel name line
+  const vesselName = data.vesselInfo?.name || ''
+  headerParas.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 40, after: 0 },
+    children: [
+      new TextRun({ text: `${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+      new TextRun({ text: vesselName ? ` — ${vesselName}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
+    ]
+  }))
   const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
 
-  // Build footer with Page X of Y
-  const policyFooter = new Footer({
-    children: [new Paragraph({
+  // Build footer — configurable text + Page X of Y
+  // Load footer settings
+  let footerText = ''
+  let configTotalPages = totalPages
+  try {
+    const settings = await window.api.getSetting('policyExportSettings')
+    if (settings) {
+      const parsed = JSON.parse(settings)
+      if (!configTotalPages && parsed.totalPages) configTotalPages = parsed.totalPages
+      if (parsed.footerText) footerText = parsed.footerText
+    }
+  } catch { /* ignore */ }
+
+  const footerChildren: Paragraph[] = []
+  if (footerText) {
+    footerChildren.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 40, after: 0 },
-      children: [
-        new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
-        new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
-        new TextRun({ text: ` of ${totalPages || ''}`, size: 16, font: 'Arial', color: '999999' })
-      ]
-    })]
-  })
+      spacing: { before: 0, after: 20 },
+      children: [new TextRun({ text: footerText, size: 14, font: 'Arial', color: '999999', italics: true })]
+    }))
+  }
+  footerChildren.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0 },
+    children: [
+      new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
+      new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
+      new TextRun({ text: configTotalPages ? ` of ${configTotalPages}` : '', size: 16, font: 'Arial', color: '999999' })
+    ]
+  }))
+  const policyFooter = new Footer({ children: footerChildren })
 
   const document = new Document({
     numbering: polMakeDocxNumbering(),
