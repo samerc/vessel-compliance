@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
 import { exportPolicyDocx, exportDebitAdviceDocx, exportCreditAdviceDocx, exportBlueCardsDocx } from '../services/PolicyExportService'
+import { getReportSettings } from '../services/ReportSettingsService'
 
 interface PolicyDetailProps {
     policyId: string
@@ -209,6 +210,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
                 return
             }
             const cardTypes = blueCards.map((bc: any) => bc.cardType)
+            const reportSettings = await getReportSettings()
             await exportBlueCardsDocx({
                 policyNumber: policy.policyNumber || '',
                 vesselName: vessel?.name || '',
@@ -219,7 +221,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
                 inceptionTime: '',
                 expiryDate: policyData.expiry?.valueDate || '',
                 expiryTime: '',
-                timezone: 'GMT'
+                timezone: 'GMT',
+                callSign: vessel?.callSign || '',
+                companyName: reportSettings.companyName || 'Insurance Company',
             }, cardTypes)
             showSuccess('Blue cards exported')
         } catch (err: any) {
