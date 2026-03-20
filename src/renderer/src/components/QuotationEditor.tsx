@@ -728,7 +728,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             ])
             const vessels = Array.isArray(qv) ? qv : []
             setQVessels(vessels)
-            setSelectedVesselIds(vessels.map(v => v.id))
+            setSelectedVesselIds(vessels.map(v => v.vesselId || v.id))
             if (Array.isArray(bankData)) setBanks(bankData)
 
             // Calculate instalment dates and amounts from quotation data
@@ -876,13 +876,13 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                                             display: 'flex', alignItems: 'center', gap: '10px',
                                             padding: '8px 12px', borderRadius: '8px',
                                             border: '1px solid var(--input-border)',
-                                            background: selectedVesselIds.includes(v.id) ? 'rgba(0,170,200,0.06)' : 'transparent',
+                                            background: selectedVesselIds.includes(v.vesselId || v.id) ? 'rgba(0,170,200,0.06)' : 'transparent',
                                             cursor: 'pointer', fontSize: '0.88rem'
                                         }}>
                                             <input
                                                 type="checkbox"
-                                                checked={selectedVesselIds.includes(v.id)}
-                                                onChange={() => toggleVessel(v.id)}
+                                                checked={selectedVesselIds.includes(v.vesselId || v.id)}
+                                                onChange={() => toggleVessel(v.vesselId || v.id)}
                                                 style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
                                             />
                                             <span style={{ fontWeight: 600 }}>{v.name || v.vesselLabel}</span>

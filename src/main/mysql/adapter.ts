@@ -7403,8 +7403,10 @@ export class MySQLAdapter {
         const createdPolicies: any[] = []
         const vessels = await this.getQuotationVessels(quotationId)
 
-        for (const vesselId of options.vesselIds) {
-            const vessel = vessels.find(v => v.vesselId === vesselId || v.id === vesselId)
+        for (const vid of options.vesselIds) {
+            const vessel = vessels.find(v => v.vesselId === vid || v.id === vid)
+            // Resolve actual vessel_id (vid might be quotation_vessels junction ID or actual vessel ID)
+            const actualVesselId = vessel?.vesselId || vid
             const policyNumber = typeCode + invertedYear + String(nextSerial).padStart(4, '0')
             const policyId = uuidv4()
 
@@ -7417,7 +7419,7 @@ export class MySQLAdapter {
                     timezone, commission_percent, show_addresses, bank_id, pro_rata,
                     per_annum_premium, premium_amount, created_by)
                 VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?)
-            `, [policyId, quotationId, vesselId, policyNumber,
+            `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
                 premiumAmount, options.createdBy])
@@ -7442,7 +7444,7 @@ export class MySQLAdapter {
                 LEFT JOIN entity_addresses ea ON va.address_id = ea.id
                 WHERE va.vessel_id = ?
                 ORDER BY va.id
-            `, [vesselId])
+            `, [actualVesselId])
             for (const assured of assureds as any[]) {
                 await this.pool.execute(`
                     INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
@@ -7463,7 +7465,7 @@ export class MySQLAdapter {
                 }
             }
 
-            createdPolicies.push({ id: policyId, policyNumber, vesselId })
+            createdPolicies.push({ id: policyId, policyNumber, vesselId: actualVesselId })
             nextSerial++
         }
 
