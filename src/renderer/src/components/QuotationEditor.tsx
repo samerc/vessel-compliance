@@ -837,9 +837,8 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
         loadAndCalc()
     }, [inceptionDate])
 
-    // Recalculate instalment amounts when premium changes (on blur, not on every keystroke)
+    // Recalculate instalment amounts when premium changes (on blur)
     const recalcInstalments = (newPremium: number) => {
-        setTotalPremium(newPremium)
         const count = instalmentAmounts.length
         if (count === 0) return
         const perInstalment = Math.round((newPremium / count) * 100) / 100
@@ -1048,8 +1047,8 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <input
                                     type="number"
-                                    defaultValue={totalPremium || ''}
-                                    key={`prem-${totalPremium}`}
+                                    value={totalPremium || ''}
+                                    onChange={e => setTotalPremium(parseFloat(e.target.value) || 0)}
                                     onBlur={e => recalcInstalments(parseFloat(e.target.value) || 0)}
                                     style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
                                     placeholder="Premium amount"

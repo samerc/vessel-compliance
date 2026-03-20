@@ -54,7 +54,7 @@ export interface BlueCardData {
 
 // ==================== Blue Card Helpers ====================
 
-const BC_FONT = 'Times New Roman'
+const BC_FONT = 'Arial'
 const BC_SIZE = 22 // 11pt
 
 function bcNoBorders() {
@@ -993,7 +993,17 @@ function polGetSanctionsText(data: PolicyExportData): string {
 }
 
 // ---- DOCX paragraph helpers (10pt Arial) ----
-const POL_FONT_SIZE = 20 // 10pt in half-points
+let POL_FONT_SIZE = 20 // 10pt in half-points (configurable via settings)
+
+async function loadPolicyFontSize(): Promise<void> {
+  try {
+    const raw = await window.api.getSetting('policy_font_size')
+    if (raw) {
+      const pt = parseInt(raw, 10)
+      if (pt >= 8 && pt <= 16) POL_FONT_SIZE = pt * 2
+    }
+  } catch { /* use default */ }
+}
 
 function polNp(text: string) {
   return new Paragraph({
@@ -1610,6 +1620,7 @@ function polGetDefaultOpeningClause(typeCode: string): string {
 // ==================== Policy Document Export ====================
 
 export async function exportPolicyDocx(policyId: string): Promise<void> {
+  await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const typeLabel = polGetTypeLabel(typeCode)
@@ -1841,6 +1852,7 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
 // ==================== Debit Advice Export ====================
 
 export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
+  await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeName = data.quotation.quotationTypeName || polGetTypeLabel(data.quotation.quotationTypeCode || 'P')
   const currency = data.quotation.premiumCurrency || 'USD'
@@ -1985,6 +1997,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
 // ==================== Credit Advice Export ====================
 
 export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
+  await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeName = data.quotation.quotationTypeName || polGetTypeLabel(data.quotation.quotationTypeCode || 'P')
   const currency = data.quotation.premiumCurrency || 'USD'

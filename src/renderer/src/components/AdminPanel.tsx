@@ -1081,7 +1081,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin || userSectionAccess.includes('reportSettings') ? [{ id: 'reportSettings', label: 'Report Settings', icon: <FileText size={16} /> }] : []),
         ...(isAdmin ? [
             { id: 'banks', label: 'Banks', icon: <Landmark size={16} />, adminOnly: true },
-            { id: 'timezones', label: 'Timezones', icon: <Clock size={16} />, adminOnly: true },
+            { id: 'policySettings', label: 'Policy Settings', icon: <Clock size={16} />, adminOnly: true },
             { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
@@ -2092,15 +2092,31 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             )}
 
             {/* Timezones */}
-            {effectiveSection === 'timezones' && isAdmin && (
+            {effectiveSection === 'policySettings' && isAdmin && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={20} color="var(--accent-primary)" /> Timezones
+                    <Clock size={20} color="var(--accent-primary)" /> Policy Settings
                 </h3>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                    Manage the list of timezone options available when converting quotations to policies.
-                </p>
-                <TimezoneManager />
+
+                {/* Font Size */}
+                <div style={{ marginBottom: '24px' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Export Font Size</h4>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                        Font size for policy, debit advice, and credit advice documents (in points).
+                    </p>
+                    <PolicyFontSizeSetting />
+                </div>
+
+                <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
+                {/* Timezones */}
+                <div>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Timezones</h4>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                        Timezone options available when converting quotations to policies.
+                    </p>
+                    <TimezoneManager />
+                </div>
             </section>
             )}
 
@@ -2822,6 +2838,51 @@ function TimezoneManager() {
                 ))}
             </div>
             {timezones.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '16px' }}>No timezones configured</p>}
+        </div>
+    )
+}
+
+// ==================== Policy Font Size Setting ====================
+function PolicyFontSizeSetting() {
+    const [fontSize, setFontSize] = useState(10)
+    const [loading, setLoading] = useState(true)
+    const { showSuccess } = useToast()
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const raw = await window.api.getSetting('policy_font_size')
+                if (raw) setFontSize(parseInt(raw, 10) || 10)
+            } catch { /* default */ }
+            finally { setLoading(false) }
+        })()
+    }, [])
+
+    const handleChange = async (pt: number) => {
+        setFontSize(pt)
+        await window.api.setSetting('policy_font_size', String(pt))
+        showSuccess(`Font size set to ${pt}pt`)
+    }
+
+    if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+    return (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {[8, 9, 10, 11, 12].map(pt => (
+                <button
+                    key={pt}
+                    onClick={() => handleChange(pt)}
+                    style={{
+                        padding: '6px 16px', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 600,
+                        border: fontSize === pt ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                        background: fontSize === pt ? 'rgba(0,170,200,0.1)' : 'transparent',
+                        color: fontSize === pt ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                    }}
+                >
+                    {pt}pt
+                </button>
+            ))}
         </div>
     )
 }
