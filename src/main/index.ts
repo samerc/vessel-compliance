@@ -2689,6 +2689,10 @@ app.whenReady().then(() => {
     await db.setSetting(REPORT_SETTINGS_KEY, JSON.stringify(settings))
   })
 
+  // Generic settings get/set
+  safeHandle('settings:get', (event, key) => { requireSession(event); return db.getSetting(key) })
+  safeHandle('settings:set', async (event, key, value) => { await requirePermission(event, 'admin:settings'); return db.setSetting(key, value) })
+
   safeHandle('settings:getUserSectionAccess', async (event) => {
     requireSession(event)
     const raw = await db.getSetting('userSectionAccess')

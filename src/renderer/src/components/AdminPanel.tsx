@@ -1081,6 +1081,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin || userSectionAccess.includes('reportSettings') ? [{ id: 'reportSettings', label: 'Report Settings', icon: <FileText size={16} /> }] : []),
         ...(isAdmin ? [
             { id: 'banks', label: 'Banks', icon: <Landmark size={16} />, adminOnly: true },
+            { id: 'timezones', label: 'Timezones', icon: <Clock size={16} />, adminOnly: true },
             { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
@@ -2090,6 +2091,19 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             </section>
             )}
 
+            {/* Timezones */}
+            {effectiveSection === 'timezones' && isAdmin && (
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={20} color="var(--accent-primary)" /> Timezones
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Manage the list of timezone options available when converting quotations to policies.
+                </p>
+                <TimezoneManager />
+            </section>
+            )}
+
             {/* Backup & Restore */}
             {effectiveSection === 'logRetention' && isAdmin && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
@@ -2726,5 +2740,89 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         </div>
     </div>
 )
+}
+
+// ==================== Timezone Manager ====================
+function TimezoneManager() {
+    const [timezones, setTimezones] = useState<string[]>([])
+    const [newTz, setNewTz] = useState('')
+    const [loading, setLoading] = useState(true)
+    const { showSuccess } = useToast()
+
+    useEffect(() => { loadTimezones() }, [])
+
+    const loadTimezones = async () => {
+        setLoading(true)
+        try {
+            const raw = await window.api.getSetting('policy_timezones')
+            if (raw) {
+                const parsed = JSON.parse(raw)
+                if (Array.isArray(parsed)) setTimezones(parsed)
+            }
+            if (!raw) setTimezones(['Lebanon Standard Time', 'Lebanon Local Standard Time', 'GMT', 'UTC'])
+        } catch { setTimezones(['Lebanon Standard Time', 'GMT', 'UTC']) }
+        finally { setLoading(false) }
+    }
+
+    const save = async (updated: string[]) => {
+        setTimezones(updated)
+        await window.api.setSetting('policy_timezones', JSON.stringify(updated))
+        showSuccess('Timezones saved')
+    }
+
+    const handleAdd = () => {
+        if (!newTz.trim() || timezones.includes(newTz.trim())) return
+        save([...timezones, newTz.trim()])
+        setNewTz('')
+    }
+
+    const handleRemove = (tz: string) => save(timezones.filter(t => t !== tz))
+
+    const handleMove = (idx: number, dir: -1 | 1) => {
+        const newIdx = idx + dir
+        if (newIdx < 0 || newIdx >= timezones.length) return
+        const updated = [...timezones]
+        ;[updated[idx], updated[newIdx]] = [updated[newIdx], updated[idx]]
+        save(updated)
+    }
+
+    if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+    return (
+        <div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <input
+                    type="text"
+                    value={newTz}
+                    onChange={e => setNewTz(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                    placeholder="Add timezone (e.g. Central European Time)"
+                    style={{ flex: 1 }}
+                />
+                <button onClick={handleAdd} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem' }}>
+                    <Plus size={14} /> Add
+                </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {timezones.map((tz, idx) => (
+                    <div key={tz} style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '8px 12px', borderRadius: '6px',
+                        border: '1px solid var(--table-border)',
+                        background: idx === 0 ? 'rgba(0,170,200,0.06)' : 'transparent'
+                    }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
+                            <button onClick={() => handleMove(idx, 1)} disabled={idx === timezones.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === timezones.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
+                        </div>
+                        <span style={{ flex: 1, fontSize: '0.9rem' }}>{tz}</span>
+                        {idx === 0 && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', fontWeight: 600 }}>DEFAULT</span>}
+                        <button onClick={() => handleRemove(tz)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                    </div>
+                ))}
+            </div>
+            {timezones.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '16px' }}>No timezones configured</p>}
+        </div>
+    )
 }
 

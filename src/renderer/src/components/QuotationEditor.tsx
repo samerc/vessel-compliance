@@ -680,17 +680,11 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
 // ==================== Convert to Policy Modal ====================
 
-const TIMEZONE_OPTIONS = [
+const DEFAULT_TIMEZONE_OPTIONS = [
     'Lebanon Standard Time',
     'Lebanon Local Standard Time',
     'GMT',
-    'UTC',
-    'CET',
-    'EET',
-    'EST',
-    'PST',
-    'GST',
-    'IST'
+    'UTC'
 ]
 
 function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLight }: {
@@ -715,6 +709,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
     const [bankId, setBankId] = useState('')
     const [showAddresses, setShowAddresses] = useState(false)
     const [blueCards, setBlueCards] = useState<string[]>([])
+    const [timezoneOptions, setTimezoneOptions] = useState<string[]>(DEFAULT_TIMEZONE_OPTIONS)
     const [piAlts, setPiAlts] = useState<QuotationPIAlternative[]>([])
     const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
     const [selectedAltId, setSelectedAltId] = useState<string>('')
@@ -744,6 +739,15 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             setQVessels(vessels)
             setSelectedVesselIds(vessels.map(v => v.vesselId || v.id))
             if (Array.isArray(bankData)) setBanks(bankData)
+
+            // Load custom timezones from settings
+            try {
+                const tzSetting = await window.api.getSetting('policy_timezones')
+                if (tzSetting) {
+                    const parsed = JSON.parse(tzSetting)
+                    if (Array.isArray(parsed) && parsed.length > 0) setTimezoneOptions(parsed)
+                }
+            } catch { /* use defaults */ }
 
             // Load alternatives
             const safePiAlts = Array.isArray(piAltsRes) ? piAltsRes : []
@@ -1050,7 +1054,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                                     placeholder="Type or select..."
                                 />
                                 <datalist id="tz-options">
-                                    {TIMEZONE_OPTIONS.map(tz => <option key={tz} value={tz} />)}
+                                    {timezoneOptions.map(tz => <option key={tz} value={tz} />)}
                                 </datalist>
                             </div>
                         </div>

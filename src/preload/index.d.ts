@@ -365,6 +365,10 @@ export interface Api {
   piDeleteTradingCustomText: (id: string) => Promise<void>
   piReorderTradingCustomTexts: (ids: string[]) => Promise<void>
 
+  // Generic Settings
+  getSetting: (key: string) => Promise<string | null>
+  setSetting: (key: string, value: string) => Promise<void>
+
   // Premium Text Templates (NCB / UPCC)
   premiumGetTextTemplates: (type?: string) => Promise<PremiumTextTemplate[]>
   premiumAddTextTemplate: (data: { name: string; text: string; type: string }) => Promise<PremiumTextTemplate>

@@ -377,6 +377,10 @@ const api = {
   piDeleteTradingCustomText: (id: string) => ipcRenderer.invoke('pi:deleteTradingCustomText', id),
   piReorderTradingCustomTexts: (ids: string[]) => ipcRenderer.invoke('pi:reorderTradingCustomTexts', ids),
 
+  // Generic Settings
+  getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
+  setSetting: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
+
   // Premium Text Templates (NCB / UPCC)
   premiumGetTextTemplates: (type?: string) => ipcRenderer.invoke('premium:getTextTemplates', type),
   premiumAddTextTemplate: (data: { name: string; text: string; type: string }) => ipcRenderer.invoke('premium:addTextTemplate', data),
