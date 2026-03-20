@@ -7426,7 +7426,7 @@ export class MySQLAdapter {
             // Create addresses from vessel assureds
             const [assureds] = await this.pool.query(`
                 SELECT va.entity_id, va.role, e.name as entityName,
-                    ea.address_text as addressText
+                    ea.address_line1 as addressText
                 FROM vessel_assureds va
                 JOIN entities e ON va.entity_id = e.id
                 LEFT JOIN entity_addresses ea ON va.address_id = ea.id
