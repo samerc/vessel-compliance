@@ -1178,7 +1178,8 @@ function polBuildVesselTable(data: PolicyExportData): Table {
     ['Flag', vi.flag || '-'],
     ['Year Built', vi.built ? String(vi.built) : '-'],
     ['GT', vi.gt ? Number(vi.gt).toLocaleString() : '-'],
-    ['IMO Number', vi.imo || '-']
+    ['IMO Number', vi.imo || '-'],
+    ['Classification', vi.classification || '-']
   ]
   if (vi.callSign) rows.push(['Call Sign', vi.callSign])
 
@@ -1444,16 +1445,39 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
   } else {
     if (wq.tradingCustomText) { content.push(polEmptyP()); content.push(...polMp(wq.tradingCustomText)) }
     if (excCountries.length > 0) { content.push(polEmptyP()); content.push(polNp('Excluding ' + excCountries.map(c => c.name).join(', ') + '.')) }
+    let sectionNum = 1
     if (wq.tradingShowDdqList && ddqCountries.length > 0) {
       const ddqList = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
-      let ddqIntro = stripHtml(polSt(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
+      const ddqIntro = stripHtml(polSt(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
       content.push(polEmptyP())
       if (ddqIntro.includes('{ddq_countries}')) {
-        content.push(polNp(ddqIntro.replace(/\{ddq_countries\}/g, ddqList)))
+        content.push(polNp(`${sectionNum}) ${ddqIntro.replace(/\{ddq_countries\}/g, ddqList)}`))
       } else {
-        content.push(polNp(ddqIntro))
+        content.push(polNp(`${sectionNum}) ${ddqIntro}`))
         content.push(polNp(ddqList))
       }
+      sectionNum++
+    }
+    if (wq.tradingShowDdqWarranties) {
+      const intro = polSt(data, 'tradingConditionA')
+      if (intro) { content.push(polEmptyP()); content.push(polNp(`${sectionNum}) ${stripHtml(intro)}`)) }
+      sectionNum++
+      const condKeys: (keyof PISectionTexts)[] = ['tradingConditionB', 'tradingConditionC', 'tradingConditionD', 'tradingConditionE', 'tradingConditionF', 'tradingConditionG']
+      const labels = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)']
+      for (let i = 0; i < condKeys.length; i++) {
+        const txt = polSt(data, condKeys[i])
+        if (txt) {
+          content.push(new Paragraph({
+            spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+            indent: { left: 400 },
+            children: [new TextRun({ text: `${labels[i]} ${stripHtml(txt)}`, size: 22, font: 'Arial', color: '000000' })]
+          }))
+        }
+      }
+    }
+    if (wq.tradingShowIsrael && polSt(data, 'tradingIsrael')) {
+      content.push(polEmptyP())
+      content.push(polNp(`${sectionNum}) ${stripHtml(polSt(data, 'tradingIsrael'))}`))
     }
   }
 
@@ -1505,6 +1529,13 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
     }
   }
 
+  const dedAggText = data.quotation.deductibleAggregateEnabled
+    ? (data.quotation.deductibleAggregateText || (polSt(data, 'deductiblesAggregate') ? stripHtml(polSt(data, 'deductiblesAggregate')) : ''))
+    : ''
+  if (dedAggText) { content.push(polEmptyP()); content.push(...polMp(dedAggText)) }
+
+  if (polSt(data, 'deductiblesAdditionalText')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'deductiblesAdditionalText'))) }
+
   return content
 }
 
@@ -1527,38 +1558,39 @@ function polBuildPremiumPaymentSection(data: PolicyExportData): (Paragraph | Tab
   content.push(polEmptyP())
 
   if (instalments.length > 0) {
+    const wq = data.quotation
+    const isFirstInstNr = wq.nonRefundableType === 'first_instalment'
     const labelW = Math.round(POL_BODY_W * 0.40)
     const dateW = Math.round(POL_BODY_W * 0.30)
     const amtW = POL_BODY_W - labelW - dateW
 
+    const instRows: TableRow[] = []
+    for (const inst of instalments) {
+      let label = `${polOrdinal(inst.instalmentNumber)} Instalment due`
+      if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
+        label += ' (non-refundable in case of cancellation, whether before or after inception)'
+      }
+      const labelChildren: TextRun[] = [new TextRun({ text: label, size: 22, font: 'Arial', color: '000000' })]
+      instRows.push(new TableRow({
+        children: [
+          new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: labelChildren })] }),
+          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: 22, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: 22, font: 'Arial', color: '000000', bold: true })] })] })
+        ]
+      }))
+    }
     content.push(new Table({
       width: { size: POL_BODY_W, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [labelW, dateW, amtW],
-      rows: instalments.map(inst => {
-        let label = `${polOrdinal(inst.instalmentNumber)} Instalment due`
-        if (inst.isNonRefundable) label += ' (non-refundable)'
-        return new TableRow({
-          children: [
-            new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: label, size: 22, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: 22, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: 22, font: 'Arial', color: '000000', bold: true })] })] })
-          ]
-        })
-      })
+      rows: instRows
     }))
     content.push(polEmptyP())
-  }
 
-  const wq = data.quotation
-  if (wq.nonRefundableType) {
-    let nrText = ''
-    if (wq.nonRefundableType === 'first_instalment') {
-      nrText = stripHtml(polSt(data, 'nonRefundableFirstText') || 'The first instalment is deemed to be non-refundable.')
-    } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
-      nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
+    if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
+      const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
+      if (nrText) { content.push(polNp(nrText)); content.push(polEmptyP()) }
     }
-    if (nrText) { content.push(polNp(nrText)); content.push(polEmptyP()) }
   }
 
   if (polSt(data, 'premiumCondition')) { content.push(...polMp(polSt(data, 'premiumCondition'))); content.push(polEmptyP()) }
@@ -1698,19 +1730,30 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
 
   // EXCLUSIONS
   const exclusionsContent: Paragraph[] = []
+  const hasAltExclusions = data.piAlternatives.length > 0
+  const firstAltId = data.piAlternatives.length > 0 ? data.piAlternatives[0].id : null
   for (const se of data.selectedExclusions) {
+    if (hasAltExclusions && se.alternativeId && se.alternativeId !== firstAltId) continue
     if (se.customText) exclusionsContent.push(polBulletP(se.customText))
     else if (se.piExclusionId) {
       const found = data.allExclusions.find(e => e.id === se.piExclusionId)
       if (found) exclusionsContent.push(polBulletP(found.text))
     }
   }
-  for (const ce of data.customExclusions) exclusionsContent.push(polBulletP(ce.text))
+  for (const ce of data.customExclusions) {
+    if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== firstAltId) continue
+    exclusionsContent.push(polBulletP(ce.text))
+  }
   if (exclusionsContent.length > 0) rows.push(makeRow('Exclusions', exclusionsContent))
 
   // SUBJECTIVITIES
-  const subjContent: Paragraph[] = data.subjectivities.map(sub => polBulletP(sub.text))
-  if (subjContent.length > 0) rows.push(makeRow('Subjectivities', subjContent))
+  if (data.subjectivities.length > 0) {
+    const subjContent: (Paragraph | Table)[] = []
+    if (polSt(data, 'subjectivitiesIntro')) subjContent.push(...polMp(polSt(data, 'subjectivitiesIntro')))
+    for (const sub of data.subjectivities) subjContent.push(polBulletP(sub.text))
+    if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }
+    rows.push(makeRow('Subjectivities', subjContent))
+  }
 
   // PREMIUM PAYMENT
   const premiumContent = polBuildPremiumPaymentSection(data)
