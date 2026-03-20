@@ -709,6 +709,7 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
     const [bankId, setBankId] = useState('')
     const [showAddresses, setShowAddresses] = useState(false)
     const [blueCards, setBlueCards] = useState<string[]>([])
+    const [blueCardNone, setBlueCardNone] = useState(false)
     const [timezoneOptions, setTimezoneOptions] = useState<string[]>(DEFAULT_TIMEZONE_OPTIONS)
     const [piAlts, setPiAlts] = useState<QuotationPIAlternative[]>([])
     const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
@@ -910,6 +911,18 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
         }
         if (instalmentDates.some(d => !d)) {
             showError('All instalment dates are required')
+            return
+        }
+        if (instalmentAmounts.some(a => !a || a <= 0)) {
+            showError('All instalment amounts are required')
+            return
+        }
+        if (!bankId && banks.length > 0) {
+            showError('Please select a bank')
+            return
+        }
+        if (isPI && !blueCardNone && blueCards.length === 0) {
+            showError('Please select blue cards or choose "None"')
             return
         }
         setConverting(true)
@@ -1194,8 +1207,20 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                         {isPI && (
                             <div style={{ marginBottom: '20px' }}>
                                 <label style={labelStyle}>Blue Cards</label>
-                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                    {['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'].map(card => (
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={blueCardNone}
+                                            onChange={() => {
+                                                setBlueCardNone(!blueCardNone)
+                                                if (!blueCardNone) setBlueCards([])
+                                            }}
+                                            style={{ width: '15px', height: '15px', accentColor: 'var(--text-secondary)' }}
+                                        />
+                                        <span style={{ color: 'var(--text-secondary)' }}>None</span>
+                                    </label>
+                                    {!blueCardNone && ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'].map(card => (
                                         <label key={card} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
                                             <input
                                                 type="checkbox"
