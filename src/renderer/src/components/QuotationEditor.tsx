@@ -701,6 +701,8 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
     const [expiryTime, setExpiryTime] = useState('12:00')
     const [timezone, setTimezone] = useState('Lebanon Standard Time')
     const [instalmentDates, setInstalmentDates] = useState<string[]>([])
+    const [instalmentAmounts, setInstalmentAmounts] = useState<number[]>([])
+    const [instalmentNonRefundable, setInstalmentNonRefundable] = useState<boolean[]>([])
     const [commissionPercent, setCommissionPercent] = useState<number | ''>('')
     const [bankId, setBankId] = useState('')
     const [showAddresses, setShowAddresses] = useState(false)
@@ -729,10 +731,21 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             setSelectedVesselIds(vessels.map(v => v.id))
             if (Array.isArray(bankData)) setBanks(bankData)
 
-            // Calculate instalment dates from instalment days + inception
+            // Calculate instalment dates and amounts from quotation data
             const safeInstalments = Array.isArray(instalments) ? instalments : []
             if (safeInstalments.length > 0) {
                 setInstalmentDates(safeInstalments.map(() => ''))
+                // Calculate premium per instalment (payable premium / number of instalments)
+                const payable = quotation.premiumAmount || 0
+                const count = safeInstalments.length
+                const perInstalment = count > 0 ? Math.round((payable / count) * 100) / 100 : 0
+                const amounts = safeInstalments.map((_, i) => {
+                    if (i === 0) return Math.round((payable - perInstalment * (count - 1)) * 100) / 100
+                    return perInstalment
+                })
+                setInstalmentAmounts(amounts)
+                // First instalment non-refundable by default if quotation has nonRefundableType
+                setInstalmentNonRefundable(safeInstalments.map((_, i) => i === 0 && !!quotation.nonRefundableType))
             }
         } catch (err: any) {
             showError(err.message || 'Failed to load data')
@@ -784,16 +797,22 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
         }
         setConverting(true)
         try {
+            const commPct = typeof commissionPercent === 'number' ? commissionPercent : 0
             const result = await window.api.policyConvertFromQuotation(quotation.id, {
-                vessels: selectedVesselIds,
+                vesselIds: selectedVesselIds,
                 inceptionDate,
                 inceptionTime,
                 expiryDate,
                 expiryTime,
                 timezone,
-                instalments: instalmentDates,
-                commissionPercent: typeof commissionPercent === 'number' ? commissionPercent : undefined,
-                bankId: bankId || undefined,
+                instalments: instalmentDates.map((dueDate, i) => ({
+                    dueDate,
+                    premiumAmount: instalmentAmounts[i] || 0,
+                    commissionAmount: Math.round((instalmentAmounts[i] || 0) * commPct / 100 * 100) / 100,
+                    isNonRefundable: instalmentNonRefundable[i] || false
+                })),
+                commissionPercent: commPct || null,
+                bankId: bankId || null,
                 showAddresses,
                 blueCards
             })
@@ -911,14 +930,14 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                             <div />
                         </div>
 
-                        {/* Instalment Dates */}
+                        {/* Instalment Schedule */}
                         {instalmentDates.length > 0 && (
                             <div style={{ marginBottom: '14px' }}>
-                                <label style={labelStyle}>Instalment Dates</label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={labelStyle}>Instalment Schedule</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {instalmentDates.map((date, i) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Instalment {i + 1}</span>
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)' }}>
+                                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', minWidth: '80px', fontWeight: 600 }}>#{i + 1}</span>
                                             <input
                                                 type="date"
                                                 value={date}
@@ -929,9 +948,37 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                                                 }}
                                                 style={{ ...inputStyle, flex: 1 }}
                                             />
+                                            <input
+                                                type="number"
+                                                value={instalmentAmounts[i] || ''}
+                                                onChange={e => {
+                                                    const updated = [...instalmentAmounts]
+                                                    updated[i] = parseFloat(e.target.value) || 0
+                                                    setInstalmentAmounts(updated)
+                                                }}
+                                                placeholder="Amount"
+                                                style={{ ...inputStyle, width: '120px', flex: 'none', textAlign: 'right' }}
+                                            />
+                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{quotation.premiumCurrency || 'USD'}</span>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={instalmentNonRefundable[i] || false}
+                                                    onChange={e => {
+                                                        const updated = [...instalmentNonRefundable]
+                                                        updated[i] = e.target.checked
+                                                        setInstalmentNonRefundable(updated)
+                                                    }}
+                                                    style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }}
+                                                />
+                                                NR
+                                            </label>
                                         </div>
                                     ))}
                                 </div>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+                                    NR = Non-refundable. Dates auto-calculated from inception + quotation instalment days.
+                                </p>
                             </div>
                         )}
 

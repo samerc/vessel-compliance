@@ -685,15 +685,15 @@ export interface Api {
   policyGetAddresses: (policyId: string) => Promise<any[]>
   policyGetBlueCards: (policyId: string) => Promise<any[]>
   policyConvertFromQuotation: (quotationId: string, options: {
-    vessels: string[]
+    vesselIds: string[]
     inceptionDate: string
     inceptionTime: string
     expiryDate: string
     expiryTime: string
     timezone: string
-    instalments: string[]
-    commissionPercent?: number
-    bankId?: string
+    instalments: { dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]
+    commissionPercent: number | null
+    bankId: string | null
     showAddresses: boolean
     blueCards: string[]
   }) => Promise<any[]>
