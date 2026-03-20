@@ -807,7 +807,9 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                 if (safeInstalments.length > 0) {
                     const dates = safeInstalments.map(inst => {
                         const d = new Date(inceptionDate)
-                        d.setDate(d.getDate() + inst.daysFromInception)
+                        // Convert days to months (30 days = 1 month in insurance)
+                        const months = Math.round(inst.daysFromInception / 30)
+                        d.setMonth(d.getMonth() + months)
                         return d.toISOString().split('T')[0]
                     })
                     setInstalmentDates(dates)
