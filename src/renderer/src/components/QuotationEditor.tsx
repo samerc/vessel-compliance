@@ -4,7 +4,7 @@ import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWar
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload, GitBranch, RefreshCw, Lock, Search, Check, MoreHorizontal } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Upload, GitBranch, RefreshCw, Lock, Search, Check, MoreHorizontal, Loader2 } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS, SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import RichTextEditor from './RichTextEditor'
@@ -148,6 +148,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
     const [reachableSteps, setReachableSteps] = useState<import('../../../shared/types').WorkflowStep[]>([])
     const [showStepMenu, setShowStepMenu] = useState(false)
     const [showActionsMenu, setShowActionsMenu] = useState(false)
+    const [showConvertModal, setShowConvertModal] = useState(false)
     const [stepComment, setStepComment] = useState('')
     const [showStepCommentModal, setShowStepCommentModal] = useState<string | null>(null)
     const [_workflowLog, setWorkflowLog] = useState<import('../../../shared/types').QuotationWorkflowLog[]>([])
@@ -485,6 +486,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                                     <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
                                     {q.exportSnapshot && !isLocked && <button onClick={() => { setShowActionsMenu(false); handleClearSnapshot() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Refresh Texts</button>}
                                     {!isLocked && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
+                                    {canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); setShowConvertModal(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#008c46' : '#00c864', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><FileText size={15} /> Convert to Policy</button></>}
                                 </div>
                             </>
                         )}
@@ -658,6 +660,356 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation }: 
                     isLight={isLight}
                 />
             )}
+
+            {showConvertModal && (
+                <ConvertToPolicyModal
+                    quotation={q}
+                    onClose={() => setShowConvertModal(false)}
+                    showSuccess={showSuccess}
+                    showError={showError}
+                    isLight={isLight}
+                />
+            )}
+        </div>
+    )
+}
+
+// ==================== Convert to Policy Modal ====================
+
+const TIMEZONE_OPTIONS = [
+    'Lebanon Standard Time',
+    'GMT',
+    'UTC',
+    'CET',
+    'EST',
+    'PST'
+]
+
+function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLight }: {
+    quotation: Quotation
+    onClose: () => void
+    showSuccess: (m: string) => void
+    showError: (m: string) => void
+    isLight: boolean
+}) {
+    const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [selectedVesselIds, setSelectedVesselIds] = useState<string[]>([])
+    const [banks, setBanks] = useState<{ id: string; name: string; details: string; order: number }[]>([])
+    const [inceptionDate, setInceptionDate] = useState('')
+    const [inceptionTime, setInceptionTime] = useState('12:00')
+    const [expiryDate, setExpiryDate] = useState('')
+    const [expiryTime, setExpiryTime] = useState('12:00')
+    const [timezone, setTimezone] = useState('Lebanon Standard Time')
+    const [instalmentDates, setInstalmentDates] = useState<string[]>([])
+    const [commissionPercent, setCommissionPercent] = useState<number | ''>('')
+    const [bankId, setBankId] = useState('')
+    const [showAddresses, setShowAddresses] = useState(false)
+    const [blueCards, setBlueCards] = useState<string[]>([])
+    const [converting, setConverting] = useState(false)
+    const [loading, setLoading] = useState(true)
+
+    const isPI = quotation.quotationTypeCode === 'P'
+    const isMultiVessel = qVessels.length > 1
+    const hasBroker = !!quotation.coName
+
+    useEffect(() => {
+        loadData()
+    }, [])
+
+    const loadData = async () => {
+        setLoading(true)
+        try {
+            const [qv, bankData, instalments] = await Promise.all([
+                window.api.getQuotationVessels(quotation.id),
+                window.api.bankGetAll(),
+                window.api.getQuotationInstalments(quotation.id)
+            ])
+            const vessels = Array.isArray(qv) ? qv : []
+            setQVessels(vessels)
+            setSelectedVesselIds(vessels.map(v => v.id))
+            if (Array.isArray(bankData)) setBanks(bankData)
+
+            // Calculate instalment dates from instalment days + inception
+            const safeInstalments = Array.isArray(instalments) ? instalments : []
+            if (safeInstalments.length > 0) {
+                setInstalmentDates(safeInstalments.map(() => ''))
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to load data')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Recalculate instalment dates when inception date changes
+    useEffect(() => {
+        if (!inceptionDate) return
+        const loadAndCalc = async () => {
+            try {
+                const instalments = await window.api.getQuotationInstalments(quotation.id)
+                const safeInstalments: QuotationInstalment[] = Array.isArray(instalments) ? instalments : []
+                if (safeInstalments.length > 0) {
+                    const dates = safeInstalments.map(inst => {
+                        const d = new Date(inceptionDate)
+                        d.setDate(d.getDate() + inst.daysFromInception)
+                        return d.toISOString().split('T')[0]
+                    })
+                    setInstalmentDates(dates)
+                }
+            } catch { /* ignore */ }
+        }
+        loadAndCalc()
+    }, [inceptionDate])
+
+    const toggleVessel = (id: string) => {
+        setSelectedVesselIds(prev =>
+            prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
+        )
+    }
+
+    const toggleBlueCard = (card: string) => {
+        setBlueCards(prev =>
+            prev.includes(card) ? prev.filter(c => c !== card) : [...prev, card]
+        )
+    }
+
+    const handleConvert = async () => {
+        if (!inceptionDate || !expiryDate) {
+            showError('Inception and expiry dates are required')
+            return
+        }
+        if (selectedVesselIds.length === 0) {
+            showError('Select at least one vessel')
+            return
+        }
+        setConverting(true)
+        try {
+            const result = await window.api.policyConvertFromQuotation(quotation.id, {
+                vessels: selectedVesselIds,
+                inceptionDate,
+                inceptionTime,
+                expiryDate,
+                expiryTime,
+                timezone,
+                instalments: instalmentDates,
+                commissionPercent: typeof commissionPercent === 'number' ? commissionPercent : undefined,
+                bankId: bankId || undefined,
+                showAddresses,
+                blueCards
+            })
+            if ((result as any)?.error) {
+                showError((result as any).message || 'Conversion failed')
+                return
+            }
+            const policies = Array.isArray(result) ? result : []
+            showSuccess(`${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} created successfully`)
+            onClose()
+        } catch (err: any) {
+            showError(err.message || 'Failed to convert to policy')
+        } finally {
+            setConverting(false)
+        }
+    }
+
+    const labelStyle: React.CSSProperties = {
+        display: 'block', fontSize: '0.65rem', fontWeight: 700,
+        letterSpacing: '0.8px', textTransform: 'uppercase',
+        color: 'var(--text-secondary)', marginBottom: '6px'
+    }
+
+    const inputStyle: React.CSSProperties = {
+        width: '100%', padding: '8px 12px', borderRadius: '8px',
+        border: '1px solid var(--input-border)', background: 'var(--input-bg)',
+        color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box'
+    }
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
+            <div style={{
+                background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '28px',
+                width: '600px', maxWidth: '95vw', maxHeight: '80vh', overflowY: 'auto',
+                border: '1px solid var(--glass-border)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+            }} onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FileText size={20} color="var(--accent-primary)" /> Convert to Policy
+                    </h3>
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+                </div>
+
+                {loading ? (
+                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <Loader2 size={24} className="spinner" />
+                    </div>
+                ) : (
+                    <>
+                        {/* Step 1: Vessel Selection (multi-vessel only) */}
+                        {isMultiVessel && (
+                            <div style={{ marginBottom: '20px' }}>
+                                <div style={labelStyle}>Vessel Selection</div>
+                                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 10px' }}>
+                                    Each selected vessel will get its own policy.
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {qVessels.map(v => (
+                                        <label key={v.id} style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 12px', borderRadius: '8px',
+                                            border: '1px solid var(--input-border)',
+                                            background: selectedVesselIds.includes(v.id) ? 'rgba(0,170,200,0.06)' : 'transparent',
+                                            cursor: 'pointer', fontSize: '0.88rem'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedVesselIds.includes(v.id)}
+                                                onChange={() => toggleVessel(v.id)}
+                                                style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+                                            />
+                                            <span style={{ fontWeight: 600 }}>{v.name || v.vesselLabel}</span>
+                                            {v.imoNumber && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>IMO {v.imoNumber}</span>}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Section divider */}
+                        {isMultiVessel && <div style={{ borderTop: '1px solid var(--glass-border)', margin: '16px 0' }} />}
+
+                        {/* Step 2: Policy Setup */}
+                        <div style={labelStyle}>Policy Setup</div>
+
+                        {/* Inception Date + Time */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                            <div>
+                                <label style={labelStyle}>Inception Date</label>
+                                <input type="date" value={inceptionDate} onChange={e => setInceptionDate(e.target.value)} style={inputStyle} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Time</label>
+                                <input type="time" value={inceptionTime} onChange={e => setInceptionTime(e.target.value)} style={inputStyle} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Timezone</label>
+                                <select value={timezone} onChange={e => setTimezone(e.target.value)} style={inputStyle}>
+                                    {TIMEZONE_OPTIONS.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Expiry Date + Time */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                            <div>
+                                <label style={labelStyle}>Expiry Date</label>
+                                <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} style={inputStyle} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Time</label>
+                                <input type="time" value={expiryTime} onChange={e => setExpiryTime(e.target.value)} style={inputStyle} />
+                            </div>
+                            <div />
+                        </div>
+
+                        {/* Instalment Dates */}
+                        {instalmentDates.length > 0 && (
+                            <div style={{ marginBottom: '14px' }}>
+                                <label style={labelStyle}>Instalment Dates</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {instalmentDates.map((date, i) => (
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Instalment {i + 1}</span>
+                                            <input
+                                                type="date"
+                                                value={date}
+                                                onChange={e => {
+                                                    const updated = [...instalmentDates]
+                                                    updated[i] = e.target.value
+                                                    setInstalmentDates(updated)
+                                                }}
+                                                style={{ ...inputStyle, flex: 1 }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Commission % (only shown if there's a broker) */}
+                        {hasBroker && (
+                            <div style={{ marginBottom: '14px' }}>
+                                <label style={labelStyle}>Commission %</label>
+                                <input
+                                    type="number"
+                                    value={commissionPercent}
+                                    onChange={e => setCommissionPercent(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                    min={0}
+                                    max={100}
+                                    step={0.01}
+                                    placeholder="e.g. 15"
+                                    style={{ ...inputStyle, width: '140px' }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Bank */}
+                        <div style={{ marginBottom: '14px' }}>
+                            <label style={labelStyle}>Bank</label>
+                            <select value={bankId} onChange={e => setBankId(e.target.value)} style={inputStyle}>
+                                <option value="">Select bank...</option>
+                                {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Show Addresses */}
+                        <div style={{ marginBottom: '14px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showAddresses}
+                                    onChange={e => setShowAddresses(e.target.checked)}
+                                    style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+                                />
+                                Show Addresses
+                            </label>
+                        </div>
+
+                        {/* Blue Cards (P&I only) */}
+                        {isPI && (
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={labelStyle}>Blue Cards</label>
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                    {['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'].map(card => (
+                                        <label key={card} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={blueCards.includes(card)}
+                                                onChange={() => toggleBlueCard(card)}
+                                                style={{ width: '15px', height: '15px', accentColor: 'var(--accent-primary)' }}
+                                            />
+                                            {card}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Create Policies button */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+                            <button onClick={onClose} className="btn-secondary" style={{ padding: '8px 20px' }}>Cancel</button>
+                            <button
+                                onClick={handleConvert}
+                                disabled={converting || !inceptionDate || !expiryDate || selectedVesselIds.length === 0}
+                                className="btn-primary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 20px' }}
+                            >
+                                {converting && <Loader2 size={16} className="spinner" />}
+                                Create Polic{isMultiVessel && selectedVesselIds.length > 1 ? 'ies' : 'y'}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     )
 }

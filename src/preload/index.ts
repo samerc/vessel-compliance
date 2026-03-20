@@ -448,6 +448,9 @@ const api = {
   deleteVesselDynamicPolicy: (id: string) => ipcRenderer.invoke('vessels:deleteDynamicPolicy', id),
   setVesselDynamicPolicyValues: (policyId: string, values: any[]) => ipcRenderer.invoke('vessels:setDynamicPolicyValues', policyId, values),
 
+  // Policy List
+  getPoliciesList: () => ipcRenderer.invoke('policies:getList'),
+
   // Policy Expiry Alerts
   getExpiredActivePolicies: () => ipcRenderer.invoke('policies:getExpiredActive'),
   getPolicyRenewalsByMonth: (year: number, month: number) => ipcRenderer.invoke('policies:getRenewalsByMonth', year, month),
@@ -672,6 +675,16 @@ const api = {
   dbBackup: () => ipcRenderer.invoke('db:backup'),
   dbRestore: () => ipcRenderer.invoke('db:restore'),
   dbGetLastBackupDate: () => ipcRenderer.invoke('db:getLastBackupDate'),
+
+  // Banks
+  bankGetAll: () => ipcRenderer.invoke('bank:getAll'),
+  bankAdd: (name: string, details: string) => ipcRenderer.invoke('bank:add', name, details),
+  bankUpdate: (id: string, data: { name: string; details: string }) => ipcRenderer.invoke('bank:update', id, data),
+  bankDelete: (id: string) => ipcRenderer.invoke('bank:delete', id),
+  bankReorder: (ids: string[]) => ipcRenderer.invoke('bank:reorder', ids),
+
+  // Policy conversion
+  policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
 }
 
 // Expose curated API to renderer via context bridge

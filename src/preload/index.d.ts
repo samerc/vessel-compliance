@@ -436,6 +436,9 @@ export interface Api {
   deleteVesselDynamicPolicy: (id: string) => Promise<void>
   setVesselDynamicPolicyValues: (policyId: string, values: Omit<VesselPolicyValue, 'id' | 'policyId' | 'characteristicName' | 'fieldType'>[]) => Promise<void>
 
+  // Policy List
+  getPoliciesList: () => Promise<any[]>
+
   // Policy Expiry Alerts
   getExpiredActivePolicies: () => Promise<any[]>
   getPolicyRenewalsByMonth: (year: number, month: number) => Promise<any[]>
@@ -668,6 +671,28 @@ export interface Api {
   workflowMoveQuotation: (quotationId: string, toStepId: string, comment?: string) => Promise<{ success: boolean }>
   workflowGetQuotationLog: (quotationId: string) => Promise<QuotationWorkflowLog[]>
   workflowGetReachableSteps: (quotationId: string) => Promise<WorkflowStep[]>
+
+  // Banks
+  bankGetAll: () => Promise<{ id: string; name: string; details: string; order: number }[]>
+  bankAdd: (name: string, details: string) => Promise<{ id: string; name: string; details: string; order: number }>
+  bankUpdate: (id: string, data: { name: string; details: string }) => Promise<void>
+  bankDelete: (id: string) => Promise<void>
+  bankReorder: (ids: string[]) => Promise<void>
+
+  // Policy conversion
+  policyConvertFromQuotation: (quotationId: string, options: {
+    vessels: string[]
+    inceptionDate: string
+    inceptionTime: string
+    expiryDate: string
+    expiryTime: string
+    timezone: string
+    instalments: string[]
+    commissionPercent?: number
+    bankId?: string
+    showAddresses: boolean
+    blueCards: string[]
+  }) => Promise<any[]>
 }
 
 declare global {
