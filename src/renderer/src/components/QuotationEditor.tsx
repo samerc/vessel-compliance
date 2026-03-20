@@ -750,8 +750,11 @@ function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateFie
 
     return (
         <div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Define the insured parties. Set the C/O Broker if applicable, then add assureds in the order they should appear in the quotation.
+            </p>
             {/* c/o Broker */}
-            <h3 style={{ fontSize: '1rem', marginBottom: '10px' }}>C/O (Broker)</h3>
+            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>C/O (Broker)</h3>
             <div style={{ position: 'relative', maxWidth: '420px', marginBottom: '28px' }}>
                 <input
                     type="text"
@@ -779,7 +782,7 @@ function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateFie
                 )}
             </div>
 
-            <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Assureds</h3>
+            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Assureds</h3>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <select
                     value={newEntityId}
@@ -868,9 +871,9 @@ function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateFie
                                                 <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
                                                 {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
                                                 <div style={{ display: 'flex', gap: '2px' }}>
-                                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                                    <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                                    <button onClick={() => handleDeleteAssured(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                                    <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                                    <button onClick={() => handleDeleteAssured(a.id)} className="btn-secondary" style={{ padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                                 </div>
                                             </div>
                                         )
@@ -886,9 +889,9 @@ function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateFie
                             <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
                             {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
                             <div style={{ display: 'flex', gap: '2px' }}>
-                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => handleDeleteAssured(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button onClick={() => handleDeleteAssured(a.id)} className="btn-secondary" style={{ padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                             </div>
                         </div>
                     ))
@@ -911,12 +914,26 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
     const [vesselSearch, setVesselSearch] = useState('')
     const [vesselDropdownOpen, setVesselDropdownOpen] = useState(false)
     const [newData, setNewData] = useState(EMPTY_NEW_VESSEL)
+    const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
+    const [classDropdownOpen, setClassDropdownOpen] = useState(false)
+    const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
+    const [flagStatesLocal, setFlagStatesLocal] = useState<any[]>([])
+    const [classSocietiesLocal, setClassSocietiesLocal] = useState<any[]>([])
+    const [vesselTypesLocal, setVesselTypesLocal] = useState<any[]>([])
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
         const qv = await window.api.getQuotationVessels(quotation.id)
         setQVessels(Array.isArray(qv) ? qv : [])
+        const [fs, cs, vt] = await Promise.all([
+            window.api.getFlagStates().catch(() => []),
+            window.api.getClassificationSocieties().catch(() => []),
+            window.api.getVesselTypes().catch(() => [])
+        ])
+        setFlagStatesLocal(Array.isArray(fs) ? fs : [])
+        setClassSocietiesLocal(Array.isArray(cs) ? cs : [])
+        setVesselTypesLocal(Array.isArray(vt) ? vt : [])
     }
 
     const nextLabel = (list: QuotationVessel[]) => `V${list.length + 1}`
@@ -1011,8 +1028,11 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
 
     return (
         <div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Add vessels from the database or enter details manually. Vessel information will appear in the quotation document.
+            </p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '1rem', margin: 0 }}>Vessels ({qVessels.length})</h3>
+                <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Vessels ({qVessels.length})</h3>
                 {!showAddForm && (
                     <button onClick={() => setShowAddForm(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
                         <Plus size={14} /> Add Vessel
@@ -1068,9 +1088,6 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                                     ['imoNumber', 'IMO Number', 'text', false],
                                     ['builtYear', 'Built Year', 'number', false],
                                     ['grossTonnage', 'Gross Tonnage', 'number', false],
-                                    ['flag', 'Flag', 'text', false],
-                                    ['vesselType', 'Vessel Type', 'text', false],
-                                    ['classification', 'Classification', 'text', false],
                                     ['callSign', 'Call Sign', 'text', false]
                                 ] as [keyof typeof EMPTY_NEW_VESSEL, string, string, boolean][]).map(([field, label, type, upper]) => (
                                     <div key={field}>
@@ -1083,6 +1100,102 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                                         />
                                     </div>
                                 ))}
+                                {/* Flag combobox */}
+                                <div style={{ position: 'relative' }}>
+                                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Flag</label>
+                                    <input
+                                        type="text"
+                                        value={newData.flag}
+                                        onChange={e => { setNewData(p => ({ ...p, flag: e.target.value })); setFlagDropdownOpen(true) }}
+                                        onFocus={() => setFlagDropdownOpen(true)}
+                                        onBlur={() => setTimeout(() => setFlagDropdownOpen(false), 150)}
+                                        placeholder="Search flag states..."
+                                        style={{ width: '100%' }}
+                                    />
+                                    {flagDropdownOpen && (() => {
+                                        const q = newData.flag.toLowerCase()
+                                        const filtered = flagStatesLocal.filter((f: any) =>
+                                            f.name?.toLowerCase().includes(q) || f.iso3Code?.toLowerCase().includes(q)
+                                        ).slice(0, 10)
+                                        return filtered.length > 0 ? (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                                {filtered.map((f: any) => (
+                                                    <div key={f.id} onMouseDown={() => { setNewData(p => ({ ...p, flag: f.name })); setFlagDropdownOpen(false) }}
+                                                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
+                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                                    >
+                                                        {f.name}{f.iso3Code ? <span style={{ color: 'var(--text-secondary)', marginLeft: '6px', fontSize: '0.8rem' }}>({f.iso3Code})</span> : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null
+                                    })()}
+                                </div>
+                                {/* Vessel Type combobox */}
+                                <div style={{ position: 'relative' }}>
+                                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Vessel Type</label>
+                                    <input
+                                        type="text"
+                                        value={newData.vesselType}
+                                        onChange={e => { setNewData(p => ({ ...p, vesselType: e.target.value })); setTypeDropdownOpen(true) }}
+                                        onFocus={() => setTypeDropdownOpen(true)}
+                                        onBlur={() => setTimeout(() => setTypeDropdownOpen(false), 150)}
+                                        placeholder="Search vessel types..."
+                                        style={{ width: '100%' }}
+                                    />
+                                    {typeDropdownOpen && (() => {
+                                        const q = newData.vesselType.toLowerCase()
+                                        const filtered = vesselTypesLocal.filter((t: any) =>
+                                            t.name?.toLowerCase().includes(q)
+                                        ).slice(0, 10)
+                                        return filtered.length > 0 ? (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                                {filtered.map((t: any) => (
+                                                    <div key={t.id} onMouseDown={() => { setNewData(p => ({ ...p, vesselType: t.name })); setTypeDropdownOpen(false) }}
+                                                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
+                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                                    >
+                                                        {t.name}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null
+                                    })()}
+                                </div>
+                                {/* Classification combobox */}
+                                <div style={{ position: 'relative' }}>
+                                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Classification</label>
+                                    <input
+                                        type="text"
+                                        value={newData.classification}
+                                        onChange={e => { setNewData(p => ({ ...p, classification: e.target.value })); setClassDropdownOpen(true) }}
+                                        onFocus={() => setClassDropdownOpen(true)}
+                                        onBlur={() => setTimeout(() => setClassDropdownOpen(false), 150)}
+                                        placeholder="Search classification societies..."
+                                        style={{ width: '100%' }}
+                                    />
+                                    {classDropdownOpen && (() => {
+                                        const q = newData.classification.toLowerCase()
+                                        const filtered = classSocietiesLocal.filter((c: any) =>
+                                            c.name?.toLowerCase().includes(q)
+                                        ).slice(0, 10)
+                                        return filtered.length > 0 ? (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                                {filtered.map((c: any) => (
+                                                    <div key={c.id} onMouseDown={() => { setNewData(p => ({ ...p, classification: c.name })); setClassDropdownOpen(false) }}
+                                                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
+                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                                    >
+                                                        {c.name}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null
+                                    })()}
+                                </div>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button onClick={handleAddNew} className="btn-primary" style={{ fontSize: '0.82rem' }}>Add Vessel</button>
@@ -1173,6 +1286,9 @@ function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveT
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Limit of Liability</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Set the limit of liability and configure sub-limits if required.
+            </p>
             <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', maxWidth: '600px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Currency:</span>
@@ -1520,6 +1636,9 @@ function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [],
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>P&I Conditions (Clauses)</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Select the P&I conditions and clauses. Use clause set presets for quick selection. Override descriptions as needed.
+            </p>
             {clauseSets.length > 0 && (
                 <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Presets:</span>
@@ -1668,6 +1787,9 @@ function PeriodTab({ quotation, updateField, setQ }: { quotation: Quotation; upd
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Period of Insurance</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Set the policy inception and expiry dates for this quotation.
+            </p>
             {(suggestion || loading) && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0,210,255,0.07)', border: '1px solid rgba(0,210,255,0.2)', marginBottom: '16px', maxWidth: '640px' }}>
                     <div style={{ flex: 1 }}>
@@ -1767,6 +1889,9 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Trading Warranty</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Configure trading warranties including excluded countries and DDQ requirements.
+            </p>
 
             {/* Section A: Trading Warranty Text (per-quotation) */}
             <div style={sectionStyle}>
@@ -1848,6 +1973,26 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
             {/* Section E: Custom Exclusion Text */}
             <div style={sectionStyle}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Custom Trading Section (optional)</label>
+                {templates.length > 0 && (
+                    <div style={{ marginBottom: '10px' }}>
+                        <select
+                            value=""
+                            onChange={e => {
+                                const tpl = templates.find(t => t.id === e.target.value)
+                                if (tpl) {
+                                    setQ(p => ({ ...p, tradingCustomText: tpl.text }))
+                                    updateField('tradingCustomText', tpl.text)
+                                }
+                            }}
+                            style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
+                        >
+                            <option value="">Load from template...</option>
+                            {templates.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
                 <RichTextEditor
                     value={quotation.tradingCustomText || ''}
                     onChange={val => { setQ(p => ({ ...p, tradingCustomText: val })); updateField('tradingCustomText', val) }}
@@ -2203,7 +2348,9 @@ function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, g
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Warranties</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Select survey warranty conditions from templates. Fill in placeholder values for each selected warranty.</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Select warranties from the master list. Apply sets for quick selection. Reorder using arrows.
+            </p>
 
             {allWarranties.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '16px' }}>No warranties defined. Add them in Settings.</p>}
 
@@ -3148,6 +3295,9 @@ function SanctionsTab({ quotation, updateField, setQ, sanctionsVersions }: { quo
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Sanctions Clause</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Configure the sanctions clause version for this quotation.
+            </p>
 
             {sanctionsVersions.length > 0 ? (
                 <div style={{ marginBottom: '16px' }}>
@@ -3391,7 +3541,7 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <h3 style={{ fontSize: '1rem', margin: 0 }}>Subjectivities</h3>
+                <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Subjectivities</h3>
                 <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', background: 'var(--table-header-bg)', color: 'var(--text-secondary)' }}>{items.length}</span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
                     {availableMasters.length > 0 && (
@@ -3404,7 +3554,7 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
                     </button>
                 </div>
             </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Add subjectivities that must be met for this quotation to be valid.</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>Add subjectivities that must be met for this quotation to be valid.</p>
 
             {/* Master picker dropdown */}
             {showMasterPicker && availableMasters.length > 0 && (
@@ -3594,6 +3744,9 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Premium</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Configure premium amounts, discounts, instalments, and non-refundable terms.
+            </p>
 
             {/* Single vessel: premium inputs */}
             {!isMultiVessel && (
@@ -4018,7 +4171,7 @@ function InformationTab({ quotation, updateField, setQ, showSuccess }: { quotati
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Information</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Add additional information items and validity period for this quotation.</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>Add additional information items and validity period for this quotation.</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', maxWidth: '300px' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Validity (days):</span>
                 <input type="number" value={quotation.validityDays} onChange={e => { setQ(p => ({ ...p, validityDays: parseInt(e.target.value) || 14 })) }} onBlur={e => updateField('validityDays', parseInt(e.target.value) || 14)} style={{ width: '80px' }} />
@@ -4356,6 +4509,9 @@ function NotesTab({ quotation, showSuccess }: { quotation: Quotation; showSucces
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Additional Notes</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Internal notes for this quotation. Notes are not included in exports.
+            </p>
             <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
                 <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Note title" style={{ width: '100%', marginBottom: '8px', fontWeight: 600 }} />
                 <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Note content..." style={{ width: '100%', minHeight: '60px', resize: 'vertical', marginBottom: '8px' }} />
@@ -4443,8 +4599,8 @@ function CustomSectionsTab({ quotation, showSuccess, showError, isLight }: { quo
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Custom Sections</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                Add custom sections that will appear in the exported quotation. Use the Section Order button in the header to position them.
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Add custom sections that will appear in the exported quotation document.
             </p>
 
             {/* Add form */}
@@ -4794,7 +4950,7 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
 
     return (
         <div>
-            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Agreed Insured Value</h3>
+            <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Agreed Insured Value</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
                 Set the agreed value and select/add text items for the Hull quotation.
             </p>
@@ -5250,7 +5406,7 @@ function SumInsuredTab({ quotation, updateField, setQ }: {
 
     return (
         <div>
-            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Sum Insured</h3>
+            <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Sum Insured</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
                 The sum insured for this War Risk quotation.
             </p>
@@ -5408,7 +5564,7 @@ function WarConditionsTab({ quotation, showError }: {
 
     return (
         <div>
-            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Conditions</h3>
+            <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Conditions</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
                 Select conditions for this War Risk quotation. Placeholders (<code style={{ fontSize: '0.78rem' }}>{'{jwla_code}'}</code>, <code style={{ fontSize: '0.78rem' }}>{'{jwla_date}'}</code>, <code style={{ fontSize: '0.78rem' }}>{'{tc_text}'}</code>) are resolved from War Settings.
             </p>
@@ -5531,7 +5687,7 @@ function WarTradingTab({ quotation, updateField, setQ }: {
 
     return (
         <div>
-            <h3 style={{ margin: '0 0 6px', fontSize: '1rem' }}>Trading Warranty</h3>
+            <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Trading Warranty</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
                 Trading warranty text for this War Risk quotation. Defaults from War Settings.
             </p>
@@ -5945,7 +6101,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem' }}>Hull Conditions</h3>
+                <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Hull Conditions</h3>
                 <button
                     onClick={handleSyncFromSettings}
                     className="btn-secondary"
