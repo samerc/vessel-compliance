@@ -7240,43 +7240,31 @@ export class MySQLAdapter {
     async getPoliciesList(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
-                    pt.name as policyTypeName, pt.id as policyTypeId,
-                    vdp.policy_number as policyNumber,
-                    vdp.condition_id as conditionId, ptcond.name as conditionName,
-                    vdp.status, vdp.currency,
-                    vdp.broker_entity_id as brokerEntityId, broker.name as brokerName,
-                    e.name as customerName, v.customer_type as customerType,
-                    f.name as fleetName,
-                    vdp.notes,
-                    vdp.created_at as createdAt, vdp.updated_at as updatedAt,
-                    (SELECT vpv_start.value_date FROM vessel_policy_values vpv_start
-                     JOIN policy_type_characteristics ptc_start ON vpv_start.characteristic_id = ptc_start.id
-                     WHERE vpv_start.policy_id = vdp.id AND ptc_start.field_type = 'date'
-                       AND (LOWER(ptc_start.name) LIKE '%inception%' OR LOWER(ptc_start.name) LIKE '%start%')
-                     LIMIT 1) as inceptionDate,
-                    (SELECT vpv_end.value_date FROM vessel_policy_values vpv_end
-                     JOIN policy_type_characteristics ptc_end ON vpv_end.characteristic_id = ptc_end.id
-                     WHERE vpv_end.policy_id = vdp.id AND ptc_end.field_type = 'date'
-                       AND LOWER(ptc_end.name) LIKE '%end%'
-                     LIMIT 1) as expiryDate,
-                    (SELECT vpv_prem.value_amount FROM vessel_policy_values vpv_prem
-                     JOIN policy_type_characteristics ptc_prem ON vpv_prem.characteristic_id = ptc_prem.id
-                     WHERE vpv_prem.policy_id = vdp.id AND ptc_prem.field_type = 'amount'
-                       AND LOWER(ptc_prem.name) LIKE '%premium%'
-                     LIMIT 1) as premiumAmount
-             FROM vessel_dynamic_policies vdp
-             JOIN vessels v ON vdp.vessel_id = v.id
-             LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
-             LEFT JOIN policy_type_conditions ptcond ON vdp.condition_id = ptcond.id
-             LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id
+            `SELECT pd.id, pd.quotation_id as quotationId, pd.vessel_id as vesselId,
+                    pd.policy_number as policyNumber, pd.status,
+                    pd.revision_number as revisionNumber,
+                    pd.inception_date as inceptionDate, pd.inception_time as inceptionTime,
+                    pd.expiry_date as expiryDate, pd.expiry_time as expiryTime,
+                    pd.timezone, pd.premium_amount as premiumAmount,
+                    pd.commission_percent as commissionPercent,
+                    pd.created_at as createdAt,
+                    v.name as vesselName, v.imo_number as imoNumber,
+                    e.name as customerName,
+                    qt.code as quotationTypeCode, qt.name as quotationTypeName,
+                    b.name as brokerName
+             FROM policy_documents pd
+             LEFT JOIN vessels v ON pd.vessel_id = v.id
              LEFT JOIN entities e ON v.customer_id = e.id
-             LEFT JOIN fleets f ON v.fleet_id = f.id
-             ORDER BY vdp.created_at DESC`
+             LEFT JOIN quotations q ON pd.quotation_id = q.id
+             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+             LEFT JOIN banks b ON pd.bank_id = b.id
+             ORDER BY pd.created_at DESC`
         )
         return (rows as any[]).map(r => ({
             ...r,
-            premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined
+            revisionNumber: Number(r.revisionNumber || 0),
+            premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined,
+            commissionPercent: r.commissionPercent != null ? Number(r.commissionPercent) : undefined
         }))
     }
 
