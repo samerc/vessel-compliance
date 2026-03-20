@@ -707,6 +707,10 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
     const [bankId, setBankId] = useState('')
     const [showAddresses, setShowAddresses] = useState(false)
     const [blueCards, setBlueCards] = useState<string[]>([])
+    const [piAlts, setPiAlts] = useState<QuotationPIAlternative[]>([])
+    const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
+    const [selectedAltId, setSelectedAltId] = useState<string>('')
+    const [totalPremium, setTotalPremium] = useState<number>(0)
     const [converting, setConverting] = useState(false)
     const [loading, setLoading] = useState(true)
 
@@ -721,15 +725,26 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
     const loadData = async () => {
         setLoading(true)
         try {
-            const [qv, bankData, instalments] = await Promise.all([
+            const [qv, bankData, instalments, piAltsRes, hullAltsRes] = await Promise.all([
                 window.api.getQuotationVessels(quotation.id),
                 window.api.bankGetAll(),
-                window.api.getQuotationInstalments(quotation.id)
+                window.api.getQuotationInstalments(quotation.id),
+                quotation.quotationTypeCode === 'P' ? window.api.piGetQuotationAlternatives(quotation.id) : Promise.resolve([]),
+                quotation.quotationTypeCode === 'H' ? window.api.hullGetQuotationAlternatives(quotation.id) : Promise.resolve([])
             ])
             const vessels = Array.isArray(qv) ? qv : []
             setQVessels(vessels)
             setSelectedVesselIds(vessels.map(v => v.vesselId || v.id))
             if (Array.isArray(bankData)) setBanks(bankData)
+
+            // Load alternatives
+            const safePiAlts = Array.isArray(piAltsRes) ? piAltsRes : []
+            const safeHullAlts = Array.isArray(hullAltsRes) ? hullAltsRes : []
+            setPiAlts(safePiAlts)
+            setHullAlts(safeHullAlts)
+            // Auto-select first alternative if any
+            const allAlts = [...safePiAlts, ...safeHullAlts]
+            if (allAlts.length > 1 && !selectedAltId) setSelectedAltId(allAlts[0].id)
 
             // Try to pre-fill inception/expiry from vessel's existing policy end date
             const withVessel = vessels.filter(v => v.vesselId)
@@ -739,7 +754,6 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                     const endDate = resolveEffectivePolicyExpiry(policies)
                     if (endDate) {
                         setInceptionDate(endDate)
-                        // Expiry = inception + periodDays (default 365)
                         const exp = new Date(endDate)
                         exp.setDate(exp.getDate() + 365)
                         setExpiryDate(exp.toISOString().split('T')[0])
@@ -747,21 +761,26 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                 } catch { /* ignore */ }
             }
 
-            // Calculate instalment dates and amounts from quotation data
+            // Calculate payable premium (after NCB/UPCC discounts)
+            let techPremium = quotation.premiumAmount || 0
+            if (vessels.length > 0) {
+                const vesselPremSum = vessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
+                if (vesselPremSum > 0) techPremium = vesselPremSum
+            }
+            // If hull alternatives with per-alt premiums, use first alt premium
+            if (safeHullAlts.length > 1 && safeHullAlts[0].premiumAmount) {
+                techPremium = safeHullAlts[0].premiumAmount
+            }
+            let payable = techPremium
+            if (quotation.ncbEnabled && quotation.ncbDiscountPercent) payable = payable * (1 - quotation.ncbDiscountPercent / 100)
+            if (quotation.upccEnabled && quotation.upccDiscountPercent) payable = payable * (1 - quotation.upccDiscountPercent / 100)
+            payable = Math.round(payable * 100) / 100
+            setTotalPremium(payable)
+
+            // Calculate instalment dates and amounts
             const safeInstalments = Array.isArray(instalments) ? instalments : []
             if (safeInstalments.length > 0) {
                 setInstalmentDates(safeInstalments.map(() => ''))
-                // Calculate payable premium (after NCB/UPCC discounts)
-                let techPremium = quotation.premiumAmount || 0
-                // For multi-vessel, sum per-vessel premiums
-                if (vessels.length > 0) {
-                    const vesselPremSum = vessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
-                    if (vesselPremSum > 0) techPremium = vesselPremSum
-                }
-                let payable = techPremium
-                if (quotation.ncbEnabled && quotation.ncbDiscountPercent) payable = payable * (1 - quotation.ncbDiscountPercent / 100)
-                if (quotation.upccEnabled && quotation.upccDiscountPercent) payable = payable * (1 - quotation.upccDiscountPercent / 100)
-                payable = Math.round(payable * 100) / 100
                 const count = safeInstalments.length
                 const perInstalment = count > 0 ? Math.round((payable / count) * 100) / 100 : 0
                 const amounts = safeInstalments.map((_, i) => {
@@ -769,7 +788,6 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                     return perInstalment
                 })
                 setInstalmentAmounts(amounts)
-                // First instalment non-refundable by default if quotation has nonRefundableType
                 setInstalmentNonRefundable(safeInstalments.map((_, i) => i === 0 && !!quotation.nonRefundableType))
             }
         } catch (err: any) {
@@ -798,6 +816,34 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
         }
         loadAndCalc()
     }, [inceptionDate])
+
+    // Recalculate instalment amounts when premium changes
+    const recalcInstalments = (newPremium: number) => {
+        setTotalPremium(newPremium)
+        const count = instalmentAmounts.length
+        if (count === 0) return
+        const perInstalment = Math.round((newPremium / count) * 100) / 100
+        const amounts = instalmentAmounts.map((_, i) => {
+            if (i === 0) return Math.round((newPremium - perInstalment * (count - 1)) * 100) / 100
+            return perInstalment
+        })
+        setInstalmentAmounts(amounts)
+    }
+
+    // When alternative changes, update premium
+    const handleAltChange = (altId: string) => {
+        setSelectedAltId(altId)
+        const piAlt = piAlts.find(a => a.id === altId)
+        const hullAlt = hullAlts.find(a => a.id === altId)
+        let tech = (piAlt as any)?.premiumAmount || (hullAlt as any)?.premiumAmount || quotation.premiumAmount || 0
+        let pay = tech
+        if (quotation.ncbEnabled && quotation.ncbDiscountPercent) pay = pay * (1 - quotation.ncbDiscountPercent / 100)
+        if (quotation.upccEnabled && quotation.upccDiscountPercent) pay = pay * (1 - quotation.upccDiscountPercent / 100)
+        recalcInstalments(Math.round(pay * 100) / 100)
+    }
+
+    const allAlts = [...piAlts, ...hullAlts]
+    const hasAlts = allAlts.length > 1
 
     const toggleVessel = (id: string) => {
         setSelectedVesselIds(prev =>
@@ -923,6 +969,49 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
 
                         {/* Step 2: Policy Setup */}
                         <div style={labelStyle}>Policy Setup</div>
+
+                        {/* Alternative Selection (if alternatives exist) */}
+                        {hasAlts && (
+                            <div style={{ marginBottom: '14px' }}>
+                                <label style={labelStyle}>Select Alternative</label>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    {allAlts.map((alt, idx) => (
+                                        <button
+                                            key={alt.id}
+                                            onClick={() => handleAltChange(alt.id)}
+                                            style={{
+                                                padding: '6px 16px', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 600,
+                                                border: selectedAltId === alt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                                                background: selectedAltId === alt.id ? 'rgba(0,170,200,0.1)' : 'transparent',
+                                                color: selectedAltId === alt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {(alt as any).label || `Alternative ${idx + 1}`}
+                                            {(alt as any).premiumAmount ? ` — ${quotation.premiumCurrency || 'USD'} ${((alt as any).premiumAmount as number).toLocaleString()}` : ''}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Editable Premium */}
+                        <div style={{ marginBottom: '14px' }}>
+                            <label style={labelStyle}>Payable Premium</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                    type="number"
+                                    value={totalPremium || ''}
+                                    onChange={e => recalcInstalments(parseFloat(e.target.value) || 0)}
+                                    style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
+                                    placeholder="Premium amount"
+                                />
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{quotation.premiumCurrency || 'USD'}</span>
+                            </div>
+                            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                                Changing this will recalculate instalment amounts
+                            </p>
+                        </div>
 
                         {/* Inception Date + Time */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
