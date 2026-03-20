@@ -683,7 +683,11 @@ const api = {
   bankDelete: (id: string) => ipcRenderer.invoke('bank:delete', id),
   bankReorder: (ids: string[]) => ipcRenderer.invoke('bank:reorder', ids),
 
-  // Policy conversion
+  // Policy document methods
+  policyGetById: (id: string) => ipcRenderer.invoke('policy:getById', id),
+  policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),
+  policyGetAddresses: (policyId: string) => ipcRenderer.invoke('policy:getAddresses', policyId),
+  policyGetBlueCards: (policyId: string) => ipcRenderer.invoke('policy:getBlueCards', policyId),
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
 }
 

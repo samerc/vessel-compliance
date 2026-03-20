@@ -2415,6 +2415,16 @@ app.whenReady().then(() => {
   })
   safeHandle('vessels:setDynamicPolicyValues', async (event, policyId, values) => { await requirePermission(event, 'policies:manage'); return db.setVesselPolicyValues(policyId, values) })
 
+  // Policy Document methods
+  safeHandle('policy:getById', (event, id) => { requireSession(event); return db.getPolicyDocumentById(id) })
+  safeHandle('policy:getInstalments', (event, policyId) => { requireSession(event); return db.getPolicyInstalments(policyId) })
+  safeHandle('policy:getAddresses', (event, policyId) => { requireSession(event); return db.getPolicyAddresses(policyId) })
+  safeHandle('policy:getBlueCards', (event, policyId) => { requireSession(event); return db.getPolicyBlueCards(policyId) })
+  safeHandle('policy:convertFromQuotation', async (event, quotationId, options) => {
+    const session = requireSession(event)
+    return db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
+  })
+
   // Policy Expiry Alerts
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })

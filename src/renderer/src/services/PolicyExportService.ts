@@ -590,7 +590,7 @@ interface PolVesselInfo {
 // ---- Data loading ----
 
 async function loadPolicyExportData(policyId: string): Promise<PolicyExportData> {
-  const policy: PolicyDocRecord = await (window.api as any).policyGetById(policyId)
+  const policy: PolicyDocRecord = await window.api.policyGetById(policyId)
   const quotationOrNull = await window.api.getQuotation(policy.quotationId)
   if (!quotationOrNull) throw new Error('Quotation not found')
   const quotation: Quotation = quotationOrNull
@@ -609,9 +609,9 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
     flagStatesRaw, surveyWarrantiesRaw, banks
   ] = await Promise.all([
-    (window.api as any).policyGetInstalments(policyId),
-    (window.api as any).policyGetAddresses(policyId),
-    (window.api as any).policyGetBlueCards(policyId),
+    window.api.policyGetInstalments(policyId),
+    window.api.policyGetAddresses(policyId),
+    window.api.policyGetBlueCards(policyId),
     window.api.getQuotationVessels(policy.quotationId),
     window.api.getVessels(),
     window.api.getQuotationAssureds(policy.quotationId),

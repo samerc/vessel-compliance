@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, FileCheck, Ship, DollarSign, Shield, FileText, Clock, ExternalLink } from 'lucide-react'
+import { ArrowLeft, FileCheck, Ship, DollarSign, Shield, FileText, Clock, ExternalLink, Download, Loader2 } from 'lucide-react'
 import { VesselDynamicPolicy, VesselPolicyValue, Vessel, Entity } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
+import { exportPolicyDocx, exportDebitAdviceDocx, exportCreditAdviceDocx, exportBlueCardsDocx } from '../services/PolicyExportService'
 
 interface PolicyDetailProps {
     policyId: string
@@ -37,7 +38,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
     const [vessel, setVessel] = useState<Vessel | null>(null)
     const [customer, setCustomer] = useState<Entity | null>(null)
     const [loading, setLoading] = useState(true)
-    const { showError } = useToast()
+    const [exportingPolicy, setExportingPolicy] = useState(false)
+    const [exportingDA, setExportingDA] = useState(false)
+    const [exportingCA, setExportingCA] = useState(false)
+    const [exportingBC, setExportingBC] = useState(false)
+    const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
 
@@ -161,6 +166,83 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
 
     const sc = statusColors[policy.status] || statusColors.inactive
 
+    const handleExportPolicy = async () => {
+        setExportingPolicy(true)
+        try {
+            await exportPolicyDocx(policyId)
+            showSuccess('Policy document exported')
+        } catch (err: any) {
+            showError(err.message || 'Failed to export policy')
+        } finally {
+            setExportingPolicy(false)
+        }
+    }
+
+    const handleExportDA = async () => {
+        setExportingDA(true)
+        try {
+            await exportDebitAdviceDocx(policyId)
+            showSuccess('Debit advice exported')
+        } catch (err: any) {
+            showError(err.message || 'Failed to export debit advice')
+        } finally {
+            setExportingDA(false)
+        }
+    }
+
+    const handleExportCA = async () => {
+        setExportingCA(true)
+        try {
+            await exportCreditAdviceDocx(policyId)
+            showSuccess('Credit advice exported')
+        } catch (err: any) {
+            showError(err.message || 'Failed to export credit advice')
+        } finally {
+            setExportingCA(false)
+        }
+    }
+
+    const handleExportBC = async () => {
+        setExportingBC(true)
+        try {
+            const blueCards = await window.api.policyGetBlueCards(policyId)
+            if (!blueCards || blueCards.length === 0) {
+                showError('No blue cards found for this policy')
+                return
+            }
+            const cardTypes = blueCards.map((bc: any) => bc.cardType)
+            await exportBlueCardsDocx({
+                policyNumber: policy.policyNumber || '',
+                vesselName: vessel?.name || '',
+                imoNumber: vessel?.imoNumber || '',
+                flagState: '',
+                grossTonnage: vessel?.grossTonnage || 0,
+                inceptionDate: policyData.inception?.valueDate || '',
+                inceptionTime: '',
+                expiryDate: policyData.expiry?.valueDate || '',
+                expiryTime: '',
+                timezone: 'GMT'
+            }, cardTypes)
+            showSuccess('Blue cards exported')
+        } catch (err: any) {
+            showError(err.message || 'Failed to export blue cards')
+        } finally {
+            setExportingBC(false)
+        }
+    }
+
+    const exportBtnStyle: React.CSSProperties = {
+        padding: '6px 12px',
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px'
+    }
+
+    const isPIType = policy.policyTypeName?.toLowerCase().includes('p&i')
+        || policy.policyTypeName?.toLowerCase().includes('protection')
+
     return (
         <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
             {/* Header */}
@@ -200,6 +282,52 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
                         <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                             Condition: {policy.conditionName}
                         </div>
+                    )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                        className="btn-secondary"
+                        style={exportBtnStyle}
+                        onClick={handleExportPolicy}
+                        disabled={exportingPolicy}
+                        title="Export Policy DOCX"
+                    >
+                        {exportingPolicy ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
+                        Export Policy
+                    </button>
+                    <button
+                        className="btn-secondary"
+                        style={exportBtnStyle}
+                        onClick={handleExportDA}
+                        disabled={exportingDA}
+                        title="Export Debit Advice DOCX"
+                    >
+                        {exportingDA ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
+                        Export DA
+                    </button>
+                    {policy.brokerName && (
+                        <button
+                            className="btn-secondary"
+                            style={exportBtnStyle}
+                            onClick={handleExportCA}
+                            disabled={exportingCA}
+                            title="Export Credit Advice DOCX"
+                        >
+                            {exportingCA ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
+                            Export CA
+                        </button>
+                    )}
+                    {isPIType && (
+                        <button
+                            className="btn-secondary"
+                            style={exportBtnStyle}
+                            onClick={handleExportBC}
+                            disabled={exportingBC}
+                            title="Export Blue Cards DOCX"
+                        >
+                            {exportingBC ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
+                            Export Blue Cards
+                        </button>
                     )}
                 </div>
             </div>

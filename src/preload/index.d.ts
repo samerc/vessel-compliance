@@ -679,7 +679,11 @@ export interface Api {
   bankDelete: (id: string) => Promise<void>
   bankReorder: (ids: string[]) => Promise<void>
 
-  // Policy conversion
+  // Policy document methods
+  policyGetById: (id: string) => Promise<any>
+  policyGetInstalments: (policyId: string) => Promise<any[]>
+  policyGetAddresses: (policyId: string) => Promise<any[]>
+  policyGetBlueCards: (policyId: string) => Promise<any[]>
   policyConvertFromQuotation: (quotationId: string, options: {
     vessels: string[]
     inceptionDate: string

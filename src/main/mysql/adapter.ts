@@ -2107,6 +2107,85 @@ export class MySQLAdapter {
                 }
             }
 
+            // Ensure policy_documents table exists
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_documents (
+                id VARCHAR(36) PRIMARY KEY,
+                quotation_id VARCHAR(36) NOT NULL,
+                vessel_id VARCHAR(36) NOT NULL,
+                policy_number VARCHAR(100) NOT NULL,
+                status VARCHAR(20) DEFAULT 'active',
+                revision_number INT DEFAULT 0,
+                inception_date VARCHAR(20),
+                inception_time VARCHAR(10),
+                expiry_date VARCHAR(20),
+                expiry_time VARCHAR(10),
+                timezone VARCHAR(100),
+                commission_percent DECIMAL(5,2) NULL,
+                show_addresses TINYINT(1) DEFAULT 0,
+                bank_id VARCHAR(36) NULL,
+                pro_rata TINYINT(1) DEFAULT 0,
+                per_annum_premium DECIMAL(15,2) NULL,
+                premium_amount DECIMAL(15,2) NULL,
+                opening_clause TEXT NULL,
+                important_notice TEXT NULL,
+                closing_city VARCHAR(255) NULL,
+                cancel_replace_text TEXT NULL,
+                previous_policy_number VARCHAR(100) NULL,
+                previous_policy_date VARCHAR(20) NULL,
+                created_by VARCHAR(36),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )`)
+
+            // Migration: add premium_amount to policy_documents if missing
+            {
+                const [pdPremCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'premium_amount'")
+                if ((pdPremCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE policy_documents ADD COLUMN premium_amount DECIMAL(15,2) NULL')
+                }
+            }
+
+            // Ensure policy_doc_instalments table exists
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_doc_instalments (
+                id VARCHAR(36) PRIMARY KEY,
+                policy_doc_id VARCHAR(36) NOT NULL,
+                instalment_number INT NOT NULL,
+                due_date VARCHAR(20),
+                premium_amount DECIMAL(15,2) DEFAULT 0,
+                commission_amount DECIMAL(15,2) DEFAULT 0,
+                is_non_refundable TINYINT(1) DEFAULT 0
+            )`)
+
+            // Ensure policy_doc_addresses table exists
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_doc_addresses (
+                id VARCHAR(36) PRIMARY KEY,
+                policy_doc_id VARCHAR(36) NOT NULL,
+                entity_id VARCHAR(36) NULL,
+                role VARCHAR(100),
+                address_text TEXT
+            )`)
+
+            // Ensure policy_blue_cards table exists
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_blue_cards (
+                id VARCHAR(36) PRIMARY KEY,
+                policy_doc_id VARCHAR(36) NOT NULL,
+                card_type VARCHAR(20) NOT NULL,
+                card_number VARCHAR(100),
+                inception_date VARCHAR(20),
+                expiry_date VARCHAR(20),
+                revision_number INT DEFAULT 0,
+                issued_date VARCHAR(20)
+            )`)
+
+            // Ensure banks table exists
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS banks (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                details TEXT,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`)
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7157,6 +7236,196 @@ export class MySQLAdapter {
             ...r,
             premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined
         }))
+    }
+
+    async getPolicyDocumentById(id: string): Promise<any> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(`
+            SELECT pd.*, qt.code as quotationTypeCode, qt.name as quotationTypeName,
+                   v.name as vesselName, v.imo_number as imoNumber, v.vessel_type as vesselType,
+                   v.flag_state_id as flagStateId, v.built_year as builtYear, v.gross_tonnage as grossTonnage,
+                   fs.name as flagStateName,
+                   e.name as customerName,
+                   b.name as bankName, b.details as bankDetails
+            FROM policy_documents pd
+            LEFT JOIN quotations q ON pd.quotation_id = q.id
+            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN vessels v ON pd.vessel_id = v.id
+            LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
+            LEFT JOIN entities e ON v.customer_id = e.id
+            LEFT JOIN banks b ON pd.bank_id = b.id
+            WHERE pd.id = ?
+        `, [id])
+        const r = (rows as any[])[0]
+        if (!r) return null
+        return {
+            ...r,
+            showAddresses: Boolean(r.show_addresses),
+            proRata: Boolean(r.pro_rata),
+            commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
+            perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
+            revisionNumber: Number(r.revision_number || 0),
+            quotationId: r.quotation_id,
+            vesselId: r.vessel_id,
+            policyNumber: r.policy_number,
+            inceptionDate: r.inception_date,
+            inceptionTime: r.inception_time,
+            expiryDate: r.expiry_date,
+            expiryTime: r.expiry_time,
+            bankId: r.bank_id,
+            createdBy: r.created_by,
+            createdAt: r.created_at,
+        }
+    }
+
+    async getPolicyInstalments(policyId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT id, policy_doc_id as policyDocId, instalment_number as instalmentNumber,
+                   due_date as dueDate, premium_amount as premiumAmount,
+                   commission_amount as commissionAmount, is_non_refundable as isNonRefundable
+            FROM policy_doc_instalments
+            WHERE policy_doc_id = ?
+            ORDER BY instalment_number ASC
+        `, [policyId])
+        return (rows as any[]).map(r => ({
+            ...r,
+            premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : 0,
+            commissionAmount: r.commissionAmount ? Number(r.commissionAmount) : 0,
+            isNonRefundable: Boolean(r.isNonRefundable),
+        }))
+    }
+
+    async getPolicyAddresses(policyId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT id, policy_doc_id as policyDocId, entity_id as entityId,
+                   role, address_text as addressText,
+                   e.name as entityName
+            FROM policy_doc_addresses pda
+            LEFT JOIN entities e ON pda.entity_id = e.id
+            WHERE pda.policy_doc_id = ?
+        `, [policyId])
+        return rows as any[]
+    }
+
+    async getPolicyBlueCards(policyId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT id, policy_doc_id as policyDocId, card_type as cardType,
+                   card_number as cardNumber, inception_date as inceptionDate,
+                   expiry_date as expiryDate, revision_number as revisionNumber,
+                   issued_date as issuedDate
+            FROM policy_blue_cards
+            WHERE policy_doc_id = ?
+            ORDER BY card_type ASC
+        `, [policyId])
+        return (rows as any[]).map(r => ({
+            ...r,
+            revisionNumber: Number(r.revisionNumber || 0),
+        }))
+    }
+
+    async convertQuotationToPolicy(quotationId: string, options: {
+        vesselIds: string[]
+        inceptionDate: string
+        inceptionTime: string
+        expiryDate: string
+        expiryTime: string
+        timezone: string
+        instalments: { dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]
+        commissionPercent: number | null
+        bankId: string | null
+        showAddresses: boolean
+        blueCards: string[]
+        createdBy: string
+    }): Promise<any[]> {
+        if (!this.pool) throw new Error('DB not connected')
+
+        const quotation = await this.getQuotation(quotationId)
+        if (!quotation) throw new Error('Quotation not found')
+
+        // Get quotation type code for policy number generation
+        const typeCode = quotation.quotationTypeCode || 'P'
+
+        // Generate policy numbers: type + inverted year + serial
+        const year = new Date().getFullYear()
+        const invertedYear = String(year).split('').reverse().join('').slice(0, 4)
+
+        // Get next serial number (global across all types)
+        const [serialRow] = await this.pool.query(
+            'SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 5) AS UNSIGNED)), 0) + 1 as nextSerial FROM policy_documents'
+        )
+        let nextSerial = (serialRow as any[])[0]?.nextSerial || 1
+
+        const createdPolicies: any[] = []
+        const vessels = await this.getQuotationVessels(quotationId)
+
+        for (const vesselId of options.vesselIds) {
+            const vessel = vessels.find(v => v.vesselId === vesselId || v.id === vesselId)
+            const policyNumber = typeCode + invertedYear + String(nextSerial).padStart(4, '0')
+            const policyId = uuidv4()
+
+            // Get payable premium for this vessel
+            const premiumAmount = vessel?.premiumAmount || quotation.premiumAmount || 0
+
+            await this.pool.execute(`
+                INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
+                    revision_number, inception_date, inception_time, expiry_date, expiry_time,
+                    timezone, commission_percent, show_addresses, bank_id, pro_rata,
+                    per_annum_premium, premium_amount, created_by)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?)
+            `, [policyId, quotationId, vesselId, policyNumber,
+                options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
+                options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
+                premiumAmount, options.createdBy])
+
+            // Create instalments
+            for (let i = 0; i < options.instalments.length; i++) {
+                const inst = options.instalments[i]
+                await this.pool.execute(`
+                    INSERT INTO policy_doc_instalments (id, policy_doc_id, instalment_number,
+                        due_date, premium_amount, commission_amount, is_non_refundable)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `, [uuidv4(), policyId, i + 1, inst.dueDate, inst.premiumAmount,
+                    inst.commissionAmount, inst.isNonRefundable])
+            }
+
+            // Create addresses from vessel assureds
+            const [assureds] = await this.pool.query(`
+                SELECT va.entity_id, va.role, e.name as entityName,
+                    ea.address_text as addressText
+                FROM vessel_assureds va
+                JOIN entities e ON va.entity_id = e.id
+                LEFT JOIN entity_addresses ea ON va.address_id = ea.id
+                WHERE va.vessel_id = ?
+                ORDER BY va.id
+            `, [vesselId])
+            for (const assured of assureds as any[]) {
+                await this.pool.execute(`
+                    INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
+                    VALUES (?, ?, ?, ?, ?)
+                `, [uuidv4(), policyId, assured.entity_id, assured.role, assured.addressText || ''])
+            }
+
+            // Create blue cards (P&I only)
+            if (options.blueCards.length > 0) {
+                for (const cardType of options.blueCards) {
+                    const cardNumber = policyNumber + '/' + cardType
+                    await this.pool.execute(`
+                        INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
+                            inception_date, expiry_date, revision_number, issued_date)
+                        VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE)
+                    `, [uuidv4(), policyId, cardType, cardNumber,
+                        options.inceptionDate, options.expiryDate])
+                }
+            }
+
+            createdPolicies.push({ id: policyId, policyNumber, vesselId })
+            nextSerial++
+        }
+
+        return createdPolicies
     }
 
     async addVesselDynamicPolicy(policy: Omit<VesselDynamicPolicy, 'id' | 'createdAt' | 'updatedAt' | 'policyTypeName' | 'conditionName' | 'brokerName' | 'values'>): Promise<string> {
