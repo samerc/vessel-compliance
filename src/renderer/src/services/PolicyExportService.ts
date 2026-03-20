@@ -2,7 +2,7 @@ import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, BorderStyle, AlignmentType, PageBreak, VerticalAlign,
   PageOrientation, TableLayoutType, LevelFormat,
-  Footer, PageNumber, ImageRun
+  Footer, PageNumber, ImageRun, Header
 } from 'docx'
 import {
   Quotation, Vessel, QuotationAssured, QuotationSubLimit, QuotationDeductible,
@@ -1047,6 +1047,27 @@ function polMakeDocxNumbering() {
         alignment: AlignmentType.LEFT,
         style: { paragraph: { indent: { left: 280, hanging: 200 } } }
       }]
+    }, {
+      reference: 'trading-numbered',
+      levels: [{
+        level: 0,
+        format: LevelFormat.DECIMAL,
+        text: '%1)',
+        alignment: AlignmentType.LEFT,
+        style: {
+          run: { font: 'Arial', size: POL_FONT_SIZE },
+          paragraph: { indent: { left: 240, hanging: 240 } }
+        }
+      }, {
+        level: 1,
+        format: LevelFormat.LOWER_LETTER,
+        text: '%2)',
+        alignment: AlignmentType.LEFT,
+        style: {
+          run: { font: 'Arial', size: POL_FONT_SIZE },
+          paragraph: { indent: { left: 720, hanging: 360 } }
+        }
+      }]
     }]
   }
 }
@@ -1190,8 +1211,7 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   const { inceptionDate, inceptionTime, expiryDate, expiryTime, timezone } = data.policy
   const labelW = Math.round(POL_BODY_W * 0.10)
   const dateW = Math.round(POL_BODY_W * 0.30)
-  const timeW = Math.round(POL_BODY_W * 0.20)
-  const tzW = POL_BODY_W - labelW - dateW - timeW
+  const timeTzW = POL_BODY_W - labelW - dateW
 
   const makeCell = (text: string, bold = false) => new TableCell({
     width: { size: 0, type: WidthType.AUTO },
@@ -1199,13 +1219,18 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
     children: [new Paragraph({ children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })] })]
   })
 
+  const fmtTimeTz = (time: string | null | undefined, tz: string | null | undefined) => {
+    const parts = [polFormatTime(time), tz || ''].filter(Boolean)
+    return parts.join(' ')
+  }
+
   return [new Table({
     width: { size: POL_BODY_W, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
-    columnWidths: [labelW, dateW, timeW, tzW],
+    columnWidths: [labelW, dateW, timeTzW],
     rows: [
-      new TableRow({ children: [makeCell('From'), makeCell(polFormatDateUS(inceptionDate), true), makeCell(polFormatTime(inceptionTime)), makeCell(timezone || '')] }),
-      new TableRow({ children: [makeCell('To'), makeCell(polFormatDateUS(expiryDate), true), makeCell(polFormatTime(expiryTime)), makeCell(timezone || '')] })
+      new TableRow({ children: [makeCell('From'), makeCell(polFormatDateUS(inceptionDate), true), makeCell(fmtTimeTz(inceptionTime, timezone))] }),
+      new TableRow({ children: [makeCell('To'), makeCell(polFormatDateUS(expiryDate), true), makeCell(fmtTimeTz(expiryTime, timezone))] })
     ]
   })]
 }
@@ -1410,10 +1435,10 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
 
 function polGetValueSectionTitle(typeCode: string | undefined): string {
   switch (typeCode) {
-    case 'P': return 'Limit of Liability'
+    case 'P': return 'Limits of Liability'
     case 'H': return 'Agreed Insured Value'
     case 'W': return 'Sum Insured'
-    default: return 'Limit of Liability'
+    default: return 'Limits of Liability'
   }
 }
 
@@ -1430,39 +1455,54 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
   } else {
     if (wq.tradingCustomText) { content.push(polEmptyP()); content.push(...polMp(wq.tradingCustomText)) }
     if (excCountries.length > 0) { content.push(polEmptyP()); content.push(polNp('Excluding ' + excCountries.map(c => c.name).join(', ') + '.')) }
-    let sectionNum = 1
     if (wq.tradingShowDdqList && ddqCountries.length > 0) {
       const ddqList = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
       const ddqIntro = stripHtml(polSt(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
       content.push(polEmptyP())
       if (ddqIntro.includes('{ddq_countries}')) {
-        content.push(polNp(`${sectionNum}) ${ddqIntro.replace(/\{ddq_countries\}/g, ddqList)}`))
+        content.push(new Paragraph({
+          numbering: { reference: 'trading-numbered', level: 0 },
+          spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+          children: [new TextRun({ text: ddqIntro.replace(/\{ddq_countries\}/g, ddqList), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+        }))
       } else {
-        content.push(polNp(`${sectionNum}) ${ddqIntro}`))
+        content.push(new Paragraph({
+          numbering: { reference: 'trading-numbered', level: 0 },
+          spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+          children: [new TextRun({ text: ddqIntro, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+        }))
         content.push(polNp(ddqList))
       }
-      sectionNum++
     }
     if (wq.tradingShowDdqWarranties) {
       const intro = polSt(data, 'tradingConditionA')
-      if (intro) { content.push(polEmptyP()); content.push(polNp(`${sectionNum}) ${stripHtml(intro)}`)) }
-      sectionNum++
+      if (intro) {
+        content.push(polEmptyP())
+        content.push(new Paragraph({
+          numbering: { reference: 'trading-numbered', level: 0 },
+          spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+          children: [new TextRun({ text: stripHtml(intro), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+        }))
+      }
       const condKeys: (keyof PISectionTexts)[] = ['tradingConditionB', 'tradingConditionC', 'tradingConditionD', 'tradingConditionE', 'tradingConditionF', 'tradingConditionG']
-      const labels = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)']
-      for (let i = 0; i < condKeys.length; i++) {
-        const txt = polSt(data, condKeys[i])
+      for (const key of condKeys) {
+        const txt = polSt(data, key)
         if (txt) {
           content.push(new Paragraph({
-            spacing: { after: 40, line: 240, lineRule: 'auto' as any },
-            indent: { left: 400 },
-            children: [new TextRun({ text: `${labels[i]} ${stripHtml(txt)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+            numbering: { reference: 'trading-numbered', level: 1 },
+            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            children: [new TextRun({ text: stripHtml(txt), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           }))
         }
       }
     }
     if (wq.tradingShowIsrael && polSt(data, 'tradingIsrael')) {
       content.push(polEmptyP())
-      content.push(polNp(`${sectionNum}) ${stripHtml(polSt(data, 'tradingIsrael'))}`))
+      content.push(new Paragraph({
+        numbering: { reference: 'trading-numbered', level: 0 },
+        spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+        children: [new TextRun({ text: stripHtml(polSt(data, 'tradingIsrael')), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+      }))
     }
   }
 
@@ -1529,45 +1569,42 @@ function polBuildPremiumPaymentSection(data: PolicyExportData): (Paragraph | Tab
   const { instalments } = data
   const numInst = instalments.length || 1
   const currency = data.quotation.premiumCurrency || 'USD'
+  const wq = data.quotation
+  const totalPremium = instalments.reduce((sum, i) => sum + (i.amount || 0), 0) || wq.premiumAmount || 0
+  const timezone = data.policy.timezone || ''
 
-  if (polSt(data, 'premiumCondition')) {
-    content.push(polBup('CONDITION PRECEDENT'))
-    content.push(polEmptyP())
-  }
-
+  // 1. Premium intro with amount
   if (numInst === 1) {
-    content.push(polNp('Premium shall be payable in a single instalment.'))
+    content.push(polNp(`Premium ${polFormatCurrency(totalPremium, currency)} shall be payable in a single instalment.`))
   } else {
-    content.push(polNp(`Premium shall be payable in ${numInst} instalments as follows:`))
+    const timePart = timezone ? `, at Noon ${timezone}, time being of the essence` : ''
+    content.push(polNp(`Premium ${polFormatCurrency(totalPremium, currency)} shall be payable in ${numInst} Instalments on the following dates${timePart}:`))
   }
   content.push(polEmptyP())
 
+  // 2. Instalment table — 2 columns only (label + date)
   if (instalments.length > 0) {
-    const wq = data.quotation
     const isFirstInstNr = wq.nonRefundableType === 'first_instalment'
-    const labelW = Math.round(POL_BODY_W * 0.40)
-    const dateW = Math.round(POL_BODY_W * 0.30)
-    const amtW = POL_BODY_W - labelW - dateW
+    const labelW = Math.round(POL_BODY_W * 0.55)
+    const dateW = POL_BODY_W - labelW
 
     const instRows: TableRow[] = []
     for (const inst of instalments) {
       let label = `${polOrdinal(inst.instalmentNumber)} Instalment due`
       if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
-        label += ' (non-refundable in case of cancellation, whether before or after inception)'
+        label += ' (non-refundable)'
       }
-      const labelChildren: TextRun[] = [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
       instRows.push(new TableRow({
         children: [
-          new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: labelChildren })] }),
-          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
+          new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       }))
     }
     content.push(new Table({
       width: { size: POL_BODY_W, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
-      columnWidths: [labelW, dateW, amtW],
+      columnWidths: [labelW, dateW],
       rows: instRows
     }))
     content.push(polEmptyP())
@@ -1578,7 +1615,13 @@ function polBuildPremiumPaymentSection(data: PolicyExportData): (Paragraph | Tab
     }
   }
 
+  // 3. Additional premium text
+  if (wq.premiumAdditionalText) { content.push(...polMp(wq.premiumAdditionalText)); content.push(polEmptyP()) }
+
+  // 4. Condition precedent text
   if (polSt(data, 'premiumCondition')) { content.push(...polMp(polSt(data, 'premiumCondition'))); content.push(polEmptyP()) }
+
+  // 5. Premium earned text
   if (polSt(data, 'premiumEarned')) { content.push(...polMp(polSt(data, 'premiumEarned'))) }
 
   return content
@@ -1593,7 +1636,7 @@ function polGetDefaultOpeningClause(typeCode: string): string {
 
 // ==================== Policy Document Export ====================
 
-export async function exportPolicyDocx(policyId: string): Promise<void> {
+export async function exportPolicyDocx(policyId: string, totalPages?: number): Promise<void> {
   await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
@@ -1661,7 +1704,7 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          margins: { top: 60, bottom: 100, left: 80, right: 80 },
+          margins: { top: 60, bottom: 200, left: 80, right: 80 },
           children: content.length > 0 ? content : [polEmptyP()]
         })
       ]
@@ -1770,10 +1813,12 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
     if (plainNotice.startsWith('IMPORTANT NOTICE')) {
       children.push(polCenteredP('IMPORTANT NOTICE', true))
       children.push(...parseHtmlToParagraphs(importantNotice.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''), {
-        size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.CENTER
+        size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED
       }))
     } else {
-      children.push(...polMp(importantNotice))
+      children.push(...parseHtmlToParagraphs(importantNotice, {
+        size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED
+      }))
     }
     children.push(polEmptyP())
   }
@@ -1794,9 +1839,9 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
     columnWidths: [sigLabelW, sigGapW, sigLabelW],
     rows: [new TableRow({
       children: [
-        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: [polCenteredP('THE INSURED', true)] }),
+        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'THE INSURED', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] }),
         new TableCell({ width: { size: sigGapW, type: WidthType.DXA }, borders: polNoBorders(), children: [polEmptyP()] }),
-        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: [polCenteredP('THE INSURER', true)] })
+        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'THE INSURER', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
       ]
     })]
   }))
@@ -1810,11 +1855,33 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
     children.push(polNp(cancelText))
   }
 
+  // Build header from section texts
+  const headerHtml = polSt(data, 'docHeader')
+  const headerSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
+  const headerParas = headerHtml
+    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Arial', color: '666666', lineSpacing: headerSpacing })
+    : []
+  const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
+
+  // Build footer with Page X of Y
+  const policyFooter = new Footer({
+    children: [new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 40, after: 0 },
+      children: [
+        new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
+        new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
+        new TextRun({ text: ` of ${totalPages || ''}`, size: 16, font: 'Arial', color: '999999' })
+      ]
+    })]
+  })
+
   const document = new Document({
     numbering: polMakeDocxNumbering(),
     sections: [{
       properties: polMakePageProperties(),
-      footers: { default: polMakeDefaultFooter() },
+      headers: { default: defaultHeader },
+      footers: { default: policyFooter },
       children: children as any[]
     }]
   })

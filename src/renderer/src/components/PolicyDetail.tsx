@@ -125,6 +125,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
   const [exportingDA, setExportingDA] = useState(false)
   const [exportingCA, setExportingCA] = useState(false)
   const [exportingBC, setExportingBC] = useState(false)
+  const [showPagesPrompt, setShowPagesPrompt] = useState(false)
+  const [totalPagesInput, setTotalPagesInput] = useState('31')
   const { showError, showSuccess } = useToast()
   const { hasPermission } = useAuth()
   const { theme } = useTheme()
@@ -251,10 +253,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
       ? (policy.commissionPercent / 100) * policy.premiumAmount
       : null
 
-  const handleExportPolicy = async () => {
+  const handleExportPolicy = () => {
+    setShowPagesPrompt(true)
+  }
+
+  const handleConfirmExportPolicy = async () => {
+    setShowPagesPrompt(false)
     setExportingPolicy(true)
     try {
-      await exportPolicyDocx(policyId)
+      const pages = parseInt(totalPagesInput, 10)
+      await exportPolicyDocx(policyId, isNaN(pages) ? undefined : pages)
       showSuccess('Policy document exported')
     } catch (err: any) {
       showError(err.message || 'Failed to export policy')
@@ -919,6 +927,42 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
           </div>
         </div>
       </div>
+
+      {showPagesPrompt && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            background: isLight ? '#ffffff' : '#1a1d28',
+            borderRadius: 12, padding: 24, minWidth: 320,
+            border: '1px solid var(--glass-border)'
+          }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 16, color: 'var(--text-primary)' }}>Export Policy</h3>
+            <label style={{ display: 'block', marginBottom: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
+              Total pages (for footer)
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={totalPagesInput}
+              onChange={e => setTotalPagesInput(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 14,
+                border: '1px solid var(--input-border)',
+                background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                boxSizing: 'border-box'
+              }}
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') handleConfirmExportPolicy() }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setShowPagesPrompt(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleConfirmExportPolicy}>Export</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
