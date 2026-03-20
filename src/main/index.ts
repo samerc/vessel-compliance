@@ -2415,6 +2415,13 @@ app.whenReady().then(() => {
   })
   safeHandle('vessels:setDynamicPolicyValues', async (event, policyId, values) => { await requirePermission(event, 'policies:manage'); return db.setVesselPolicyValues(policyId, values) })
 
+  // Banks
+  safeHandle('bank:getAll', (event) => { requireSession(event); return db.getBanks() })
+  safeHandle('bank:add', async (event, name, details) => { await requirePermission(event, 'admin:settings'); return db.addBank(name, details) })
+  safeHandle('bank:update', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updateBank(id, updates) })
+  safeHandle('bank:delete', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteBank(id) })
+  safeHandle('bank:reorder', async (event, ids) => { await requirePermission(event, 'admin:settings'); return db.reorderBanks(ids) })
+
   // Policy Document methods
   safeHandle('policy:getById', (event, id) => { requireSession(event); return db.getPolicyDocumentById(id) })
   safeHandle('policy:getInstalments', (event, policyId) => { requireSession(event); return db.getPolicyInstalments(policyId) })

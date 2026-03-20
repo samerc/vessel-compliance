@@ -7195,6 +7195,48 @@ export class MySQLAdapter {
         return policies
     }
 
+    // ==================== Banks ====================
+
+    async getBanks(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, details, order_index AS `order` FROM banks ORDER BY order_index ASC')
+        return rows as any[]
+    }
+
+    async addBank(name: string, details: string): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM banks')
+        const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+        await this.pool.execute('INSERT INTO banks (id, name, details, order_index) VALUES (?, ?, ?, ?)', [id, name, details, nextOrder])
+        return { id, name, details, order: nextOrder }
+    }
+
+    async updateBank(id: string, updates: Partial<{ name: string; details: string }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.details !== undefined) { fields.push('details = ?'); values.push(updates.details) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE banks SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteBank(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM banks WHERE id = ?', [id])
+    }
+
+    async reorderBanks(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE banks SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
+    // ==================== Policy Documents ====================
+
     async getPoliciesList(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
