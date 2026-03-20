@@ -2375,6 +2375,7 @@ app.whenReady().then(() => {
   // Vessel Dynamic Policies
   safeHandle('vessels:getDynamicPolicies', (event, vesselId) => { requireSession(event); return db.getVesselDynamicPolicies(vesselId) })
   safeHandle('vessels:getAllDynamicPolicies', (event) => { requireSession(event); return db.getAllVesselDynamicPolicies() })
+  safeHandle('policies:getList', (event) => { requireSession(event); return db.getPoliciesList() })
   safeHandle('vessels:addDynamicPolicy', async (event, policy) => {
     const user = await requirePermission(event, 'policies:manage')
     const result = await db.addVesselDynamicPolicy(policy)

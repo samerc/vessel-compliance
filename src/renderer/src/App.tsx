@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -30,6 +30,8 @@ const Reports = lazy(() => import('./components/Reports'))
 const FleetAnalytics = lazy(() => import('./components/FleetAnalytics'))
 const ActivityLog = lazy(() => import('./components/ActivityLog'))
 const EmailTemplates = lazy(() => import('./components/EmailTemplates'))
+const PolicyList = lazy(() => import('./components/PolicyList'))
+const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
 
 const LoadingFallback = () => (
   <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -38,7 +40,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'email-templates'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'email-templates' | 'policies-list' | 'policy-detail'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -50,6 +52,7 @@ function App(): React.JSX.Element {
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
   const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
   const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -272,6 +275,7 @@ function App(): React.JSX.Element {
               {hasPermission('surveys:view') && navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
               {navItem('calculators', <Calculator size={18} />, 'Calculators')}
               {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
+              {hasPermission('policies:view') && navItem('policies-list', <FileCheck size={18} />, 'Policies')}
               {hasPermission('email:view') && navItem('email-templates', <Mail size={18} />, 'Email Templates')}
               {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
             </NavGroup>
@@ -322,6 +326,7 @@ function App(): React.JSX.Element {
               'admin': 'Back to System Setup',
               'reminders': 'Back to Reminders',
               'survey-followup': 'Back to Survey Follow-Up',
+              'policies-list': 'Back to Policies',
             } as Record<string, string>)[navigateBackTab] || 'Back' : undefined}
           />}
           {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
@@ -340,6 +345,22 @@ function App(): React.JSX.Element {
           {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
           {activeTab === 'email-templates' && <Suspense fallback={<LoadingFallback />}><EmailTemplates /></Suspense>}
+          {activeTab === 'policies-list' && <Suspense fallback={<LoadingFallback />}>
+            <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+              <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                <FileCheck size={28} /> Policies
+              </h1>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '24px' }}>Insurance policy documents</p>
+              <PolicyList onSelectPolicy={(id) => { setSelectedPolicyId(id); setActiveTab('policy-detail') }} />
+            </div>
+          </Suspense>}
+          {activeTab === 'policy-detail' && selectedPolicyId && <Suspense fallback={<LoadingFallback />}>
+            <PolicyDetail
+              policyId={selectedPolicyId}
+              onBack={() => { setSelectedPolicyId(null); setActiveTab('policies-list') }}
+              onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('policies-list'); setActiveTab('vessels') }}
+            />
+          </Suspense>}
           {activeTab === 'activity-log' && <Suspense fallback={<LoadingFallback />}><ActivityLog /></Suspense>}
         </main>
         <UpdateNotification />

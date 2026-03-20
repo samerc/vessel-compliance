@@ -2078,6 +2078,35 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Seed "Converted" workflow step if it doesn't exist
+            {
+                const [convRows] = await this.pool.query(
+                    "SELECT id FROM quotation_workflow_steps WHERE name = 'Converted'"
+                )
+                if ((convRows as any[]).length === 0) {
+                    const convertedId = uuidv4()
+                    const [maxOrdRows] = await this.pool.query(
+                        'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_workflow_steps'
+                    )
+                    const nextOrder = (maxOrdRows as any[])[0].nextOrder
+                    await this.pool.execute(
+                        'INSERT INTO quotation_workflow_steps (id, name, color, order_index, can_edit, can_export, is_lock_point, is_initial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [convertedId, 'Converted', '#22c55e', nextOrder, false, true, true, false]
+                    )
+                    // Add transition from Sent → Converted
+                    const [sentRows] = await this.pool.query(
+                        "SELECT id FROM quotation_workflow_steps WHERE name = 'Sent'"
+                    )
+                    if ((sentRows as any[]).length > 0) {
+                        const sentId = (sentRows as any[])[0].id
+                        await this.pool.execute(
+                            'INSERT INTO quotation_workflow_transitions (id, from_step_id, to_step_id, permission_key, auto_create_revision) VALUES (?, ?, ?, ?, ?)',
+                            [uuidv4(), sentId, convertedId, null, false]
+                        )
+                    }
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7085,6 +7114,49 @@ export class MySQLAdapter {
         }
 
         return policies
+    }
+
+    async getPoliciesList(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
+                    pt.name as policyTypeName, pt.id as policyTypeId,
+                    vdp.policy_number as policyNumber,
+                    vdp.condition_id as conditionId, ptcond.name as conditionName,
+                    vdp.status, vdp.currency,
+                    vdp.broker_entity_id as brokerEntityId, broker.name as brokerName,
+                    e.name as customerName, v.customer_type as customerType,
+                    f.name as fleetName,
+                    vdp.notes,
+                    vdp.created_at as createdAt, vdp.updated_at as updatedAt,
+                    (SELECT vpv_start.value_date FROM vessel_policy_values vpv_start
+                     JOIN policy_type_characteristics ptc_start ON vpv_start.characteristic_id = ptc_start.id
+                     WHERE vpv_start.policy_id = vdp.id AND ptc_start.field_type = 'date'
+                       AND (LOWER(ptc_start.name) LIKE '%inception%' OR LOWER(ptc_start.name) LIKE '%start%')
+                     LIMIT 1) as inceptionDate,
+                    (SELECT vpv_end.value_date FROM vessel_policy_values vpv_end
+                     JOIN policy_type_characteristics ptc_end ON vpv_end.characteristic_id = ptc_end.id
+                     WHERE vpv_end.policy_id = vdp.id AND ptc_end.field_type = 'date'
+                       AND LOWER(ptc_end.name) LIKE '%end%'
+                     LIMIT 1) as expiryDate,
+                    (SELECT vpv_prem.value_amount FROM vessel_policy_values vpv_prem
+                     JOIN policy_type_characteristics ptc_prem ON vpv_prem.characteristic_id = ptc_prem.id
+                     WHERE vpv_prem.policy_id = vdp.id AND ptc_prem.field_type = 'amount'
+                       AND LOWER(ptc_prem.name) LIKE '%premium%'
+                     LIMIT 1) as premiumAmount
+             FROM vessel_dynamic_policies vdp
+             JOIN vessels v ON vdp.vessel_id = v.id
+             LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
+             LEFT JOIN policy_type_conditions ptcond ON vdp.condition_id = ptcond.id
+             LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id
+             LEFT JOIN entities e ON v.customer_id = e.id
+             LEFT JOIN fleets f ON v.fleet_id = f.id
+             ORDER BY vdp.created_at DESC`
+        )
+        return (rows as any[]).map(r => ({
+            ...r,
+            premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined
+        }))
     }
 
     async addVesselDynamicPolicy(policy: Omit<VesselDynamicPolicy, 'id' | 'createdAt' | 'updatedAt' | 'policyTypeName' | 'conditionName' | 'brokerName' | 'values'>): Promise<string> {
