@@ -2432,6 +2432,8 @@ app.whenReady().then(() => {
     return db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
   })
 
+  safeHandle('policy:delete', async (event, id) => { await requirePermission(event, 'policies:manage'); return db.deletePolicyDocument(id) })
+
   // Policy Expiry Alerts
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })

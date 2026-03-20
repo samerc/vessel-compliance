@@ -7251,6 +7251,7 @@ export class MySQLAdapter {
                     v.name as vesselName, v.imo_number as imoNumber,
                     e.name as customerName,
                     qt.code as quotationTypeCode, qt.name as quotationTypeName,
+                    qt.id as policyTypeId, qt.name as policyTypeName,
                     b.name as brokerName
              FROM policy_documents pd
              LEFT JOIN vessels v ON pd.vessel_id = v.id
@@ -7356,6 +7357,15 @@ export class MySQLAdapter {
         }))
     }
 
+    async deletePolicyDocument(id: string): Promise<void> {
+        if (!this.pool) return
+        // Delete related records first (no FK cascade since no FK constraints)
+        await this.pool.execute('DELETE FROM policy_doc_instalments WHERE policy_doc_id = ?', [id])
+        await this.pool.execute('DELETE FROM policy_doc_addresses WHERE policy_doc_id = ?', [id])
+        await this.pool.execute('DELETE FROM policy_blue_cards WHERE policy_doc_id = ?', [id])
+        await this.pool.execute('DELETE FROM policy_documents WHERE id = ?', [id])
+    }
+
     async convertQuotationToPolicy(quotationId: string, options: {
         vesselIds: string[]
         inceptionDate: string
@@ -7384,11 +7394,17 @@ export class MySQLAdapter {
         const invertedYear = yearStr.slice(2) + yearStr.slice(0, 2)
 
         // Get next serial number (global across all types)
-        // Policy number format: {type}{4-digit year}{4-digit serial} = 9 chars min
+        // Extract serial from right side of policy number (after type code + 4-digit year = 5 chars)
         const [serialRow] = await this.pool.query(
-            'SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 6) AS UNSIGNED)), 0) + 1 as nextSerial FROM policy_documents'
+            `SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 6) AS UNSIGNED)), 0) as maxSerial
+             FROM policy_documents WHERE LENGTH(policy_number) >= 9 AND policy_number REGEXP '^[A-Z][0-9]{4,}'`
         )
-        let nextSerial = (serialRow as any[])[0]?.nextSerial || 1
+        let nextSerial = ((serialRow as any[])[0]?.maxSerial || 0) + 1
+        // If corrupted data exists, just count total + 1
+        if (nextSerial > 99999) {
+            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM policy_documents')
+            nextSerial = ((countRow as any[])[0]?.cnt || 0) + 1
+        }
 
         const createdPolicies: any[] = []
         const vessels = await this.getQuotationVessels(quotationId)

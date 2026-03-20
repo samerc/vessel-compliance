@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, FileCheck, Ship, DollarSign, Shield, FileText, Clock, ExternalLink, Download, Loader2 } from 'lucide-react'
+import { ArrowLeft, FileCheck, Ship, DollarSign, Shield, FileText, Clock, ExternalLink, Download, Loader2, Trash2 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { VesselDynamicPolicy, VesselPolicyValue, Vessel, Entity } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -43,6 +44,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
     const [exportingCA, setExportingCA] = useState(false)
     const [exportingBC, setExportingBC] = useState(false)
     const { showError, showSuccess } = useToast()
+    const { hasPermission } = useAuth()
     const { theme } = useTheme()
     const isLight = theme === 'light'
 
@@ -51,13 +53,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
     const loadData = async () => {
         setLoading(true)
         try {
-            // Load all policies to find the one we want (with values)
-            const allPolicies = await window.api.getAllVesselDynamicPolicies()
-            const found = Array.isArray(allPolicies)
-                ? allPolicies.find((p: VesselDynamicPolicy) => p.id === policyId)
-                : null
+            const found = await window.api.policyGetById(policyId)
 
-            if (!found) {
+            if (!found || (found as any).error) {
                 showError('Policy not found')
                 onBack()
                 return
@@ -327,6 +325,21 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
                         >
                             {exportingBC ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
                             Export Blue Cards
+                        </button>
+                    )}
+                    {hasPermission('policies:manage') && (
+                        <button
+                            onClick={async () => {
+                                if (!confirm('Are you sure you want to delete this policy? This cannot be undone.')) return
+                                try {
+                                    await window.api.policyDelete(policyId)
+                                    showSuccess('Policy deleted')
+                                    onBack()
+                                } catch (err: any) { showError(err.message || 'Failed to delete') }
+                            }}
+                            style={{ background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            <Trash2 size={14} /> Delete
                         </button>
                     )}
                 </div>

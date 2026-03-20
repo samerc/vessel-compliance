@@ -688,6 +688,7 @@ export interface Api {
   policyGetInstalments: (policyId: string) => Promise<any[]>
   policyGetAddresses: (policyId: string) => Promise<any[]>
   policyGetBlueCards: (policyId: string) => Promise<any[]>
+  policyDelete: (id: string) => Promise<void>
   policyConvertFromQuotation: (quotationId: string, options: {
     vesselIds: string[]
     inceptionDate: string
