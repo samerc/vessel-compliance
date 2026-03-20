@@ -882,8 +882,28 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             showError('Inception and expiry dates are required')
             return
         }
+        if (!inceptionTime || !expiryTime) {
+            showError('Inception and expiry times are required')
+            return
+        }
+        if (!timezone.trim()) {
+            showError('Timezone is required')
+            return
+        }
         if (selectedVesselIds.length === 0) {
             showError('Select at least one vessel')
+            return
+        }
+        if (hasAlts && !selectedAltId) {
+            showError('Please select an alternative')
+            return
+        }
+        if (totalPremium <= 0) {
+            showError('Premium amount is required')
+            return
+        }
+        if (instalmentDates.some(d => !d)) {
+            showError('All instalment dates are required')
             return
         }
         setConverting(true)

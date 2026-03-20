@@ -25,20 +25,6 @@ import { formatDate } from '../utils/dateUtils'
 
 type BlueCardType = 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2'
 
-const CONVENTION_NAMES: Record<BlueCardType, string> = {
-  BBC: 'International Convention on Civil Liability for Bunker Oil Pollution Damage, 2001',
-  WRC: 'Nairobi International Convention on the Removal of Wrecks, 2007',
-  'MLC4.2': 'Maritime Labour Convention, 2006 \u2014 Regulation 4.2: Shipowners\u2019 Liability',
-  'MLC2.5.2': 'Maritime Labour Convention, 2006 \u2014 Standard A2.5.2: Financial Security (Repatriation)',
-}
-
-const CONVENTION_SHORT: Record<BlueCardType, string> = {
-  BBC: 'the International Convention on Civil Liability for Bunker Oil Pollution Damage, 2001',
-  WRC: 'the Nairobi International Convention on the Removal of Wrecks, 2007',
-  'MLC4.2': 'the Maritime Labour Convention, 2006, Regulation 4.2',
-  'MLC2.5.2': 'the Maritime Labour Convention, 2006, Standard A2.5.2',
-}
-
 // ==================== Input Types ====================
 
 export interface BlueCardData {
@@ -52,318 +38,463 @@ export interface BlueCardData {
   expiryDate: string
   expiryTime: string
   timezone: string
+  callSign?: string
+  portOfRegistry?: string
+  ownerName?: string
+  ownerAddress?: string
+  flagAuthorityName?: string
+  flagAuthorityAddress?: string
+  companyName: string
+  companyAddress?: string
+  companyWebsite?: string
+  contactEmail?: string
+  contactPhone?: string
+  closingCity?: string
 }
 
-// ==================== Border Helpers ====================
+// ==================== Blue Card Helpers ====================
 
-function noBorders() {
+const BC_FONT = 'Times New Roman'
+const BC_SIZE = 22 // 11pt
+
+function bcNoBorders() {
   const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   return { top: none, bottom: none, left: none, right: none }
 }
 
-// ==================== Blue Card Page Builder ====================
+function bcText(text: string, opts?: { bold?: boolean; size?: number; caps?: boolean }): TextRun {
+  return new TextRun({
+    text: opts?.caps ? text.toUpperCase() : text,
+    font: BC_FONT,
+    size: opts?.size ?? BC_SIZE,
+    bold: opts?.bold ?? false,
+  })
+}
 
-function buildBlueCardPage(
+function bcParagraph(
+  text: string,
+  opts?: {
+    bold?: boolean
+    size?: number
+    caps?: boolean
+    alignment?: (typeof AlignmentType)[keyof typeof AlignmentType]
+    spacingBefore?: number
+    spacingAfter?: number
+    indent?: number
+  }
+): Paragraph {
+  return new Paragraph({
+    alignment: opts?.alignment ?? AlignmentType.LEFT,
+    spacing: { before: opts?.spacingBefore ?? 0, after: opts?.spacingAfter ?? 60 },
+    indent: opts?.indent ? { left: opts.indent } : undefined,
+    children: [bcText(text, { bold: opts?.bold, size: opts?.size, caps: opts?.caps })],
+  })
+}
+
+function bcSpacer(twips: number = 200): Paragraph {
+  return new Paragraph({ spacing: { before: twips }, children: [] })
+}
+
+/** Borderless key : value row for vessel detail tables */
+function bcDetailRow(label: string, value: string): TableRow {
+  const LABEL_W = 4200
+  const VALUE_W = 5800
+  return new TableRow({
+    children: [
+      new TableCell({
+        width: { size: LABEL_W, type: WidthType.DXA },
+        borders: bcNoBorders(),
+        children: [
+          new Paragraph({
+            spacing: { before: 30, after: 30 },
+            children: [bcText(label, { caps: true })],
+          }),
+        ],
+      }),
+      new TableCell({
+        width: { size: VALUE_W, type: WidthType.DXA },
+        borders: bcNoBorders(),
+        children: [
+          new Paragraph({
+            spacing: { before: 30, after: 30 },
+            children: [bcText(`: ${value}`)],
+          }),
+        ],
+      }),
+    ],
+  })
+}
+
+/** Multi-line address block */
+function bcAddressBlock(lines: string[], spacingAfter: number = 120): Paragraph[] {
+  return lines.filter(Boolean).map((line, i) =>
+    new Paragraph({
+      spacing: { after: i === lines.length - 1 ? spacingAfter : 20 },
+      children: [bcText(line)],
+    })
+  )
+}
+
+// ==================== BBC / WRC Page Builder ====================
+
+function buildBbcWrcPage(
   data: BlueCardData,
-  cardType: BlueCardType,
-  companyName: string,
+  cardType: 'BBC' | 'WRC',
   isLastPage: boolean
 ): Paragraph[] {
-  const certNumber = `${data.policyNumber}/${cardType}`
-  const conventionFull = CONVENTION_NAMES[cardType]
-  const conventionRef = CONVENTION_SHORT[cardType]
+  const ref = `${data.policyNumber}/${cardType}`
+  const inceptionFmt = formatDate(data.inceptionDate)
+  const expiryFmt = formatDate(data.expiryDate)
   const gt = typeof data.grossTonnage === 'number'
     ? data.grossTonnage.toLocaleString('en-US')
     : data.grossTonnage
+  const portOfRegistry = data.portOfRegistry || data.flagState || ''
+  const today = formatDate(new Date())
+  const city = data.closingCity || ''
 
-  const inceptionFormatted = formatDate(data.inceptionDate)
-  const expiryFormatted = formatDate(data.expiryDate)
-
-  const LABEL_W = 2800
-  const VALUE_W = 7400
-
-  const detailRow = (label: string, value: string) =>
-    new TableRow({
-      children: [
-        new TableCell({
-          width: { size: LABEL_W, type: WidthType.DXA },
-          borders: noBorders(),
-          children: [
-            new Paragraph({
-              spacing: { before: 40, after: 40 },
-              children: [new TextRun({ text: label, size: 20, font: 'Calibri' })],
-            }),
-          ],
-        }),
-        new TableCell({
-          width: { size: VALUE_W, type: WidthType.DXA },
-          borders: noBorders(),
-          children: [
-            new Paragraph({
-              spacing: { before: 40, after: 40 },
-              children: [new TextRun({ text: value, size: 20, font: 'Calibri', bold: true })],
-            }),
-          ],
-        }),
-      ],
-    })
+  const isBBC = cardType === 'BBC'
+  const conventionArticle = isBBC
+    ? 'ARTICLE 7 OF THE INTERNATIONAL CONVENTION ON CIVIL LIABILITY FOR BUNKER OIL POLLUTION DAMAGE, 2001'
+    : 'ARTICLE 12 OF THE NAIROBI INTERNATIONAL CONVENTION ON THE REMOVAL OF WRECKS, 2007'
 
   const children: Paragraph[] = []
 
-  // Spacer at top
-  children.push(new Paragraph({ spacing: { before: 400 }, children: [] }))
+  // NOT TRANSFERABLE
+  children.push(bcParagraph('NOT TRANSFERABLE', {
+    bold: true,
+    size: 24,
+    caps: true,
+    alignment: AlignmentType.RIGHT,
+    spacingAfter: 120,
+  }))
 
-  // Company name
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 80 },
-      children: [
-        new TextRun({
-          text: companyName,
-          bold: true,
-          size: 32,
-          font: 'Calibri',
-        }),
-      ],
-    })
-  )
-
-  // Divider line
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-      children: [
-        new TextRun({
-          text: '\u2500'.repeat(60),
-          size: 16,
-          font: 'Calibri',
-          color: '999999',
-        }),
-      ],
-    })
-  )
-
-  // CERTIFICATE OF INSURANCE
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 120 },
-      children: [
-        new TextRun({
-          text: 'CERTIFICATE OF INSURANCE',
-          bold: true,
-          size: 28,
-          font: 'Calibri',
-        }),
-      ],
-    })
-  )
-
-  // Convention name (italics)
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 300 },
-      children: [
-        new TextRun({
-          text: conventionFull,
-          italics: true,
-          size: 20,
-          font: 'Calibri',
-        }),
-      ],
-    })
-  )
-
-  // Certificate number
+  // REF line
   children.push(
     new Paragraph({
       spacing: { after: 300 },
       children: [
-        new TextRun({ text: 'Certificate Number: ', size: 20, font: 'Calibri' }),
-        new TextRun({ text: certNumber, bold: true, size: 22, font: 'Calibri' }),
+        bcText('REF: ', { bold: true }),
+        bcText(ref, { bold: true }),
       ],
     })
   )
+
+  // To: flag authority
+  children.push(bcParagraph('To:', { spacingAfter: 40 }))
+  if (data.flagAuthorityName) {
+    children.push(...bcAddressBlock([
+      data.flagAuthorityName,
+      ...(data.flagAuthorityAddress || '').split('\n'),
+    ], 300))
+  } else {
+    children.push(bcSpacer(200))
+  }
+
+  // CERTIFICATE OF INSURANCE title block
+  children.push(bcParagraph('CERTIFICATE OF INSURANCE', {
+    bold: true,
+    size: 26,
+    caps: true,
+    alignment: AlignmentType.CENTER,
+    spacingAfter: 40,
+  }))
+  children.push(bcParagraph('PURSUANT', {
+    bold: true,
+    caps: true,
+    alignment: AlignmentType.CENTER,
+    spacingAfter: 40,
+  }))
+  children.push(bcParagraph(`TO ${conventionArticle}`, {
+    bold: true,
+    caps: true,
+    alignment: AlignmentType.CENTER,
+    spacingAfter: 300,
+  }))
 
   // Vessel details table
-  const vesselTable = new Table({
-    width: { size: LABEL_W + VALUE_W, type: WidthType.DXA },
-    rows: [
-      detailRow('Name of Ship:', data.vesselName),
-      detailRow('IMO Number:', data.imoNumber),
-      detailRow('Port of Registry:', data.flagState),
-      detailRow('Gross Tonnage:', gt),
-    ],
-  })
+  const vesselRows = [
+    bcDetailRow('NAME OF SHIP', data.vesselName),
+    bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
+    bcDetailRow('PORT OF REGISTRY', portOfRegistry),
+    bcDetailRow('IMO NUMBER', data.imoNumber),
+  ]
+  if (cardType === 'WRC') {
+    vesselRows.push(bcDetailRow('GROSS TONNAGE', gt))
+  }
 
-  children.push(vesselTable as unknown as Paragraph)
+  children.push(new Table({
+    width: { size: 10000, type: WidthType.DXA },
+    rows: vesselRows,
+  }) as unknown as Paragraph)
 
-  // Spacer
-  children.push(new Paragraph({ spacing: { before: 300 }, children: [] }))
+  children.push(bcSpacer(240))
 
-  // Period of insurance header
+  // Owner block
+  children.push(bcParagraph(
+    'NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:',
+    { bold: true, caps: true, spacingAfter: 80 }
+  ))
+  children.push(...bcAddressBlock([
+    data.ownerName || '',
+    ...(data.ownerAddress || '').split('\n'),
+  ], 240))
+
+  // Certification text
   children.push(
     new Paragraph({
-      spacing: { after: 80 },
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 240 },
       children: [
-        new TextRun({
-          text: 'Period of Insurance:',
-          bold: true,
-          size: 20,
-          font: 'Calibri',
-          underline: {},
-        }),
+        bcText(
+          'THIS IS TO CERTIFY that there is in force in respect of the above-named ship a policy '
+          + 'of insurance or other financial security satisfying the requirements of '
+          + (isBBC
+            ? 'Article 7 of the International Convention on Civil Liability for Bunker Oil Pollution Damage, 2001.'
+            : 'Article 12 of the Nairobi International Convention on the Removal of Wrecks, 2007.')
+        ),
       ],
     })
   )
 
-  // From line
-  children.push(
-    new Paragraph({
-      spacing: { after: 40 },
-      indent: { left: 400 },
-      children: [
-        new TextRun({ text: 'From:  ', size: 20, font: 'Calibri' }),
-        new TextRun({
-          text: `${inceptionFormatted}  ${data.inceptionTime}  ${data.timezone}`,
-          bold: true,
-          size: 20,
-          font: 'Calibri',
-        }),
-      ],
-    })
-  )
-
-  // To line
-  children.push(
-    new Paragraph({
-      spacing: { after: 300 },
-      indent: { left: 400 },
-      children: [
-        new TextRun({ text: 'To:      ', size: 20, font: 'Calibri' }),
-        new TextRun({
-          text: `${expiryFormatted}  ${data.expiryTime}  ${data.timezone}`,
-          bold: true,
-          size: 20,
-          font: 'Calibri',
-        }),
-      ],
-    })
-  )
-
-  // Insurer details
-  children.push(
-    new Paragraph({
-      spacing: { after: 80 },
-      children: [
-        new TextRun({
-          text: 'Insurer Details:',
-          bold: true,
-          size: 20,
-          font: 'Calibri',
-          underline: {},
-        }),
-      ],
-    })
-  )
-
-  children.push(
-    new Paragraph({
-      spacing: { after: 300 },
-      indent: { left: 400 },
-      children: [
-        new TextRun({ text: 'Name of Insurer:  ', size: 20, font: 'Calibri' }),
-        new TextRun({ text: companyName, bold: true, size: 20, font: 'Calibri' }),
-      ],
-    })
-  )
-
-  // Accordance statement
-  children.push(
-    new Paragraph({
-      spacing: { after: 400 },
-      children: [
-        new TextRun({
-          text: `This certificate is issued in accordance with the provisions of ${conventionRef}.`,
-          italics: true,
-          size: 20,
-          font: 'Calibri',
-        }),
-      ],
-    })
-  )
-
-  // Date and place
-  const today = formatDate(new Date())
-  children.push(
-    new Paragraph({
-      spacing: { after: 200 },
-      children: [
-        new TextRun({ text: 'Date: ', size: 20, font: 'Calibri' }),
-        new TextRun({ text: today, bold: true, size: 20, font: 'Calibri' }),
-      ],
-    })
-  )
-
-  // Spacer before signature
-  children.push(new Paragraph({ spacing: { before: 600 }, children: [] }))
-
-  // Signature line
-  children.push(
-    new Paragraph({
-      spacing: { after: 80 },
-      children: [
-        new TextRun({
-          text: '_'.repeat(40),
-          size: 20,
-          font: 'Calibri',
-          color: '999999',
-        }),
-      ],
-    })
-  )
-
-  // Signature label
+  // Period of Insurance
+  children.push(bcParagraph('Period of Insurance:', { bold: true, spacingAfter: 80 }))
   children.push(
     new Paragraph({
       spacing: { after: 40 },
       children: [
-        new TextRun({
-          text: companyName,
-          bold: true,
-          size: 20,
-          font: 'Calibri',
-        }),
+        bcText('From  '),
+        bcText(`${inceptionFmt}  ${data.inceptionTime}  ${data.timezone}`, { bold: true }),
+      ],
+    })
+  )
+  children.push(
+    new Paragraph({
+      spacing: { after: 240 },
+      children: [
+        bcText('To    '),
+        bcText(`${expiryFmt}  ${data.expiryTime}  ${data.timezone}`, { bold: true }),
       ],
     })
   )
 
+  // Cancellation text
   children.push(
     new Paragraph({
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 300 },
       children: [
-        new TextRun({
-          text: 'Authorised Signatory',
-          size: 18,
-          font: 'Calibri',
-          color: '666666',
-        }),
+        bcText(
+          'Provided always that the insurer may cancel this certificate by giving three months\' '
+          + 'written notice to the above Authority, the insurance ceasing to be effective on the date '
+          + 'of expiry of the said notice or on the date of expiry of the policy whichever is the earlier.'
+        ),
+      ],
+    })
+  )
+
+  // Place & date
+  children.push(
+    new Paragraph({
+      spacing: { after: 0 },
+      children: [
+        bcText('PLACE & DATE: ', { bold: true }),
+        bcText(`${city}${city ? ', ' : ''}${today}`),
       ],
     })
   )
 
   // Page break unless last page
   if (!isLastPage) {
-    children.push(
-      new Paragraph({
-        children: [new PageBreak()],
-      })
-    )
+    children.push(new Paragraph({ children: [new PageBreak()] }))
   }
 
   return children
+}
+
+// ==================== MLC Page Builder ====================
+
+function buildMlcPage(
+  data: BlueCardData,
+  cardType: 'MLC4.2' | 'MLC2.5.2',
+  isLastPage: boolean
+): Paragraph[] {
+  const ref = `${data.policyNumber}/${cardType === 'MLC4.2' ? 'MLC REG 4.2' : 'MLC REG 2.5.2'}`
+  const inceptionFmt = formatDate(data.inceptionDate)
+  const expiryFmt = formatDate(data.expiryDate)
+  const portOfRegistry = data.portOfRegistry || data.flagState || ''
+  const today = formatDate(new Date())
+  const city = data.closingCity || ''
+
+  const is42 = cardType === 'MLC4.2'
+
+  const titleText = is42
+    ? 'CERTIFICATE OF INSURANCE OR OTHER FINANCIAL SECURITY IN RESPECT OF '
+      + 'SHIPOWNERS\u2019 LIABILITY AS REQUIRED UNDER REGULATION 4.2, STANDARD A4.2.1 '
+      + 'PARAGRAPH 1(b) OF THE MARITIME LABOUR CONVENTION 2006, AS AMENDED'
+    : 'CERTIFICATE OF INSURANCE OR OTHER FINANCIAL SECURITY IN RESPECT OF '
+      + 'SEAFARER REPATRIATION COSTS AND LIABILITIES AS REQUIRED UNDER '
+      + 'REGULATION 2.5.2, STANDARD A2.5.2 '
+      + 'OF THE MARITIME LABOUR CONVENTION 2006, AS AMENDED'
+
+  const certText = is42
+    ? 'THIS IS TO CERTIFY that there is in force, in respect of the above-named ship, '
+      + 'a policy of insurance or other financial security satisfying the requirements of '
+      + 'Standard A4.2.1, paragraph 1(b) of the Maritime Labour Convention, 2006, as amended.'
+    : 'THIS IS TO CERTIFY that there is in force, in respect of the above-named ship, '
+      + 'a policy of insurance or other financial security satisfying the requirements of '
+      + 'Regulation 2.5.2, Standard A2.5.2 of the Maritime Labour Convention, 2006, as amended.'
+
+  const cancellationRef = is42 ? 'Standard A4.2.12' : 'Standard A2.5.2.11'
+  const cancellationText =
+    `The insurer undertakes to give at least 30 days\u2019 notice to the competent authority `
+    + `of the flag State of the ship of the cancellation or termination of the financial security, `
+    + `as required by ${cancellationRef} of the Maritime Labour Convention, 2006, as amended.`
+
+  const children: Paragraph[] = []
+
+  // REF line
+  children.push(
+    new Paragraph({
+      spacing: { after: 300 },
+      children: [
+        bcText('REF: ', { bold: true }),
+        bcText(ref, { bold: true }),
+      ],
+    })
+  )
+
+  // Title block (centered, bold, caps)
+  children.push(bcParagraph(titleText, {
+    bold: true,
+    alignment: AlignmentType.CENTER,
+    spacingAfter: 300,
+  }))
+
+  // Vessel details table
+  const vesselTable = new Table({
+    width: { size: 10000, type: WidthType.DXA },
+    rows: [
+      bcDetailRow('NAME OF SHIP', data.vesselName),
+      bcDetailRow('IMO NUMBER', data.imoNumber),
+      bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
+      bcDetailRow('PORT OF REGISTRY', portOfRegistry),
+    ],
+  })
+  children.push(vesselTable as unknown as Paragraph)
+
+  children.push(bcSpacer(120))
+
+  // Period of insurance (inline)
+  children.push(
+    new Paragraph({
+      spacing: { after: 240 },
+      children: [
+        bcText('PERIOD OF INSURANCE', { bold: true }),
+        bcText(`   :   FROM ${inceptionFmt} TO ${expiryFmt}`),
+      ],
+    })
+  )
+
+  // Shipowner block
+  children.push(bcParagraph(
+    'NAME OF THE SHIPOWNER ON WHOSE BEHALF FINANCIAL SECURITY HAS BEEN PROVIDED:',
+    { bold: true, caps: true, spacingAfter: 80 }
+  ))
+  children.push(...bcAddressBlock([
+    data.ownerName || '',
+    ...(data.ownerAddress || '').split('\n'),
+  ], 240))
+
+  // Provider block
+  children.push(bcParagraph(
+    'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY',
+    { bold: true, caps: true, spacingAfter: 80 }
+  ))
+  children.push(...bcAddressBlock([
+    data.companyName,
+    ...(data.companyAddress || '').split('\n'),
+    data.companyWebsite || '',
+  ], 240))
+
+  // Contact details
+  children.push(bcParagraph(
+    'CONTACT DETAILS OF THE PERSONS OR ENTITY RESPONSIBLE FOR HANDLING SEAFARERS\u2019 REQUEST FOR RELIEF:',
+    { bold: true, caps: true, spacingAfter: 80 }
+  ))
+  if (data.contactEmail) {
+    children.push(
+      new Paragraph({
+        spacing: { after: 40 },
+        children: [
+          bcText('Email    '),
+          bcText(data.contactEmail),
+        ],
+      })
+    )
+  }
+  if (data.contactPhone) {
+    children.push(
+      new Paragraph({
+        spacing: { after: 200 },
+        children: [
+          bcText('Tel      '),
+          bcText(data.contactPhone),
+        ],
+      })
+    )
+  }
+  if (!data.contactEmail && !data.contactPhone) {
+    children.push(bcSpacer(100))
+  }
+
+  // Certification text
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 200 },
+      children: [bcText(certText)],
+    })
+  )
+
+  // Cancellation text
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 300 },
+      children: [bcText(cancellationText)],
+    })
+  )
+
+  // Place & date
+  children.push(
+    new Paragraph({
+      spacing: { after: 0 },
+      children: [
+        bcText('PLACE & DATE: ', { bold: true }),
+        bcText(`${city}${city ? ', ' : ''}${today}`),
+      ],
+    })
+  )
+
+  // Page break unless last page
+  if (!isLastPage) {
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  return children
+}
+
+// ==================== Blue Card Page Router ====================
+
+function buildBlueCardPage(
+  data: BlueCardData,
+  cardType: BlueCardType,
+  isLastPage: boolean
+): Paragraph[] {
+  if (cardType === 'BBC' || cardType === 'WRC') {
+    return buildBbcWrcPage(data, cardType, isLastPage)
+  }
+  return buildMlcPage(data, cardType, isLastPage)
 }
 
 // ==================== Public Export Functions ====================
@@ -375,10 +506,7 @@ export async function exportBlueCardDocx(
   data: BlueCardData,
   cardType: BlueCardType
 ): Promise<void> {
-  const settings = await getReportSettings()
-  const companyName = settings.companyName || 'Insurance Company'
-
-  const children = buildBlueCardPage(data, cardType, companyName, true)
+  const children = buildBlueCardPage(data, cardType, true)
 
   const document = new Document({
     sections: [{
@@ -419,13 +547,10 @@ export async function exportBlueCardsDocx(
     return exportBlueCardDocx(data, cardTypes[0])
   }
 
-  const settings = await getReportSettings()
-  const companyName = settings.companyName || 'Insurance Company'
-
   const allChildren: Paragraph[] = []
   cardTypes.forEach((cardType, idx) => {
     const isLast = idx === cardTypes.length - 1
-    const pageChildren = buildBlueCardPage(data, cardType, companyName, isLast)
+    const pageChildren = buildBlueCardPage(data, cardType, isLast)
     allChildren.push(...pageChildren)
   })
 
@@ -1498,8 +1623,8 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
   }
 
   // Build main two-column table
-  const thin = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
-  const thinBorders = () => ({ top: thin, bottom: thin, left: thin, right: thin })
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
@@ -1597,8 +1722,8 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
     columnWidths: [POL_TITLE_W, POL_BODY_W],
     layout: TableLayoutType.FIXED,
     borders: {
-      top: thin, bottom: thin, left: thin, right: thin,
-      insideHorizontal: thin, insideVertical: thin
+      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+      insideHorizontal: noBorder, insideVertical: noBorder
     },
     rows
   })

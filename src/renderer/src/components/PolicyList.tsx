@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCheck, RotateCw } from 'lucide-react'
+import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCheck, RotateCw, Trash2 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateShort } from '../utils/dateUtils'
 
@@ -73,7 +74,8 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [page, setPage] = useState(0)
     const [loading, setLoading] = useState(false)
-    const { showError } = useToast()
+    const { showError, showSuccess } = useToast()
+    const { hasPermission } = useAuth()
     const { theme } = useTheme()
     const isLight = theme === 'light'
 
@@ -287,12 +289,13 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                             <th style={thStyle('premiumAmount', 'right')} onClick={() => toggleSort('premiumAmount')}>
                                 Premium <SortIcon field="premiumAmount" />
                             </th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {paginated.length === 0 ? (
                             <tr>
-                                <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                     <FileCheck size={36} style={{ opacity: 0.3, marginBottom: '10px' }} />
                                     <div style={{ fontSize: '0.9rem' }}>
                                         {loading ? 'Loading policies...' : policies.length === 0 ? 'No policies found' : 'No policies match your filters'}
@@ -344,6 +347,25 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     </td>
                                     <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.82rem', fontWeight: p.premiumAmount ? 600 : 400, whiteSpace: 'nowrap' }}>
                                         {formatCurrency(p.premiumAmount, p.currency)}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                        {hasPermission('policies:manage') && (
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation()
+                                                    if (!confirm('Delete this policy?')) return
+                                                    try {
+                                                        await window.api.policyDelete(p.id)
+                                                        showSuccess('Policy deleted')
+                                                        loadData()
+                                                    } catch (err: any) { showError(err.message || 'Failed to delete') }
+                                                }}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
+                                                title="Delete policy"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             )
