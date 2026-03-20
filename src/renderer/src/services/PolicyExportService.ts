@@ -992,13 +992,14 @@ function polGetSanctionsText(data: PolicyExportData): string {
   return version?.text || ''
 }
 
-// ---- DOCX paragraph helpers ----
+// ---- DOCX paragraph helpers (10pt Arial) ----
+const POL_FONT_SIZE = 20 // 10pt in half-points
 
 function polNp(text: string) {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
   })
 }
 
@@ -1006,14 +1007,14 @@ function polBp(text: string) {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true })]
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   })
 }
 
 function polBup(text: string) {
   return new Paragraph({
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true, underline: {} })]
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })]
   })
 }
 
@@ -1022,7 +1023,7 @@ function polBulletP(text: string) {
     numbering: { reference: 'dash-bullet', level: 0 },
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 40, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
   })
 }
 
@@ -1032,7 +1033,7 @@ function polEmptyP() {
 
 function polMp(text: string): Paragraph[] {
   if (!text) return []
-  if (polIsHtml(text)) return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+  if (polIsHtml(text)) return parseHtmlToParagraphs(text, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
   return text.split('\n').map(p =>
     p.trim() ? polNp(p) : polEmptyP()
   )
@@ -1042,7 +1043,7 @@ function polCenteredP(text: string, bold = false) {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold })]
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })]
   })
 }
 
@@ -1132,9 +1133,9 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   if (data.addresses.length > 0) {
     for (const addr of data.addresses.sort((a, b) => a.order - b.order)) {
       const runs: TextRun[] = []
-      runs.push(new TextRun({ text: addr.entityName, size: 22, font: 'Arial', color: '000000', bold: true }))
+      runs.push(new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }))
       if (addr.country) {
-        runs.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: 22, font: 'Arial', color: '000000' }))
+        runs.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' }))
       }
       content.push(new Paragraph({
         spacing: { after: 40, line: 240, lineRule: 'auto' as any },
@@ -1193,9 +1194,9 @@ function polBuildVesselTable(data: PolicyExportData): Table {
     columnWidths: [labelW, sepW, valW],
     rows: rows.map(([label, value]) => new TableRow({
       children: [
-        new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: label, size: 22, font: 'Arial', color: '000000' })] })] }),
-        new TableCell({ width: { size: sepW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: ':', size: 22, font: 'Arial', color: '000000' })] })] }),
-        new TableCell({ width: { size: valW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: value, size: 22, font: 'Arial', color: '000000', bold: true })] })] })
+        new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+        new TableCell({ width: { size: sepW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: ':', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+        new TableCell({ width: { size: valW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: value, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
       ]
     }))
   })
@@ -1211,7 +1212,7 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   const makeCell = (text: string, bold = false) => new TableCell({
     width: { size: 0, type: WidthType.AUTO },
     borders: polNoBorders(),
-    children: [new Paragraph({ children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold })] })]
+    children: [new Paragraph({ children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })] })]
   })
 
   return [new Table({
@@ -1231,17 +1232,17 @@ function polBuildPeriodParagraphs(data: PolicyExportData): Paragraph[] {
     new Paragraph({
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
       children: [
-        new TextRun({ text: 'From  ', size: 22, font: 'Arial', color: '000000' }),
-        new TextRun({ text: polFormatDateUS(inceptionDate), size: 22, font: 'Arial', color: '000000', bold: true }),
-        new TextRun({ text: `  ${polFormatTime(inceptionTime)}  ${timezone || ''}`, size: 22, font: 'Arial', color: '000000' })
+        new TextRun({ text: 'From  ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
+        new TextRun({ text: polFormatDateUS(inceptionDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+        new TextRun({ text: `  ${polFormatTime(inceptionTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     }),
     new Paragraph({
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
       children: [
-        new TextRun({ text: 'To      ', size: 22, font: 'Arial', color: '000000' }),
-        new TextRun({ text: polFormatDateUS(expiryDate), size: 22, font: 'Arial', color: '000000', bold: true }),
-        new TextRun({ text: `  ${polFormatTime(expiryTime)}  ${timezone || ''}`, size: 22, font: 'Arial', color: '000000' })
+        new TextRun({ text: 'To      ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
+        new TextRun({ text: polFormatDateUS(expiryDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+        new TextRun({ text: `  ${polFormatTime(expiryTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     })
   ]
@@ -1268,8 +1269,8 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
           const rightText = displayName ? `${displayName}${clauseDesc}` : (desc || '')
           return new TableRow({
             children: [
-              new TableCell({ width: { size: clauseRefW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Section B Cl.${c.clauseNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
-              new TableCell({ width: { size: clauseDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: rightText, size: 22, font: 'Arial', color: '000000' })] })] })
+              new TableCell({ width: { size: clauseRefW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Section B Cl.${c.clauseNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+              new TableCell({ width: { size: clauseDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: rightText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
             ]
           })
         })
@@ -1286,8 +1287,8 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
           numbering: { reference: 'dash-bullet', level: 0 },
           spacing: { after: 40 },
           children: [
-            ...(code ? [new TextRun({ text: code + ' ', size: 22, font: 'Arial', color: '000000' })] : []),
-            new TextRun({ text, size: 22, font: 'Arial', color: '000000' })
+            ...(code ? [new TextRun({ text: code + ' ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] : []),
+            new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
           ]
         }))
       }
@@ -1324,8 +1325,8 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
       }
       return new TableRow({
         children: [
-          new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       })
     }).filter(Boolean) as TableRow[]
@@ -1470,7 +1471,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
           content.push(new Paragraph({
             spacing: { after: 40, line: 240, lineRule: 'auto' as any },
             indent: { left: 400 },
-            children: [new TextRun({ text: `${labels[i]} ${stripHtml(txt)}`, size: 22, font: 'Arial', color: '000000' })]
+            children: [new TextRun({ text: `${labels[i]} ${stripHtml(txt)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           }))
         }
       }
@@ -1515,8 +1516,8 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
       columnWidths: [dedAmtW, dedDescW],
       rows: data.deductibles.map(d => new TableRow({
         children: [
-          new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___'), size: 22, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(d.amount, d.currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___'), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       }))
     }))
@@ -1570,12 +1571,12 @@ function polBuildPremiumPaymentSection(data: PolicyExportData): (Paragraph | Tab
       if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
         label += ' (non-refundable in case of cancellation, whether before or after inception)'
       }
-      const labelChildren: TextRun[] = [new TextRun({ text: label, size: 22, font: 'Arial', color: '000000' })]
+      const labelChildren: TextRun[] = [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
       instRows.push(new TableRow({
         children: [
           new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: labelChildren })] }),
-          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: 22, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: 22, font: 'Arial', color: '000000', bold: true })] })] })
+          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
         ]
       }))
     }
@@ -1668,7 +1669,7 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
             spacing: { before: 60, after: 60 },
-            children: [new TextRun({ text: title, bold: true, size: 22, font: 'Arial', color: '000000' })]
+            children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
         }),
         new TableCell({
@@ -1784,7 +1785,7 @@ export async function exportPolicyDocx(policyId: string): Promise<void> {
     if (plainNotice.startsWith('IMPORTANT NOTICE')) {
       children.push(polCenteredP('IMPORTANT NOTICE', true))
       children.push(...parseHtmlToParagraphs(importantNotice.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''), {
-        size: 22, font: 'Arial', color: '000000', alignment: AlignmentType.CENTER
+        size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.CENTER
       }))
     } else {
       children.push(...polMp(importantNotice))
@@ -1919,9 +1920,9 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
       columnWidths: [labelW, dateW, amtW],
       rows: data.instalments.map(inst => new TableRow({
         children: [
-          new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment`, size: 22, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: 22, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: 22, font: 'Arial', color: '000000', bold: true })] })] })
+          new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
         ]
       }))
     }))
@@ -2060,9 +2061,9 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
         const commAmt = inst.commissionAmount != null ? inst.commissionAmount : (inst.amount * commissionPercent / 100)
         return new TableRow({
           children: [
-            new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment`, size: 22, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: 22, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(commAmt, currency), size: 22, font: 'Arial', color: '000000', bold: true })] })] })
+            new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(commAmt, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
           ]
         })
       })
