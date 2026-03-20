@@ -731,12 +731,37 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             setSelectedVesselIds(vessels.map(v => v.vesselId || v.id))
             if (Array.isArray(bankData)) setBanks(bankData)
 
+            // Try to pre-fill inception/expiry from vessel's existing policy end date
+            const withVessel = vessels.filter(v => v.vesselId)
+            if (withVessel.length > 0 && !inceptionDate) {
+                try {
+                    const policies = await window.api.getVesselDynamicPolicies(withVessel[0].vesselId!)
+                    const endDate = resolveEffectivePolicyExpiry(policies)
+                    if (endDate) {
+                        setInceptionDate(endDate)
+                        // Expiry = inception + periodDays (default 365)
+                        const exp = new Date(endDate)
+                        exp.setDate(exp.getDate() + 365)
+                        setExpiryDate(exp.toISOString().split('T')[0])
+                    }
+                } catch { /* ignore */ }
+            }
+
             // Calculate instalment dates and amounts from quotation data
             const safeInstalments = Array.isArray(instalments) ? instalments : []
             if (safeInstalments.length > 0) {
                 setInstalmentDates(safeInstalments.map(() => ''))
-                // Calculate premium per instalment (payable premium / number of instalments)
-                const payable = quotation.premiumAmount || 0
+                // Calculate payable premium (after NCB/UPCC discounts)
+                let techPremium = quotation.premiumAmount || 0
+                // For multi-vessel, sum per-vessel premiums
+                if (vessels.length > 0) {
+                    const vesselPremSum = vessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
+                    if (vesselPremSum > 0) techPremium = vesselPremSum
+                }
+                let payable = techPremium
+                if (quotation.ncbEnabled && quotation.ncbDiscountPercent) payable = payable * (1 - quotation.ncbDiscountPercent / 100)
+                if (quotation.upccEnabled && quotation.upccDiscountPercent) payable = payable * (1 - quotation.upccDiscountPercent / 100)
+                payable = Math.round(payable * 100) / 100
                 const count = safeInstalments.length
                 const perInstalment = count > 0 ? Math.round((payable / count) * 100) / 100 : 0
                 const amounts = safeInstalments.map((_, i) => {
