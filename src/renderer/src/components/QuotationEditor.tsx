@@ -767,9 +767,11 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                 const vesselPremSum = vessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
                 if (vesselPremSum > 0) techPremium = vesselPremSum
             }
-            // If hull alternatives with per-alt premiums, use first alt premium
-            if (safeHullAlts.length > 1 && safeHullAlts[0].premiumAmount) {
-                techPremium = safeHullAlts[0].premiumAmount
+            // If alternatives with per-alt premiums, use selected (or first) alt premium
+            const allAltsLocal = [...safePiAlts, ...safeHullAlts]
+            if (allAltsLocal.length > 1) {
+                const firstAlt = allAltsLocal[0]
+                if (firstAlt.premiumAmount) techPremium = firstAlt.premiumAmount
             }
             let payable = techPremium
             if (quotation.ncbEnabled && quotation.ncbDiscountPercent) payable = payable * (1 - quotation.ncbDiscountPercent / 100)
