@@ -7655,7 +7655,26 @@ export class MySQLAdapter {
             `, [uuidv4(), newId, addr.entityId || null, addr.role || '', addr.addressText || ''])
         }
 
-        // Mark old policy as superseded
+        // Copy active blue cards
+        const blueCards = await this.getPolicyBlueCards(policyId)
+        for (const bc of blueCards.filter((b: any) => b.status === 'active')) {
+            await this.pool.execute(`
+                INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
+                    inception_date, expiry_date, revision_number, issued_date, status,
+                    owner_entity_id, owner_name, owner_address, port_of_registry,
+                    addressed_to_flag_id, addressed_to_name, addressed_to_address, cancel_replace_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                uuidv4(), newId, bc.cardType, bc.cardNumber,
+                bc.inceptionDate, bc.expiryDate, bc.revisionNumber || 0, bc.issuedDate,
+                bc.ownerEntityId || null, bc.ownerName || null, bc.ownerAddress || null,
+                bc.portOfRegistry || null, bc.addressedToFlagId || null,
+                bc.addressedToName || null, bc.addressedToAddress || null,
+                bc.cancelReplaceText || null
+            ])
+        }
+
+        // Mark old policy as superseded (blue cards on old policy stay as-is for historical reference)
         await this.pool.execute(
             `UPDATE policy_documents SET status = 'superseded' WHERE id = ?`,
             [policyId]
