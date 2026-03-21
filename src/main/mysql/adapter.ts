@@ -5983,7 +5983,8 @@ export class MySQLAdapter {
 
         const source = await this.getQuotation(sourceId)
         if (!source) throw new Error('Source quotation not found')
-        if (source.isLocked) throw new Error('Cannot revise a locked quotation')
+        // Locked quotations CAN be revised — that's the purpose of revisions
+        // (create a new unlocked copy from a locked/sent/converted original)
 
         const newId = uuidv4()
         const revisionGroupId = source.revisionGroupId || source.id
