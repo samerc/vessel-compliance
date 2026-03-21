@@ -50,7 +50,7 @@ interface PolicyDetailProps {
   policyId: string
   onBack: () => void
   onNavigateToVessel?: (vesselId: string) => void
-  onNavigateToQuotation?: () => void
+  onNavigateToQuotation?: (quotationId: string) => void
 }
 
 interface PolicyRecord {
@@ -1533,7 +1533,20 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   <button
                     className="btn-secondary"
                     style={{ marginLeft: 'auto', padding: '5px 14px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}
-                    onClick={onNavigateToQuotation}
+                    onClick={async () => {
+                      try {
+                        // Auto-create quotation revision and navigate to it
+                        const newRevisionId = await window.api.createQuotationRevision(policy.quotationId)
+                        if (newRevisionId && !(newRevisionId as any).error) {
+                          showSuccess('Quotation revision created. Navigating to editor...')
+                          onNavigateToQuotation(typeof newRevisionId === 'string' ? newRevisionId : policy.quotationId)
+                        } else {
+                          showError('Failed to create quotation revision')
+                        }
+                      } catch (err: any) {
+                        showError(err.message || 'Failed to create revision')
+                      }
+                    }}
                   >
                     Edit Coverage in Quotation <ChevronRight size={14} />
                   </button>
