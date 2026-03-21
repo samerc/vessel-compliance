@@ -313,7 +313,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     onClick={() => onSelectPolicy(p.id)}
                                 >
                                     <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem', color: isLight ? '#007a91' : '#00aac8' }}>
-                                        {p.policyNumber || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>--</span>}
+                                        {p.policyNumber ? `${p.policyNumber}${(p as any).revisionNumber > 0 ? `-R${(p as any).revisionNumber}` : ''}` : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>--</span>}
                                     </td>
                                     <td style={{ padding: '12px 14px' }}>
                                         <span style={{

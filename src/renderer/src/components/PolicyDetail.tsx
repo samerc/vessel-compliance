@@ -420,22 +420,53 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     if (!policy?.quotationId) return
     setCoverageLoading(true)
     try {
-      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities] = await Promise.all([
+      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities, allWarranties, allDeductiblesMaster, allExclusionsMaster, allClausesMaster, allSubjectivitiesMaster] = await Promise.all([
         window.api.getQuotation(policy.quotationId),
         window.api.getQuotationWarranties(policy.quotationId),
         window.api.getQuotationCustomWarranties(policy.quotationId),
         window.api.getQuotationDeductibles(policy.quotationId),
         window.api.getQuotationExclusions(policy.quotationId),
         window.api.getQuotationClauses(policy.quotationId),
-        window.api.getQuotationSubjectivities(policy.quotationId)
+        window.api.getQuotationSubjectivities(policy.quotationId),
+        window.api.piGetWarranties(),
+        window.api.piGetDeductibles(),
+        window.api.piGetExclusions(),
+        window.api.piGetClauses(),
+        window.api.getPISubjectivities()
       ])
       setQuotationData(q)
-      setCoverageWarranties(Array.isArray(warranties) ? warranties : [])
+      // Resolve warranty names from master list
+      const masterWarrantyMap = new Map((Array.isArray(allWarranties) ? allWarranties : []).map((w: any) => [w.id, w]))
+      const resolvedWarranties = (Array.isArray(warranties) ? warranties : []).map((w: any) => {
+        const master = masterWarrantyMap.get(w.piWarrantyId)
+        return { ...w, text: master?.text || master?.name || '', name: master?.name || '' }
+      })
+      setCoverageWarranties(resolvedWarranties)
       setCoverageCustomWarranties(Array.isArray(customWarranties) ? customWarranties : [])
-      setCoverageDeductibles(Array.isArray(deductibles) ? deductibles : [])
-      setCoverageExclusions(Array.isArray(exclusions) ? exclusions : [])
-      setCoverageClauses(Array.isArray(clauses) ? clauses : [])
-      setCoverageSubjectivities(Array.isArray(subjectivities) ? subjectivities : [])
+      // Resolve deductible names
+      const masterDedMap = new Map((Array.isArray(allDeductiblesMaster) ? allDeductiblesMaster : []).map((d: any) => [d.id, d]))
+      setCoverageDeductibles((Array.isArray(deductibles) ? deductibles : []).map((d: any) => {
+        const master = masterDedMap.get(d.piDeductibleId)
+        return { ...d, text: d.customText || master?.text || d.text || '' }
+      }))
+      // Resolve exclusion names
+      const masterExclMap = new Map((Array.isArray(allExclusionsMaster) ? allExclusionsMaster : []).map((e: any) => [e.id, e]))
+      setCoverageExclusions((Array.isArray(exclusions) ? exclusions : []).map((e: any) => {
+        const master = masterExclMap.get(e.piExclusionId)
+        return { ...e, text: e.customText || master?.text || e.text || '' }
+      }))
+      // Resolve clause names
+      const masterClauseMap = new Map((Array.isArray(allClausesMaster) ? allClausesMaster : []).map((c: any) => [c.id, c]))
+      setCoverageClauses((Array.isArray(clauses) ? clauses : []).map((c: any) => {
+        const master = masterClauseMap.get(c.piClauseId)
+        return { ...c, text: master?.name || master?.text || c.text || '', code: master?.code || '' }
+      }))
+      // Resolve subjectivity names
+      const masterSubjMap = new Map((Array.isArray(allSubjectivitiesMaster) ? allSubjectivitiesMaster : []).map((s: any) => [s.id, s]))
+      setCoverageSubjectivities((Array.isArray(subjectivities) ? subjectivities : []).map((s: any) => {
+        const master = masterSubjMap.get(s.piSubjectivityId)
+        return { ...s, text: master?.text || s.text || '' }
+      }))
     } catch {
       // Non-critical
     } finally {
@@ -977,7 +1008,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               }}
             >
               <FileCheck size={26} />
-              {policy.policyNumber || 'Untitled Policy'}
+              {policy.policyNumber || 'Untitled Policy'}{policy.revisionNumber > 0 ? `-R${policy.revisionNumber}` : ''}
             </h1>
             <span
               style={{

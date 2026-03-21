@@ -1976,7 +1976,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   })
 
   const blob = await Packer.toBlob(document)
-  polDownloadBlob(blob, `${data.policy.policyNumber}.docx`)
+  const revSuffix = data.policy.revisionNumber > 0 ? `-R${data.policy.revisionNumber}` : ''
+  polDownloadBlob(blob, `${data.policy.policyNumber}${revSuffix}.docx`)
 }
 
 // ==================== Debit Advice Export ====================
@@ -2121,7 +2122,8 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   })
 
   const blob = await Packer.toBlob(document)
-  polDownloadBlob(blob, `DA - ${data.policy.policyNumber}.docx`)
+  const daRevSuffix = data.policy.revisionNumber > 0 ? `-R${data.policy.revisionNumber}` : ''
+  polDownloadBlob(blob, `DA - ${data.policy.policyNumber}${daRevSuffix}.docx`)
 }
 
 // ==================== Credit Advice Export ====================
@@ -2237,5 +2239,6 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   })
 
   const blob = await Packer.toBlob(document)
-  polDownloadBlob(blob, `CA - ${data.policy.policyNumber}.docx`)
+  const caRevSuffix = data.policy.revisionNumber > 0 ? `-R${data.policy.revisionNumber}` : ''
+  polDownloadBlob(blob, `CA - ${data.policy.policyNumber}${caRevSuffix}.docx`)
 }
