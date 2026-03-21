@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FileText, Settings, List } from 'lucide-react'
 import { Quotation } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,12 +8,39 @@ import QuotationEditor from './QuotationEditor'
 
 type QuotationView = 'list' | 'settings' | 'editor'
 
-export default function QuotationManager({ onNavigateToPolicy }: { onNavigateToPolicy?: (policyId: string) => void }) {
+interface QuotationManagerProps {
+    onNavigateToPolicy?: (policyId: string) => void
+    initialQuotationId?: string | null
+    onClearInitialQuotation?: () => void
+    policyContext?: { policyId: string; policyNumber: string } | null
+    onClearPolicyContext?: () => void
+    onReturnToPolicy?: (policyId: string) => void
+}
+
+export default function QuotationManager({ onNavigateToPolicy, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy }: QuotationManagerProps) {
     const { hasPermission } = useAuth()
     const canSettings = hasPermission('quotations:settings')
     const [view, setView] = useState<QuotationView>('list')
     const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
+    const [activePolicyContext, setActivePolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
     const [listKey, setListKey] = useState(0)
+    const initialLoadRef = useRef(false)
+
+    // Auto-open quotation when navigating from policy
+    useEffect(() => {
+        if (initialQuotationId && !initialLoadRef.current) {
+            initialLoadRef.current = true
+            if (policyContext) setActivePolicyContext(policyContext)
+            window.api.getQuotation(initialQuotationId).then(q => {
+                if (q && !(q as any).error) {
+                    setEditingQuotation(q)
+                    setView('editor')
+                }
+                if (onClearInitialQuotation) onClearInitialQuotation()
+                if (onClearPolicyContext) onClearPolicyContext()
+            })
+        }
+    }, [initialQuotationId])
 
     const handleOpenEditor = (quotation: Quotation) => {
         setEditingQuotation(quotation)
@@ -22,6 +49,7 @@ export default function QuotationManager({ onNavigateToPolicy }: { onNavigateToP
 
     const handleBackToList = () => {
         setEditingQuotation(null)
+        setActivePolicyContext(null)
         setView('list')
         setListKey(k => k + 1)
     }
@@ -81,7 +109,14 @@ export default function QuotationManager({ onNavigateToPolicy }: { onNavigateToP
             {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} />}
             {view === 'settings' && canSettings && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
-                <QuotationEditor quotation={editingQuotation} onBack={handleBackToList} onOpenQuotation={handleOpenEditor} onNavigateToPolicy={onNavigateToPolicy} />
+                <QuotationEditor
+                    quotation={editingQuotation}
+                    onBack={handleBackToList}
+                    onOpenQuotation={handleOpenEditor}
+                    onNavigateToPolicy={onNavigateToPolicy}
+                    policyContext={activePolicyContext}
+                    onReturnToPolicy={onReturnToPolicy ? (policyId) => { setActivePolicyContext(null); onReturnToPolicy(policyId) } : undefined}
+                />
             )}
         </div>
     )

@@ -50,7 +50,7 @@ interface PolicyDetailProps {
   policyId: string
   onBack: () => void
   onNavigateToVessel?: (vesselId: string) => void
-  onNavigateToQuotation?: (quotationId: string) => void
+  onNavigateToQuotation?: (quotationId: string, policyContext?: { policyId: string; policyNumber: string }) => void
 }
 
 interface PolicyRecord {
@@ -1547,7 +1547,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                         const newRevisionId = await window.api.createQuotationRevision(policy.quotationId)
                         if (newRevisionId && !(newRevisionId as any).error) {
                           showSuccess('Quotation revision created. Navigating to editor...')
-                          onNavigateToQuotation(typeof newRevisionId === 'string' ? newRevisionId : policy.quotationId)
+                          const revId = typeof newRevisionId === 'string' ? newRevisionId : (newRevisionId.id || policy.quotationId)
+                          onNavigateToQuotation(revId, { policyId: policy.id, policyNumber: policy.policyNumber || '' })
                         } else {
                           showError('Failed to create quotation revision')
                         }

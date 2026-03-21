@@ -53,6 +53,8 @@ function App(): React.JSX.Element {
   const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
   const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
+  const [initialQuotationId, setInitialQuotationId] = useState<string | null>(null)
+  const [quotationPolicyContext, setQuotationPolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -340,7 +342,14 @@ function App(): React.JSX.Element {
           {activeTab === 'surveys' && <Suspense fallback={<LoadingFallback />}><ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'survey-followup' && <Suspense fallback={<LoadingFallback />}><SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators /></Suspense>}
-          {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager onNavigateToPolicy={(policyId) => { setSelectedPolicyId(policyId); setActiveTab('policy-detail') }} /></Suspense>}
+          {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager
+            onNavigateToPolicy={(policyId) => { setSelectedPolicyId(policyId); setActiveTab('policy-detail') }}
+            initialQuotationId={initialQuotationId}
+            onClearInitialQuotation={() => { setInitialQuotationId(null) }}
+            policyContext={quotationPolicyContext}
+            onClearPolicyContext={() => { setQuotationPolicyContext(null) }}
+            onReturnToPolicy={(policyId) => { setSelectedPolicyId(policyId); setQuotationPolicyContext(null); setInitialQuotationId(null); setActiveTab('policy-detail') }}
+          /></Suspense>}
           {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
@@ -359,7 +368,11 @@ function App(): React.JSX.Element {
               policyId={selectedPolicyId}
               onBack={() => { setSelectedPolicyId(null); setActiveTab('policies-list') }}
               onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('policies-list'); setActiveTab('vessels') }}
-              onNavigateToQuotation={(_quotationId: string) => { setActiveTab('quotations') }}
+              onNavigateToQuotation={(quotationId: string, policyCtx?: { policyId: string; policyNumber: string }) => {
+                setInitialQuotationId(quotationId)
+                if (policyCtx) setQuotationPolicyContext(policyCtx)
+                setActiveTab('quotations')
+              }}
             />
           </Suspense>}
           {activeTab === 'activity-log' && <Suspense fallback={<LoadingFallback />}><ActivityLog /></Suspense>}

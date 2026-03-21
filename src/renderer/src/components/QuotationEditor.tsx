@@ -134,9 +134,11 @@ interface QuotationEditorProps {
     onBack: () => void
     onOpenQuotation?: (quotation: Quotation) => void
     onNavigateToPolicy?: (policyId: string) => void
+    policyContext?: { policyId: string; policyNumber: string } | null
+    onReturnToPolicy?: (policyId: string) => void
 }
 
-export default function QuotationEditor({ quotation, onBack, onOpenQuotation, onNavigateToPolicy }: QuotationEditorProps) {
+export default function QuotationEditor({ quotation, onBack, onOpenQuotation, onNavigateToPolicy, policyContext, onReturnToPolicy }: QuotationEditorProps) {
     const [activeTab, setActiveTab] = useState<EditorTab>('vessel')
     const [q, setQ] = useState<Quotation>(quotation)
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
@@ -332,9 +334,26 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
     return (
         <div className="fade-in">
-            <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                <ArrowLeft size={18} /> Back to Quotations
-            </button>
+            {policyContext ? (
+                <button onClick={() => onReturnToPolicy ? onReturnToPolicy(policyContext.policyId) : onBack()} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <ArrowLeft size={18} /> Return to Policy
+                </button>
+            ) : (
+                <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <ArrowLeft size={18} /> Back to Quotations
+                </button>
+            )}
+
+            {/* Policy editing context banner */}
+            {policyContext && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', marginBottom: '12px',
+                    borderRadius: '10px', background: 'rgba(0, 170, 200, 0.1)', border: '1px solid rgba(0, 170, 200, 0.3)',
+                    color: isLight ? '#007a91' : '#00aac8', fontSize: '0.85rem', fontWeight: 600
+                }}>
+                    <FileText size={16} /> Editing coverage for Policy {policyContext.policyNumber || policyContext.policyId}
+                </div>
+            )}
 
             {/* Locked banner */}
             {isLocked && (
@@ -482,12 +501,12 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
                                     borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                 }}>
-                                    {canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
-                                    {canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
+                                    {!policyContext && canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
+                                    {!policyContext && canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
                                     <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
                                     {q.exportSnapshot && !isLocked && <button onClick={() => { setShowActionsMenu(false); handleClearSnapshot() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Refresh Texts</button>}
-                                    {!isLocked && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
-                                    {canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); setShowConvertModal(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#008c46' : '#00c864', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><FileText size={15} /> Convert to Policy</button></>}
+                                    {!policyContext && !isLocked && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
+                                    {!policyContext && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); setShowConvertModal(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#008c46' : '#00c864', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><FileText size={15} /> Convert to Policy</button></>}
                                 </div>
                             </>
                         )}
