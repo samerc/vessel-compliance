@@ -1135,36 +1135,59 @@ async function polLoadLogoAsBuffer(logoPath: string): Promise<{ buffer: ArrayBuf
 
 function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
+  const nameW = Math.round(POL_BODY_W * 0.45)
+  const roleW = Math.round(POL_BODY_W * 0.55)
+
+  // Build insured rows as a borderless table: Name (+ country) | As Role + Address
+  const tableRows: TableRow[] = []
 
   if (data.addresses.length > 0) {
     for (const addr of data.addresses.sort((a, b) => a.order - b.order)) {
-      const runs: TextRun[] = []
-      runs.push(new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }))
-      if (addr.country) {
-        runs.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' }))
-      }
-      content.push(new Paragraph({
-        spacing: { after: 40, line: 240, lineRule: 'auto' as any },
-        children: runs
-      }))
-      if (addr.role) {
-        content.push(polNp(`As ${addr.role}`))
-      }
+      // Left: entity name – country
+      const leftChildren: Paragraph[] = []
+      const nameRuns: TextRun[] = [new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+      if (addr.country) nameRuns.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' }))
+      leftChildren.push(new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: nameRuns }))
+
+      // Right: role + address lines
+      const rightChildren: Paragraph[] = []
+      if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `As ${addr.role}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
       if (addr.address) {
         for (const line of addr.address.split('\n')) {
-          if (line.trim()) content.push(polNp(line.trim()))
+          if (line.trim()) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
         }
       }
-      content.push(polEmptyP())
+      if (rightChildren.length === 0) rightChildren.push(polEmptyP())
+
+      tableRows.push(new TableRow({
+        children: [
+          new TableCell({ width: { size: nameW, type: WidthType.DXA }, borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: leftChildren }),
+          new TableCell({ width: { size: roleW, type: WidthType.DXA }, borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: rightChildren })
+        ]
+      }))
     }
   } else if (data.assureds.length > 0) {
     for (const a of data.assureds) {
-      content.push(polNp(a.name + (a.role ? ` \u2013 as ${a.role}` : '')))
+      tableRows.push(new TableRow({
+        children: [
+          new TableCell({ width: { size: nameW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.name, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: roleW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `As ${a.role}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+        ]
+      }))
     }
-    content.push(polEmptyP())
+  }
+
+  if (tableRows.length > 0) {
+    content.push(new Table({
+      width: { size: POL_BODY_W, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [nameW, roleW],
+      rows: tableRows
+    }))
   }
 
   if (polSt(data, 'insuredFooter')) {
+    content.push(polEmptyP())
     content.push(...polMp(polSt(data, 'insuredFooter')))
   }
 
@@ -1407,14 +1430,33 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
 
   if (typeCode === 'P') {
+    let lolText = ''
     if (data.quotation.limitOfLiabilityText) {
-      content.push(...polMp(data.quotation.limitOfLiabilityText))
+      lolText = data.quotation.limitOfLiabilityText
+    } else if (polSt(data, 'limitOfLiabilityDefaultText') && data.quotation.limitOfLiabilityAmount != null) {
+      lolText = htmlToPlainText(polSt(data, 'limitOfLiabilityDefaultText'))
+        .replace(/\{amount\}/g, polFormatAmountOnly(data.quotation.limitOfLiabilityAmount))
+        .replace(/\{currency\}/g, data.quotation.limitOfLiabilityCurrency || 'USD')
     } else if (data.quotation.limitOfLiabilityAmount != null) {
-      content.push(polNp(`${polFormatCurrency(data.quotation.limitOfLiabilityAmount, data.quotation.limitOfLiabilityCurrency)} all claims in the aggregate.`))
+      lolText = `${polFormatCurrency(data.quotation.limitOfLiabilityAmount, data.quotation.limitOfLiabilityCurrency)} all claims in the aggregate.`
     }
-    if (data.subLimits.length > 0) {
-      for (const sl of data.subLimits) {
-        content.push(polNp(sl.text.replace('{amount}', polFormatAmountOnly(sl.amount)).replace('{currency}', sl.currency || 'USD')))
+    // Handle sub-limits
+    const subLimitLines = data.subLimits.map(sl =>
+      sl.text.replace(/\{amount\}/g, polFormatAmountOnly(sl.amount)).replace(/\{currency\}/g, sl.currency || 'USD')
+    )
+    if (lolText.includes('{sub_limits}')) {
+      if (subLimitLines.length > 0) {
+        lolText = lolText.replace('{sub_limits}', subLimitLines.join('\n'))
+      } else {
+        lolText = lolText.replace(/\n*\{sub_limits\}\n*/g, '\n')
+      }
+    } else if (subLimitLines.length > 0) {
+      lolText += '\n\n' + subLimitLines.join('\n')
+      lolText += '\n\nUnder no circumstances is the Combined Single Limit detailed above to be exceeded.'
+    }
+    if (lolText) {
+      for (const line of lolText.split('\n')) {
+        if (line.trim()) content.push(polNp(line.trim()))
       }
     }
   } else if (typeCode === 'H') {
