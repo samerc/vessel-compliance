@@ -2126,7 +2126,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   const blob = await Packer.toBlob(document)
   const daVName = data.vesselInfo?.name || ''
   const daRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `DA - ${data.policy.policyNumber} - ${daVName}${daRevSuffix}.docx`)
+  polDownloadBlob(blob, `${data.policy.policyNumber} - ${daVName} - Debit Advice${daRevSuffix}.docx`)
 }
 
 // ==================== Credit Advice Export ====================
@@ -2244,5 +2244,5 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const blob = await Packer.toBlob(document)
   const caVName = data.vesselInfo?.name || ''
   const caRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `CA - ${data.policy.policyNumber} - ${caVName}${caRevSuffix}.docx`)
+  polDownloadBlob(blob, `${data.policy.policyNumber} - ${caVName} - Credit Advice${caRevSuffix}.docx`)
 }
