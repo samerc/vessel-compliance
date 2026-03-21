@@ -115,7 +115,18 @@ export interface FlagState {
   iso3Code: string
   address?: string
   email?: string
+  ratifiedBunker?: boolean
+  ratifiedWreck?: boolean
+  authorityName?: string | null
+  authorityAddress?: string | null
   vesselCount?: number
+}
+
+export interface FlagStatePort {
+  id: string
+  flagStateId: string
+  name: string
+  isDefault: boolean
 }
 
 export interface AppData {

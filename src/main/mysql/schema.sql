@@ -799,3 +799,11 @@ CREATE TABLE IF NOT EXISTS quotation_survey_warranties (
   alternative_id VARCHAR(36) DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS flag_state_ports (
+  id VARCHAR(36) PRIMARY KEY,
+  flag_state_id VARCHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  is_default BOOLEAN DEFAULT FALSE,
+  INDEX idx_fsp_flag (flag_state_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -150,6 +150,12 @@ const api = {
   deleteFlagState: (id: string) => ipcRenderer.invoke('db:deleteFlagState', id),
   getVesselsByFlagState: (flagStateId: string) => ipcRenderer.invoke('db:getVesselsByFlagState', flagStateId),
 
+  // Flag State Ports
+  flagStateGetPorts: (flagStateId: string) => ipcRenderer.invoke('flagState:getPorts', flagStateId),
+  flagStateAddPort: (flagStateId: string, name: string, isDefault: boolean) => ipcRenderer.invoke('flagState:addPort', flagStateId, name, isDefault),
+  flagStateUpdatePort: (id: string, name: string, isDefault: boolean) => ipcRenderer.invoke('flagState:updatePort', id, name, isDefault),
+  flagStateDeletePort: (id: string) => ipcRenderer.invoke('flagState:deletePort', id),
+
   // Policy Types
   getPolicyTypes: () => ipcRenderer.invoke('db:getPolicyTypes'),
   addPolicyType: (name: string) => ipcRenderer.invoke('db:addPolicyType', name),
@@ -692,6 +698,9 @@ const api = {
   policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),
   policyGetAddresses: (policyId: string) => ipcRenderer.invoke('policy:getAddresses', policyId),
   policyGetBlueCards: (policyId: string) => ipcRenderer.invoke('policy:getBlueCards', policyId),
+  policyAddBlueCard: (data: any) => ipcRenderer.invoke('policy:addBlueCard', data),
+  policyUpdateBlueCard: (id: string, data: any) => ipcRenderer.invoke('policy:updateBlueCard', id, data),
+  policySupersedeBlueCard: (id: string) => ipcRenderer.invoke('policy:supersedeBlueCard', id),
   policyDelete: (id: string) => ipcRenderer.invoke('policy:delete', id),
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
 }

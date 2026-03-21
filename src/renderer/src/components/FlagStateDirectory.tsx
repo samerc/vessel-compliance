@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Pencil, Ship, Flag } from 'lucide-react'
-import { FlagState } from '../../../shared/types'
+import { Plus, Trash2, ChevronDown, ChevronRight, Pencil, Ship, Flag, X, Anchor, Building2, CheckCircle2 } from 'lucide-react'
+import { FlagState, FlagStatePort } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import ConfirmationModal from './ConfirmationModal'
@@ -23,8 +23,20 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
     const [editIso3, setEditIso3] = useState('')
     const [editAddress, setEditAddress] = useState('')
     const [editEmail, setEditEmail] = useState('')
+    const [editRatifiedBunker, setEditRatifiedBunker] = useState(false)
+    const [editRatifiedWreck, setEditRatifiedWreck] = useState(false)
+    const [editAuthorityName, setEditAuthorityName] = useState('')
+    const [editAuthorityAddress, setEditAuthorityAddress] = useState('')
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
+
+    // Ports state
+    const [expandedPorts, setExpandedPorts] = useState<FlagStatePort[]>([])
+    const [newPortName, setNewPortName] = useState('')
+    const [newPortDefault, setNewPortDefault] = useState(false)
+    const [editingPortId, setEditingPortId] = useState<string | null>(null)
+    const [editPortName, setEditPortName] = useState('')
+    const [editPortDefault, setEditPortDefault] = useState(false)
 
     useEffect(() => {
         loadData()
@@ -65,11 +77,16 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
         await window.api.deleteFlagState(id)
         setExpandedId(null)
         setExpandedVessels([])
+        setExpandedPorts([])
         setEditingId(null)
         setEditName('')
         setEditIso3('')
         setEditAddress('')
         setEditEmail('')
+        setEditRatifiedBunker(false)
+        setEditRatifiedWreck(false)
+        setEditAuthorityName('')
+        setEditAuthorityAddress('')
         setDeleteConfirmId(null)
         showSuccess('Flag state deleted')
         loadData()
@@ -79,11 +96,16 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
         if (expandedId === flagState.id) {
             setExpandedId(null)
             setExpandedVessels([])
+            setExpandedPorts([])
             return
         }
-        const vessels = await window.api.getVesselsByFlagState(flagState.id)
+        const [vessels, ports] = await Promise.all([
+            window.api.getVesselsByFlagState(flagState.id),
+            window.api.flagStateGetPorts(flagState.id)
+        ])
         setExpandedId(flagState.id)
         setExpandedVessels(vessels)
+        setExpandedPorts(Array.isArray(ports) ? ports : [])
     }
 
     const startEditing = (fs: FlagState) => {
@@ -92,6 +114,10 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
         setEditIso3(fs.iso3Code)
         setEditAddress(fs.address || '')
         setEditEmail(fs.email || '')
+        setEditRatifiedBunker(Boolean(fs.ratifiedBunker))
+        setEditRatifiedWreck(Boolean(fs.ratifiedWreck))
+        setEditAuthorityName(fs.authorityName || '')
+        setEditAuthorityAddress(fs.authorityAddress || '')
     }
 
     const saveEdit = async (id: string) => {
@@ -101,13 +127,90 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
             return
         }
         try {
-            await window.api.updateFlagState(id, { name: editName, iso3Code: editIso3.toUpperCase(), address: editAddress || undefined, email: editEmail || undefined })
+            await window.api.updateFlagState(id, {
+                name: editName,
+                iso3Code: editIso3.toUpperCase(),
+                address: editAddress || undefined,
+                email: editEmail || undefined,
+                ratifiedBunker: editRatifiedBunker,
+                ratifiedWreck: editRatifiedWreck,
+                authorityName: editAuthorityName || undefined,
+                authorityAddress: editAuthorityAddress || undefined
+            })
             setEditingId(null)
             showSuccess('Flag state updated')
             loadData()
         } catch (err: any) {
             showError(err.message || 'Failed to update flag state')
         }
+    }
+
+    // Port handlers
+    const handleAddPort = async (flagStateId: string) => {
+        if (!newPortName.trim()) return
+        try {
+            const port = await window.api.flagStateAddPort(flagStateId, newPortName.trim(), newPortDefault) as any
+            if (port && !port.error) {
+                // If new port is default, unset others locally
+                const updated = newPortDefault
+                    ? expandedPorts.map(p => ({ ...p, isDefault: false }))
+                    : [...expandedPorts]
+                updated.push(port)
+                setExpandedPorts(updated)
+                setNewPortName('')
+                setNewPortDefault(false)
+                showSuccess('Port added')
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to add port')
+        }
+    }
+
+    const handleUpdatePort = async () => {
+        if (!editingPortId || !editPortName.trim()) return
+        try {
+            await window.api.flagStateUpdatePort(editingPortId, editPortName.trim(), editPortDefault)
+            // Update local state
+            setExpandedPorts(prev => prev.map(p => {
+                if (p.id === editingPortId) return { ...p, name: editPortName.trim(), isDefault: editPortDefault }
+                if (editPortDefault) return { ...p, isDefault: false }
+                return p
+            }))
+            setEditingPortId(null)
+            showSuccess('Port updated')
+        } catch (err: any) {
+            showError(err.message || 'Failed to update port')
+        }
+    }
+
+    const handleDeletePort = async (portId: string) => {
+        try {
+            await window.api.flagStateDeletePort(portId)
+            setExpandedPorts(prev => prev.filter(p => p.id !== portId))
+            showSuccess('Port deleted')
+        } catch (err: any) {
+            showError(err.message || 'Failed to delete port')
+        }
+    }
+
+    const sectionHeaderStyle: React.CSSProperties = {
+        fontSize: '0.75rem',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        color: 'var(--text-secondary)',
+        marginTop: '12px',
+        marginBottom: '6px'
+    }
+
+    const badgeStyle: React.CSSProperties = {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '2px 8px',
+        borderRadius: '4px',
+        fontSize: '0.75rem',
+        fontWeight: '500'
     }
 
     return (
@@ -181,6 +284,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                             <th scope="col" style={{ padding: '16px', width: '40px' }}></th>
                             <th scope="col" style={{ padding: '16px' }}>Flag State</th>
                             <th scope="col" style={{ padding: '16px', width: '80px' }}>Code</th>
+                            <th scope="col" style={{ padding: '16px', width: '160px' }}>Conventions</th>
                             <th scope="col" style={{ padding: '16px', width: '120px' }}>Vessels</th>
                             <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
                         </tr>
@@ -188,7 +292,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                     <tbody>
                         {flagStates.length === 0 ? (
                             <tr>
-                                <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                     No flag states added yet.
                                 </td>
                             </tr>
@@ -243,6 +347,51 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                                                         placeholder="Email addresses (comma-separated)"
                                                         style={{ width: '100%' }}
                                                     />
+
+                                                    {/* Conventions */}
+                                                    <div style={{ width: '100%' }}>
+                                                        <div style={sectionHeaderStyle}>Conventions</div>
+                                                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={editRatifiedBunker}
+                                                                    onChange={e => setEditRatifiedBunker(e.target.checked)}
+                                                                />
+                                                                Bunker Convention (2001)
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={editRatifiedWreck}
+                                                                    onChange={e => setEditRatifiedWreck(e.target.checked)}
+                                                                />
+                                                                Wreck Removal Convention (2007)
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Maritime Authority */}
+                                                    <div style={{ width: '100%' }}>
+                                                        <div style={sectionHeaderStyle}>Maritime Authority</div>
+                                                        <div style={{ display: 'flex', gap: '12px' }}>
+                                                            <input
+                                                                type="text"
+                                                                value={editAuthorityName}
+                                                                onChange={e => setEditAuthorityName(e.target.value)}
+                                                                placeholder="Authority name (e.g. Panama Maritime Authority)"
+                                                                style={{ flex: 1 }}
+                                                            />
+                                                        </div>
+                                                        <textarea
+                                                            value={editAuthorityAddress}
+                                                            onChange={e => setEditAuthorityAddress(e.target.value)}
+                                                            placeholder="Authority address"
+                                                            rows={2}
+                                                            style={{ width: '100%', resize: 'vertical', marginTop: '8px' }}
+                                                        />
+                                                    </div>
+
                                                     <div style={{ display: 'flex', gap: '6px' }}>
                                                         <button onClick={(e) => { e.stopPropagation(); saveEdit(fs.id) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Save</button>
                                                         <button onClick={(e) => { e.stopPropagation(); setEditingId(null) }} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Cancel</button>
@@ -262,6 +411,20 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                                         </td>
                                         <td style={{ padding: '16px', width: '80px' }}>
                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{fs.iso3Code}</span>
+                                        </td>
+                                        <td style={{ padding: '16px', width: '160px' }}>
+                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                {fs.ratifiedBunker && (
+                                                    <span style={{ ...badgeStyle, background: 'rgba(0, 200, 120, 0.1)', border: '1px solid rgba(0, 200, 120, 0.25)', color: 'rgb(0, 180, 100)' }}>
+                                                        <CheckCircle2 size={10} /> Bunker
+                                                    </span>
+                                                )}
+                                                {fs.ratifiedWreck && (
+                                                    <span style={{ ...badgeStyle, background: 'rgba(0, 170, 200, 0.1)', border: '1px solid rgba(0, 170, 200, 0.25)', color: 'rgb(0, 150, 180)' }}>
+                                                        <CheckCircle2 size={10} /> Wreck
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td style={{ padding: '16px', width: '120px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
@@ -291,7 +454,8 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                                     </tr>
                                     {isExpanded && (
                                         <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                            <td colSpan={5} style={{ padding: '0 16px 16px 56px', borderTop: '1px solid var(--table-border)' }}>
+                                            <td colSpan={6} style={{ padding: '0 16px 16px 56px', borderTop: '1px solid var(--table-border)' }}>
+                                                {/* Address & Email */}
                                                 {(fs.address || fs.email) && (
                                                     <div style={{ marginBottom: '12px', marginTop: '12px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                                                         {fs.address && <div style={{ whiteSpace: 'pre-line', marginBottom: fs.email ? '8px' : '0' }}>{fs.address}</div>}
@@ -311,6 +475,140 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                                                         )}
                                                     </div>
                                                 )}
+
+                                                {/* Maritime Authority */}
+                                                {(fs.authorityName || fs.authorityAddress) && (
+                                                    <div style={{ marginBottom: '12px', marginTop: fs.address || fs.email ? '0' : '12px' }}>
+                                                        <div style={{ ...sectionHeaderStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <Building2 size={12} /> Maritime Authority
+                                                        </div>
+                                                        {fs.authorityName && (
+                                                            <div style={{ fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>{fs.authorityName}</div>
+                                                        )}
+                                                        {fs.authorityAddress && (
+                                                            <div style={{ whiteSpace: 'pre-line', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{fs.authorityAddress}</div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Ports of Registry */}
+                                                <div style={{ marginBottom: '12px', marginTop: '12px' }}>
+                                                    <div style={{ ...sectionHeaderStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <Anchor size={12} /> Ports of Registry
+                                                    </div>
+                                                    {expandedPorts.length > 0 && (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                                                            {expandedPorts.map(port => (
+                                                                <div key={port.id} style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '6px',
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '6px',
+                                                                    background: port.isDefault ? 'rgba(0, 170, 200, 0.1)' : 'rgba(255,255,255,0.04)',
+                                                                    border: port.isDefault ? '1px solid rgba(0, 170, 200, 0.3)' : '1px solid var(--glass-border)',
+                                                                    fontSize: '0.85rem'
+                                                                }}>
+                                                                    {editingPortId === port.id ? (
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editPortName}
+                                                                                onChange={e => setEditPortName(e.target.value)}
+                                                                                style={{ width: '120px', padding: '2px 6px', fontSize: '0.85rem' }}
+                                                                                autoFocus
+                                                                                onKeyDown={e => { if (e.key === 'Enter') handleUpdatePort(); if (e.key === 'Escape') setEditingPortId(null) }}
+                                                                            />
+                                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer' }}>
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={editPortDefault}
+                                                                                    onChange={e => setEditPortDefault(e.target.checked)}
+                                                                                />
+                                                                                Default
+                                                                            </label>
+                                                                            <button
+                                                                                onClick={() => handleUpdatePort()}
+                                                                                className="btn-primary"
+                                                                                style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                                                                            >Save</button>
+                                                                            <button
+                                                                                onClick={() => setEditingPortId(null)}
+                                                                                className="btn-secondary"
+                                                                                style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                                                                            >Cancel</button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span style={{ fontWeight: port.isDefault ? '600' : '400' }}>{port.name}</span>
+                                                                            {port.isDefault && (
+                                                                                <span style={{
+                                                                                    fontSize: '0.65rem',
+                                                                                    padding: '1px 5px',
+                                                                                    borderRadius: '3px',
+                                                                                    background: 'rgba(0, 170, 200, 0.2)',
+                                                                                    color: 'var(--accent-primary)',
+                                                                                    fontWeight: '600',
+                                                                                    textTransform: 'uppercase'
+                                                                                }}>Default</span>
+                                                                            )}
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setEditingPortId(port.id)
+                                                                                    setEditPortName(port.name)
+                                                                                    setEditPortDefault(port.isDefault)
+                                                                                }}
+                                                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}
+                                                                                title="Edit port"
+                                                                            >
+                                                                                <Pencil size={12} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeletePort(port.id)}
+                                                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}
+                                                                                title="Delete port"
+                                                                            >
+                                                                                <X size={12} />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {expandedPorts.length === 0 && (
+                                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic', marginBottom: '8px' }}>
+                                                            No ports of registry added.
+                                                        </div>
+                                                    )}
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={newPortName}
+                                                            onChange={e => setNewPortName(e.target.value)}
+                                                            placeholder="Port name"
+                                                            style={{ width: '180px', padding: '4px 8px', fontSize: '0.85rem' }}
+                                                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPort(fs.id) } }}
+                                                        />
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={newPortDefault}
+                                                                onChange={e => setNewPortDefault(e.target.checked)}
+                                                            />
+                                                            Default
+                                                        </label>
+                                                        <button
+                                                            onClick={() => handleAddPort(fs.id)}
+                                                            className="btn-primary"
+                                                            style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                        >
+                                                            <Plus size={14} /> Add Port
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Vessels */}
                                                 {expandedVessels.length === 0 ? (
                                                     <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic', marginTop: '12px' }}>
                                                         No vessels registered under this flag.

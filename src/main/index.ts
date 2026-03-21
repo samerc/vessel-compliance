@@ -1129,6 +1129,12 @@ app.whenReady().then(() => {
   safeHandle('db:deleteFlagState', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteFlagState(id) })
   safeHandle('db:getVesselsByFlagState', (event, flagStateId) => { requireSession(event); return db.getVesselsByFlagState(flagStateId) })
 
+  // Flag State Ports
+  safeHandle('flagState:getPorts', (event, flagStateId) => { requireSession(event); return db.getFlagStatePorts(flagStateId) })
+  safeHandle('flagState:addPort', async (event, flagStateId, name, isDefault) => { await requirePermission(event, 'admin:settings'); return db.addFlagStatePort(flagStateId, name, isDefault) })
+  safeHandle('flagState:updatePort', async (event, id, name, isDefault) => { await requirePermission(event, 'admin:settings'); return db.updateFlagStatePort(id, name, isDefault) })
+  safeHandle('flagState:deletePort', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteFlagStatePort(id) })
+
   // Policy Types
   safeHandle('db:getPolicyTypes', (event) => { requireSession(event); return db.getPolicyTypes() })
   safeHandle('db:addPolicyType', async (event, name) => { await requirePermission(event, 'admin:settings'); return db.addPolicyType(name) })
@@ -2427,6 +2433,9 @@ app.whenReady().then(() => {
   safeHandle('policy:getInstalments', (event, policyId) => { requireSession(event); return db.getPolicyInstalments(policyId) })
   safeHandle('policy:getAddresses', (event, policyId) => { requireSession(event); return db.getPolicyAddresses(policyId) })
   safeHandle('policy:getBlueCards', (event, policyId) => { requireSession(event); return db.getPolicyBlueCards(policyId) })
+  safeHandle('policy:addBlueCard', (event, data) => { requireSession(event); return db.addPolicyBlueCard(data) })
+  safeHandle('policy:updateBlueCard', (event, id, data) => { requireSession(event); return db.updatePolicyBlueCard(id, data) })
+  safeHandle('policy:supersedeBlueCard', (event, id) => { requireSession(event); return db.supersedePolicyBlueCard(id) })
   safeHandle('policy:convertFromQuotation', async (event, quotationId, options) => {
     const session = requireSession(event)
     return db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })

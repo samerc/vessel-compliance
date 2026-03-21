@@ -2186,6 +2186,53 @@ export class MySQLAdapter {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )`)
 
+            // Migrate policy_blue_cards — add owner/port/addressedTo/status columns
+            {
+                const [bcMigCols] = await this.pool.query('SHOW COLUMNS FROM policy_blue_cards') as any[]
+                const bcMigColNames = bcMigCols.map((c: any) => c.Field)
+                const bcNewCols: [string, string][] = [
+                    ['status', `VARCHAR(20) DEFAULT 'active'`],
+                    ['owner_entity_id', 'VARCHAR(36) NULL'],
+                    ['owner_name', 'VARCHAR(255) NULL'],
+                    ['owner_address', 'TEXT NULL'],
+                    ['port_of_registry', 'VARCHAR(255) NULL'],
+                    ['addressed_to_flag_id', 'VARCHAR(36) NULL'],
+                    ['addressed_to_name', 'VARCHAR(255) NULL'],
+                    ['addressed_to_address', 'TEXT NULL'],
+                    ['cancel_replace_text', 'TEXT NULL'],
+                ]
+                for (const [col, def] of bcNewCols) {
+                    if (!bcMigColNames.includes(col)) {
+                        await this.pool.query(`ALTER TABLE policy_blue_cards ADD COLUMN ${col} ${def}`)
+                    }
+                }
+            }
+
+            // Migration: Add ratification flags and authority details to flag_states
+            const [fsCols] = await this.pool.query('SHOW COLUMNS FROM flag_states')
+            const fsColNames = (fsCols as any[]).map((c: any) => c.Field)
+            if (!fsColNames.includes('ratified_bunker')) {
+                await this.pool.query('ALTER TABLE flag_states ADD COLUMN ratified_bunker BOOLEAN DEFAULT FALSE')
+            }
+            if (!fsColNames.includes('ratified_wreck')) {
+                await this.pool.query('ALTER TABLE flag_states ADD COLUMN ratified_wreck BOOLEAN DEFAULT FALSE')
+            }
+            if (!fsColNames.includes('authority_name')) {
+                await this.pool.query('ALTER TABLE flag_states ADD COLUMN authority_name VARCHAR(255) DEFAULT NULL')
+            }
+            if (!fsColNames.includes('authority_address')) {
+                await this.pool.query('ALTER TABLE flag_states ADD COLUMN authority_address TEXT DEFAULT NULL')
+            }
+
+            // Ensure flag_state_ports table exists
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS flag_state_ports (
+                id VARCHAR(36) PRIMARY KEY,
+                flag_state_id VARCHAR(36) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                is_default BOOLEAN DEFAULT FALSE,
+                INDEX idx_fsp_flag (flag_state_id)
+            )`)
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -2660,26 +2707,36 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`
             SELECT fs.id, fs.name, fs.iso3_code as iso3Code, fs.address, fs.email,
+                   fs.ratified_bunker as ratifiedBunker,
+                   fs.ratified_wreck as ratifiedWreck,
+                   fs.authority_name as authorityName,
+                   fs.authority_address as authorityAddress,
                    COUNT(v.id) as vesselCount
             FROM flag_states fs
             LEFT JOIN vessels v ON fs.id = v.flag_state_id
-            GROUP BY fs.id, fs.name, fs.iso3_code, fs.address, fs.email
+            GROUP BY fs.id, fs.name, fs.iso3_code, fs.address, fs.email,
+                     fs.ratified_bunker, fs.ratified_wreck, fs.authority_name, fs.authority_address
             ORDER BY fs.name ASC
         `)
-        return (rows as any[]).map(r => ({ ...r, vesselCount: Number(r.vesselCount) }))
+        return (rows as any[]).map(r => ({
+            ...r,
+            vesselCount: Number(r.vesselCount),
+            ratifiedBunker: Boolean(r.ratifiedBunker),
+            ratifiedWreck: Boolean(r.ratifiedWreck)
+        }))
     }
 
-    async addFlagState(flagState: { name: string; iso3Code: string; address?: string; email?: string }): Promise<any> {
+    async addFlagState(flagState: { name: string; iso3Code: string; address?: string; email?: string; ratifiedBunker?: boolean; ratifiedWreck?: boolean; authorityName?: string; authorityAddress?: string }): Promise<any> {
         if (!this.pool) throw new Error('No database connection')
         const id = require('crypto').randomUUID()
         await this.pool.execute(
-            'INSERT INTO flag_states (id, name, iso3_code, address, email) VALUES (?, ?, ?, ?, ?)',
-            [id, flagState.name, flagState.iso3Code.toUpperCase(), flagState.address || null, flagState.email || null]
+            'INSERT INTO flag_states (id, name, iso3_code, address, email, ratified_bunker, ratified_wreck, authority_name, authority_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, flagState.name, flagState.iso3Code.toUpperCase(), flagState.address || null, flagState.email || null, flagState.ratifiedBunker ? 1 : 0, flagState.ratifiedWreck ? 1 : 0, flagState.authorityName || null, flagState.authorityAddress || null]
         )
-        return { id, ...flagState, iso3Code: flagState.iso3Code.toUpperCase(), vesselCount: 0 }
+        return { id, ...flagState, iso3Code: flagState.iso3Code.toUpperCase(), ratifiedBunker: Boolean(flagState.ratifiedBunker), ratifiedWreck: Boolean(flagState.ratifiedWreck), vesselCount: 0 }
     }
 
-    async updateFlagState(id: string, updates: { name?: string; iso3Code?: string; address?: string; email?: string }): Promise<void> {
+    async updateFlagState(id: string, updates: { name?: string; iso3Code?: string; address?: string; email?: string; ratifiedBunker?: boolean; ratifiedWreck?: boolean; authorityName?: string | null; authorityAddress?: string | null }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
@@ -2687,6 +2744,10 @@ export class MySQLAdapter {
         if (updates.iso3Code !== undefined) { fields.push('iso3_code = ?'); values.push(updates.iso3Code.toUpperCase()) }
         if (updates.address !== undefined) { fields.push('address = ?'); values.push(updates.address || null) }
         if (updates.email !== undefined) { fields.push('email = ?'); values.push(updates.email || null) }
+        if (updates.ratifiedBunker !== undefined) { fields.push('ratified_bunker = ?'); values.push(updates.ratifiedBunker ? 1 : 0) }
+        if (updates.ratifiedWreck !== undefined) { fields.push('ratified_wreck = ?'); values.push(updates.ratifiedWreck ? 1 : 0) }
+        if (updates.authorityName !== undefined) { fields.push('authority_name = ?'); values.push(updates.authorityName || null) }
+        if (updates.authorityAddress !== undefined) { fields.push('authority_address = ?'); values.push(updates.authorityAddress || null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE flag_states SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -2696,6 +2757,8 @@ export class MySQLAdapter {
         if (!this.pool) return
         // Clear flag_state_id on vessels referencing this flag state
         await this.pool.execute('UPDATE vessels SET flag_state_id = NULL WHERE flag_state_id = ?', [id])
+        // Delete associated ports
+        await this.pool.execute('DELETE FROM flag_state_ports WHERE flag_state_id = ?', [id])
         await this.pool.execute('DELETE FROM flag_states WHERE id = ?', [id])
     }
 
@@ -2706,6 +2769,46 @@ export class MySQLAdapter {
             [flagStateId]
         )
         return rows as any[]
+    }
+
+    // --- Flag State Ports ---
+    async getFlagStatePorts(flagStateId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, flag_state_id as flagStateId, name, is_default as isDefault FROM flag_state_ports WHERE flag_state_id = ? ORDER BY name ASC',
+            [flagStateId]
+        )
+        return (rows as any[]).map(r => ({ ...r, isDefault: Boolean(r.isDefault) }))
+    }
+
+    async addFlagStatePort(flagStateId: string, name: string, isDefault: boolean): Promise<any> {
+        if (!this.pool) throw new Error('No database connection')
+        const id = require('crypto').randomUUID()
+        if (isDefault) {
+            await this.pool.execute('UPDATE flag_state_ports SET is_default = FALSE WHERE flag_state_id = ?', [flagStateId])
+        }
+        await this.pool.execute(
+            'INSERT INTO flag_state_ports (id, flag_state_id, name, is_default) VALUES (?, ?, ?, ?)',
+            [id, flagStateId, name, isDefault ? 1 : 0]
+        )
+        return { id, flagStateId, name, isDefault }
+    }
+
+    async updateFlagStatePort(id: string, name: string, isDefault: boolean): Promise<void> {
+        if (!this.pool) return
+        if (isDefault) {
+            const [rows] = await this.pool.query('SELECT flag_state_id FROM flag_state_ports WHERE id = ?', [id])
+            const port = (rows as any[])[0]
+            if (port) {
+                await this.pool.execute('UPDATE flag_state_ports SET is_default = FALSE WHERE flag_state_id = ?', [port.flag_state_id])
+            }
+        }
+        await this.pool.execute('UPDATE flag_state_ports SET name = ?, is_default = ? WHERE id = ?', [name, isDefault ? 1 : 0, id])
+    }
+
+    async deleteFlagStatePort(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM flag_state_ports WHERE id = ?', [id])
     }
 
     // --- Entities ---
@@ -7347,15 +7450,101 @@ export class MySQLAdapter {
             SELECT id, policy_doc_id as policyDocId, card_type as cardType,
                    card_number as cardNumber, inception_date as inceptionDate,
                    expiry_date as expiryDate, revision_number as revisionNumber,
-                   issued_date as issuedDate
+                   issued_date as issuedDate, status,
+                   owner_entity_id as ownerEntityId, owner_name as ownerName,
+                   owner_address as ownerAddress, port_of_registry as portOfRegistry,
+                   addressed_to_flag_id as addressedToFlagId,
+                   addressed_to_name as addressedToName,
+                   addressed_to_address as addressedToAddress,
+                   cancel_replace_text as cancelReplaceText
             FROM policy_blue_cards
             WHERE policy_doc_id = ?
-            ORDER BY card_type ASC
+            ORDER BY card_type ASC, revision_number DESC
         `, [policyId])
         return (rows as any[]).map(r => ({
             ...r,
             revisionNumber: Number(r.revisionNumber || 0),
+            status: r.status || 'active',
         }))
+    }
+
+    async addPolicyBlueCard(data: {
+        policyId: string
+        cardType: string
+        cardNumber: string
+        inceptionDate: string
+        expiryDate: string
+        revisionNumber: number
+        issuedDate: string
+        status?: string
+        ownerEntityId?: string
+        ownerName?: string
+        ownerAddress?: string
+        portOfRegistry?: string
+        addressedToFlagId?: string
+        addressedToName?: string
+        addressedToAddress?: string
+        cancelReplaceText?: string
+    }): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        await this.pool.execute(`
+            INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
+                inception_date, expiry_date, revision_number, issued_date, status,
+                owner_entity_id, owner_name, owner_address, port_of_registry,
+                addressed_to_flag_id, addressed_to_name, addressed_to_address,
+                cancel_replace_text)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            id, data.policyId, data.cardType, data.cardNumber,
+            data.inceptionDate, data.expiryDate, data.revisionNumber,
+            data.issuedDate, data.status || 'active',
+            data.ownerEntityId || null, data.ownerName || null,
+            data.ownerAddress || null, data.portOfRegistry || null,
+            data.addressedToFlagId || null, data.addressedToName || null,
+            data.addressedToAddress || null, data.cancelReplaceText || null,
+        ])
+        return { id, ...data, status: data.status || 'active' }
+    }
+
+    async updatePolicyBlueCard(id: string, data: Record<string, any>): Promise<void> {
+        if (!this.pool) return
+        const sets: string[] = []
+        const vals: any[] = []
+        const fieldMap: Record<string, string> = {
+            cardNumber: 'card_number',
+            inceptionDate: 'inception_date',
+            expiryDate: 'expiry_date',
+            issuedDate: 'issued_date',
+            ownerEntityId: 'owner_entity_id',
+            ownerName: 'owner_name',
+            ownerAddress: 'owner_address',
+            portOfRegistry: 'port_of_registry',
+            addressedToFlagId: 'addressed_to_flag_id',
+            addressedToName: 'addressed_to_name',
+            addressedToAddress: 'addressed_to_address',
+            cancelReplaceText: 'cancel_replace_text',
+        }
+        for (const [key, col] of Object.entries(fieldMap)) {
+            if (key in data) {
+                sets.push(`${col} = ?`)
+                vals.push(data[key] ?? null)
+            }
+        }
+        if (sets.length === 0) return
+        vals.push(id)
+        await this.pool.execute(
+            `UPDATE policy_blue_cards SET ${sets.join(', ')} WHERE id = ?`,
+            vals
+        )
+    }
+
+    async supersedePolicyBlueCard(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            `UPDATE policy_blue_cards SET status = 'superseded' WHERE id = ?`,
+            [id]
+        )
     }
 
     async deletePolicyDocument(id: string): Promise<void> {
