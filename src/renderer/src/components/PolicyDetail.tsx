@@ -1544,10 +1544,12 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     onClick={async () => {
                       try {
                         // Auto-create quotation revision and navigate to it
-                        const newRevisionId = await window.api.createQuotationRevision(policy.quotationId)
-                        if (newRevisionId && !(newRevisionId as any).error) {
+                        const newRevision = await window.api.createQuotationRevision(policy.quotationId)
+                        if (newRevision && !(newRevision as any).error) {
+                          const revId = typeof newRevision === 'string' ? newRevision : (newRevision.id || policy.quotationId)
+                          // Update the policy to reference the new quotation revision
+                          await window.api.policyUpdate(policy.id, { quotationId: revId })
                           showSuccess('Quotation revision created. Navigating to editor...')
-                          const revId = typeof newRevisionId === 'string' ? newRevisionId : (newRevisionId.id || policy.quotationId)
                           onNavigateToQuotation(revId, { policyId: policy.id, policyNumber: policy.policyNumber || '' })
                         } else {
                           showError('Failed to create quotation revision')

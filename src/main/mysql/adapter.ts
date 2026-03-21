@@ -7570,6 +7570,7 @@ export class MySQLAdapter {
             openingClause: 'opening_clause',
             importantNotice: 'important_notice',
             closingCity: 'closing_city',
+            quotationId: 'quotation_id',
         }
         const sets: string[] = []
         const vals: any[] = []
