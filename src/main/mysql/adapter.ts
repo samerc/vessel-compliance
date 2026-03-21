@@ -7363,6 +7363,10 @@ export class MySQLAdapter {
              LEFT JOIN quotations q ON pd.quotation_id = q.id
              LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
              LEFT JOIN banks b ON pd.bank_id = b.id
+             WHERE pd.revision_number = (
+                SELECT MAX(pd2.revision_number) FROM policy_documents pd2
+                WHERE pd2.policy_number = pd.policy_number
+             )
              ORDER BY pd.created_at DESC`
         )
         return (rows as any[]).map(r => ({
@@ -7436,8 +7440,8 @@ export class MySQLAdapter {
     async getPolicyAddresses(policyId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`
-            SELECT id, policy_doc_id as policyDocId, entity_id as entityId,
-                   role, address_text as addressText,
+            SELECT pda.id, pda.policy_doc_id as policyDocId, pda.entity_id as entityId,
+                   pda.role, pda.address_text as addressText,
                    e.name as entityName
             FROM policy_doc_addresses pda
             LEFT JOIN entities e ON pda.entity_id = e.id
@@ -7616,7 +7620,12 @@ export class MySQLAdapter {
         if (!existing) throw new Error('Policy not found')
 
         const newId = uuidv4()
-        const newRevision = (existing.revisionNumber || 0) + 1
+        // Get max revision for this policy number to avoid duplicates
+        const [maxRevRows] = await this.pool.query(
+            'SELECT COALESCE(MAX(revision_number), 0) as maxRev FROM policy_documents WHERE policy_number = ?',
+            [existing.policyNumber]
+        )
+        const newRevision = ((maxRevRows as any[])[0]?.maxRev || 0) + 1
 
         // Insert new revision
         await this.pool.execute(`
