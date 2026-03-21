@@ -701,6 +701,10 @@ const api = {
   policyAddBlueCard: (data: any) => ipcRenderer.invoke('policy:addBlueCard', data),
   policyUpdateBlueCard: (id: string, data: any) => ipcRenderer.invoke('policy:updateBlueCard', id, data),
   policySupersedeBlueCard: (id: string) => ipcRenderer.invoke('policy:supersedeBlueCard', id),
+  policyUpdate: (id: string, fields: any) => ipcRenderer.invoke('policy:update', id, fields),
+  policySetInstalments: (policyId: string, instalments: any[]) => ipcRenderer.invoke('policy:setInstalments', policyId, instalments),
+  policySetAddresses: (policyId: string, addresses: any[]) => ipcRenderer.invoke('policy:setAddresses', policyId, addresses),
+  policyCreateRevision: (policyId: string) => ipcRenderer.invoke('policy:createRevision', policyId),
   policyDelete: (id: string) => ipcRenderer.invoke('policy:delete', id),
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
 }

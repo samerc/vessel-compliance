@@ -359,6 +359,7 @@ function App(): React.JSX.Element {
               policyId={selectedPolicyId}
               onBack={() => { setSelectedPolicyId(null); setActiveTab('policies-list') }}
               onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('policies-list'); setActiveTab('vessels') }}
+              onNavigateToQuotation={() => { setActiveTab('quotations') }}
             />
           </Suspense>}
           {activeTab === 'activity-log' && <Suspense fallback={<LoadingFallback />}><ActivityLog /></Suspense>}

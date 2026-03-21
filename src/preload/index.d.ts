@@ -697,6 +697,10 @@ export interface Api {
   policyAddBlueCard: (data: any) => Promise<any>
   policyUpdateBlueCard: (id: string, data: any) => Promise<void>
   policySupersedeBlueCard: (id: string) => Promise<void>
+  policyUpdate: (id: string, fields: Record<string, any>) => Promise<void>
+  policySetInstalments: (policyId: string, instalments: { instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]) => Promise<void>
+  policySetAddresses: (policyId: string, addresses: { entityId: string; role: string; addressText: string }[]) => Promise<void>
+  policyCreateRevision: (policyId: string) => Promise<string>
   policyDelete: (id: string) => Promise<void>
   policyConvertFromQuotation: (quotationId: string, options: {
     vesselIds: string[]

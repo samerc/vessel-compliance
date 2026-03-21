@@ -17,7 +17,11 @@ import {
   Edit3,
   X,
   AlertTriangle,
-  Check
+  Check,
+  Save,
+  Shield,
+  ChevronRight,
+  Copy
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -33,10 +37,20 @@ import {
 import { getReportSettings } from '../services/ReportSettingsService'
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
 
+const DEFAULT_TIMEZONE_OPTIONS = [
+  'Lebanon Standard Time',
+  'Lebanon Local Standard Time',
+  'GMT',
+  'UTC'
+]
+
+type EditTab = 'overview' | 'insured' | 'premium' | 'coverage'
+
 interface PolicyDetailProps {
   policyId: string
   onBack: () => void
   onNavigateToVessel?: (vesselId: string) => void
+  onNavigateToQuotation?: () => void
 }
 
 interface PolicyRecord {
@@ -59,6 +73,7 @@ interface PolicyRecord {
   proRata: boolean
   perAnnumPremium: number | null
   premiumAmount: number | null
+  cancelReplaceText: string | null
   createdBy: string
   createdAt: string
   quotationTypeCode: string
@@ -166,7 +181,7 @@ function formatPeriod(date?: string, time?: string): string {
   return formatted
 }
 
-export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: PolicyDetailProps) {
+export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onNavigateToQuotation }: PolicyDetailProps) {
   const [policy, setPolicy] = useState<PolicyRecord | null>(null)
   const [instalments, setInstalments] = useState<Instalment[]>([])
   const [addresses, setAddresses] = useState<PolicyAddress[]>([])
@@ -176,6 +191,39 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
   const [exportingDA, setExportingDA] = useState(false)
   const [exportingCA, setExportingCA] = useState(false)
   const [exportingBC, setExportingBC] = useState(false)
+
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false)
+  const [activeTab, setActiveTab] = useState<EditTab>('overview')
+  const [saving, setSaving] = useState(false)
+
+  // Editable policy fields
+  const [editInception, setEditInception] = useState('')
+  const [editInceptionTime, setEditInceptionTime] = useState('12:00')
+  const [editExpiry, setEditExpiry] = useState('')
+  const [editExpiryTime, setEditExpiryTime] = useState('12:00')
+  const [editTimezone, setEditTimezone] = useState('')
+  const [editPremium, setEditPremium] = useState<number>(0)
+  const [editCommission, setEditCommission] = useState<number>(0)
+  const [editBankId, setEditBankId] = useState('')
+  const [editInstalments, setEditInstalments] = useState<{ instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]>([])
+  const [editAddresses, setEditAddresses] = useState<{ entityId: string; entityName: string; role: string; addressText: string }[]>([])
+  const [editCancelReplace, setEditCancelReplace] = useState(false)
+  const [editCancelReplaceText, setEditCancelReplaceText] = useState('')
+
+  // Supplementary data for editing
+  const [banks, setBanks] = useState<{ id: string; name: string; details: string; order: number }[]>([])
+
+  // Coverage tab state
+  const [quotationData, setQuotationData] = useState<any>(null)
+  const [coverageWarranties, setCoverageWarranties] = useState<any[]>([])
+  const [coverageCustomWarranties, setCoverageCustomWarranties] = useState<any[]>([])
+  const [coverageDeductibles, setCoverageDeductibles] = useState<any[]>([])
+  const [coverageExclusions, setCoverageExclusions] = useState<any[]>([])
+  const [coverageClauses, setCoverageClauses] = useState<any[]>([])
+  const [coverageSubjectivities, setCoverageSubjectivities] = useState<any[]>([])
+  const [coverageLoading, setCoverageLoading] = useState(false)
+  const [coverageExpanded, setCoverageExpanded] = useState<Record<string, boolean>>({})
 
   // Blue card management state
   const [bcModalOpen, setBcModalOpen] = useState(false)
@@ -239,15 +287,17 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
     loadData()
   }, [loadData])
 
-  // Load supplementary data for blue card management
+  // Load supplementary data for blue card management + editing
   useEffect(() => {
     const loadSupplementary = async (): Promise<void> => {
       try {
-        const [fs, entities] = await Promise.all([
+        const [fs, entities, bnks] = await Promise.all([
           window.api.getFlagStates(),
-          window.api.getEntities()
+          window.api.getEntities(),
+          window.api.bankGetAll()
         ])
         setFlagStates(Array.isArray(fs) ? fs : [])
+        setBanks(Array.isArray(bnks) ? bnks : [])
         // Build a simple entity lookup for assured entities
         const entMap = Array.isArray(entities)
           ? entities.map((e: any) => ({ id: e.id, name: e.name, address: e.address }))
@@ -287,6 +337,157 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
     }
     loadPorts()
   }, [policy?.flagStateId])
+
+  // Enter edit mode — populate edit fields from current data
+  const enterEditMode = useCallback(() => {
+    if (!policy) return
+    setEditInception(policy.inceptionDate || '')
+    setEditInceptionTime(policy.inceptionTime || '12:00')
+    setEditExpiry(policy.expiryDate || '')
+    setEditExpiryTime(policy.expiryTime || '12:00')
+    setEditTimezone(policy.timezone || 'GMT')
+    setEditPremium(policy.premiumAmount || 0)
+    setEditCommission(policy.commissionPercent || 0)
+    setEditBankId(policy.bankId || '')
+    setEditInstalments(instalments.map(inst => ({
+      instalmentNumber: inst.instalmentNumber,
+      dueDate: inst.dueDate || '',
+      premiumAmount: inst.premiumAmount || 0,
+      commissionAmount: inst.commissionAmount || 0,
+      isNonRefundable: inst.isNonRefundable
+    })))
+    setEditAddresses(addresses.map(addr => ({
+      entityId: addr.entityId || '',
+      entityName: addr.entityName || '',
+      role: addr.role || '',
+      addressText: addr.addressText || ''
+    })))
+    setEditCancelReplace(!!policy.cancelReplaceText)
+    setEditCancelReplaceText(policy.cancelReplaceText || '')
+    setActiveTab('overview')
+    setIsEditing(true)
+  }, [policy, instalments, addresses])
+
+  // Save edited policy
+  const handleSavePolicy = async (): Promise<void> => {
+    if (!policy) return
+    setSaving(true)
+    try {
+      await window.api.policyUpdate(policyId, {
+        inceptionDate: editInception,
+        inceptionTime: editInceptionTime,
+        expiryDate: editExpiry,
+        expiryTime: editExpiryTime,
+        timezone: editTimezone,
+        premiumAmount: editPremium,
+        commissionPercent: editCommission || null,
+        bankId: editBankId || null,
+        cancelReplaceText: editCancelReplace ? editCancelReplaceText : null
+      })
+      await window.api.policySetInstalments(policyId, editInstalments)
+      await window.api.policySetAddresses(policyId, editAddresses.map(a => ({
+        entityId: a.entityId,
+        role: a.role,
+        addressText: a.addressText
+      })))
+      showSuccess('Policy updated')
+      setIsEditing(false)
+      await loadData()
+    } catch (err: any) {
+      showError(err.message || 'Failed to save policy')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Create new revision
+  const handleCreateRevision = async (): Promise<void> => {
+    if (!confirm('Create a new revision of this policy? The current version will be marked as superseded.')) return
+    try {
+      const newId = await window.api.policyCreateRevision(policyId)
+      if (newId && typeof newId === 'string') {
+        showSuccess('New revision created')
+        // Reload with new policy ID — but since policyId is a prop, we just reload
+        await loadData()
+      }
+    } catch (err: any) {
+      showError(err.message || 'Failed to create revision')
+    }
+  }
+
+  // Load coverage data from linked quotation
+  const loadCoverageData = useCallback(async () => {
+    if (!policy?.quotationId) return
+    setCoverageLoading(true)
+    try {
+      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities] = await Promise.all([
+        window.api.getQuotation(policy.quotationId),
+        window.api.getQuotationWarranties(policy.quotationId),
+        window.api.getQuotationCustomWarranties(policy.quotationId),
+        window.api.getQuotationDeductibles(policy.quotationId),
+        window.api.getQuotationExclusions(policy.quotationId),
+        window.api.getQuotationClauses(policy.quotationId),
+        window.api.getQuotationSubjectivities(policy.quotationId)
+      ])
+      setQuotationData(q)
+      setCoverageWarranties(Array.isArray(warranties) ? warranties : [])
+      setCoverageCustomWarranties(Array.isArray(customWarranties) ? customWarranties : [])
+      setCoverageDeductibles(Array.isArray(deductibles) ? deductibles : [])
+      setCoverageExclusions(Array.isArray(exclusions) ? exclusions : [])
+      setCoverageClauses(Array.isArray(clauses) ? clauses : [])
+      setCoverageSubjectivities(Array.isArray(subjectivities) ? subjectivities : [])
+    } catch {
+      // Non-critical
+    } finally {
+      setCoverageLoading(false)
+    }
+  }, [policy?.quotationId])
+
+  // Load coverage when switching to that tab
+  useEffect(() => {
+    if (isEditing && activeTab === 'coverage' && !quotationData && !coverageLoading) {
+      loadCoverageData()
+    }
+  }, [isEditing, activeTab, quotationData, coverageLoading, loadCoverageData])
+
+  // Recalculate instalment amounts when premium or commission change
+  const recalcInstalments = (newPremium: number, newCommission: number, currentInstalments: typeof editInstalments): typeof editInstalments => {
+    if (currentInstalments.length === 0) return currentInstalments
+    const perInstPremium = newPremium / currentInstalments.length
+    const commRate = newCommission / 100
+    return currentInstalments.map(inst => ({
+      ...inst,
+      premiumAmount: Math.round(perInstPremium * 100) / 100,
+      commissionAmount: Math.round(perInstPremium * commRate * 100) / 100
+    }))
+  }
+
+  // Add instalment row
+  const addInstalment = (): void => {
+    const next = editInstalments.length + 1
+    setEditInstalments(prev => [...prev, {
+      instalmentNumber: next,
+      dueDate: '',
+      premiumAmount: 0,
+      commissionAmount: 0,
+      isNonRefundable: false
+    }])
+  }
+
+  // Remove instalment row
+  const removeInstalment = (idx: number): void => {
+    setEditInstalments(prev => prev.filter((_, i) => i !== idx).map((inst, i) => ({ ...inst, instalmentNumber: i + 1 })))
+  }
+
+  // Add address row
+  const addAddress = (): void => {
+    setEditAddresses(prev => [...prev, { entityId: '', entityName: '', role: '', addressText: '' }])
+  }
+
+  // Remove address row
+  const removeAddress = (idx: number): void => {
+    setEditAddresses(prev => prev.filter((_, i) => i !== idx))
+  }
 
   // Group blue cards by type
   const blueCardsByType = useMemo(() => {
@@ -817,9 +1018,44 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
                 Rev. {policy.revisionNumber}
               </span>
             )}
+            {isEditing && (
+              <span
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  background: 'rgba(255, 176, 32, 0.15)',
+                  color: isLight ? '#b07a10' : '#ffb020'
+                }}
+              >
+                Editing
+              </span>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {!isEditing && hasPermission('policies:manage') && policy.status === 'active' && (
+            <>
+              <button
+                className="btn-primary"
+                style={{ ...exportBtnStyle, fontWeight: 700 }}
+                onClick={enterEditMode}
+                title="Edit Policy"
+              >
+                <Edit3 size={14} /> Edit Policy
+              </button>
+              <button
+                className="btn-secondary"
+                style={exportBtnStyle}
+                onClick={handleCreateRevision}
+                title="Create New Revision"
+              >
+                <Copy size={14} /> New Revision
+              </button>
+            </>
+          )}
           <button
             className="btn-secondary"
             style={exportBtnStyle}
@@ -904,6 +1140,563 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
         </div>
       </div>
 
+      {/* ─── EDIT MODE ─── */}
+      {isEditing && (
+        <>
+          {/* Tab bar */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--glass-border)',
+            paddingBottom: '0'
+          }}>
+            {([
+              { key: 'overview', label: 'Overview', icon: <Ship size={15} /> },
+              { key: 'insured', label: 'Insured', icon: <Users size={15} /> },
+              { key: 'premium', label: 'Premium', icon: <DollarSign size={15} /> },
+              { key: 'coverage', label: 'Coverage', icon: <Shield size={15} /> }
+            ] as { key: EditTab; label: string; icon: React.ReactNode }[]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: '10px 18px',
+                  fontSize: '0.82rem',
+                  fontWeight: activeTab === tab.key ? 700 : 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === tab.key ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                  color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  marginBottom: '-1px'
+                }}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <Ship size={18} style={{ color: 'var(--accent-primary)' }} />
+                <span style={cardTitleStyle}>Overview & Period</span>
+              </div>
+
+              {/* Vessel info (read-only) */}
+              <div style={{ marginBottom: '20px', padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{policy.vesselName || '-'}</span>
+                  {policy.imoNumber && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>IMO {policy.imoNumber}</span>}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  {[policy.vesselType, policy.flagStateName, policy.builtYear ? `Built ${policy.builtYear}` : null, policy.grossTonnage ? `GT ${Number(policy.grossTonnage).toLocaleString()}` : null].filter(Boolean).join(' | ')}
+                </div>
+                {policy.customerName && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Customer: {policy.customerName}</div>}
+              </div>
+
+              {/* Editable period */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+                <div>
+                  <label style={labelStyle}>Inception Date</label>
+                  <input
+                    type="date"
+                    value={editInception}
+                    onChange={e => setEditInception(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Inception Time</label>
+                  <input
+                    type="time"
+                    value={editInceptionTime}
+                    onChange={e => setEditInceptionTime(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Expiry Date</label>
+                  <input
+                    type="date"
+                    value={editExpiry}
+                    onChange={e => setEditExpiry(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Expiry Time</label>
+                  <input
+                    type="time"
+                    value={editExpiryTime}
+                    onChange={e => setEditExpiryTime(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={labelStyle}>Timezone</label>
+                <select
+                  value={editTimezone}
+                  onChange={e => setEditTimezone(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                >
+                  {DEFAULT_TIMEZONE_OPTIONS.map(tz => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
+                  {editTimezone && !DEFAULT_TIMEZONE_OPTIONS.includes(editTimezone) && (
+                    <option value={editTimezone}>{editTimezone}</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Cancel & Replace */}
+              <div style={{
+                padding: '12px',
+                borderRadius: '8px',
+                background: editCancelReplace ? (isLight ? 'rgba(255, 176, 32, 0.06)' : 'rgba(255, 176, 32, 0.08)') : 'transparent',
+                border: editCancelReplace ? '1px solid rgba(255, 176, 32, 0.2)' : '1px solid transparent'
+              }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}>
+                  <input type="checkbox" checked={editCancelReplace} onChange={e => setEditCancelReplace(e.target.checked)} />
+                  Cancel & Replace
+                </label>
+                {editCancelReplace && (
+                  <textarea
+                    placeholder="Cancel & replace text..."
+                    value={editCancelReplaceText}
+                    onChange={e => setEditCancelReplaceText(e.target.value)}
+                    rows={2}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical', marginTop: '8px' }}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Insured Tab */}
+          {activeTab === 'insured' && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <Users size={18} style={{ color: '#6464ff' }} />
+                <span style={cardTitleStyle}>Addresses</span>
+                <button
+                  className="btn-secondary"
+                  style={{ marginLeft: 'auto', padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+                  onClick={addAddress}
+                >
+                  <Plus size={13} /> Add Address
+                </button>
+              </div>
+
+              {editAddresses.length === 0 && (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  No addresses. Click "Add Address" to add one.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {editAddresses.map((addr, idx) => (
+                  <div key={idx} style={{ padding: '14px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', position: 'relative' }}>
+                    <button
+                      onClick={() => removeAddress(idx)}
+                      style={{ position: 'absolute', top: '8px', right: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}
+                      title="Remove address"
+                    >
+                      <X size={16} />
+                    </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                      <div>
+                        <label style={labelStyle}>Entity</label>
+                        <select
+                          value={addr.entityId || ''}
+                          onChange={e => {
+                            const ent = assuredEntities.find(en => en.id === e.target.value)
+                            setEditAddresses(prev => prev.map((a, i) => i === idx ? { ...a, entityId: e.target.value, entityName: ent?.name || a.entityName } : a))
+                          }}
+                          style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                        >
+                          <option value="">Select entity...</option>
+                          {assuredEntities.map(ent => (
+                            <option key={ent.id} value={ent.id}>{ent.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Role</label>
+                        <input
+                          type="text"
+                          value={addr.role}
+                          onChange={e => setEditAddresses(prev => prev.map((a, i) => i === idx ? { ...a, role: e.target.value } : a))}
+                          placeholder="e.g. Assured, Owner..."
+                          style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Address</label>
+                      <textarea
+                        value={addr.addressText}
+                        onChange={e => setEditAddresses(prev => prev.map((a, i) => i === idx ? { ...a, addressText: e.target.value } : a))}
+                        placeholder="Full address..."
+                        rows={2}
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Premium Tab */}
+          {activeTab === 'premium' && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <DollarSign size={18} style={{ color: '#00c864' }} />
+                <span style={cardTitleStyle}>Financial Details</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+                <div>
+                  <label style={labelStyle}>Premium Amount</label>
+                  <input
+                    type="number"
+                    value={editPremium || ''}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value) || 0
+                      setEditPremium(val)
+                      setEditInstalments(prev => recalcInstalments(val, editCommission, prev))
+                    }}
+                    step="0.01"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Commission %</label>
+                  <input
+                    type="number"
+                    value={editCommission || ''}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value) || 0
+                      setEditCommission(val)
+                      setEditInstalments(prev => recalcInstalments(editPremium, val, prev))
+                    }}
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Bank</label>
+                  <select
+                    value={editBankId}
+                    onChange={e => setEditBankId(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  >
+                    <option value="">No bank selected</option>
+                    {banks.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Instalments */}
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <span style={{ ...labelStyle, marginBottom: 0 }}>Instalments</span>
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: '3px 10px', fontSize: '0.72rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={addInstalment}
+                  >
+                    <Plus size={12} /> Add
+                  </button>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                    Changing premium recalculates instalment amounts
+                  </span>
+                </div>
+
+                {editInstalments.length > 0 && (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                        <th style={thStyle}>#</th>
+                        <th style={thStyle}>Due Date</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Premium</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Commission</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>NR</th>
+                        <th style={{ ...thStyle, width: '40px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editInstalments.map((inst, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--table-border)', background: idx % 2 === 0 ? 'transparent' : isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
+                          <td style={tdStyle}>{inst.instalmentNumber}</td>
+                          <td style={tdStyle}>
+                            <input
+                              type="date"
+                              value={inst.dueDate}
+                              onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, dueDate: e.target.value } : r))}
+                              style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+                            />
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            <input
+                              type="number"
+                              value={inst.premiumAmount || ''}
+                              onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, premiumAmount: parseFloat(e.target.value) || 0 } : r))}
+                              step="0.01"
+                              style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }}
+                            />
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            <input
+                              type="number"
+                              value={inst.commissionAmount || ''}
+                              onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, commissionAmount: parseFloat(e.target.value) || 0 } : r))}
+                              step="0.01"
+                              style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }}
+                            />
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'center' }}>
+                            <input type="checkbox" checked={inst.isNonRefundable} onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, isNonRefundable: e.target.checked } : r))} />
+                          </td>
+                          <td style={tdStyle}>
+                            <button
+                              onClick={() => removeInstalment(idx)}
+                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}
+                              title="Remove instalment"
+                            >
+                              <X size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Coverage Tab (read-only) */}
+          {activeTab === 'coverage' && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <Shield size={18} style={{ color: '#00aac8' }} />
+                <span style={cardTitleStyle}>Coverage</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginLeft: '8px' }}>
+                  Read-only — sourced from linked quotation
+                </span>
+                {onNavigateToQuotation && policy.quotationId && (
+                  <button
+                    className="btn-secondary"
+                    style={{ marginLeft: 'auto', padding: '5px 14px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}
+                    onClick={onNavigateToQuotation}
+                  >
+                    Edit Coverage in Quotation <ChevronRight size={14} />
+                  </button>
+                )}
+              </div>
+
+              {coverageLoading ? (
+                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <Loader2 size={20} className="spinner" style={{ marginBottom: '8px' }} /> Loading coverage data...
+                </div>
+              ) : !quotationData ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  No linked quotation data available
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Warranties */}
+                  {(coverageWarranties.length > 0 || coverageCustomWarranties.length > 0) && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.warranties ? '10px' : 0 }}
+                        onClick={() => setCoverageExpanded(prev => ({ ...prev, warranties: !prev.warranties }))}
+                      >
+                        <ChevronRight size={16} style={{ transform: coverageExpanded.warranties ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Warranties</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                          {coverageWarranties.length + coverageCustomWarranties.length}
+                        </span>
+                      </div>
+                      {coverageExpanded.warranties && (
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {coverageWarranties.map((w: any, i: number) => (
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                              {w.text || w.name || `Warranty ${i + 1}`}
+                            </div>
+                          ))}
+                          {coverageCustomWarranties.map((cw: any, i: number) => (
+                            <div key={`cw-${i}`} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)', fontStyle: 'italic' }}>
+                              {cw.text || `Custom Warranty ${i + 1}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Deductibles */}
+                  {coverageDeductibles.length > 0 && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.deductibles ? '10px' : 0 }}
+                        onClick={() => setCoverageExpanded(prev => ({ ...prev, deductibles: !prev.deductibles }))}
+                      >
+                        <ChevronRight size={16} style={{ transform: coverageExpanded.deductibles ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Deductibles</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                          {coverageDeductibles.length}
+                        </span>
+                      </div>
+                      {coverageExpanded.deductibles && (
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {coverageDeductibles.map((d: any, i: number) => (
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                              {d.text || d.name || `Deductible ${i + 1}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Exclusions */}
+                  {coverageExclusions.length > 0 && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.exclusions ? '10px' : 0 }}
+                        onClick={() => setCoverageExpanded(prev => ({ ...prev, exclusions: !prev.exclusions }))}
+                      >
+                        <ChevronRight size={16} style={{ transform: coverageExpanded.exclusions ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Exclusions</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                          {coverageExclusions.length}
+                        </span>
+                      </div>
+                      {coverageExpanded.exclusions && (
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {coverageExclusions.map((ex: any, i: number) => (
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                              {ex.text || ex.name || `Exclusion ${i + 1}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Clauses */}
+                  {coverageClauses.length > 0 && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.clauses ? '10px' : 0 }}
+                        onClick={() => setCoverageExpanded(prev => ({ ...prev, clauses: !prev.clauses }))}
+                      >
+                        <ChevronRight size={16} style={{ transform: coverageExpanded.clauses ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Conditions / Clauses</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                          {coverageClauses.length}
+                        </span>
+                      </div>
+                      {coverageExpanded.clauses && (
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {coverageClauses.map((c: any, i: number) => (
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                              {c.text || c.name || c.code || `Clause ${i + 1}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Subjectivities */}
+                  {coverageSubjectivities.length > 0 && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.subjectivities ? '10px' : 0 }}
+                        onClick={() => setCoverageExpanded(prev => ({ ...prev, subjectivities: !prev.subjectivities }))}
+                      >
+                        <ChevronRight size={16} style={{ transform: coverageExpanded.subjectivities ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Subjectivities</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                          {coverageSubjectivities.length}
+                        </span>
+                      </div>
+                      {coverageExpanded.subjectivities && (
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {coverageSubjectivities.map((s: any, i: number) => (
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                              {s.text || s.name || `Subjectivity ${i + 1}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {coverageWarranties.length === 0 && coverageCustomWarranties.length === 0 && coverageDeductibles.length === 0 && coverageExclusions.length === 0 && coverageClauses.length === 0 && coverageSubjectivities.length === 0 && (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                      No coverage items found in the linked quotation
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sticky save/cancel footer */}
+          <div style={{
+            position: 'sticky',
+            bottom: 0,
+            padding: '14px 20px',
+            marginTop: '16px',
+            background: isLight ? '#ffffff' : '#1a1d28',
+            border: '1px solid var(--glass-border)',
+            borderRadius: '12px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '10px',
+            zIndex: 10
+          }}>
+            <button
+              className="btn-secondary"
+              style={{ padding: '8px 20px', fontSize: '0.85rem' }}
+              onClick={() => setIsEditing(false)}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-primary"
+              style={{ padding: '8px 24px', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={handleSavePolicy}
+              disabled={saving}
+            >
+              {saving ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}
+              Save Changes
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ─── READ-ONLY VIEW ─── */}
+      {!isEditing && (
+        <>
       {/* Two-column layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         {/* Overview Card */}
@@ -2059,6 +2852,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel }: P
           </div>
         </div>
       </div>
+        </>
+      )}
 
     </div>
   )

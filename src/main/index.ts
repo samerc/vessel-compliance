@@ -2441,6 +2441,10 @@ app.whenReady().then(() => {
     return db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
   })
 
+  safeHandle('policy:update', async (event, id, fields) => { await requirePermission(event, 'policies:manage'); return db.updatePolicyDocument(id, fields) })
+  safeHandle('policy:setInstalments', async (event, policyId, instalments) => { await requirePermission(event, 'policies:manage'); return db.setPolicyInstalments(policyId, instalments) })
+  safeHandle('policy:setAddresses', async (event, policyId, addresses) => { await requirePermission(event, 'policies:manage'); return db.setPolicyAddresses(policyId, addresses) })
+  safeHandle('policy:createRevision', async (event, policyId) => { const session = requireSession(event); await requirePermission(event, 'policies:manage'); return db.createPolicyRevision(policyId, session.id) })
   safeHandle('policy:delete', async (event, id) => { await requirePermission(event, 'policies:manage'); return db.deletePolicyDocument(id) })
 
   // Policy Expiry Alerts

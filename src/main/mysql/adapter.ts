@@ -7408,6 +7408,7 @@ export class MySQLAdapter {
             expiryDate: r.expiry_date,
             expiryTime: r.expiry_time,
             bankId: r.bank_id,
+            cancelReplaceText: r.cancel_replace_text || null,
             createdBy: r.created_by,
             createdAt: r.created_at,
         }
@@ -7545,6 +7546,121 @@ export class MySQLAdapter {
             `UPDATE policy_blue_cards SET status = 'superseded' WHERE id = ?`,
             [id]
         )
+    }
+
+    async updatePolicyDocument(id: string, fields: Record<string, any>): Promise<void> {
+        if (!this.pool) return
+        const fieldMap: Record<string, string> = {
+            inceptionDate: 'inception_date',
+            inceptionTime: 'inception_time',
+            expiryDate: 'expiry_date',
+            expiryTime: 'expiry_time',
+            timezone: 'timezone',
+            premiumAmount: 'premium_amount',
+            perAnnumPremium: 'per_annum_premium',
+            commissionPercent: 'commission_percent',
+            bankId: 'bank_id',
+            showAddresses: 'show_addresses',
+            proRata: 'pro_rata',
+            status: 'status',
+            cancelReplaceText: 'cancel_replace_text',
+            previousPolicyNumber: 'previous_policy_number',
+            previousPolicyDate: 'previous_policy_date',
+            openingClause: 'opening_clause',
+            importantNotice: 'important_notice',
+            closingCity: 'closing_city',
+        }
+        const sets: string[] = []
+        const vals: any[] = []
+        for (const [key, col] of Object.entries(fieldMap)) {
+            if (key in fields) {
+                sets.push(`${col} = ?`)
+                vals.push(fields[key] ?? null)
+            }
+        }
+        if (sets.length === 0) return
+        vals.push(id)
+        await this.pool.execute(
+            `UPDATE policy_documents SET ${sets.join(', ')} WHERE id = ?`,
+            vals
+        )
+    }
+
+    async setPolicyInstalments(policyId: string, instalments: { instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM policy_doc_instalments WHERE policy_doc_id = ?', [policyId])
+        for (const inst of instalments) {
+            await this.pool.execute(`
+                INSERT INTO policy_doc_instalments (id, policy_doc_id, instalment_number, due_date, premium_amount, commission_amount, is_non_refundable)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [uuidv4(), policyId, inst.instalmentNumber, inst.dueDate, inst.premiumAmount, inst.commissionAmount, inst.isNonRefundable ? 1 : 0])
+        }
+    }
+
+    async setPolicyAddresses(policyId: string, addresses: { entityId: string; role: string; addressText: string }[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM policy_doc_addresses WHERE policy_doc_id = ?', [policyId])
+        for (const addr of addresses) {
+            await this.pool.execute(`
+                INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
+                VALUES (?, ?, ?, ?, ?)
+            `, [uuidv4(), policyId, addr.entityId || null, addr.role || '', addr.addressText || ''])
+        }
+    }
+
+    async createPolicyRevision(policyId: string, createdBy: string): Promise<string> {
+        if (!this.pool) throw new Error('DB not connected')
+        const existing = await this.getPolicyDocumentById(policyId)
+        if (!existing) throw new Error('Policy not found')
+
+        const newId = uuidv4()
+        const newRevision = (existing.revisionNumber || 0) + 1
+
+        // Insert new revision
+        await this.pool.execute(`
+            INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
+                revision_number, inception_date, inception_time, expiry_date, expiry_time,
+                timezone, commission_percent, show_addresses, bank_id, pro_rata,
+                per_annum_premium, premium_amount, opening_clause, important_notice,
+                closing_city, cancel_replace_text, previous_policy_number, previous_policy_date,
+                created_by)
+            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            newId, existing.quotationId, existing.vesselId, existing.policyNumber, newRevision,
+            existing.inceptionDate, existing.inceptionTime, existing.expiryDate, existing.expiryTime,
+            existing.timezone, existing.commissionPercent, existing.showAddresses ? 1 : 0,
+            existing.bankId, existing.proRata ? 1 : 0, existing.perAnnumPremium, existing.premiumAmount,
+            existing.opening_clause || null, existing.important_notice || null,
+            existing.closing_city || null, existing.cancel_replace_text || null,
+            existing.previous_policy_number || null, existing.previous_policy_date || null,
+            createdBy
+        ])
+
+        // Copy instalments
+        const instalments = await this.getPolicyInstalments(policyId)
+        for (const inst of instalments) {
+            await this.pool.execute(`
+                INSERT INTO policy_doc_instalments (id, policy_doc_id, instalment_number, due_date, premium_amount, commission_amount, is_non_refundable)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [uuidv4(), newId, inst.instalmentNumber, inst.dueDate, inst.premiumAmount, inst.commissionAmount, inst.isNonRefundable ? 1 : 0])
+        }
+
+        // Copy addresses
+        const addresses = await this.getPolicyAddresses(policyId)
+        for (const addr of addresses) {
+            await this.pool.execute(`
+                INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
+                VALUES (?, ?, ?, ?, ?)
+            `, [uuidv4(), newId, addr.entityId || null, addr.role || '', addr.addressText || ''])
+        }
+
+        // Mark old policy as superseded
+        await this.pool.execute(
+            `UPDATE policy_documents SET status = 'superseded' WHERE id = ?`,
+            [policyId]
+        )
+
+        return newId
     }
 
     async deletePolicyDocument(id: string): Promise<void> {
