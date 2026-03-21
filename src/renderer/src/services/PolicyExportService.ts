@@ -529,7 +529,8 @@ export async function exportBlueCardDocx(
   const url = URL.createObjectURL(blob)
   const a = window.document.createElement('a')
   a.href = url
-  a.download = `${data.policyNumber}-${cardType}.docx`
+  const bcVName = data.vesselName ? ` - ${data.vesselName}` : ''
+  a.download = `${data.policyNumber}${bcVName} - ${cardType}.docx`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -1976,8 +1977,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   })
 
   const blob = await Packer.toBlob(document)
-  const revSuffix = data.policy.revisionNumber > 0 ? `-R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `${data.policy.policyNumber}${revSuffix}.docx`)
+  const vName = data.vesselInfo?.name || ''
+  const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
+  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`)
 }
 
 // ==================== Debit Advice Export ====================
@@ -2122,8 +2124,9 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   })
 
   const blob = await Packer.toBlob(document)
-  const daRevSuffix = data.policy.revisionNumber > 0 ? `-R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `DA - ${data.policy.policyNumber}${daRevSuffix}.docx`)
+  const daVName = data.vesselInfo?.name || ''
+  const daRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
+  polDownloadBlob(blob, `DA - ${data.policy.policyNumber} - ${daVName}${daRevSuffix}.docx`)
 }
 
 // ==================== Credit Advice Export ====================
@@ -2239,6 +2242,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   })
 
   const blob = await Packer.toBlob(document)
-  const caRevSuffix = data.policy.revisionNumber > 0 ? `-R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `CA - ${data.policy.policyNumber}${caRevSuffix}.docx`)
+  const caVName = data.vesselInfo?.name || ''
+  const caRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
+  polDownloadBlob(blob, `CA - ${data.policy.policyNumber} - ${caVName}${caRevSuffix}.docx`)
 }
