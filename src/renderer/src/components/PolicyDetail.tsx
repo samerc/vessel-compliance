@@ -420,7 +420,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     if (!policy?.quotationId) return
     setCoverageLoading(true)
     try {
-      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities, allWarranties, allDeductiblesMaster, allExclusionsMaster, allClausesMaster, allSubjectivitiesMaster] = await Promise.all([
+      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities, allWarranties, , allExclusionsMaster, allClausesMaster, allSubjectivitiesMaster] = await Promise.all([
         window.api.getQuotation(policy.quotationId),
         window.api.getQuotationWarranties(policy.quotationId),
         window.api.getQuotationCustomWarranties(policy.quotationId),
@@ -443,25 +443,33 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       })
       setCoverageWarranties(resolvedWarranties)
       setCoverageCustomWarranties(Array.isArray(customWarranties) ? customWarranties : [])
-      // Resolve deductible names
-      const masterDedMap = new Map((Array.isArray(allDeductiblesMaster) ? allDeductiblesMaster : []).map((d: any) => [d.id, d]))
+      // Resolve deductible text — deductibles have title+description directly
       setCoverageDeductibles((Array.isArray(deductibles) ? deductibles : []).map((d: any) => {
-        const master = masterDedMap.get(d.piDeductibleId)
-        return { ...d, text: d.customText || master?.text || d.text || '' }
+        const parts = [d.title, d.description].filter(Boolean)
+        let text = parts.join(' — ')
+        if (d.amount) text += ` ${d.currency || 'USD'} ${Number(d.amount).toLocaleString()}`
+        return { ...d, text: text || 'Deductible' }
       }))
-      // Resolve exclusion names
+      // Resolve exclusion text — exclusions have customText or reference master
       const masterExclMap = new Map((Array.isArray(allExclusionsMaster) ? allExclusionsMaster : []).map((e: any) => [e.id, e]))
       setCoverageExclusions((Array.isArray(exclusions) ? exclusions : []).map((e: any) => {
         const master = masterExclMap.get(e.piExclusionId)
         return { ...e, text: e.customText || master?.text || e.text || '' }
       }))
-      // Resolve clause names
+      // Resolve clause names — clauses reference master pi_clauses with name+code
       const masterClauseMap = new Map((Array.isArray(allClausesMaster) ? allClausesMaster : []).map((c: any) => [c.id, c]))
-      setCoverageClauses((Array.isArray(clauses) ? clauses : []).map((c: any) => {
+      // Deduplicate clauses by piClauseId
+      const seenClauseIds = new Set<string>()
+      const dedupedClauses = (Array.isArray(clauses) ? clauses : []).filter((c: any) => {
+        if (seenClauseIds.has(c.piClauseId)) return false
+        seenClauseIds.add(c.piClauseId)
+        return true
+      })
+      setCoverageClauses(dedupedClauses.map((c: any) => {
         const master = masterClauseMap.get(c.piClauseId)
         return { ...c, text: master?.name || master?.text || c.text || '', code: master?.code || '' }
       }))
-      // Resolve subjectivity names
+      // Resolve subjectivity text
       const masterSubjMap = new Map((Array.isArray(allSubjectivitiesMaster) ? allSubjectivitiesMaster : []).map((s: any) => [s.id, s]))
       setCoverageSubjectivities((Array.isArray(subjectivities) ? subjectivities : []).map((s: any) => {
         const master = masterSubjMap.get(s.piSubjectivityId)
