@@ -352,6 +352,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     color: isLight ? '#007a91' : '#00aac8', fontSize: '0.85rem', fontWeight: 600
                 }}>
                     <FileText size={16} /> Editing coverage for Policy {policyContext.policyNumber || policyContext.policyId}
+                    <button
+                        onClick={() => onReturnToPolicy ? onReturnToPolicy(policyContext.policyId) : onBack()}
+                        className="btn-primary"
+                        style={{ marginLeft: 'auto', padding: '6px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        Done — Return to Policy <ArrowLeft size={14} style={{ transform: 'rotate(180deg)' }} />
+                    </button>
                 </div>
             )}
 
