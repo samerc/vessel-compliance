@@ -2893,9 +2893,17 @@ function PolicyFontSizeSetting() {
 }
 
 function PolicyExportSettings() {
-    const [totalPages, setTotalPages] = useState(31)
+    const defaultTitles: Record<string, string> = { P: 'Protection and Indemnity Certificate', H: 'Hull & Machinery Certificate', W: 'War Risk Certificate' }
+    const defaultPageMap: Record<string, Record<string, number>> = { P: { '3': 30, '4': 31, '5': 32, '6': 33 }, H: { '3': 28, '4': 29, '5': 30 }, W: { '3': 25, '4': 26 } }
+
+    const [headerTitles, setHeaderTitles] = useState(defaultTitles)
+    const [pageCountMap, setPageCountMap] = useState(defaultPageMap)
     const [footerText, setFooterText] = useState('')
+    const [premiumIntroText, setPremiumIntroText] = useState('Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:')
     const [loading, setLoading] = useState(true)
+    const [newPageType, setNewPageType] = useState('P')
+    const [newPageCount, setNewPageCount] = useState('')
+    const [newTotalPages, setNewTotalPages] = useState('')
     const { showSuccess } = useToast()
 
     useEffect(() => {
@@ -2904,8 +2912,10 @@ function PolicyExportSettings() {
                 const raw = await window.api.getSetting('policyExportSettings')
                 if (raw) {
                     const parsed = JSON.parse(raw)
-                    if (parsed.totalPages) setTotalPages(parsed.totalPages)
+                    if (parsed.headerTitles) setHeaderTitles({ ...defaultTitles, ...parsed.headerTitles })
+                    if (parsed.pageCountMap) setPageCountMap({ ...defaultPageMap, ...parsed.pageCountMap })
                     if (parsed.footerText) setFooterText(parsed.footerText)
+                    if (parsed.premiumIntroText) setPremiumIntroText(parsed.premiumIntroText)
                 }
             } catch { /* default */ }
             finally { setLoading(false) }
@@ -2913,39 +2923,115 @@ function PolicyExportSettings() {
     }, [])
 
     const save = async () => {
-        await window.api.setSetting('policyExportSettings', JSON.stringify({ totalPages, footerText }))
+        await window.api.setSetting('policyExportSettings', JSON.stringify({ headerTitles, pageCountMap, footerText, premiumIntroText }))
         showSuccess('Policy export settings saved')
     }
+
+    const addPageCountRow = () => {
+        if (!newPageCount || !newTotalPages) return
+        const updated = { ...pageCountMap }
+        if (!updated[newPageType]) updated[newPageType] = {}
+        updated[newPageType][newPageCount] = parseInt(newTotalPages, 10)
+        setPageCountMap(updated)
+        setNewPageCount('')
+        setNewTotalPages('')
+    }
+
+    const removePageCountRow = (type: string, pages: string) => {
+        const updated = { ...pageCountMap }
+        if (updated[type]) {
+            delete updated[type][pages]
+            if (Object.keys(updated[type]).length === 0) delete updated[type]
+        }
+        setPageCountMap(updated)
+    }
+
+    const typeLabels: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War' }
 
     if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
 
     return (
         <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Page Numbering</h4>
+            {/* Header Titles per Type */}
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Header Titles</h4>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                Total pages including attached terms & conditions. Used in footer &quot;Page X of Y&quot;.
+                Title shown in the header of each policy type document, followed by the policy number.
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total pages:</label>
-                <input
-                    type="number"
-                    value={totalPages}
-                    onChange={e => setTotalPages(parseInt(e.target.value, 10) || 0)}
-                    min={1}
-                    style={{ width: '80px' }}
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                {Object.entries(typeLabels).map(([code, label]) => (
+                    <div key={code} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '50px' }}>{label}:</span>
+                        <input
+                            type="text"
+                            value={headerTitles[code] || ''}
+                            onChange={e => setHeaderTitles({ ...headerTitles, [code]: e.target.value })}
+                            style={{ flex: 1 }}
+                        />
+                    </div>
+                ))}
             </div>
+
+            <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
+            {/* Page Count Mapping */}
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Page Count Mapping</h4>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                Map policy page count to total pages (including attached terms &amp; conditions). Used in footer &quot;Page X of Y&quot;.
+            </p>
+            <div style={{ marginBottom: '12px' }}>
+                {Object.entries(pageCountMap).sort().map(([type, mapping]) => (
+                    <div key={type} style={{ marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{typeLabels[type] || type}</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                            {Object.entries(mapping).sort(([a], [b]) => Number(a) - Number(b)).map(([pages, total]) => (
+                                <span key={pages} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid var(--input-border)', background: 'rgba(0,170,200,0.05)' }}>
+                                    {pages} pg → {total}
+                                    <button onClick={() => removePageCountRow(type, pages)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.75rem', padding: '0 2px' }}>×</button>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '20px' }}>
+                <select value={newPageType} onChange={e => setNewPageType(e.target.value)} style={{ width: '80px' }}>
+                    {Object.entries(typeLabels).map(([c, l]) => <option key={c} value={c}>{l}</option>)}
+                </select>
+                <input type="number" value={newPageCount} onChange={e => setNewPageCount(e.target.value)} placeholder="Pages" style={{ width: '70px' }} min={1} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>→</span>
+                <input type="number" value={newTotalPages} onChange={e => setNewTotalPages(e.target.value)} placeholder="Total" style={{ width: '70px' }} min={1} />
+                <button onClick={addPageCountRow} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Add</button>
+            </div>
+
+            <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
+            {/* Premium Intro Text */}
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Premium Intro Text</h4>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Placeholders: {'{currency}'}, {'{amount}'}, {'{instalments}'}, {'{time}'}, {'{timezone}'}
+            </p>
+            <textarea
+                value={premiumIntroText}
+                onChange={e => setPremiumIntroText(e.target.value)}
+                rows={3}
+                style={{ width: '100%', marginBottom: '16px', resize: 'vertical' }}
+            />
+
+            <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
+            {/* Footer Text */}
             <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Footer Text</h4>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                Optional text displayed above the page number in the footer of policy documents.
+                Optional text displayed above the page number in the footer.
             </p>
             <input
                 type="text"
                 value={footerText}
                 onChange={e => setFooterText(e.target.value)}
                 placeholder="e.g., Confidential — For Insured Use Only"
-                style={{ width: '100%', marginBottom: '12px' }}
+                style={{ width: '100%', marginBottom: '16px' }}
             />
+
             <button className="btn-primary" onClick={save} style={{ padding: '6px 20px' }}>Save</button>
         </div>
     )

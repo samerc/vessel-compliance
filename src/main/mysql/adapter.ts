@@ -7295,6 +7295,7 @@ export class MySQLAdapter {
             proRata: Boolean(r.pro_rata),
             commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
             perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
+            premiumAmount: r.premium_amount ? Number(r.premium_amount) : 0,
             revisionNumber: Number(r.revision_number || 0),
             quotationId: r.quotation_id,
             vesselId: r.vessel_id,

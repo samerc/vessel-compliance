@@ -582,6 +582,7 @@ interface PolicyDocRecord {
   showAddresses: boolean
   openingClause?: string
   importantNotice?: string
+  premiumAmount?: number
   closingCity?: string
   cancelReplaceText?: string
   previousPolicyNumber?: string
@@ -1229,8 +1230,8 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeTzW],
     rows: [
-      new TableRow({ children: [makeCell('From'), makeCell(polFormatDateUS(inceptionDate), true), makeCell(fmtTimeTz(inceptionTime, timezone))] }),
-      new TableRow({ children: [makeCell('To'), makeCell(polFormatDateUS(expiryDate), true), makeCell(fmtTimeTz(expiryTime, timezone))] })
+      new TableRow({ children: [makeCell('From'), makeCell(polFormatDateUS(inceptionDate)), makeCell(fmtTimeTz(inceptionTime, timezone))] }),
+      new TableRow({ children: [makeCell('To'), makeCell(polFormatDateUS(expiryDate)), makeCell(fmtTimeTz(expiryTime, timezone))] })
     ]
   })]
 }
@@ -1242,7 +1243,7 @@ function polBuildPeriodParagraphs(data: PolicyExportData): Paragraph[] {
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
       children: [
         new TextRun({ text: 'From  ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: polFormatDateUS(inceptionDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+        new TextRun({ text: polFormatDateUS(inceptionDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
         new TextRun({ text: `  ${polFormatTime(inceptionTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     }),
@@ -1250,7 +1251,7 @@ function polBuildPeriodParagraphs(data: PolicyExportData): Paragraph[] {
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
       children: [
         new TextRun({ text: 'To      ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: polFormatDateUS(expiryDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+        new TextRun({ text: polFormatDateUS(expiryDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
         new TextRun({ text: `  ${polFormatTime(expiryTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     })
@@ -1564,53 +1565,47 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
   return content
 }
 
-function polBuildPremiumPaymentSection(data: PolicyExportData): (Paragraph | Table)[] {
+async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(Paragraph | Table)[]> {
   const content: (Paragraph | Table)[] = []
   const { instalments } = data
   const numInst = instalments.length || 1
   const currency = data.quotation.premiumCurrency || 'USD'
   const wq = data.quotation
-  const totalPremium = instalments.reduce((sum, i) => sum + (i.amount || 0), 0) || wq.premiumAmount || 0
+  const totalPremium = data.policy.premiumAmount || instalments.reduce((sum, i) => sum + (i.amount || 0), 0) || wq.premiumAmount || 0
   const timezone = data.policy.timezone || ''
 
-  // 1. Premium intro with amount
-  if (numInst === 1) {
-    content.push(polNp(`Premium ${polFormatCurrency(totalPremium, currency)} shall be payable in a single instalment.`))
-  } else {
-    const timePart = timezone ? `, at Noon ${timezone}, time being of the essence` : ''
-    content.push(polNp(`Premium ${polFormatCurrency(totalPremium, currency)} shall be payable in ${numInst} Instalments on the following dates${timePart}:`))
-  }
+  // 1. Premium intro with amount — use configurable template
+  let premIntroTemplate = 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
+  try {
+    const s = await window.api.getSetting('policyExportSettings')
+    if (s) {
+      const p = JSON.parse(s)
+      if (p.premiumIntroText) premIntroTemplate = p.premiumIntroText
+    }
+  } catch { /* default */ }
+  const premIntro = premIntroTemplate
+    .replace(/\{currency\}/g, currency)
+    .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
+    .replace(/\{instalments\}/g, String(numInst))
+    .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
+    .replace(/\{timezone\}/g, timezone)
+  content.push(polNp(premIntro))
   content.push(polEmptyP())
 
-  // 2. Instalment table — 2 columns only (label + date)
+  // 2. Instalment lines — plain text paragraphs
   if (instalments.length > 0) {
     const isFirstInstNr = wq.nonRefundableType === 'first_instalment'
-    const labelW = Math.round(POL_BODY_W * 0.55)
-    const dateW = POL_BODY_W - labelW
-
-    const instRows: TableRow[] = []
     for (const inst of instalments) {
-      let label = `${polOrdinal(inst.instalmentNumber)} Instalment due`
+      let line = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
       if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
-        label += ' (non-refundable)'
+        line += ' (non-refundable in case of cancellation, whether before or after inception)'
       }
-      instRows.push(new TableRow({
-        children: [
-          new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
-        ]
-      }))
+      content.push(polNp(line))
     }
-    content.push(new Table({
-      width: { size: POL_BODY_W, type: WidthType.DXA },
-      layout: TableLayoutType.FIXED,
-      columnWidths: [labelW, dateW],
-      rows: instRows
-    }))
     content.push(polEmptyP())
 
     if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
-      const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
+      const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
       if (nrText) { content.push(polNp(nrText)); content.push(polEmptyP()) }
     }
   }
@@ -1640,7 +1635,6 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
-  const typeLabel = polGetTypeLabel(typeCode)
 
   const children: (Paragraph | Table)[] = []
 
@@ -1664,11 +1658,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
   }
 
-  // Title
-  children.push(polCenteredP(`${typeLabel} POLICY`, true))
-  children.push(polCenteredP(`M/V ${data.vesselInfo.name.toUpperCase()}`))
-  children.push(polCenteredP(`Policy No. ${data.policy.policyNumber}`))
-  children.push(polEmptyP())
+  // Title now in header — no body title needed
 
   // Opening Clause
   const openingClause = data.policy.openingClause || polGetDefaultOpeningClause(typeCode)
@@ -1755,7 +1745,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
 
   // SANCTIONS
   const sanctionsText = polGetSanctionsText(data)
-  if (sanctionsText) rows.push(makeRow('Sanctions\nClause', polMp(sanctionsText)))
+  if (sanctionsText) rows.push(makeRow('Sanction Limitation\nand Exclusion\nClause', polMp(sanctionsText)))
 
   // EXCLUSIONS
   const exclusionsContent: Paragraph[] = []
@@ -1785,7 +1775,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   }
 
   // PREMIUM PAYMENT
-  const premiumContent = polBuildPremiumPaymentSection(data)
+  const premiumContent = await polBuildPremiumPaymentSection(data)
   if (premiumContent.length > 0) rows.push(makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
 
   // Build main table
@@ -1861,30 +1851,58 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   const headerParas = headerHtml
     ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing })
     : []
-  // Add policy number + vessel name line
-  const vesselName = data.vesselInfo?.name || ''
-  headerParas.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 40, after: 0 },
-    children: [
-      new TextRun({ text: `${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
-      new TextRun({ text: vesselName ? ` — ${vesselName}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
-    ]
-  }))
-  const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
-
-  // Build footer — configurable text + Page X of Y
-  // Load footer settings
+  // Load policy export settings
   let footerText = ''
   let configTotalPages = totalPages
+  let headerTitles: Record<string, string> = {
+    P: 'Protection and Indemnity Certificate',
+    H: 'Hull & Machinery Certificate',
+    W: 'War Risk Certificate'
+  }
+  let pageCountMap: Record<string, Record<string, number>> = {}
   try {
     const settings = await window.api.getSetting('policyExportSettings')
     if (settings) {
       const parsed = JSON.parse(settings)
-      if (!configTotalPages && parsed.totalPages) configTotalPages = parsed.totalPages
       if (parsed.footerText) footerText = parsed.footerText
+      if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
+      if (parsed.pageCountMap) pageCountMap = parsed.pageCountMap
     }
   } catch { /* ignore */ }
+
+  // Resolve total pages from page count map if not passed
+  if (!configTotalPages) {
+    const typeCode = data.quotation.quotationTypeCode || 'P'
+    const typeMap = pageCountMap[typeCode]
+    if (typeMap) {
+      // We don't know exact page count yet, use first mapping as default
+      const firstKey = Object.keys(typeMap).sort()[0]
+      if (firstKey) configTotalPages = typeMap[firstKey]
+    }
+  }
+
+  // Add spacing between company details and policy title
+  headerParas.push(new Paragraph({ spacing: { after: 80 }, children: [] }))
+  // Add policy title (configurable per type)
+  const headerTitle = headerTitles[typeCode] || 'Certificate'
+  const vesselName = data.vesselInfo?.name || ''
+  headerParas.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0 },
+    children: [
+      new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
+    ]
+  }))
+  if (vesselName) {
+    headerParas.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0 },
+      children: [
+        new TextRun({ text: `M/V ${vesselName.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
+      ]
+    }))
+  }
+  const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
 
   const footerChildren: Paragraph[] = []
   if (footerText) {
