@@ -584,6 +584,7 @@ interface PolicyDocRecord {
   openingClause?: string
   importantNotice?: string
   premiumAmount?: number
+  selectedAlternativeId?: string | null
   closingCity?: string
   cancelReplaceText?: string
   previousPolicyNumber?: string
@@ -746,13 +747,20 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     window.api.bankGetAll()
   ])
 
-  const safeClauseRows = Array.isArray(clauseRows) ? clauseRows : []
+  // Filter by selected alternative if policy has one
+  const altId = policy.selectedAlternativeId || null
+  const filterByAlt = (items: any[]) => {
+    if (!altId) return items
+    return items.filter((item: any) => !item.alternativeId || item.alternativeId === altId)
+  }
+
+  const safeClauseRows = filterByAlt(Array.isArray(clauseRows) ? clauseRows : [])
   const selectedClauseIds = safeClauseRows.map((r: any) => r.piClauseId)
   const clauseOverrides: Record<string, string> = (clauseOverridesArr && typeof clauseOverridesArr === 'object' && !Array.isArray(clauseOverridesArr))
     ? clauseOverridesArr as Record<string, string>
     : {}
 
-  const safeWarrantyRows = Array.isArray(warrantyRows) ? warrantyRows : []
+  const safeWarrantyRows = filterByAlt(Array.isArray(warrantyRows) ? warrantyRows : [])
   const selectedWarrantyIds = safeWarrantyRows.map((r: any) => r.piWarrantyId)
 
   const piAlternativesRaw = quotation.quotationTypeCode === 'P'
@@ -789,16 +797,16 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     subLimits: Array.isArray(subLimits) ? subLimits : [],
     selectedClauseIds,
     allClauses: Array.isArray(allClauses) ? allClauses : [],
-    additionalClauses: Array.isArray(additionalClauses) ? additionalClauses : [],
+    additionalClauses: filterByAlt(Array.isArray(additionalClauses) ? additionalClauses : []),
     allAdditionalClauses: Array.isArray(allAdditionalClauses) ? allAdditionalClauses : [],
     selectedWarrantyIds,
     allWarranties: Array.isArray(allWarranties) ? allWarranties : [],
-    customWarranties: Array.isArray(customWarranties) ? customWarranties : [],
-    deductibles: Array.isArray(deductibles) ? deductibles : [],
-    textDeductibles: Array.isArray(textDeductibles) ? textDeductibles : [],
-    selectedExclusions: Array.isArray(selectedExclusions) ? selectedExclusions : [],
+    customWarranties: filterByAlt(Array.isArray(customWarranties) ? customWarranties : []),
+    deductibles: filterByAlt(Array.isArray(deductibles) ? deductibles : []),
+    textDeductibles: filterByAlt(Array.isArray(textDeductibles) ? textDeductibles : []),
+    selectedExclusions: filterByAlt(Array.isArray(selectedExclusions) ? selectedExclusions : []),
     allExclusions: Array.isArray(allExclusions) ? allExclusions : [],
-    customExclusions: Array.isArray(customExclusions) ? customExclusions : [],
+    customExclusions: filterByAlt(Array.isArray(customExclusions) ? customExclusions : []),
     excludedCountries: Array.isArray(excludedCountries) ? excludedCountries : [],
     subjectivities: Array.isArray(subjectivities) ? subjectivities : [],
     sectionTexts: mergedTexts,

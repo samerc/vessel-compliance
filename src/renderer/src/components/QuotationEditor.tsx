@@ -970,7 +970,8 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                 commissionPercent: commPct || null,
                 bankId: bankId || null,
                 showAddresses,
-                blueCards
+                blueCards,
+                selectedAlternativeId: selectedAltId || null
             })
             if ((result as any)?.error) {
                 showError((result as any).message || 'Conversion failed')

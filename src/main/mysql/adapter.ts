@@ -2144,6 +2144,13 @@ export class MySQLAdapter {
                     await this.pool.query('ALTER TABLE policy_documents ADD COLUMN premium_amount DECIMAL(15,2) NULL')
                 }
             }
+            // Migration: add selected_alternative_id to policy_documents
+            {
+                const [pdAltCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'selected_alternative_id'")
+                if ((pdAltCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE policy_documents ADD COLUMN selected_alternative_id VARCHAR(36) NULL')
+                }
+            }
 
             // Ensure policy_doc_instalments table exists
             await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_doc_instalments (
@@ -7404,6 +7411,7 @@ export class MySQLAdapter {
             commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
             perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
             premiumAmount: r.premium_amount ? Number(r.premium_amount) : 0,
+            selectedAlternativeId: r.selected_alternative_id || null,
             revisionNumber: Number(r.revision_number || 0),
             quotationId: r.quotation_id,
             vesselId: r.vessel_id,
@@ -7715,6 +7723,7 @@ export class MySQLAdapter {
         showAddresses: boolean
         blueCards: string[]
         createdBy: string
+        selectedAlternativeId?: string | null
     }): Promise<any[]> {
         if (!this.pool) throw new Error('DB not connected')
 
@@ -7759,12 +7768,12 @@ export class MySQLAdapter {
                 INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
                     revision_number, inception_date, inception_time, expiry_date, expiry_time,
                     timezone, commission_percent, show_addresses, bank_id, pro_rata,
-                    per_annum_premium, premium_amount, created_by)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?)
+                    per_annum_premium, premium_amount, selected_alternative_id, created_by)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
-                premiumAmount, options.createdBy])
+                premiumAmount, options.selectedAlternativeId || null, options.createdBy])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {

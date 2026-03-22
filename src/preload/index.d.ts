@@ -714,6 +714,7 @@ export interface Api {
     bankId: string | null
     showAddresses: boolean
     blueCards: string[]
+    selectedAlternativeId?: string | null
   }) => Promise<any[]>
 }
 
