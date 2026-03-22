@@ -842,7 +842,11 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             const allAltsLocal = [...safePiAlts, ...safeHullAlts]
             if (allAltsLocal.length > 1) {
                 const firstAlt = allAltsLocal[0]
-                if (firstAlt.premiumAmount) techPremium = firstAlt.premiumAmount
+                if (firstAlt.premiumAmount) {
+                    techPremium = firstAlt.premiumAmount
+                    // Add IV premium if enabled
+                    if (quotation.ivEnabled && quotation.ivPremiumAmount) techPremium += quotation.ivPremiumAmount
+                }
             }
             let payable = techPremium
             if (quotation.ncbEnabled && quotation.ncbDiscountPercent) payable = payable * (1 - quotation.ncbDiscountPercent / 100)
