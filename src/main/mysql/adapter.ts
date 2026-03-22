@@ -2151,6 +2151,13 @@ export class MySQLAdapter {
                     await this.pool.query('ALTER TABLE policy_documents ADD COLUMN selected_alternative_id VARCHAR(36) NULL')
                 }
             }
+            // Add exported_at column
+            {
+                const [cols] = await this.pool.query('SHOW COLUMNS FROM policy_documents LIKE \'exported_at\'')
+                if ((cols as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE policy_documents ADD COLUMN exported_at TIMESTAMP NULL')
+                }
+            }
 
             // Ensure policy_doc_instalments table exists
             await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_doc_instalments (
@@ -7492,6 +7499,7 @@ export class MySQLAdapter {
             importantNotice: r.important_notice || null,
             closingCity: r.closing_city || null,
             createdBy: r.created_by || null,
+            exportedAt: r.exported_at || null,
             createdBy: r.created_by,
             createdAt: r.created_at,
         }
@@ -7654,6 +7662,7 @@ export class MySQLAdapter {
             closingCity: 'closing_city',
             quotationId: 'quotation_id',
             selectedAlternativeId: 'selected_alternative_id',
+            exportedAt: 'exported_at',
         }
         const sets: string[] = []
         const vals: any[] = []

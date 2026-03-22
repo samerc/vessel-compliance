@@ -2091,6 +2091,23 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     children.push(polEmptyP())
   }
 
+  // Resolve cancel/replace text for both body and footer
+  let cancelReplaceResolved = ''
+  if ((data.policy.revisionNumber > 0 && data.policy.previousPolicyNumber) || data.policy.cancelReplaceText) {
+    cancelReplaceResolved = data.policy.cancelReplaceText || ''
+    if (!cancelReplaceResolved && data.policy.previousPolicyNumber) {
+      cancelReplaceResolved = `This policy ${data.policy.policyNumber} cancels and replaces policy ${data.policy.previousPolicyNumber}`
+      if (data.policy.previousPolicyDate) cancelReplaceResolved += ` dated ${polFormatDateUS(data.policy.previousPolicyDate)}`
+    }
+  }
+
+  // Cancel and replace in body (before Drawn up in Duplicate, on last page)
+  if (cancelReplaceResolved) {
+    children.push(polEmptyP())
+    children.push(polNp(cancelReplaceResolved))
+    children.push(polEmptyP())
+  }
+
   // Closing
   const closingCity = data.policy.closingCity || 'Beirut'
   const closingDate = polFormatDateUS(data.policy.createdAt)
@@ -2114,18 +2131,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     })]
   }))
 
-  // Cancel and replace footer (if revision > 0 OR explicitly set)
-  if ((data.policy.revisionNumber > 0 && data.policy.previousPolicyNumber) || data.policy.cancelReplaceText) {
-    children.push(polEmptyP())
-    children.push(polEmptyP())
-    // Use stored cancelReplaceText if available, otherwise auto-generate
-    let cancelText = data.policy.cancelReplaceText
-    if (!cancelText && data.policy.previousPolicyNumber) {
-      cancelText = `This policy ${data.policy.policyNumber} cancels and replaces policy ${data.policy.previousPolicyNumber}`
-      if (data.policy.previousPolicyDate) cancelText += ` dated ${polFormatDateUS(data.policy.previousPolicyDate)}`
-    }
-    if (cancelText) children.push(polNp(cancelText))
-  }
+  // (cancelReplaceResolved declared above, before body content)
 
   // Build header — company details (Times New Roman) + policy number & vessel (Arial)
   const headerHtml = polSt(data, 'docHeader')
@@ -2187,6 +2193,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
 
   const footerChildren: Paragraph[] = []
+  // Cancel and replace on every page (in footer) — uses cancelReplaceResolved from above
+  if (cancelReplaceResolved) {
+    footerChildren.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 20 },
+      children: [new TextRun({ text: cancelReplaceResolved, size: 16, font: 'Arial', color: '000000', italics: true })]
+    }))
+  }
   if (footerText) {
     footerChildren.push(new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -2219,6 +2233,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`)
+
+  // Mark policy as exported
+  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString() }) } catch { /* non-critical */ }
 }
 
 // ==================== Debit Advice Export ====================

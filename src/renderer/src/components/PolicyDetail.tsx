@@ -77,6 +77,7 @@ interface PolicyRecord {
   premiumAmount: number | null
   selectedAlternativeId: string | null
   cancelReplaceText: string | null
+  exportedAt: string | null
   createdBy: string
   createdAt: string
   quotationTypeCode: string
@@ -1137,14 +1138,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {!isEditing && hasPermission('policies:manage') && policy.status === 'active' && (
             <>
-              <button
-                className="btn-primary"
-                style={{ ...exportBtnStyle, fontWeight: 700 }}
-                onClick={enterEditMode}
-                title="Edit Policy"
-              >
-                <Edit3 size={14} /> Edit Policy
-              </button>
+              {!policy.exportedAt && (
+                <button
+                  className="btn-primary"
+                  style={{ ...exportBtnStyle, fontWeight: 700 }}
+                  onClick={enterEditMode}
+                  title="Edit Policy"
+                >
+                  <Edit3 size={14} /> Edit Policy
+                </button>
+              )}
               <button
                 className="btn-secondary"
                 style={exportBtnStyle}
