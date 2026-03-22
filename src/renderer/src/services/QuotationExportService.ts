@@ -2555,7 +2555,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.piAlternatives.length > 1) {
       const wMultiAlt = data.hullAlternatives.length > 1
       const wPiMultiAlt = data.piAlternatives.length > 1
-      const premLabelW = Math.round(BODY_W * 0.25)
+      const premLabelW = Math.round(BODY_W * 0.40)
       const premAmtW = BODY_W - premLabelW
       const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT, w?: number) => new TableCell({
         borders: noBorders(),
