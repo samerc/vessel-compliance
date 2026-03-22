@@ -260,16 +260,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             if (q.exportSnapshot) {
                 await window.api.clearExportSnapshot(q.id)
             }
-            // Reload excluded/DDQ countries from master list if empty
-            const currentCountries = await window.api.getQuotationExcludedCountries(q.id)
-            if (!Array.isArray(currentCountries) || currentCountries.length === 0) {
-                const masterCountries = await window.api.piGetTradingExcludedCountries()
-                if (Array.isArray(masterCountries) && masterCountries.length > 0) {
-                    await window.api.setQuotationExcludedCountries(q.id, masterCountries.map((c: any) => ({
-                        name: c.name,
-                        listType: c.listType
-                    })))
-                }
+            // Always reload excluded/DDQ countries from master list
+            const masterCountries = await window.api.piGetTradingExcludedCountries()
+            if (Array.isArray(masterCountries) && masterCountries.length > 0) {
+                await window.api.setQuotationExcludedCountries(q.id, masterCountries.map((c: any) => ({
+                    name: c.name,
+                    listType: c.listType
+                })))
             }
             // Reload quotation to pick up fresh settings
             const fullQ = await window.api.getQuotation(q.id)
