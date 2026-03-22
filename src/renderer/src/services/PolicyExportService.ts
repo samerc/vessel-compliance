@@ -1180,7 +1180,17 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   const tableRows: TableRow[] = []
 
   if (data.addresses.length > 0) {
-    for (const addr of data.addresses.sort((a, b) => a.order - b.order)) {
+    // Sort addresses to match quotation assured order
+    const assuredOrder = data.assureds.map((a: any) => a.entityId || a.entity_id)
+    const sortedAddrs = [...data.addresses].sort((a, b) => {
+      const aIdx = assuredOrder.indexOf(a.entityId)
+      const bIdx = assuredOrder.indexOf(b.entityId)
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+      if (aIdx !== -1) return -1
+      if (bIdx !== -1) return 1
+      return 0
+    })
+    for (const addr of sortedAddrs) {
       // Left: entity name – country
       const leftChildren: Paragraph[] = []
       const nameRuns: TextRun[] = [new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
@@ -1971,6 +1981,28 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     for (const sub of data.subjectivities) subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
     if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }
     rows.push(makeRow('Subjectivities', subjContent))
+  }
+
+  // NCB (No Claims Bonus)
+  if (data.quotation.ncbEnabled && data.quotation.ncbText) {
+    const ncbContent: (Paragraph | Table)[] = []
+    let ncbText = decodeHtmlEntities(htmlToPlainText(data.quotation.ncbText))
+    if (data.quotation.ncbDiscountPercent != null) ncbText = ncbText.replace(/\{ncb_percent\}/g, String(data.quotation.ncbDiscountPercent))
+    if (data.quotation.ncbDiscountAmount != null) ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(data.quotation.ncbDiscountAmount))
+    ncbText = ncbText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
+    ncbContent.push(...ncbText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
+    rows.push(makeRow('No Claims\nBonus (NCB)', ncbContent))
+  }
+
+  // UPCC (Upfront Continuity Credit)
+  if (data.quotation.upccEnabled && data.quotation.upccText) {
+    const upccContent: (Paragraph | Table)[] = []
+    let upccText = decodeHtmlEntities(htmlToPlainText(data.quotation.upccText))
+    if (data.quotation.upccDiscountPercent != null) upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
+    if (data.quotation.upccDiscountAmount != null) upccText = upccText.replace(/\{upcc_amount\}/g, polFormatAmountOnly(data.quotation.upccDiscountAmount))
+    upccText = upccText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
+    upccContent.push(...upccText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
+    rows.push(makeRow('Upfront\nContinuity\nCredit (UPCC)', upccContent))
   }
 
   // PREMIUM PAYMENT

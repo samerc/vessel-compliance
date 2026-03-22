@@ -7825,8 +7825,9 @@ export class MySQLAdapter {
             const policyNumber = typeCode + invertedYear + String(nextSerial).padStart(4, '0')
             const policyId = uuidv4()
 
-            // Get payable premium for this vessel
-            const premiumAmount = vessel?.premiumAmount || quotation.premiumAmount || 0
+            // Get payable premium: sum of instalments (most accurate) or vessel premium or quotation premium
+            const instalmentSum = options.instalments.reduce((sum, inst) => sum + (inst.premiumAmount || 0), 0)
+            const premiumAmount = instalmentSum > 0 ? instalmentSum : (vessel?.premiumAmount || quotation.premiumAmount || 0)
 
             await this.pool.execute(`
                 INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
