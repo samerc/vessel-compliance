@@ -789,7 +789,18 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
             setHullAlts(safeHullAlts)
             // Auto-select first alternative if any
             const allAlts = [...safePiAlts, ...safeHullAlts]
-            if (allAlts.length > 1 && !selectedAltId) setSelectedAltId(allAlts[0].id)
+            if (allAlts.length > 1 && !selectedAltId) {
+                setSelectedAltId(allAlts[0].id)
+                // Also update premium to reflect the first alternative
+                const firstAlt = allAlts[0] as any
+                let tech = firstAlt.premiumAmount || quotation.premiumAmount || 0
+                // Add IV premium if enabled
+                if (quotation.ivEnabled && quotation.ivPremiumAmount) tech += quotation.ivPremiumAmount
+                let pay = tech
+                if (quotation.ncbEnabled && quotation.ncbDiscountPercent) pay = pay * (1 - quotation.ncbDiscountPercent / 100)
+                if (quotation.upccEnabled && quotation.upccDiscountPercent) pay = pay * (1 - quotation.upccDiscountPercent / 100)
+                setTotalPremium(Math.round(pay * 100) / 100)
+            }
 
             // Try to pre-fill inception/expiry from vessel's existing policy end date
             const withVessel = vessels.filter(v => v.vesselId)
@@ -895,6 +906,8 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
         const piAlt = piAlts.find(a => a.id === altId)
         const hullAlt = hullAlts.find(a => a.id === altId)
         let tech = (piAlt as any)?.premiumAmount || (hullAlt as any)?.premiumAmount || quotation.premiumAmount || 0
+        // Add IV premium if enabled
+        if (quotation.ivEnabled && quotation.ivPremiumAmount) tech += quotation.ivPremiumAmount
         let pay = tech
         if (quotation.ncbEnabled && quotation.ncbDiscountPercent) pay = pay * (1 - quotation.ncbDiscountPercent / 100)
         if (quotation.upccEnabled && quotation.upccDiscountPercent) pay = pay * (1 - quotation.upccDiscountPercent / 100)
