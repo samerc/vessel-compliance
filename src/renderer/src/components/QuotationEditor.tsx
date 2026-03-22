@@ -1095,7 +1095,8 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                                             }}
                                         >
                                             {(alt as any).label || `Alternative ${idx + 1}`}
-                                            {(alt as any).premiumAmount ? ` — ${quotation.premiumCurrency || 'USD'} ${((alt as any).premiumAmount as number).toLocaleString()}` : ''}
+                                            {(alt as any).premiumAmount != null ? ` — ${quotation.premiumCurrency || 'USD'} ${((alt as any).premiumAmount as number).toLocaleString()}` : ''}
+                                            {quotation.ivEnabled && quotation.ivPremiumAmount ? ` + IV ${quotation.ivPremiumAmount.toLocaleString()}` : ''}
                                         </button>
                                     ))}
                                 </div>
