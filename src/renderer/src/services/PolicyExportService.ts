@@ -1055,8 +1055,9 @@ function polEmptyP() {
 
 function polMp(text: string): Paragraph[] {
   if (!text) return []
-  if (polIsHtml(text)) return parseHtmlToParagraphs(text, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
-  return text.split('\n').map(p =>
+  const decoded = decodeHtmlEntities(text)
+  if (polIsHtml(decoded)) return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+  return decoded.split('\n').map(p =>
     p.trim() ? polNp(p) : polEmptyP()
   )
 }
@@ -1404,7 +1405,7 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
         text = text.replace(new RegExp(escaped, 'g'), polFormatCurrency(amount, currency))
       }
       // Issue 3: resolve generic {currency} and {amount} placeholders
-      text = text.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, amount != null ? polFormatCurrency(amount, currency) : '')
+      text = text.replace(new RegExp(`\\{currency\\}\\s*${currency}`, 'gi'), currency).replace(/\{currency\}/g, currency).replace(/\{amount\}/g, amount != null ? polFormatCurrency(amount, currency) : '')
       return new TableRow({
         children: [
           new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: decodeHtmlEntities(`Cl. ${def.conditionNumber}`), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
@@ -1414,29 +1415,64 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
     }).filter(Boolean) as TableRow[]
   })
 
-  // Issue 1 & 2: If policy has selectedAlternativeId, only show that alternative's content
-  // Filter conditions to selected alt + shared (null alternativeId), dedup by conditionId
-  const selectedAlt = altId ? dAlts.find(a => a.id === altId) : null
-  if (selectedAlt) {
-    // Show only selected alternative — no "Alternative N" header
-    const clause = data.hullClauses.find(c => c.id === selectedAlt.hullClauseId)
-    if (clause) {
-      content.push(polNp(decodeHtmlEntities(clause.description || clause.name)))
-      content.push(polEmptyP())
+  // Helper: get which hull clause a condition belongs to
+  const getCondClauseId = (qc: typeof hc[0]): string | null => {
+    const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
+    return def?.hullClauseId || null
+  }
+  const ivClauseId = data.quotation.ivClauseId || null
+
+  // Dedup helper: merge alt-specific + null, prefer alt-specific
+  const dedupConds = (conds: typeof hc) => {
+    const seen = new Map<string, typeof hc[0]>()
+    // Alt-specific first
+    for (const c of conds.filter(x => x.alternativeId)) {
+      seen.set(c.hullConditionId, c)
     }
-    // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
-    const ownConds = hc.filter(qc => qc.alternativeId === selectedAlt.id)
-    const nullConds = hc.filter(qc => !qc.alternativeId)
-    const merged = [...ownConds]
-    for (const nc of nullConds) {
-      if (!merged.some(c => c.hullConditionId === nc.hullConditionId)) merged.push(nc)
+    // Then null-scoped (only if not already present)
+    for (const c of conds.filter(x => !x.alternativeId)) {
+      if (!seen.has(c.hullConditionId)) seen.set(c.hullConditionId, c)
     }
-    merged.sort((a, b) => {
+    return Array.from(seen.values()).sort((a, b) => {
       const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
       const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
       return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
     })
-    if (merged.length > 0) content.push(makeCondTable(merged))
+  }
+
+  const selectedAlt = altId ? dAlts.find(a => a.id === altId) : null
+  if (selectedAlt) {
+    // === Selected alternative: separate main clause from IV ===
+    const mainClauseId = selectedAlt.hullClauseId
+    const clause = data.hullClauses.find(c => c.id === mainClauseId)
+
+    // Main clause conditions (not IV)
+    const mainConds = hc.filter(qc => {
+      const clauseId = getCondClauseId(qc)
+      return clauseId === mainClauseId || (!clauseId && !ivClauseId)
+    }).filter(qc => qc.alternativeId === selectedAlt.id || !qc.alternativeId)
+    const dedupedMain = dedupConds(mainConds)
+
+    if (clause) {
+      content.push(polNp(decodeHtmlEntities(clause.description || clause.name)))
+      content.push(polEmptyP())
+    }
+    if (dedupedMain.length > 0) content.push(makeCondTable(dedupedMain))
+
+    // IV conditions (separate section)
+    if (data.quotation.ivEnabled && ivClauseId) {
+      const ivConds = hc.filter(qc => getCondClauseId(qc) === ivClauseId)
+      const dedupedIV = dedupConds(ivConds)
+      const ivClause = data.hullClauses.find(c => c.id === ivClauseId)
+      content.push(polEmptyP())
+      content.push(polBup('Increased Value'))
+      content.push(polEmptyP())
+      if (ivClause) {
+        content.push(polNp(decodeHtmlEntities(ivClause.description || ivClause.name)))
+        content.push(polEmptyP())
+      }
+      if (dedupedIV.length > 0) content.push(makeCondTable(dedupedIV))
+    }
   } else if (dAlts.length > 1) {
     for (let i = 0; i < dAlts.length; i++) {
       const alt = dAlts[i]
@@ -1469,7 +1505,7 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
     if (hc.length > 0) content.push(makeCondTable(hc))
   }
 
-  // Filter additional conditions by selected alternative too
+  // Shared additional conditions ("Applicable to all sections")
   const filteredHa = altId
     ? (() => {
         const ownAddls = ha.filter(qa => qa.alternativeId === altId)
@@ -1482,6 +1518,10 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
       })()
     : ha
   if (filteredHa.length > 0) {
+    if (selectedAlt && data.quotation.ivEnabled && ivClauseId) {
+      content.push(polEmptyP())
+      content.push(polBup('Applicable to all sections'))
+    }
     content.push(polEmptyP())
     for (const qa of filteredHa) {
       const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
@@ -1557,22 +1597,31 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       }
     }
   } else if (typeCode === 'H') {
-    if (data.quotation.agreedValue != null) {
-      content.push(polBp(polFormatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')))
-    }
-    // H&M text items (exclude IV-section items unless IV is enabled)
+    const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
     const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
     const ivItems = data.quotation.ivEnabled ? data.hullAgreedValueItems.filter(it => it.section === 'iv') : []
-    if (hmItems.length > 0) {
-      content.push(polEmptyP())
-      for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
-    }
-    // IV section only when ivEnabled
+
     if (data.quotation.ivEnabled && data.quotation.ivValue != null) {
+      // Section A / Section B format
+      if (data.quotation.agreedValue != null) {
+        content.push(polBp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)}`))
+      }
+      if (hmItems.length > 0) {
+        for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
+      }
       content.push(polEmptyP())
-      content.push(polBp(`Disbursements and/or Earnings: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || data.quotation.agreedValueCurrency || 'USD')}`))
+      content.push(polBp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)}`))
       if (ivItems.length > 0) {
         for (const it of ivItems) content.push(polNp(decodeHtmlEntities(it.text)))
+      }
+    } else {
+      // Single value format (no IV)
+      if (data.quotation.agreedValue != null) {
+        content.push(polBp(polFormatCurrency(data.quotation.agreedValue, hmCurrency)))
+      }
+      if (hmItems.length > 0) {
+        content.push(polEmptyP())
+        for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
     }
   } else if (typeCode === 'W') {
