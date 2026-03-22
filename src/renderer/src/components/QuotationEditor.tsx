@@ -1086,9 +1086,12 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <input
                                     type="number"
-                                    value={totalPremium || ''}
-                                    onChange={e => setTotalPremium(parseFloat(e.target.value) || 0)}
-                                    onBlur={e => recalcInstalments(parseFloat(e.target.value) || 0)}
+                                    value={totalPremium}
+                                    onChange={e => {
+                                        const val = parseFloat(e.target.value) || 0
+                                        setTotalPremium(val)
+                                        recalcInstalments(val)
+                                    }}
                                     style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
                                     placeholder="Premium amount"
                                 />
