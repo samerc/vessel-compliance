@@ -1387,7 +1387,14 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   const hc = data.hullConditions
   const ha = data.hullAdditionalConditions
   const dAlts = data.hullAlternatives
-  const altId = data.policy.selectedAlternativeId || null
+  // Use selectedAlternativeId, or auto-select first non-IV alt if only one exists
+  let altId = data.policy.selectedAlternativeId || null
+  if (!altId && dAlts.length === 1) altId = dAlts[0].id
+  if (!altId && dAlts.length > 1) {
+    // If there's a selected alternative stored on the quotation, use that
+    const qAltId = (data.quotation as any).selectedAlternativeId
+    if (qAltId && dAlts.some(a => a.id === qAltId)) altId = qAltId
+  }
   const currency = data.quotation.premiumCurrency || 'USD'
   if (hc.length === 0 && ha.length === 0) return
 
@@ -2107,13 +2114,17 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     })]
   }))
 
-  // Cancel and replace footer (if revision > 0)
-  if (data.policy.revisionNumber > 0 && data.policy.previousPolicyNumber) {
+  // Cancel and replace footer (if revision > 0 OR explicitly set)
+  if ((data.policy.revisionNumber > 0 && data.policy.previousPolicyNumber) || data.policy.cancelReplaceText) {
     children.push(polEmptyP())
     children.push(polEmptyP())
-    let cancelText = `This policy ${data.policy.policyNumber} cancels and replaces policy ${data.policy.previousPolicyNumber}`
-    if (data.policy.previousPolicyDate) cancelText += ` dated ${polFormatDateUS(data.policy.previousPolicyDate)}`
-    children.push(polNp(cancelText))
+    // Use stored cancelReplaceText if available, otherwise auto-generate
+    let cancelText = data.policy.cancelReplaceText
+    if (!cancelText && data.policy.previousPolicyNumber) {
+      cancelText = `This policy ${data.policy.policyNumber} cancels and replaces policy ${data.policy.previousPolicyNumber}`
+      if (data.policy.previousPolicyDate) cancelText += ` dated ${polFormatDateUS(data.policy.previousPolicyDate)}`
+    }
+    if (cancelText) children.push(polNp(cancelText))
   }
 
   // Build header — company details (Times New Roman) + policy number & vessel (Arial)

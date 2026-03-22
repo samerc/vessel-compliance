@@ -7486,6 +7486,12 @@ export class MySQLAdapter {
             expiryTime: r.expiry_time,
             bankId: r.bank_id,
             cancelReplaceText: r.cancel_replace_text || null,
+            previousPolicyNumber: r.previous_policy_number || null,
+            previousPolicyDate: r.previous_policy_date || null,
+            openingClause: r.opening_clause || null,
+            importantNotice: r.important_notice || null,
+            closingCity: r.closing_city || null,
+            createdBy: r.created_by || null,
             createdBy: r.created_by,
             createdAt: r.created_at,
         }
