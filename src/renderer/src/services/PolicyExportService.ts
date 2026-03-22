@@ -774,7 +774,25 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   const safeFlagStates: { id: string; name: string }[] = Array.isArray(flagStatesRaw) ? flagStatesRaw : []
   const safeAllVessels: Vessel[] = Array.isArray(allVessels) ? allVessels : []
 
-  const vesselInfo: PolVesselInfo = vessel ? polGetVesselInfo(vessel, safeAllVessels, safeFlagStates) : { name: 'Unknown' }
+  // Try quotation vessel first, then fall back to real vessel data from the policy JOIN
+  let vesselInfo: PolVesselInfo = vessel ? polGetVesselInfo(vessel, safeAllVessels, safeFlagStates) : { name: 'Unknown' }
+  // If vessel info is empty/dashes, try loading directly from the vessels table
+  if (policy.vesselId && (!vesselInfo.type || !vesselInfo.flag)) {
+    const realVessel = safeAllVessels.find(v => v.id === policy.vesselId)
+    if (realVessel) {
+      const flagName = realVessel.flagStateId ? (safeFlagStates.find(f => f.id === realVessel.flagStateId)?.name || vesselInfo.flag) : vesselInfo.flag
+      vesselInfo = {
+        name: realVessel.name || vesselInfo.name,
+        imo: realVessel.imoNumber || vesselInfo.imo,
+        built: realVessel.builtYear || vesselInfo.built,
+        gt: realVessel.grossTonnage || vesselInfo.gt,
+        type: realVessel.vesselType || vesselInfo.type,
+        flag: flagName || vesselInfo.flag,
+        classification: realVessel.classificationSociety || vesselInfo.classification,
+        callSign: realVessel.callSign || vesselInfo.callSign
+      }
+    }
+  }
 
   const safeBanks: BankRecord[] = Array.isArray(banks) ? banks : []
   const bank = policy.bankId ? safeBanks.find(b => b.id === policy.bankId) || null : null
@@ -946,12 +964,22 @@ function polIsHtml(text: string): boolean {
 
 function polSt(data: PolicyExportData, key: keyof PISectionTexts): string {
   const raw = String(data.sectionTexts[key] || '')
-  return raw.replace(/\{quotation_type\}/g, data.quotation.quotationTypeName || 'P&I')
+  return decodeHtmlEntities(raw.replace(/\{quotation_type\}/g, data.quotation.quotationTypeName || 'P&I'))
 }
 
 function polFmtPct(val: number | string): string {
   const n = typeof val === 'string' ? parseFloat(val) : val
   return n % 1 === 0 ? String(Math.round(n)) : String(n)
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
 }
 
 function polGetTypeLabel(typeCode: string | undefined): string {
@@ -1329,8 +1357,8 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
           numbering: { reference: 'dash-bullet', level: 0 },
           spacing: { after: 40 },
           children: [
-            ...(code ? [new TextRun({ text: code + ' ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] : []),
-            new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+            ...(code ? [new TextRun({ text: decodeHtmlEntities(code) + ' ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] : []),
+            new TextRun({ text: decodeHtmlEntities(text), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
           ]
         }))
       }
@@ -1348,10 +1376,19 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   const hc = data.hullConditions
   const ha = data.hullAdditionalConditions
   const dAlts = data.hullAlternatives
+  const altId = data.policy.selectedAlternativeId || null
+  const currency = data.quotation.premiumCurrency || 'USD'
   if (hc.length === 0 && ha.length === 0) return
 
   const condCol1W = Math.round(POL_BODY_W * 0.30)
   const condCol2W = POL_BODY_W - condCol1W
+
+  // Resolve amount: check the condition itself, then any sibling with the same conditionId
+  const resolveAmount = (qc: typeof hc[0]): number | null | undefined => {
+    if (qc.amount != null) return qc.amount
+    const sibling = hc.find(c => c.hullConditionId === qc.hullConditionId && c.id !== qc.id && c.amount != null)
+    return sibling?.amount
+  }
 
   const makeCondTable = (conds: typeof hc) => new Table({
     width: { size: POL_BODY_W, type: WidthType.DXA },
@@ -1361,51 +1398,102 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
       const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
       if (!def) return null
       let text = qc.textOverride || def.text
-      if (def.hasAmount && def.amountPlaceholder && qc.amount != null) {
+      const amount = resolveAmount(qc)
+      if (def.hasAmount && def.amountPlaceholder && amount != null) {
         const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        text = text.replace(new RegExp(escaped, 'g'), polFormatCurrency(qc.amount, data.quotation.premiumCurrency || 'USD'))
+        text = text.replace(new RegExp(escaped, 'g'), polFormatCurrency(amount, currency))
       }
+      // Issue 3: resolve generic {currency} and {amount} placeholders
+      text = text.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, amount != null ? polFormatCurrency(amount, currency) : '')
       return new TableRow({
         children: [
-          new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: decodeHtmlEntities(`Cl. ${def.conditionNumber}`), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: decodeHtmlEntities(text), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       })
     }).filter(Boolean) as TableRow[]
   })
 
-  if (dAlts.length > 1) {
+  // Issue 1 & 2: If policy has selectedAlternativeId, only show that alternative's content
+  // Filter conditions to selected alt + shared (null alternativeId), dedup by conditionId
+  const selectedAlt = altId ? dAlts.find(a => a.id === altId) : null
+  if (selectedAlt) {
+    // Show only selected alternative — no "Alternative N" header
+    const clause = data.hullClauses.find(c => c.id === selectedAlt.hullClauseId)
+    if (clause) {
+      content.push(polNp(decodeHtmlEntities(clause.description || clause.name)))
+      content.push(polEmptyP())
+    }
+    // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
+    const ownConds = hc.filter(qc => qc.alternativeId === selectedAlt.id)
+    const nullConds = hc.filter(qc => !qc.alternativeId)
+    const merged = [...ownConds]
+    for (const nc of nullConds) {
+      if (!merged.some(c => c.hullConditionId === nc.hullConditionId)) merged.push(nc)
+    }
+    merged.sort((a, b) => {
+      const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+      const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+      return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+    })
+    if (merged.length > 0) content.push(makeCondTable(merged))
+  } else if (dAlts.length > 1) {
     for (let i = 0; i < dAlts.length; i++) {
       const alt = dAlts[i]
       const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-      const altConds = hc.filter(qc => qc.alternativeId === alt.id || !qc.alternativeId)
+      // Dedup conditions per alternative
+      const ownConds = hc.filter(qc => qc.alternativeId === alt.id)
+      const nullConds = hc.filter(qc => !qc.alternativeId)
+      const altMerged = [...ownConds]
+      for (const nc of nullConds) {
+        if (!altMerged.some(c => c.hullConditionId === nc.hullConditionId)) altMerged.push(nc)
+      }
+      altMerged.sort((a, b) => {
+        const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+        const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+        return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+      })
       content.push(polBup(`Alternative ${i + 1}`))
       content.push(polEmptyP())
-      if (clause) { content.push(polNp(clause.description || clause.name)); content.push(polEmptyP()) }
-      if (altConds.length > 0) content.push(makeCondTable(altConds))
+      if (clause) { content.push(polNp(decodeHtmlEntities(clause.description || clause.name))); content.push(polEmptyP()) }
+      if (altMerged.length > 0) content.push(makeCondTable(altMerged))
       content.push(polEmptyP())
     }
   } else {
     const singleAlt = dAlts[0]
     const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
     if (selectedClause) {
-      content.push(polNp(selectedClause.description || selectedClause.name))
+      content.push(polNp(decodeHtmlEntities(selectedClause.description || selectedClause.name)))
       content.push(polEmptyP())
     }
     if (hc.length > 0) content.push(makeCondTable(hc))
   }
 
-  if (ha.length > 0) {
+  // Filter additional conditions by selected alternative too
+  const filteredHa = altId
+    ? (() => {
+        const ownAddls = ha.filter(qa => qa.alternativeId === altId)
+        const nullAddls = ha.filter(qa => !qa.alternativeId)
+        const merged = [...ownAddls]
+        for (const nc of nullAddls) {
+          if (!merged.some(c => c.hullAdditionalConditionId === nc.hullAdditionalConditionId)) merged.push(nc)
+        }
+        return merged
+      })()
+    : ha
+  if (filteredHa.length > 0) {
     content.push(polEmptyP())
-    for (const qa of ha) {
+    for (const qa of filteredHa) {
       const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
       if (!def) continue
       let condText = qa.textOverride || def.text
       if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
         const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        condText = condText.replace(new RegExp(escaped, 'g'), polFormatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
+        condText = condText.replace(new RegExp(escaped, 'g'), polFormatCurrency(qa.amount, currency))
       }
-      content.push(polBulletP(condText))
+      // Issue 3: resolve generic {currency} and {amount} placeholders
+      condText = condText.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
+      content.push(polBulletP(decodeHtmlEntities(condText)))
     }
   }
 }
@@ -1425,7 +1513,7 @@ function polBuildWarConditionsContent(data: PolicyExportData, content: (Paragrap
   for (const qc of wc) {
     const def = data.allWarConditions.find(c => c.id === qc.warConditionId)
     if (!def) continue
-    content.push(polBulletP(resolveWarText(qc.textOverride || def.text)))
+    content.push(polBulletP(decodeHtmlEntities(resolveWarText(qc.textOverride || def.text))))
   }
 
   if (data.warSettings?.tcText) {
@@ -1472,9 +1560,20 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     if (data.quotation.agreedValue != null) {
       content.push(polBp(polFormatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')))
     }
-    if (data.hullAgreedValueItems.length > 0) {
+    // H&M text items (exclude IV-section items unless IV is enabled)
+    const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
+    const ivItems = data.quotation.ivEnabled ? data.hullAgreedValueItems.filter(it => it.section === 'iv') : []
+    if (hmItems.length > 0) {
       content.push(polEmptyP())
-      for (const it of data.hullAgreedValueItems) content.push(polNp(it.text))
+      for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
+    }
+    // IV section only when ivEnabled
+    if (data.quotation.ivEnabled && data.quotation.ivValue != null) {
+      content.push(polEmptyP())
+      content.push(polBp(`Disbursements and/or Earnings: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || data.quotation.agreedValueCurrency || 'USD')}`))
+      if (ivItems.length > 0) {
+        for (const it of ivItems) content.push(polNp(decodeHtmlEntities(it.text)))
+      }
     }
   } else if (typeCode === 'W') {
     if (data.quotation.agreedValue != null) {
@@ -1566,13 +1665,13 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
 
   for (const wid of data.selectedWarrantyIds) {
     const w = data.allWarranties.find(ww => ww.id === wid)
-    if (w) content.push(polBulletP(w.text))
+    if (w) content.push(polBulletP(decodeHtmlEntities(w.text)))
   }
   for (const cw of [...data.customWarranties].sort((a, b) => a.order - b.order)) {
-    content.push(polBulletP(cw.text))
+    content.push(polBulletP(decodeHtmlEntities(cw.text)))
   }
   if (data.quotation.quotationTypeCode !== 'W') {
-    for (const sw of data.surveyWarranties) content.push(polBulletP(sw.text))
+    for (const sw of data.surveyWarranties) content.push(polBulletP(decodeHtmlEntities(sw.text)))
   }
   if (polSt(data, 'warrantiesAdditionalText')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'warrantiesAdditionalText'))) }
   if (polSt(data, 'warrantiesBreach')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'warrantiesBreach'))) }
@@ -1622,7 +1721,7 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   const numInst = instalments.length || 1
   const currency = data.quotation.premiumCurrency || 'USD'
   const wq = data.quotation
-  const totalPremium = data.policy.premiumAmount || instalments.reduce((sum, i) => sum + (i.amount || 0), 0) || wq.premiumAmount || 0
+  const totalPremium = data.policy.premiumAmount || wq.premiumAmount || instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || i.amount || 0), 0) || 0
   const timezone = data.policy.timezone || ''
 
   // 1. Premium intro with amount — use configurable template
@@ -1796,7 +1895,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
 
   // SANCTIONS
   const sanctionsText = polGetSanctionsText(data)
-  if (sanctionsText) rows.push(makeRow('Sanction Limitation\nand Exclusion\nClause', polMp(sanctionsText)))
+  if (sanctionsText) rows.push(makeRow('Sanction Limitation and Exclusion Clause', polMp(decodeHtmlEntities(sanctionsText))))
 
   // EXCLUSIONS
   const exclusionsContent: Paragraph[] = []
@@ -1804,15 +1903,15 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   const firstAltId = data.piAlternatives.length > 0 ? data.piAlternatives[0].id : null
   for (const se of data.selectedExclusions) {
     if (hasAltExclusions && se.alternativeId && se.alternativeId !== firstAltId) continue
-    if (se.customText) exclusionsContent.push(polBulletP(se.customText))
+    if (se.customText) exclusionsContent.push(polBulletP(decodeHtmlEntities(se.customText)))
     else if (se.piExclusionId) {
       const found = data.allExclusions.find(e => e.id === se.piExclusionId)
-      if (found) exclusionsContent.push(polBulletP(found.text))
+      if (found) exclusionsContent.push(polBulletP(decodeHtmlEntities(found.text)))
     }
   }
   for (const ce of data.customExclusions) {
     if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== firstAltId) continue
-    exclusionsContent.push(polBulletP(ce.text))
+    exclusionsContent.push(polBulletP(decodeHtmlEntities(ce.text)))
   }
   if (exclusionsContent.length > 0) rows.push(makeRow('Exclusions', exclusionsContent))
 
@@ -1820,7 +1919,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   if (data.subjectivities.length > 0) {
     const subjContent: (Paragraph | Table)[] = []
     if (polSt(data, 'subjectivitiesIntro')) subjContent.push(...polMp(polSt(data, 'subjectivitiesIntro')))
-    for (const sub of data.subjectivities) subjContent.push(polBulletP(sub.text))
+    for (const sub of data.subjectivities) subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
     if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }
     rows.push(makeRow('Subjectivities', subjContent))
   }
@@ -1847,9 +1946,17 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   children.push(polNp('The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'))
   children.push(polEmptyP())
 
-  // Important Notice
-  const importantNotice = data.policy.importantNotice || polSt(data, 'importantNotice')
+  // Important Notice — make type-aware by replacing P&I references for other types
+  let importantNotice = data.policy.importantNotice || polSt(data, 'importantNotice')
   if (importantNotice) {
+    // Replace type-specific references if not P&I
+    if (typeCode === 'H') {
+      importantNotice = importantNotice.replace(/P&I Terms and Conditions/gi, 'H&M Terms and Conditions')
+        .replace(/P&I terms and conditions/gi, 'H&M Terms and Conditions')
+    } else if (typeCode === 'W') {
+      importantNotice = importantNotice.replace(/P&I Terms and Conditions/gi, 'War Terms and Conditions')
+        .replace(/P&I terms and conditions/gi, 'War Terms and Conditions')
+    }
     const plainNotice = htmlToPlainText(importantNotice)
     if (plainNotice.startsWith('IMPORTANT NOTICE')) {
       children.push(polCenteredP('IMPORTANT NOTICE', true))
