@@ -1193,7 +1193,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
     for (const addr of sortedAddrs) {
       // Left: entity name – country
       const leftChildren: Paragraph[] = []
-      const nameRuns: TextRun[] = [new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+      const nameRuns: TextRun[] = [new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
       if (addr.country) nameRuns.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' }))
       leftChildren.push(new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: nameRuns }))
 
@@ -1463,6 +1463,11 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
     }).filter(qc => qc.alternativeId === selectedAlt.id || !qc.alternativeId)
     const dedupedMain = dedupConds(mainConds)
 
+    // "Hull and Machinery" sub-heading when IV exists
+    if (data.quotation.ivEnabled && ivClauseId) {
+      content.push(polBup('Hull and Machinery'))
+      content.push(polEmptyP())
+    }
     if (clause) {
       content.push(polNp(decodeHtmlEntities(clause.description || clause.name)))
       content.push(polEmptyP())
@@ -1780,7 +1785,9 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   const numInst = instalments.length || 1
   const currency = data.quotation.premiumCurrency || 'USD'
   const wq = data.quotation
-  const totalPremium = data.policy.premiumAmount || wq.premiumAmount || instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || i.amount || 0), 0) || 0
+  // Priority: instalment sum (most accurate) → policy premium → quotation premium
+  const instalmentSum = instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0)
+  const totalPremium = instalmentSum > 0 ? instalmentSum : (data.policy.premiumAmount != null && data.policy.premiumAmount > 0 ? data.policy.premiumAmount : (wq.premiumAmount || 0))
   const timezone = data.policy.timezone || ''
 
   // 1. Premium intro with amount — use configurable template
@@ -1919,9 +1926,27 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   // INSURED VESSEL
   rows.push(makeRow('Insured Vessel', [polBuildVesselTable(data)]))
 
-  // VALUE / LIMIT
-  const valueContent = polBuildValueSection(data)
-  if (valueContent.length > 0) rows.push(makeRow(polGetValueSectionTitle(typeCode), valueContent))
+  // VALUE / LIMIT — Hull with IV gets split into Interest + Agreed Insured Value
+  if (typeCode === 'H' && data.quotation.ivEnabled && data.quotation.ivValue != null) {
+    const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
+    const ivItems = data.hullAgreedValueItems.filter(it => it.section === 'iv')
+    // Interest section (text descriptions)
+    if (hmItems.length > 0 || ivItems.length > 0) {
+      const intContent: (Paragraph | Table)[] = []
+      if (hmItems.length > 0) intContent.push(polNp('A) ' + hmItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
+      if (ivItems.length > 0) intContent.push(polNp('B) ' + ivItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
+      rows.push(makeRow('Interest', intContent))
+    }
+    // Agreed Insured Value (amounts)
+    const avContent: (Paragraph | Table)[] = []
+    const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
+    if (data.quotation.agreedValue != null) avContent.push(polNp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)}`))
+    avContent.push(polNp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)}`))
+    rows.push(makeRow('Agreed Insured\nValue', avContent))
+  } else {
+    const valueContent = polBuildValueSection(data)
+    if (valueContent.length > 0) rows.push(makeRow(polGetValueSectionTitle(typeCode), valueContent))
+  }
 
   // PERIOD
   const periodContent = polBuildPeriodSection(data)
@@ -1987,8 +2012,15 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   if (data.quotation.ncbEnabled && data.quotation.ncbText) {
     const ncbContent: (Paragraph | Table)[] = []
     let ncbText = decodeHtmlEntities(htmlToPlainText(data.quotation.ncbText))
-    if (data.quotation.ncbDiscountPercent != null) ncbText = ncbText.replace(/\{ncb_percent\}/g, String(data.quotation.ncbDiscountPercent))
-    if (data.quotation.ncbDiscountAmount != null) ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(data.quotation.ncbDiscountAmount))
+    const ncbPct = data.quotation.ncbDiscountPercent
+    const ncbAmt = data.quotation.ncbDiscountAmount
+    if (ncbPct != null) ncbText = ncbText.replace(/\{ncb_percent\}/g, String(ncbPct))
+    if (ncbAmt != null) {
+      ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(ncbAmt))
+    } else if (ncbPct != null) {
+      // If discount is percentage-based, resolve {ncb_amount} to "X%"
+      ncbText = ncbText.replace(/\{ncb_amount\}/g, `${ncbPct}%`)
+    }
     ncbText = ncbText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
     ncbContent.push(...ncbText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
     rows.push(makeRow('No Claims\nBonus (NCB)', ncbContent))
