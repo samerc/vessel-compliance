@@ -502,9 +502,9 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         </button>
                         {showActionsMenu && (
                             <>
-                                <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowActionsMenu(false)} />
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={() => setShowActionsMenu(false)} />
                                 <div style={{
-                                    position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100,
+                                    position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 1000,
                                     background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
                                     borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                 }}>
