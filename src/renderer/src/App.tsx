@@ -373,6 +373,7 @@ function App(): React.JSX.Element {
                 if (policyCtx) setQuotationPolicyContext(policyCtx)
                 setActiveTab('quotations')
               }}
+              onNavigateToPolicy={(newPolicyId: string) => { setSelectedPolicyId(newPolicyId) }}
             />
           </Suspense>}
           {activeTab === 'activity-log' && <Suspense fallback={<LoadingFallback />}><ActivityLog /></Suspense>}

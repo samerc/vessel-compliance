@@ -52,6 +52,7 @@ interface PolicyDetailProps {
   onBack: () => void
   onNavigateToVessel?: (vesselId: string) => void
   onNavigateToQuotation?: (quotationId: string, policyContext?: { policyId: string; policyNumber: string }) => void
+  onNavigateToPolicy?: (policyId: string) => void
 }
 
 interface PolicyRecord {
@@ -183,7 +184,7 @@ function formatPeriod(date?: string, time?: string): string {
   return formatted
 }
 
-export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onNavigateToQuotation }: PolicyDetailProps) {
+export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onNavigateToQuotation, onNavigateToPolicy }: PolicyDetailProps) {
   const [policy, setPolicy] = useState<PolicyRecord | null>(null)
   const [instalments, setInstalments] = useState<Instalment[]>([])
   const [addresses, setAddresses] = useState<PolicyAddress[]>([])
@@ -415,7 +416,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           const newId = await window.api.policyCreateRevision(policyId)
           if (newId && typeof newId === 'string') {
             showSuccess('New revision created')
-            await loadData()
+            if (onNavigateToPolicy) {
+              onNavigateToPolicy(newId)
+            } else {
+              await loadData()
+            }
           }
         } catch (err: any) {
           showError(err.message || 'Failed to create revision')
