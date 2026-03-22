@@ -374,7 +374,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             )}
 
             {/* Header — Row 1: Identity + Badges + Actions */}
-            <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '20px' }}>
+            <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '20px', overflow: 'visible' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                     {/* Reference number */}
                     <input
