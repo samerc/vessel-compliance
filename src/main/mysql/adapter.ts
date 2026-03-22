@@ -7700,23 +7700,28 @@ export class MySQLAdapter {
         )
         const newRevision = ((maxRevRows as any[])[0]?.maxRev || 0) + 1
 
-        // Insert new revision
+        // Auto-generate cancel and replace text
+        const today = new Date().toISOString().split('T')[0]
+        const cancelText = `This policy ${existing.policyNumber} cancels and replaces policy ${existing.policyNumber} dated ${today}`
+
+        // Insert new revision with selected_alternative_id preserved
         await this.pool.execute(`
             INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
                 revision_number, inception_date, inception_time, expiry_date, expiry_time,
                 timezone, commission_percent, show_addresses, bank_id, pro_rata,
-                per_annum_premium, premium_amount, opening_clause, important_notice,
-                closing_city, cancel_replace_text, previous_policy_number, previous_policy_date,
-                created_by)
-            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                per_annum_premium, premium_amount, selected_alternative_id, opening_clause,
+                important_notice, closing_city, cancel_replace_text,
+                previous_policy_number, previous_policy_date, created_by)
+            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             newId, existing.quotationId, existing.vesselId, existing.policyNumber, newRevision,
             existing.inceptionDate, existing.inceptionTime, existing.expiryDate, existing.expiryTime,
             existing.timezone, existing.commissionPercent, existing.showAddresses ? 1 : 0,
             existing.bankId, existing.proRata ? 1 : 0, existing.perAnnumPremium, existing.premiumAmount,
+            existing.selectedAlternativeId || existing.selected_alternative_id || null,
             existing.opening_clause || null, existing.important_notice || null,
-            existing.closing_city || null, existing.cancel_replace_text || null,
-            existing.previous_policy_number || null, existing.previous_policy_date || null,
+            existing.closing_city || null, cancelText,
+            existing.policyNumber, today,
             createdBy
         ])
 
