@@ -1100,11 +1100,10 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
                                         </button>
                                     ))}
                                 </div>
-                                {(quotation.ncbEnabled || quotation.upccEnabled || quotation.ivEnabled) && (
+                                {(quotation.ncbEnabled || quotation.upccEnabled) && (
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
                                         {quotation.ncbEnabled && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(34,197,94,0.1)', color: isLight ? '#166534' : '#86efac', fontWeight: 600 }}>NCB {quotation.ncbDiscountPercent}%</span>}
                                         {quotation.upccEnabled && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(59,130,246,0.1)', color: isLight ? '#1e40af' : '#93c5fd', fontWeight: 600 }}>UPCC {quotation.upccDiscountPercent}%</span>}
-                                        {quotation.ivEnabled && quotation.ivPremiumAmount && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,176,32,0.1)', color: isLight ? '#92400e' : '#fcd34d', fontWeight: 600 }}>IV {(quotation.premiumCurrency || 'USD')} {quotation.ivPremiumAmount.toLocaleString()}</span>}
                                     </div>
                                 )}
                             </div>
