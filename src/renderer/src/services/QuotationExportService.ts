@@ -2017,7 +2017,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
       const dGetAltCondsResolved = (alt: typeof dAlts[0]) => {
-        const ownConds = hc.filter(qc => qc.alternativeId === alt.id)
+        // Alt-specific conditions: exclude IV conditions
+        const ownConds = hc.filter(qc =>
+          qc.alternativeId === alt.id &&
+          !(dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
+        )
+        // Null-scoped conditions: must belong to this alt's clause, exclude IV
         const nullConds = hc.filter(qc =>
           !qc.alternativeId &&
           dGetCondClauseId(qc) === alt.hullClauseId &&
