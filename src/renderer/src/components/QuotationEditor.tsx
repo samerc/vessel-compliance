@@ -905,12 +905,14 @@ function ConvertToPolicyModal({ quotation, onClose, showSuccess, showError, isLi
         setSelectedAltId(altId)
         const piAlt = piAlts.find(a => a.id === altId)
         const hullAlt = hullAlts.find(a => a.id === altId)
-        let tech = (piAlt as any)?.premiumAmount || (hullAlt as any)?.premiumAmount || quotation.premiumAmount || 0
+        const altPremium = (piAlt as any)?.premiumAmount ?? (hullAlt as any)?.premiumAmount ?? null
+        let tech = altPremium != null ? altPremium : (quotation.premiumAmount || 0)
         // Add IV premium if enabled
         if (quotation.ivEnabled && quotation.ivPremiumAmount) tech += quotation.ivPremiumAmount
         let pay = tech
         if (quotation.ncbEnabled && quotation.ncbDiscountPercent) pay = pay * (1 - quotation.ncbDiscountPercent / 100)
         if (quotation.upccEnabled && quotation.upccDiscountPercent) pay = pay * (1 - quotation.upccDiscountPercent / 100)
+        setTotalPremium(Math.round(pay * 100) / 100)
         recalcInstalments(Math.round(pay * 100) / 100)
     }
 
