@@ -4,6 +4,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateShort } from '../utils/dateUtils'
+import ConfirmationModal from './ConfirmationModal'
 
 interface PolicyListItem {
     id: string
@@ -74,6 +75,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [page, setPage] = useState(0)
     const [loading, setLoading] = useState(false)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; policy: any }>({ show: false, policy: null })
     const { showError, showSuccess } = useToast()
     const { hasPermission } = useAuth()
     const { theme } = useTheme()
@@ -351,14 +353,9 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                                         {hasPermission('policies:manage') && (
                                             <button
-                                                onClick={async (e) => {
+                                                onClick={(e) => {
                                                     e.stopPropagation()
-                                                    if (!confirm('Delete this policy?')) return
-                                                    try {
-                                                        await window.api.policyDelete(p.id)
-                                                        showSuccess('Policy deleted')
-                                                        loadData()
-                                                    } catch (err: any) { showError(err.message || 'Failed to delete') }
+                                                    setDeleteConfirm({ show: true, policy: p })
                                                 }}
                                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
                                                 title="Delete policy"
@@ -415,6 +412,23 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                     </div>
                 </div>
             )}
+        {deleteConfirm.show && deleteConfirm.policy && (
+            <ConfirmationModal
+                title="Delete Policy?"
+                message={`Delete policy ${deleteConfirm.policy.policyNumber || ''}? This cannot be undone.`}
+                confirmLabel="Delete"
+                isDangerous
+                onConfirm={async () => {
+                    setDeleteConfirm({ show: false, policy: null })
+                    try {
+                        await window.api.policyDelete(deleteConfirm.policy.id)
+                        showSuccess('Policy deleted')
+                        loadData()
+                    } catch (err: any) { showError(err.message || 'Failed to delete') }
+                }}
+                onCancel={() => setDeleteConfirm({ show: false, policy: null })}
+            />
+        )}
         </div>
     )
 }

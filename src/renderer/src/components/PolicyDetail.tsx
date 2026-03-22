@@ -35,6 +35,7 @@ import {
   exportBlueCardDocx
 } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
+import ConfirmationModal from './ConfirmationModal'
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
@@ -192,6 +193,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [exportingDA, setExportingDA] = useState(false)
   const [exportingCA, setExportingCA] = useState(false)
   const [exportingBC, setExportingBC] = useState(false)
+  const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -402,18 +404,24 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   }
 
   // Create new revision
-  const handleCreateRevision = async (): Promise<void> => {
-    if (!confirm('Create a new revision of this policy? The current version will be marked as superseded.')) return
-    try {
-      const newId = await window.api.policyCreateRevision(policyId)
-      if (newId && typeof newId === 'string') {
-        showSuccess('New revision created')
-        // Reload with new policy ID — but since policyId is a prop, we just reload
-        await loadData()
+  const handleCreateRevision = (): void => {
+    setConfirmation({
+      show: true,
+      title: 'Create Revision?',
+      message: 'Create a new revision of this policy? The current version will be marked as superseded.',
+      onConfirm: async () => {
+        setConfirmation(prev => ({ ...prev, show: false }))
+        try {
+          const newId = await window.api.policyCreateRevision(policyId)
+          if (newId && typeof newId === 'string') {
+            showSuccess('New revision created')
+            await loadData()
+          }
+        } catch (err: any) {
+          showError(err.message || 'Failed to create revision')
+        }
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to create revision')
-    }
+    })
   }
 
   // Load coverage data from linked quotation
@@ -1146,21 +1154,22 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           )}
           {hasPermission('policies:manage') && (
             <button
-              onClick={async () => {
-                if (
-                  !confirm(
-                    'Are you sure you want to delete this policy? This cannot be undone.'
-                  )
-                )
-                  return
-                try {
-                  await window.api.policyDelete(policyId)
-                  showSuccess('Policy deleted')
-                  onBack()
-                } catch (err: any) {
-                  showError(err.message || 'Failed to delete')
+              onClick={() => setConfirmation({
+                show: true,
+                title: 'Delete Policy?',
+                message: `Delete policy ${policy.policyNumber}? This cannot be undone.`,
+                isDangerous: true,
+                onConfirm: async () => {
+                  setConfirmation(prev => ({ ...prev, show: false }))
+                  try {
+                    await window.api.policyDelete(policyId)
+                    showSuccess('Policy deleted')
+                    onBack()
+                  } catch (err: any) {
+                    showError(err.message || 'Failed to delete')
+                  }
                 }
-              }}
+              })}
               style={{
                 background: 'transparent',
                 border: '1px solid var(--danger)',
@@ -2915,6 +2924,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         </>
       )}
 
+      {confirmation.show && (
+        <ConfirmationModal
+          title={confirmation.title}
+          message={confirmation.message}
+          confirmLabel={confirmation.isDangerous ? 'Delete' : 'Confirm'}
+          isDangerous={confirmation.isDangerous}
+          onConfirm={confirmation.onConfirm}
+          onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
+        />
+      )}
     </div>
   )
 }
