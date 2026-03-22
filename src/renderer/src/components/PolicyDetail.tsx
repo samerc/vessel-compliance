@@ -434,7 +434,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     if (!policy?.quotationId) return
     setCoverageLoading(true)
     try {
-      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities, allWarranties, , allExclusionsMaster, allClausesMaster, allSubjectivitiesMaster] = await Promise.all([
+      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities, allWarranties, , allExclusionsMaster, allClausesMaster, allSubjectivitiesMaster,
+        hullConditions, hullAdditionalConditions, hullClauses, allHullConditions, hullAlternatives, customExclusions
+      ] = await Promise.all([
         window.api.getQuotation(policy.quotationId),
         window.api.getQuotationWarranties(policy.quotationId),
         window.api.getQuotationCustomWarranties(policy.quotationId),
@@ -446,7 +448,13 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         window.api.piGetDeductibles(),
         window.api.piGetExclusions(),
         window.api.piGetClauses(),
-        window.api.getPISubjectivities()
+        window.api.getPISubjectivities(),
+        window.api.hullGetQuotationHullConditions(policy.quotationId),
+        window.api.hullGetQuotationHullAdditionalConditions(policy.quotationId),
+        window.api.hullGetClauses(),
+        window.api.hullGetClauseConditions(),
+        window.api.hullGetQuotationAlternatives(policy.quotationId),
+        window.api.getQuotationCustomExclusions(policy.quotationId)
       ])
       setQuotationData(q)
       // Resolve warranty names from master list
@@ -483,6 +491,44 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         const master = masterClauseMap.get(c.piClauseId)
         return { ...c, text: master?.name || master?.text || c.text || '', code: master?.code || '' }
       }))
+      // For Hull: add hull conditions as clauses if P&I clauses are empty
+      const typeCode = q?.quotationTypeCode || policy.quotationTypeCode
+      if ((typeCode === 'H' || typeCode === 'W') && dedupedClauses.length === 0) {
+        const safeHullConds = Array.isArray(hullConditions) ? hullConditions : []
+        const safeAllHullConds = Array.isArray(allHullConditions) ? allHullConditions : []
+        const safeHullClauses = Array.isArray(hullClauses) ? hullClauses : []
+        const safeHullAlts = Array.isArray(hullAlternatives) ? hullAlternatives : []
+        const safeHullAddl = Array.isArray(hullAdditionalConditions) ? hullAdditionalConditions : []
+        const selectedAltId = policy.selectedAlternativeId
+        // Get selected alt's clause
+        const selectedAlt = selectedAltId ? safeHullAlts.find((a: any) => a.id === selectedAltId) : safeHullAlts[0]
+        const selectedClause = selectedAlt ? safeHullClauses.find((c: any) => c.id === selectedAlt.hullClauseId) : null
+        // Filter conditions to selected alt
+        const filteredConds = selectedAltId
+          ? safeHullConds.filter((c: any) => c.alternativeId === selectedAltId || !c.alternativeId)
+          : safeHullConds
+        // Dedup
+        const seenHull = new Map<string, any>()
+        for (const c of filteredConds.filter((x: any) => x.alternativeId)) seenHull.set(c.hullConditionId, c)
+        for (const c of filteredConds.filter((x: any) => !x.alternativeId)) { if (!seenHull.has(c.hullConditionId)) seenHull.set(c.hullConditionId, c) }
+        const hullClauseItems = Array.from(seenHull.values()).map((qc: any) => {
+          const def = safeAllHullConds.find((c: any) => c.id === qc.hullConditionId)
+          return { text: `Cl. ${def?.conditionNumber || '?'} — ${qc.textOverride || def?.text || ''}`, code: `Cl. ${def?.conditionNumber || '?'}` }
+        })
+        // Add clause description as first item
+        if (selectedClause) hullClauseItems.unshift({ text: selectedClause.description || selectedClause.name, code: '' })
+        // Add additional conditions
+        for (const qa of safeHullAddl) {
+          const text = qa.textOverride || (qa as any).text || ''
+          if (text) hullClauseItems.push({ text, code: '' })
+        }
+        setCoverageClauses(hullClauseItems)
+      }
+      // For Hull/War: add custom exclusions to exclusions
+      const safeCustomExcl = Array.isArray(customExclusions) ? customExclusions : []
+      if (safeCustomExcl.length > 0) {
+        setCoverageExclusions(prev => [...prev, ...safeCustomExcl.map((e: any) => ({ text: e.text || '' }))])
+      }
       // Resolve subjectivity text
       const masterSubjMap = new Map((Array.isArray(allSubjectivitiesMaster) ? allSubjectivitiesMaster : []).map((s: any) => [s.id, s]))
       setCoverageSubjectivities((Array.isArray(subjectivities) ? subjectivities : []).map((s: any) => {
