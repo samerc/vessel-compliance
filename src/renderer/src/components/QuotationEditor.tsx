@@ -254,13 +254,31 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         }
     }
 
-    const handleClearSnapshot = async () => {
+    const handleReloadFromSettings = async () => {
         try {
-            await window.api.clearExportSnapshot(q.id)
-            setQ(prev => ({ ...prev, exportSnapshot: undefined }))
-            showSuccess('Export snapshot cleared — next export will use current settings')
+            // Clear export snapshot
+            if (q.exportSnapshot) {
+                await window.api.clearExportSnapshot(q.id)
+            }
+            // Reload excluded/DDQ countries from master list if empty
+            const currentCountries = await window.api.getQuotationExcludedCountries(q.id)
+            if (!Array.isArray(currentCountries) || currentCountries.length === 0) {
+                const masterCountries = await window.api.piGetTradingExcludedCountries()
+                if (Array.isArray(masterCountries) && masterCountries.length > 0) {
+                    await window.api.setQuotationExcludedCountries(q.id, masterCountries.map((c: any) => ({
+                        name: c.name,
+                        listType: c.listType
+                    })))
+                }
+            }
+            // Reload quotation to pick up fresh settings
+            const fullQ = await window.api.getQuotation(q.id)
+            if (fullQ && !(fullQ as any).error) {
+                setQ({ ...fullQ, exportSnapshot: undefined })
+            }
+            showSuccess('Reloaded texts and data from settings')
         } catch (err: any) {
-            showError(err.message || 'Failed to clear snapshot')
+            showError(err.message || 'Failed to reload from settings')
         }
     }
 
@@ -516,7 +534,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     {!policyContext && canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
                                     {!policyContext && canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
                                     <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
-                                    {q.exportSnapshot && !isLocked && <button onClick={() => { setShowActionsMenu(false); handleClearSnapshot() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Refresh Texts</button>}
+                                    {!isLocked && canEdit && <button onClick={async () => { setShowActionsMenu(false); await handleReloadFromSettings() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Reload from Settings</button>}
                                     {!policyContext && !isLocked && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
                                     {!policyContext && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); setShowConvertModal(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#008c46' : '#00c864', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><FileText size={15} /> Convert to Policy</button></>}
                                 </div>
