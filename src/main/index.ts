@@ -2558,6 +2558,10 @@ app.whenReady().then(() => {
     }).catch(() => {})
     return result
   })
+  safeHandle('db:stripNonSelectedAlternative', async (event, quotationId, keepAlternativeId) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.stripNonSelectedAlternative(quotationId, keepAlternativeId)
+  })
   safeHandle('db:duplicateQuotation', async (event, sourceId) => {
     const user = await requirePermission(event, 'quotations:create')
     const source = await db.getQuotation(sourceId)

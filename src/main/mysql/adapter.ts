@@ -6048,6 +6048,45 @@ export class MySQLAdapter {
         return (await this.getQuotation(newId))!
     }
 
+    async stripNonSelectedAlternative(quotationId: string, keepAlternativeId: string): Promise<void> {
+        if (!this.pool || !keepAlternativeId) return
+        // Delete items from non-selected P&I alternatives
+        // Keep items where alternativeId = keepAlternativeId OR alternativeId IS NULL (shared)
+        const tables = [
+            'quotation_clauses',
+            'quotation_warranties',
+            'quotation_custom_warranties',
+            'quotation_deductibles',
+            'quotation_text_deductibles',
+            'quotation_exclusions',
+            'quotation_custom_exclusions'
+        ]
+        for (const table of tables) {
+            try {
+                await this.pool.execute(
+                    `DELETE FROM ${table} WHERE quotation_id = ? AND alternative_id IS NOT NULL AND alternative_id != ?`,
+                    [quotationId, keepAlternativeId]
+                )
+            } catch { /* table might not have alternative_id column */ }
+        }
+        // Delete the PI alternatives themselves (keep only the selected one)
+        try {
+            await this.pool.execute(
+                'DELETE FROM quotation_pi_alternatives WHERE quotation_id = ? AND id != ?',
+                [quotationId, keepAlternativeId]
+            )
+        } catch { /* ignore */ }
+        // Set remaining items' alternativeId to NULL (they're no longer scoped since there's only one)
+        for (const table of tables) {
+            try {
+                await this.pool.execute(
+                    `UPDATE ${table} SET alternative_id = NULL WHERE quotation_id = ? AND alternative_id = ?`,
+                    [quotationId, keepAlternativeId]
+                )
+            } catch { /* ignore */ }
+        }
+    }
+
     async duplicateQuotation(sourceId: string): Promise<Quotation> {
         if (!this.pool) throw new Error('DB not connected')
 

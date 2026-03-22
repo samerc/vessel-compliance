@@ -73,6 +73,7 @@ interface PolicyRecord {
   proRata: boolean
   perAnnumPremium: number | null
   premiumAmount: number | null
+  selectedAlternativeId: string | null
   cancelReplaceText: string | null
   createdBy: string
   createdAt: string
@@ -1547,6 +1548,10 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                         const newRevision = await window.api.createQuotationRevision(policy.quotationId)
                         if (newRevision && !(newRevision as any).error) {
                           const revId = typeof newRevision === 'string' ? newRevision : (newRevision.id || policy.quotationId)
+                          // Strip non-selected alternative from the revision
+                          if (policy.selectedAlternativeId) {
+                            await window.api.stripNonSelectedAlternative(revId, policy.selectedAlternativeId)
+                          }
                           // Update the policy to reference the new quotation revision
                           await window.api.policyUpdate(policy.id, { quotationId: revId })
                           showSuccess('Quotation revision created. Navigating to editor...')

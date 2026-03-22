@@ -498,6 +498,7 @@ const api = {
   updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),
   deleteQuotation: (id: string) => ipcRenderer.invoke('db:deleteQuotation', id),
   createQuotationRevision: (sourceId: string) => ipcRenderer.invoke('db:createQuotationRevision', sourceId),
+  stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) => ipcRenderer.invoke('db:stripNonSelectedAlternative', quotationId, keepAlternativeId),
   duplicateQuotation: (sourceId: string) => ipcRenderer.invoke('db:duplicateQuotation', sourceId),
   getQuotationRevisions: (revisionGroupId: string) => ipcRenderer.invoke('db:getQuotationRevisions', revisionGroupId),
   saveExportSnapshot: (quotationId: string, snapshot: string) => ipcRenderer.invoke('db:saveExportSnapshot', quotationId, snapshot),
