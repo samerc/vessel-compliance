@@ -151,6 +151,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [reachableSteps, setReachableSteps] = useState<import('../../../shared/types').WorkflowStep[]>([])
     const [showStepMenu, setShowStepMenu] = useState(false)
     const [showActionsMenu, setShowActionsMenu] = useState(false)
+    const actionsRef = useRef<HTMLDivElement>(null)
     const [showConvertModal, setShowConvertModal] = useState(false)
     const [stepComment, setStepComment] = useState('')
     const [showStepCommentModal, setShowStepCommentModal] = useState<string | null>(null)
@@ -492,7 +493,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     {/* Spacer */}
                     <div style={{ flex: 1 }} />
                     {/* Actions dropdown */}
-                    <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative' }} ref={actionsRef}>
                         <button
                             onClick={() => setShowActionsMenu(!showActionsMenu)}
                             className="btn-secondary"
@@ -502,9 +503,12 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         </button>
                         {showActionsMenu && (
                             <>
-                                <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={() => setShowActionsMenu(false)} />
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowActionsMenu(false)} />
                                 <div style={{
-                                    position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 1000,
+                                    position: 'fixed',
+                                    top: (actionsRef.current?.getBoundingClientRect().bottom || 0) + 4,
+                                    right: window.innerWidth - (actionsRef.current?.getBoundingClientRect().right || 0),
+                                    zIndex: 9999,
                                     background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
                                     borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                 }}>
