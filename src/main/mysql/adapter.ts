@@ -5648,38 +5648,63 @@ export class MySQLAdapter {
 
     async getQuotations(): Promise<Quotation[]> {
         if (!this.pool) return []
+        // First get the latest revision IDs efficiently
+        const [latestIds] = await this.pool.query(`
+            SELECT id FROM quotations q
+            WHERE revision_number = (
+                SELECT MAX(revision_number) FROM quotations q2
+                WHERE q2.revision_group_id = q.revision_group_id
+            )
+        `)
+        const idSet = new Set((latestIds as any[]).map(r => r.id))
+        if (idSet.size === 0) return []
+
         const [rows] = await this.pool.query(`
             SELECT q.id, q.reference_number as referenceNumber,
                 q.quotation_type_id as quotationTypeId, qt.name as quotationTypeName, qt.code as quotationTypeCode,
                 q.quotation_date as quotationDate,
                 q.policy_type_id as policyTypeId, pt.name as policyTypeName,
-                (SELECT COALESCE(vv.name, qv.name) FROM quotation_vessels qv LEFT JOIN vessels vv ON qv.vessel_id = vv.id WHERE qv.quotation_id = q.id ORDER BY qv.order_index ASC LIMIT 1) as vesselName,
-                (SELECT COUNT(*) FROM quotation_vessels qv2 WHERE qv2.quotation_id = q.id) as vesselCount,
                 q.is_renewal as isRenewal, q.status,
                 q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
                 q.co_name as coName, q.title as title,
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
-                (SELECT GROUP_CONCAT(pc.name ORDER BY pc.order_index SEPARATOR ', ') FROM quotation_clauses qc JOIN pi_clauses pc ON CONVERT(pc.id USING utf8mb4) = CONVERT(qc.pi_clause_id USING utf8mb4) WHERE qc.quotation_id = q.id) as piClauseNames,
-                (SELECT GROUP_CONCAT(DISTINCT hc.code ORDER BY qha.order_index SEPARATOR ', ') FROM quotation_hull_alternatives qha JOIN hull_clauses hc ON CONVERT(hc.id USING utf8mb4) = CONVERT(qha.hull_clause_id USING utf8mb4) WHERE qha.quotation_id = q.id) as hullClauseCodes,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
             LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
-            WHERE q.id = (
-                SELECT q2.id FROM quotations q2
-                WHERE q2.revision_group_id = q.revision_group_id
-                ORDER BY q2.revision_number DESC LIMIT 1
-            )
             ORDER BY q.created_at DESC
         `)
-        return (rows as any[]).map(r => ({
+        // Filter to latest revisions in JS (faster than correlated subquery)
+        const filtered = (rows as any[]).filter(r => idSet.has(r.id))
+
+        // Batch load vessel names and counts
+        const qIds = filtered.map(r => r.id)
+        if (qIds.length === 0) return []
+        const [vesselRows] = await this.pool.query(`
+            SELECT qv.quotation_id, COALESCE(v.name, qv.name) as vesselName, qv.order_index
+            FROM quotation_vessels qv
+            LEFT JOIN vessels v ON qv.vessel_id = v.id
+            WHERE qv.quotation_id IN (${qIds.map(() => '?').join(',')})
+            ORDER BY qv.order_index ASC
+        `, qIds)
+        const vesselMap = new Map<string, string>()
+        const vesselCountMap = new Map<string, number>()
+        for (const v of vesselRows as any[]) {
+            if (!vesselMap.has(v.quotation_id)) vesselMap.set(v.quotation_id, v.vesselName)
+            vesselCountMap.set(v.quotation_id, (vesselCountMap.get(v.quotation_id) || 0) + 1)
+        }
+
+        return filtered.map(r => ({
             ...r,
+            vesselName: vesselMap.get(r.id) || null,
+            vesselCount: vesselCountMap.get(r.id) || 0,
+            piClauseNames: null,
+            hullClauseCodes: null,
             isRenewal: Boolean(r.isRenewal),
             isLocked: Boolean(r.isLocked),
             premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
-            vesselCount: Number(r.vesselCount || 0),
             revisionNumber: Number(r.revisionNumber || 0)
         }))
     }
