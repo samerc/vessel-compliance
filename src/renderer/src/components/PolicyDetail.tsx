@@ -1608,12 +1608,27 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                         const newRevision = await window.api.createQuotationRevision(policy.quotationId)
                         if (newRevision && !(newRevision as any).error) {
                           const revId = typeof newRevision === 'string' ? newRevision : (newRevision.id || policy.quotationId)
-                          // Strip non-selected alternative from the revision
+                          // Find the new alternative ID that corresponds to the selected one
+                          let newSelectedAltId: string | null = null
                           if (policy.selectedAlternativeId) {
-                            await window.api.stripNonSelectedAlternative(revId, policy.selectedAlternativeId)
+                            // Get old alternatives to find the hull_clause_id of the selected one
+                            const oldAlts = await window.api.hullGetQuotationAlternatives(policy.quotationId)
+                            const selectedOldAlt = Array.isArray(oldAlts) ? oldAlts.find((a: any) => a.id === policy.selectedAlternativeId) : null
+                            if (selectedOldAlt) {
+                              // Get new alternatives and match by hull_clause_id
+                              const newAlts = await window.api.hullGetQuotationAlternatives(revId)
+                              const matchingNewAlt = Array.isArray(newAlts) ? newAlts.find((a: any) => a.hullClauseId === selectedOldAlt.hullClauseId) : null
+                              if (matchingNewAlt) {
+                                newSelectedAltId = matchingNewAlt.id
+                                // Strip the non-selected alternative using the NEW ID
+                                await window.api.stripNonSelectedAlternative(revId, matchingNewAlt.id)
+                              }
+                            }
                           }
-                          // Update the policy to reference the new quotation revision
-                          await window.api.policyUpdate(policy.id, { quotationId: revId })
+                          // Update the policy to reference the new quotation revision + new alt ID
+                          const updateFields: Record<string, any> = { quotationId: revId }
+                          if (newSelectedAltId) updateFields.selectedAlternativeId = newSelectedAltId
+                          await window.api.policyUpdate(policy.id, updateFields)
                           showSuccess('Quotation revision created. Navigating to editor...')
                           onNavigateToQuotation(revId, { policyId: policy.id, policyNumber: policy.policyNumber || '' })
                         } else {

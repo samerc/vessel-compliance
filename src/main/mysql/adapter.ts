@@ -7647,6 +7647,7 @@ export class MySQLAdapter {
             importantNotice: 'important_notice',
             closingCity: 'closing_city',
             quotationId: 'quotation_id',
+            selectedAlternativeId: 'selected_alternative_id',
         }
         const sets: string[] = []
         const vals: any[] = []
