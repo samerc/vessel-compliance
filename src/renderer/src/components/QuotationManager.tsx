@@ -10,6 +10,7 @@ type QuotationView = 'list' | 'settings' | 'editor'
 
 interface QuotationManagerProps {
     onNavigateToPolicy?: (policyId: string) => void
+    onNavigateToPolicySetup?: (quotationId: string) => void
     initialQuotationId?: string | null
     onClearInitialQuotation?: () => void
     policyContext?: { policyId: string; policyNumber: string } | null
@@ -17,7 +18,7 @@ interface QuotationManagerProps {
     onReturnToPolicy?: (policyId: string) => void
 }
 
-export default function QuotationManager({ onNavigateToPolicy, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy }: QuotationManagerProps) {
+export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolicySetup, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy }: QuotationManagerProps) {
     const { hasPermission } = useAuth()
     const canSettings = hasPermission('quotations:settings')
     const [view, setView] = useState<QuotationView>('list')
@@ -114,6 +115,7 @@ export default function QuotationManager({ onNavigateToPolicy, initialQuotationI
                     onBack={handleBackToList}
                     onOpenQuotation={handleOpenEditor}
                     onNavigateToPolicy={onNavigateToPolicy}
+                    onNavigateToPolicySetup={onNavigateToPolicySetup}
                     policyContext={activePolicyContext}
                     onReturnToPolicy={onReturnToPolicy ? (policyId) => { setActivePolicyContext(null); onReturnToPolicy(policyId) } : undefined}
                 />

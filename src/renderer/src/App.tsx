@@ -33,6 +33,7 @@ const EmailTemplates = lazy(() => import('./components/EmailTemplates'))
 const PolicyList = lazy(() => import('./components/PolicyList'))
 const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
 const PolicySettings = lazy(() => import('./components/PolicySettings'))
+const PolicySetupWizard = lazy(() => import('./components/PolicySetupWizard'))
 
 const LoadingFallback = () => (
   <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -41,7 +42,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'email-templates' | 'policies-list' | 'policy-detail'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'email-templates' | 'policies-list' | 'policy-detail' | 'policy-setup'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -57,6 +58,7 @@ function App(): React.JSX.Element {
   const [initialQuotationId, setInitialQuotationId] = useState<string | null>(null)
   const [quotationPolicyContext, setQuotationPolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
   const [policyView, setPolicyView] = useState<'list' | 'settings'>('list')
+  const [policySetupQuotationId, setPolicySetupQuotationId] = useState<string | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -346,6 +348,7 @@ function App(): React.JSX.Element {
           {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators /></Suspense>}
           {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager
             onNavigateToPolicy={(policyId) => { setSelectedPolicyId(policyId); setActiveTab('policy-detail') }}
+            onNavigateToPolicySetup={(quotationId) => { setPolicySetupQuotationId(quotationId); setActiveTab('policy-setup') }}
             initialQuotationId={initialQuotationId}
             onClearInitialQuotation={() => { setInitialQuotationId(null) }}
             policyContext={quotationPolicyContext}
@@ -412,6 +415,13 @@ function App(): React.JSX.Element {
             />
           </Suspense>}
           {activeTab === 'activity-log' && <Suspense fallback={<LoadingFallback />}><ActivityLog /></Suspense>}
+          {activeTab === 'policy-setup' && policySetupQuotationId && <Suspense fallback={<LoadingFallback />}>
+            <PolicySetupWizard
+              quotationId={policySetupQuotationId}
+              onComplete={(policyId) => { setPolicySetupQuotationId(null); setSelectedPolicyId(policyId); setActiveTab('policy-detail') }}
+              onCancel={() => { setPolicySetupQuotationId(null); setActiveTab('quotations') }}
+            />
+          </Suspense>}
         </main>
         <UpdateNotification />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
