@@ -1001,7 +1001,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const isPIType = policy.quotationTypeCode === 'P'
   const commissionAmount =
     policy.commissionPercent && policy.premiumAmount
-      ? (policy.commissionPercent / 100) * policy.premiumAmount
+      ? Math.round((policy.commissionPercent / 100) * policy.premiumAmount * 100) / 100
+      : null
+  const netPremium =
+    policy.premiumAmount && commissionAmount != null
+      ? Math.round((policy.premiumAmount - commissionAmount) * 100) / 100
       : null
 
   const handleExportPolicy = async () => {
@@ -2100,7 +2104,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 </div>
               </div>
             )}
-            {policy.commissionPercent != null && (
+            {policy.commissionPercent != null && policy.commissionPercent > 0 && (
               <div>
                 <div style={labelStyle}>Commission</div>
                 <div style={valueStyle}>
@@ -2110,6 +2114,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       ({formatAmount(commissionAmount)})
                     </span>
                   )}
+                </div>
+              </div>
+            )}
+            {netPremium != null && (
+              <div>
+                <div style={labelStyle}>Net Premium</div>
+                <div style={{ ...valueStyle, fontWeight: 600, color: isLight ? '#047857' : '#34d399' }}>
+                  {formatAmount(netPremium)}
                 </div>
               </div>
             )}
@@ -2138,6 +2150,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     <th style={thStyle}>Due Date</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Premium</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Commission</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Net</th>
                     <th style={{ ...thStyle, textAlign: 'center' }}>NR</th>
                   </tr>
                 </thead>
@@ -2164,6 +2177,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         {formatAmount(inst.commissionAmount)}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right', color: isLight ? '#047857' : '#34d399' }}>
+                        {formatAmount((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         {inst.isNonRefundable ? (
