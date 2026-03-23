@@ -1054,11 +1054,13 @@ function DeductiblesTab({ showSuccess }: TabProps) {
     const [deductibles, setDeductibles] = useState<PIDeductible[]>([])
     const [textDeds, setTextDeds] = useState<PITextDeductible[]>([])
     const [newTitle, setNewTitle] = useState('')
+    const [newCode, setNewCode] = useState('')
     const [newDesc, setNewDesc] = useState('')
     const [newHasSecondary, setNewHasSecondary] = useState(false)
     const [newSecDesc, setNewSecDesc] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editTitle, setEditTitle] = useState('')
+    const [editCode, setEditCode] = useState('')
     const [editDesc, setEditDesc] = useState('')
     const [editHasSecondary, setEditHasSecondary] = useState(false)
     const [editSecDesc, setEditSecDesc] = useState('')
@@ -1082,16 +1084,16 @@ function DeductiblesTab({ showSuccess }: TabProps) {
         e.preventDefault()
         if (!newTitle.trim()) return
         await window.api.piAddDeductible({
-            title: newTitle, description: newDesc, defaultAmount: 0, defaultCurrency: 'USD',
+            title: newTitle, letterCode: newCode || undefined, description: newDesc, defaultAmount: 0, defaultCurrency: 'USD',
             hasSecondary: newHasSecondary, secondaryDescription: newSecDesc || undefined, order: 0
         })
-        setNewTitle(''); setNewDesc(''); setNewHasSecondary(false); setNewSecDesc('')
+        setNewTitle(''); setNewCode(''); setNewDesc(''); setNewHasSecondary(false); setNewSecDesc('')
         showSuccess('Deductible added'); loadData()
     }
 
     const saveEdit = async (id: string) => {
         await window.api.piUpdateDeductible(id, {
-            title: editTitle, description: editDesc, hasSecondary: editHasSecondary,
+            title: editTitle, letterCode: editCode || undefined, description: editDesc, hasSecondary: editHasSecondary,
             secondaryDescription: editSecDesc || undefined
         })
         setEditingId(null); showSuccess('Deductible updated'); loadData()
@@ -1136,6 +1138,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
             <form onSubmit={handleAdd} style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. Crew Claims)" style={{ width: '200px' }} required />
+                    <input type="text" value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code" title="Letter code for QB export (e.g. C, P, O)" maxLength={3} style={{ width: '50px', textAlign: 'center', textTransform: 'uppercase' }} />
                     <input type="text" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Description..." style={{ flex: 1 }} />
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input type="checkbox" checked={newHasSecondary} onChange={e => setNewHasSecondary(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} /> Has secondary
@@ -1155,6 +1158,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
                         <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                                 <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '200px' }} />
+                                <input type="text" value={editCode} onChange={e => setEditCode(e.target.value)} placeholder="Code" title="Letter code for QB export" maxLength={3} style={{ width: '50px', textAlign: 'center', textTransform: 'uppercase' }} />
                                 <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Description" style={{ flex: 1 }} />
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1173,6 +1177,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
                         <>
                             <div style={{ flex: 1 }}>
                                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{d.title}</span>
+                                {d.letterCode && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255, 176, 32, 0.15)', color: '#b07a10', marginLeft: '6px', fontWeight: 700, fontFamily: 'monospace' }}>{d.letterCode}</span>}
                                 {d.hasSecondary && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)', marginLeft: '6px' }}>Multi-value</span>}
                                 {d.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{d.description}</div>}
                                 {d.hasSecondary && d.secondaryDescription && (
@@ -1184,7 +1189,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
                             <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
                                 <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                 <button onClick={() => handleMove(i, 'down')} disabled={i === deductibles.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === deductibles.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(d.id); setEditTitle(d.title || ''); setEditDesc(d.description); setEditHasSecondary(d.hasSecondary); setEditSecDesc(d.secondaryDescription || '') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button onClick={() => { setEditingId(d.id); setEditTitle(d.title || ''); setEditCode(d.letterCode || ''); setEditDesc(d.description); setEditHasSecondary(d.hasSecondary); setEditSecDesc(d.secondaryDescription || '') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                 <button onClick={async () => { await window.api.piDeleteDeductible(d.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         </>

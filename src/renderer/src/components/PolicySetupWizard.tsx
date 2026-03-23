@@ -42,6 +42,7 @@ interface WizardData {
   commissionPercent: number | ''
   bankId: string
   showAddresses: boolean
+  exchangeRate: number
   // Step 5
   blueCards: string[]
   blueCardNone: boolean
@@ -66,6 +67,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const [banks, setBanks] = useState<{ id: string; name: string; details: string; order: number }[]>([])
   const [flagStates, setFlagStates] = useState<FlagState[]>([])
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(DEFAULT_TIMEZONE_OPTIONS)
+  const [baseCurrency, setBaseCurrency] = useState('USD')
 
   // Wizard state
   const [data, setData] = useState<WizardData>({
@@ -83,6 +85,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     commissionPercent: '',
     bankId: '',
     showAddresses: false,
+    exchangeRate: 1,
     blueCards: [],
     blueCardNone: false,
     blueCardAddressedTo: {}
@@ -146,6 +149,12 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           if (Array.isArray(parsed) && parsed.length > 0) setTimezoneOptions(parsed)
         }
       } catch { /* use defaults */ }
+
+      // Load base currency
+      try {
+        const bcSetting = await window.api.getSetting('base_currency')
+        if (bcSetting) setBaseCurrency(bcSetting)
+      } catch { /* use default USD */ }
 
       // Calculate payable premium
       const quot = q as Quotation
@@ -358,7 +367,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         bankId: data.bankId || null,
         showAddresses: data.showAddresses,
         blueCards: data.blueCardNone ? [] : data.blueCards,
-        selectedAlternativeId: data.selectedAltId || null
+        selectedAlternativeId: data.selectedAltId || null,
+        exchangeRate: data.exchangeRate || 1
       })
       if ((result as any)?.error) {
         showError((result as any).message || 'Conversion failed')
@@ -538,6 +548,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             data={data}
             banks={banks}
             hasBroker={hasBroker}
+            premiumCurrency={quotation?.premiumCurrency || 'USD'}
+            baseCurrency={baseCurrency}
             onUpdate={updateData}
             labelStyle={labelStyle}
             inputStyle={inputStyle}
@@ -892,14 +904,17 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
   )
 }
 
-function StepDetails({ data, banks, hasBroker, onUpdate, labelStyle, inputStyle }: {
+function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, onUpdate, labelStyle, inputStyle }: {
   data: WizardData
   banks: { id: string; name: string; details: string; order: number }[]
   hasBroker: boolean
+  premiumCurrency: string
+  baseCurrency: string
   onUpdate: (partial: Partial<WizardData>) => void
   labelStyle: React.CSSProperties
   inputStyle: React.CSSProperties
 }) {
+  const sameAsBase = premiumCurrency.toUpperCase() === baseCurrency.toUpperCase()
   return (
     <div>
       <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Additional Details</h2>
@@ -921,6 +936,21 @@ function StepDetails({ data, banks, hasBroker, onUpdate, labelStyle, inputStyle 
           style={{ ...inputStyle, width: '160px' }}
         />
         {hasBroker && <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Broker commission — will generate Credit Advice</p>}
+      </div>
+
+      {/* Exchange Rate */}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={labelStyle}>Exchange Rate ({premiumCurrency} to {baseCurrency})</label>
+        <input
+          type="number"
+          value={data.exchangeRate}
+          onChange={e => onUpdate({ exchangeRate: parseFloat(e.target.value) || 1 })}
+          min={0}
+          step={0.000001}
+          readOnly={sameAsBase}
+          style={{ ...inputStyle, width: '200px', ...(sameAsBase ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+        />
+        {sameAsBase && <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Same as base currency — rate fixed at 1</p>}
       </div>
 
       {/* Bank */}

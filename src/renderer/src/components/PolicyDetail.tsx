@@ -21,7 +21,8 @@ import {
   Save,
   Shield,
   ChevronRight,
-  Copy
+  Copy,
+  FileSpreadsheet
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -35,6 +36,7 @@ import {
   exportBlueCardDocx
 } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
+import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
 import ConfirmationModal from './ConfirmationModal'
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
 
@@ -89,8 +91,15 @@ interface PolicyRecord {
   builtYear: number | null
   grossTonnage: number | null
   flagStateName: string
+  flagIso3Code: string | null
   customerName: string
+  customerType: string | null
   callSign?: string
+  exchangeRate: number
+  fleetId: string | null
+  fleetName: string | null
+  classificationSociety: string | null
+  createdByName: string | null
 }
 
 interface Instalment {
@@ -195,6 +204,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [exportingDA, setExportingDA] = useState(false)
   const [exportingCA, setExportingCA] = useState(false)
   const [exportingBC, setExportingBC] = useState(false)
+  const [exportingQB, setExportingQB] = useState(false)
   const [bcDropdownOpen, setBcDropdownOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
   const [renewing, setRenewing] = useState(false)
@@ -1079,6 +1089,18 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     }
   }
 
+  const handleExportQuickBooks = async () => {
+    setExportingQB(true)
+    try {
+      await exportPolicyToQuickBooks(policyId)
+      showSuccess('QuickBooks Excel exported')
+    } catch (err: any) {
+      showError(err.message || 'Failed to export QuickBooks Excel')
+    } finally {
+      setExportingQB(false)
+    }
+  }
+
   return (
     <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
@@ -1322,6 +1344,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               )}
             </div>
           )}
+          <button
+            className="btn-secondary"
+            style={{ ...exportBtnStyle, background: 'rgba(0, 170, 200, 0.10)', color: isLight ? '#007a91' : '#00aac8', border: '1px solid rgba(0, 170, 200, 0.25)' }}
+            onClick={handleExportQuickBooks}
+            disabled={exportingQB}
+            title="Export to QuickBooks Excel"
+          >
+            {exportingQB ? <Loader2 size={14} className="spinner" /> : <FileSpreadsheet size={14} />}
+            QB Export
+          </button>
           {hasPermission('policies:manage') && (
             <button
               onClick={() => setConfirmation({
@@ -2135,6 +2167,12 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               <div>
                 <div style={labelStyle}>Pro Rata</div>
                 <div style={valueStyle}>Yes</div>
+              </div>
+            )}
+            {policy.exchangeRate != null && policy.exchangeRate !== 1 && (
+              <div>
+                <div style={labelStyle}>Exchange Rate</div>
+                <div style={valueStyle}>{policy.exchangeRate.toFixed(6)}</div>
               </div>
             )}
           </div>

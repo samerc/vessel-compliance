@@ -622,6 +622,7 @@ export interface QuotationCustomWarranty {
 export interface PIDeductible {
   id: string
   title: string
+  letterCode?: string
   description: string
   defaultAmount: number
   defaultCurrency: string

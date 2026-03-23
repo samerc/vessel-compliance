@@ -2121,6 +2121,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
                 <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
 
+                {/* Base Currency */}
+                <BaseCurrencySetting />
+
+                <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
                 {/* Total Pages & Footer */}
                 <PolicyExportSettings />
             </section>
@@ -2849,6 +2854,48 @@ function TimezoneManager() {
 }
 
 // ==================== Policy Font Size Setting ====================
+function BaseCurrencySetting() {
+    const [currency, setCurrency] = useState('USD')
+    const [loading, setLoading] = useState(true)
+    const { showSuccess } = useToast()
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const raw = await window.api.getSetting('base_currency')
+                if (raw) setCurrency(raw)
+            } catch { /* default */ }
+            finally { setLoading(false) }
+        })()
+    }, [])
+
+    const handleSave = async () => {
+        await window.api.setSetting('base_currency', currency.toUpperCase().trim())
+        showSuccess(`Base currency set to ${currency.toUpperCase().trim()}`)
+    }
+
+    if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+    return (
+        <div>
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>Base Currency</h4>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                The default accounting currency. Used for exchange rate calculations on policies.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                    type="text"
+                    value={currency}
+                    onChange={e => setCurrency(e.target.value)}
+                    maxLength={5}
+                    style={{ width: '100px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.88rem', textTransform: 'uppercase' }}
+                />
+                <button onClick={handleSave} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.84rem' }}>Save</button>
+            </div>
+        </div>
+    )
+}
+
 function PolicyFontSizeSetting() {
     const [fontSize, setFontSize] = useState(10)
     const [loading, setLoading] = useState(true)

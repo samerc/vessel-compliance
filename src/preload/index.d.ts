@@ -717,6 +717,7 @@ export interface Api {
     showAddresses: boolean
     blueCards: string[]
     selectedAlternativeId?: string | null
+    exchangeRate?: number
   }) => Promise<any[]>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>
 }

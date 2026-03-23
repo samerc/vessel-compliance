@@ -2259,6 +2259,22 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Add letter_code column to pi_deductibles if missing
+            {
+                const [lcCol] = await this.pool.query("SHOW COLUMNS FROM pi_deductibles LIKE 'letter_code'") as any[]
+                if (lcCol.length === 0) {
+                    await this.pool.query("ALTER TABLE pi_deductibles ADD COLUMN letter_code VARCHAR(10) DEFAULT NULL AFTER title")
+                }
+            }
+
+            // Migration: Add exchange_rate column to policy_documents if missing
+            {
+                const [erCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'exchange_rate'") as any[]
+                if (erCol.length === 0) {
+                    await this.pool.query('ALTER TABLE policy_documents ADD COLUMN exchange_rate DECIMAL(10,6) DEFAULT 1.000000')
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -5075,7 +5091,7 @@ export class MySQLAdapter {
 
     async getPIDeductibles(): Promise<PIDeductible[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, title, description, default_amount as defaultAmount, default_currency as defaultCurrency, has_secondary as hasSecondary, secondary_description as secondaryDescription, secondary_default_amount as secondaryDefaultAmount, order_index as `order` FROM pi_deductibles ORDER BY order_index ASC')
+        const [rows] = await this.pool.query('SELECT id, title, letter_code as letterCode, description, default_amount as defaultAmount, default_currency as defaultCurrency, has_secondary as hasSecondary, secondary_description as secondaryDescription, secondary_default_amount as secondaryDefaultAmount, order_index as `order` FROM pi_deductibles ORDER BY order_index ASC')
         return (rows as any[]).map(r => ({ ...r, hasSecondary: Boolean(r.hasSecondary), defaultAmount: Number(r.defaultAmount), secondaryDefaultAmount: r.secondaryDefaultAmount ? Number(r.secondaryDefaultAmount) : undefined }))
     }
 
@@ -5085,8 +5101,8 @@ export class MySQLAdapter {
         const [maxRow]: any[] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_deductibles')
         const order = maxRow[0].nextOrder
         await this.pool.execute(
-            'INSERT INTO pi_deductibles (id, title, description, default_amount, default_currency, has_secondary, secondary_description, secondary_default_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, ded.title || '', ded.description, ded.defaultAmount, ded.defaultCurrency || 'USD', ded.hasSecondary || false, ded.secondaryDescription || null, ded.secondaryDefaultAmount || null, order]
+            'INSERT INTO pi_deductibles (id, title, letter_code, description, default_amount, default_currency, has_secondary, secondary_description, secondary_default_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, ded.title || '', ded.letterCode || null, ded.description, ded.defaultAmount, ded.defaultCurrency || 'USD', ded.hasSecondary || false, ded.secondaryDescription || null, ded.secondaryDefaultAmount || null, order]
         )
         return { ...ded, id, order }
     }
@@ -5096,6 +5112,7 @@ export class MySQLAdapter {
         const fields: string[] = []
         const values: any[] = []
         if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
+        if (updates.letterCode !== undefined) { fields.push('letter_code = ?'); values.push(updates.letterCode || null) }
         if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
         if (updates.defaultAmount !== undefined) { fields.push('default_amount = ?'); values.push(updates.defaultAmount) }
         if (updates.defaultCurrency !== undefined) { fields.push('default_currency = ?'); values.push(updates.defaultCurrency) }
@@ -7591,9 +7608,12 @@ export class MySQLAdapter {
             SELECT pd.*, qt.code as quotationTypeCode, qt.name as quotationTypeName,
                    v.name as vesselName, v.imo_number as imoNumber, v.vessel_type as vesselType,
                    v.flag_state_id as flagStateId, v.built_year as builtYear, v.gross_tonnage as grossTonnage,
-                   fs.name as flagStateName,
+                   v.classification_society as classificationSociety, v.fleet_id as fleetId, v.customer_type as customerType, v.call_sign as callSign,
+                   fs.name as flagStateName, fs.iso3_code as flagIso3Code,
                    e.name as customerName,
-                   b.name as bankName, b.details as bankDetails
+                   b.name as bankName, b.details as bankDetails,
+                   f.name as fleetName,
+                   u.username as createdByName
             FROM policy_documents pd
             LEFT JOIN quotations q ON pd.quotation_id = q.id
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
@@ -7601,6 +7621,8 @@ export class MySQLAdapter {
             LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
             LEFT JOIN entities e ON v.customer_id = e.id
             LEFT JOIN banks b ON pd.bank_id = b.id
+            LEFT JOIN fleets f ON v.fleet_id = f.id
+            LEFT JOIN users u ON pd.created_by = u.id
             WHERE pd.id = ?
         `, [id])
         const r = (rows as any[])[0]
@@ -7631,6 +7653,13 @@ export class MySQLAdapter {
             createdBy: r.created_by || null,
             exportedAt: r.exported_at || null,
             createdAt: r.created_at,
+            exchangeRate: r.exchange_rate ? Number(r.exchange_rate) : 1,
+            flagIso3Code: r.flagIso3Code || null,
+            fleetId: r.fleetId || null,
+            fleetName: r.fleetName || null,
+            classificationSociety: r.classificationSociety || null,
+            customerType: r.customerType || null,
+            createdByName: r.createdByName || null,
         }
     }
 
@@ -7806,6 +7835,7 @@ export class MySQLAdapter {
             quotationId: 'quotation_id',
             selectedAlternativeId: 'selected_alternative_id',
             exportedAt: 'exported_at',
+            exchangeRate: 'exchange_rate',
         }
         const sets: string[] = []
         const vals: any[] = []
@@ -7952,6 +7982,7 @@ export class MySQLAdapter {
         blueCards: string[]
         createdBy: string
         selectedAlternativeId?: string | null
+        exchangeRate?: number
     }): Promise<any[]> {
         if (!this.pool) throw new Error('DB not connected')
 
@@ -7997,12 +8028,12 @@ export class MySQLAdapter {
                 INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
                     revision_number, inception_date, inception_time, expiry_date, expiry_time,
                     timezone, commission_percent, show_addresses, bank_id, pro_rata,
-                    per_annum_premium, premium_amount, selected_alternative_id, created_by)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?)
+                    per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
-                premiumAmount, options.selectedAlternativeId || null, options.createdBy])
+                premiumAmount, options.selectedAlternativeId || null, options.createdBy, options.exchangeRate || 1])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {
