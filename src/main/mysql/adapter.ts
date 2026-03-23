@@ -8049,6 +8049,20 @@ export class MySQLAdapter {
             nextSerial++
         }
 
+        // Auto-move quotation to "Converted" workflow step
+        try {
+            const [convertedSteps] = await this.pool.query(
+                "SELECT id FROM quotation_workflow_steps WHERE LOWER(name) = 'converted' LIMIT 1"
+            )
+            const convertedStep = (convertedSteps as any[])[0]
+            if (convertedStep) {
+                await this.pool.execute(
+                    'UPDATE quotations SET workflow_step_id = ? WHERE id = ?',
+                    [convertedStep.id, quotationId]
+                )
+            }
+        } catch { /* ignore if step doesn't exist */ }
+
         return createdPolicies
     }
 
