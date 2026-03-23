@@ -611,9 +611,10 @@ interface PolicyAddress {
   entityId: string
   entityName: string
   role: string
-  address: string
-  country: string
-  order: number
+  address?: string
+  addressText?: string
+  country?: string
+  order?: number
 }
 
 interface PolicyBlueCardEntry {
@@ -1200,8 +1201,9 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
       // Right: role + address lines
       const rightChildren: Paragraph[] = []
       if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `As ${addr.role}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-      if (addr.address) {
-        for (const line of addr.address.split('\n')) {
+      const addrText = addr.addressText || addr.address || ''
+      if (addrText) {
+        for (const line of addrText.split('\n')) {
           if (line.trim()) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
         }
       }
@@ -2101,13 +2103,6 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
   }
 
-  // Cancel and replace in body (before Drawn up in Duplicate, on last page)
-  if (cancelReplaceResolved) {
-    children.push(polEmptyP())
-    children.push(polNp(cancelReplaceResolved))
-    children.push(polEmptyP())
-  }
-
   // Closing
   const closingCity = data.policy.closingCity || 'Beirut'
   const closingDate = polFormatDateUS(data.policy.createdAt)
@@ -2202,11 +2197,15 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }))
   }
   if (footerText) {
-    footerChildren.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 20 },
-      children: [new TextRun({ text: footerText, size: 14, font: 'Arial', color: '999999', italics: true })]
-    }))
+    if (polIsHtml(footerText)) {
+      footerChildren.push(...parseHtmlToParagraphs(footerText, { size: 14, font: 'Arial', color: '999999', alignment: AlignmentType.CENTER }))
+    } else {
+      footerChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 20 },
+        children: [new TextRun({ text: footerText, size: 14, font: 'Arial', color: '999999' })]
+      }))
+    }
   }
   footerChildren.push(new Paragraph({
     alignment: AlignmentType.CENTER,

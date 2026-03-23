@@ -5,6 +5,7 @@ import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/Report
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateTime } from '../utils/dateUtils'
+import RichTextEditor from './RichTextEditor'
 
 // ── Section definitions ────────────────────────────────────────────────────────
 const GRANTABLE_SECTIONS = [
@@ -3024,12 +3025,10 @@ function PolicyExportSettings() {
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
                 Optional text displayed above the page number in the footer.
             </p>
-            <input
-                type="text"
+            <RichTextEditor
                 value={footerText}
-                onChange={e => setFooterText(e.target.value)}
-                placeholder="e.g., Confidential — For Insured Use Only"
-                style={{ width: '100%', marginBottom: '16px' }}
+                onChange={setFooterText}
+                minHeight={60}
             />
 
             <button className="btn-primary" onClick={save} style={{ padding: '6px 20px' }}>Save</button>
