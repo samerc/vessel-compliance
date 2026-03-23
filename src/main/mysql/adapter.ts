@@ -2304,13 +2304,13 @@ export class MySQLAdapter {
                 }
             }
 
-            // Migration: Add parent_note_id, author_user_id, author_username to vessel_notes
-            {
+            // Migration: Add parent_note_id to vessel_notes
+            try {
                 const [vnPnCols] = await this.pool.query("SHOW COLUMNS FROM vessel_notes LIKE 'parent_note_id'") as any[]
                 if (vnPnCols.length === 0) {
                     await this.pool.query('ALTER TABLE vessel_notes ADD COLUMN parent_note_id VARCHAR(36) DEFAULT NULL')
                 }
-            }
+            } catch (e) { console.error('vessel_notes parent_note_id migration:', e) }
 
         } catch (error) {
             console.error('Schema initialization failed:', error)
