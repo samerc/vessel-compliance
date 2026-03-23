@@ -2275,6 +2275,46 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: notifications table
+            {
+                const [ntTable] = await this.pool.query("SHOW TABLES LIKE 'notifications'")
+                if ((ntTable as any[]).length === 0) {
+                    await this.pool.query(`CREATE TABLE notifications (
+                        id VARCHAR(36) PRIMARY KEY,
+                        user_id VARCHAR(36) NOT NULL,
+                        type VARCHAR(50) NOT NULL,
+                        title VARCHAR(500) NOT NULL,
+                        message TEXT DEFAULT NULL,
+                        link_type VARCHAR(50) DEFAULT NULL,
+                        link_id VARCHAR(36) DEFAULT NULL,
+                        is_read BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_notif_user (user_id),
+                        INDEX idx_notif_user_read (user_id, is_read),
+                        INDEX idx_notif_created (created_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                }
+            }
+
+            // Migration: Add parent_note_id, author_user_id, author_username to quotation_notes
+            {
+                const [pnCols] = await this.pool.query("SHOW COLUMNS FROM quotation_notes LIKE 'parent_note_id'") as any[]
+                if (pnCols.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_notes ADD COLUMN parent_note_id VARCHAR(36) DEFAULT NULL')
+                    await this.pool.query('ALTER TABLE quotation_notes ADD COLUMN author_user_id VARCHAR(36) DEFAULT NULL')
+                    await this.pool.query('ALTER TABLE quotation_notes ADD COLUMN author_username VARCHAR(255) DEFAULT NULL')
+                    await this.pool.query('ALTER TABLE quotation_notes ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+                }
+            }
+
+            // Migration: Add parent_note_id, author_user_id, author_username to vessel_notes
+            {
+                const [vnPnCols] = await this.pool.query("SHOW COLUMNS FROM vessel_notes LIKE 'parent_note_id'") as any[]
+                if (vnPnCols.length === 0) {
+                    await this.pool.query('ALTER TABLE vessel_notes ADD COLUMN parent_note_id VARCHAR(36) DEFAULT NULL')
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7037,15 +7077,19 @@ export class MySQLAdapter {
     async getQuotationNotes(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, title, content, order_index as 'order' FROM quotation_notes WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
+            `SELECT id, quotation_id as quotationId, title, content, order_index as 'order',
+             parent_note_id AS parentNoteId, author_user_id AS authorUserId, author_username AS authorUsername,
+             created_at AS createdAt
+             FROM quotation_notes WHERE quotation_id = ? ORDER BY created_at ASC, order_index ASC`, [quotationId])
         return rows as any[]
     }
 
-    async addQuotationNote(data: { quotationId: string; title: string; content?: string; order?: number }): Promise<any> {
+    async addQuotationNote(data: { quotationId: string; title: string; content?: string; order?: number; parentNoteId?: string; authorUserId?: string; authorUsername?: string }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.execute('INSERT INTO quotation_notes (id, quotation_id, title, content, order_index) VALUES (?, ?, ?, ?, ?)',
-            [id, data.quotationId, data.title, data.content || null, data.order || 0])
+        await this.pool.execute(
+            'INSERT INTO quotation_notes (id, quotation_id, title, content, order_index, parent_note_id, author_user_id, author_username) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.title, data.content || null, data.order || 0, data.parentNoteId || null, data.authorUserId || null, data.authorUsername || null])
         return { id, ...data }
     }
 
@@ -9579,6 +9623,90 @@ export class MySQLAdapter {
     async deleteQuotationSurveyWarranty(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotation_survey_warranties WHERE id = ?', [id])
+    }
+
+    // ==================== Notifications ====================
+
+    async getNotifications(userId: string, opts?: { unreadOnly?: boolean; limit?: number; offset?: number }): Promise<{ data: any[]; unreadCount: number }> {
+        if (!this.pool) return { data: [], unreadCount: 0 }
+        const limit = opts?.limit || 50
+        const offset = opts?.offset || 0
+        let query = 'SELECT id, user_id AS userId, type, title, message, link_type AS linkType, link_id AS linkId, is_read AS isRead, created_at AS createdAt FROM notifications WHERE user_id = ?'
+        const values: any[] = [userId]
+        if (opts?.unreadOnly) {
+            query += ' AND is_read = FALSE'
+        }
+        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+        values.push(limit, offset)
+        const [rows] = await this.pool.query(query, values)
+        const data = (rows as any[]).map(r => ({ ...r, isRead: Boolean(r.isRead) }))
+        const [countRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = FALSE', [userId])
+        const unreadCount = (countRows as any[])[0].cnt
+        return { data, unreadCount }
+    }
+
+    async getUnreadNotificationCount(userId: string): Promise<number> {
+        if (!this.pool) return 0
+        const [rows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = FALSE', [userId])
+        return (rows as any[])[0].cnt
+    }
+
+    async createNotification(notification: { userId: string; type: string; title: string; message?: string; linkType?: string; linkId?: string }): Promise<void> {
+        if (!this.pool) return
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO notifications (id, user_id, type, title, message, link_type, link_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, notification.userId, notification.type, notification.title, notification.message || null, notification.linkType || null, notification.linkId || null]
+        )
+    }
+
+    async markNotificationRead(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE notifications SET is_read = TRUE WHERE id = ?', [id])
+    }
+
+    async markAllNotificationsRead(userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE notifications SET is_read = TRUE WHERE user_id = ?', [userId])
+    }
+
+    async deleteNotification(id: string, userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM notifications WHERE id = ? AND user_id = ?', [id, userId])
+    }
+
+    async deleteOldNotifications(days: number): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM notifications WHERE is_read = TRUE AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)', [days])
+    }
+
+    async notifyUser(userId: string, type: string, title: string, message?: string, linkType?: string, linkId?: string): Promise<void> {
+        await this.createNotification({ userId, type, title, message, linkType, linkId })
+    }
+
+    async notifyUsersWithPermission(permissionKey: string, type: string, title: string, message?: string, linkType?: string, linkId?: string, excludeUserId?: string): Promise<void> {
+        if (!this.pool) return
+        // Find all users who have the permission (via group membership or are admin)
+        const [rows] = await this.pool.query(
+            `SELECT DISTINCT u.id FROM users u
+             LEFT JOIN user_group_members ugm ON ugm.user_id = u.id
+             LEFT JOIN group_permissions gp ON gp.group_id = ugm.group_id AND gp.permission_key = ?
+             LEFT JOIN user_permission_overrides upo ON upo.user_id = u.id AND upo.permission_key = ?
+             WHERE (u.role = 'admin' OR gp.permission_key IS NOT NULL OR (upo.permission_key IS NOT NULL AND upo.granted = TRUE))
+               AND NOT (upo.permission_key IS NOT NULL AND upo.granted = FALSE)`,
+            [permissionKey, permissionKey]
+        )
+        for (const row of rows as any[]) {
+            if (excludeUserId && row.id === excludeUserId) continue
+            await this.createNotification({ userId: row.id, type, title, message, linkType, linkId })
+        }
+    }
+
+    async getUsersByUsername(usernames: string[]): Promise<{ id: string; username: string }[]> {
+        if (!this.pool || usernames.length === 0) return []
+        const placeholders = usernames.map(() => '?').join(', ')
+        const [rows] = await this.pool.query(`SELECT id, username FROM users WHERE username IN (${placeholders})`, usernames)
+        return rows as { id: string; username: string }[]
     }
 }
 

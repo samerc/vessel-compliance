@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText, FlagStatePort } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText, FlagStatePort, Notification } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -591,7 +591,7 @@ export interface Api {
   deleteQuotationInformation: (id: string) => Promise<void>
 
   getQuotationNotes: (qId: string) => Promise<QuotationNote[]>
-  addQuotationNote: (data: { quotationId: string; title: string; content?: string; order?: number }) => Promise<QuotationNote>
+  addQuotationNote: (data: { quotationId: string; title: string; content?: string; order?: number; parentNoteId?: string }) => Promise<QuotationNote>
   updateQuotationNote: (id: string, updates: { title?: string; content?: string }) => Promise<void>
   deleteQuotationNote: (id: string) => Promise<void>
 
@@ -720,6 +720,14 @@ export interface Api {
     exchangeRate?: number
   }) => Promise<any[]>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>
+
+  // Notifications
+  notificationsGet: (opts?: { unreadOnly?: boolean; limit?: number; offset?: number }) => Promise<{ data: Notification[]; unreadCount: number }>
+  notificationsGetUnreadCount: () => Promise<number>
+  notificationsMarkRead: (id: string) => Promise<void>
+  notificationsMarkAllRead: () => Promise<void>
+  notificationsDelete: (id: string) => Promise<void>
+  notificationsGetUsernames: () => Promise<{ id: string; username: string }[]>
 }
 
 declare global {

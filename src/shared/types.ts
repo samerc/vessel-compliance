@@ -1108,6 +1108,23 @@ export interface QuotationNote {
   title: string
   content: string
   order: number
+  parentNoteId?: string | null
+  authorUserId?: string | null
+  authorUsername?: string | null
+  createdAt?: string | null
+  replies?: QuotationNote[]
+}
+
+export interface Notification {
+  id: string
+  userId: string
+  type: string
+  title: string
+  message?: string | null
+  linkType?: string | null
+  linkId?: string | null
+  isRead: boolean
+  createdAt: string
 }
 
 export interface PISectionTexts {

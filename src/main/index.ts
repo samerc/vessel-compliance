@@ -2439,7 +2439,16 @@ app.whenReady().then(() => {
   safeHandle('policy:supersedeBlueCard', (event, id) => { requireSession(event); return db.supersedePolicyBlueCard(id) })
   safeHandle('policy:convertFromQuotation', async (event, quotationId, options) => {
     const session = requireSession(event)
-    return db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
+    const result = await db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
+    // Notify quotation creator about conversion
+    try {
+      const [qRows] = await (db as any).pool.query('SELECT created_by, reference FROM quotations WHERE id = ?', [quotationId])
+      const q = (qRows as any[])[0]
+      if (q?.created_by && q.created_by !== session.id) {
+        await db.notifyUser(q.created_by, 'policy_created', `Your quotation ${q.reference || ''} has been converted to a policy`, undefined, 'quotation', quotationId)
+      }
+    } catch (err) { console.error('Policy conversion notification error:', err) }
+    return result
   })
 
   safeHandle('policy:update', async (event, id, fields) => { await requirePermission(event, 'policies:manage'); return db.updatePolicyDocument(id, fields) })
@@ -2697,7 +2706,47 @@ app.whenReady().then(() => {
   safeHandle('db:deleteQuotationInformation', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationInformation(id) })
 
   safeHandle('db:getQuotationNotes', (event, qId) => { requireSession(event); return db.getQuotationNotes(qId) })
-  safeHandle('db:addQuotationNote', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationNote(data) })
+  safeHandle('db:addQuotationNote', async (event, data) => {
+    const user = await requirePermission(event, 'quotations:edit')
+    const noteData = { ...data, authorUserId: user.id, authorUsername: user.username }
+    const result = await db.addQuotationNote(noteData)
+    // Handle reply notifications
+    if (data.parentNoteId) {
+      try {
+        const allNotes = await db.getQuotationNotes(data.quotationId)
+        const parentNote = allNotes.find((n: any) => n.id === data.parentNoteId)
+        const notifiedUserIds = new Set<string>()
+        // Notify the parent note author
+        if (parentNote?.authorUserId && parentNote.authorUserId !== user.id) {
+          await db.notifyUser(parentNote.authorUserId, 'note_reply', `${user.username} replied to your note`, data.content || data.title, 'quotation', data.quotationId)
+          notifiedUserIds.add(parentNote.authorUserId)
+        }
+        // Notify other thread participants
+        const threadReplies = allNotes.filter((n: any) => n.parentNoteId === data.parentNoteId && n.authorUserId && n.authorUserId !== user.id && !notifiedUserIds.has(n.authorUserId))
+        for (const reply of threadReplies) {
+          if (!notifiedUserIds.has(reply.authorUserId)) {
+            await db.notifyUser(reply.authorUserId, 'note_reply', `${user.username} replied in a thread you participated in`, data.content || data.title, 'quotation', data.quotationId)
+            notifiedUserIds.add(reply.authorUserId)
+          }
+        }
+      } catch (err) { console.error('Reply notification error:', err) }
+    }
+    // Handle @mention notifications
+    const text = (data.content || '') + ' ' + (data.title || '')
+    const mentionMatches = text.match(/@(\w+)/g)
+    if (mentionMatches) {
+      try {
+        const usernames = [...new Set(mentionMatches.map((m: string) => m.slice(1)))]
+        const mentionedUsers = await db.getUsersByUsername(usernames)
+        for (const mu of mentionedUsers) {
+          if (mu.id !== user.id) {
+            await db.notifyUser(mu.id, 'note_mention', `${user.username} mentioned you in a note`, data.content || data.title, 'quotation', data.quotationId)
+          }
+        }
+      } catch (err) { console.error('Mention notification error:', err) }
+    }
+    return result
+  })
   safeHandle('db:updateQuotationNote', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationNote(id, updates) })
   safeHandle('db:deleteQuotationNote', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationNote(id) })
 
@@ -2983,6 +3032,19 @@ app.whenReady().then(() => {
     const steps = await db.getWorkflowSteps()
     const toStep = steps.find(s => s.id === toStepId)
     db.logActivity({ userId: user.id, username: user.username, action: 'WORKFLOW', module: 'Quotations', entityType: 'quotation', entityId: quotationId, entityName: '', details: `Moved to ${toStep?.name || 'unknown'}${comment ? ': ' + comment : ''}` }).catch(() => {})
+    // Notify users with relevant permissions about workflow transitions
+    try {
+      const toStepName = toStep?.name || 'unknown'
+      db.notifyUsersWithPermission(
+        'quotations:approve',
+        'workflow_action_needed',
+        `Quotation moved to ${toStepName}`,
+        comment || undefined,
+        'quotation',
+        quotationId,
+        user.id
+      ).catch(() => {})
+    } catch (err) { console.error('Workflow notification error:', err) }
     return { success: true }
   })
 
@@ -3018,6 +3080,41 @@ app.whenReady().then(() => {
   safeHandle('quotationSurveyWarranty:add', async (event, data: any) => { requireSession(event); return db.addQuotationSurveyWarranty(data) })
   safeHandle('quotationSurveyWarranty:update', async (event, id: string, data: any) => { requireSession(event); return db.updateQuotationSurveyWarranty(id, data) })
   safeHandle('quotationSurveyWarranty:delete', async (event, id: string) => { requireSession(event); return db.deleteQuotationSurveyWarranty(id) })
+
+  // ==================== Notifications ====================
+  safeHandle('notifications:get', async (event, opts?: { unreadOnly?: boolean; limit?: number; offset?: number }) => {
+    const user = requireSession(event)
+    return db.getNotifications(user.id, opts)
+  })
+
+  safeHandle('notifications:getUnreadCount', async (event) => {
+    const user = requireSession(event)
+    return db.getUnreadNotificationCount(user.id)
+  })
+
+  safeHandle('notifications:markRead', async (event, id: string) => {
+    requireSession(event)
+    return db.markNotificationRead(id)
+  })
+
+  safeHandle('notifications:markAllRead', async (event) => {
+    const user = requireSession(event)
+    return db.markAllNotificationsRead(user.id)
+  })
+
+  safeHandle('notifications:delete', async (event, id: string) => {
+    const user = requireSession(event)
+    return db.deleteNotification(id, user.id)
+  })
+
+  safeHandle('notifications:getUsernames', async (event) => {
+    requireSession(event)
+    const users = await db.getUsers()
+    return users.map((u: any) => ({ id: u.id, username: u.username }))
+  })
+
+  // Cleanup old read notifications on startup
+  db.deleteOldNotifications(90).catch(() => {})
 
   createWindow()
 

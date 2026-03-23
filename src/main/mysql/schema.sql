@@ -807,3 +807,18 @@ CREATE TABLE IF NOT EXISTS flag_state_ports (
   is_default BOOLEAN DEFAULT FALSE,
   INDEX idx_fsp_flag (flag_state_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  message TEXT DEFAULT NULL,
+  link_type VARCHAR(50) DEFAULT NULL,
+  link_id VARCHAR(36) DEFAULT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_notif_user (user_id),
+  INDEX idx_notif_user_read (user_id, is_read),
+  INDEX idx_notif_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

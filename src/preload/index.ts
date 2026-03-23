@@ -710,6 +710,14 @@ const api = {
   policyDelete: (id: string) => ipcRenderer.invoke('policy:delete', id),
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
   policyRenew: (policyId: string) => ipcRenderer.invoke('policy:renew', policyId),
+
+  // Notifications
+  notificationsGet: (opts?: any) => ipcRenderer.invoke('notifications:get', opts),
+  notificationsGetUnreadCount: () => ipcRenderer.invoke('notifications:getUnreadCount'),
+  notificationsMarkRead: (id: string) => ipcRenderer.invoke('notifications:markRead', id),
+  notificationsMarkAllRead: () => ipcRenderer.invoke('notifications:markAllRead'),
+  notificationsDelete: (id: string) => ipcRenderer.invoke('notifications:delete', id),
+  notificationsGetUsernames: () => ipcRenderer.invoke('notifications:getUsernames'),
 }
 
 // Expose curated API to renderer via context bridge

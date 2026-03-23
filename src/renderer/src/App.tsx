@@ -34,6 +34,7 @@ const PolicyList = lazy(() => import('./components/PolicyList'))
 const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
 const PolicySettings = lazy(() => import('./components/PolicySettings'))
 const PolicySetupWizard = lazy(() => import('./components/PolicySetupWizard'))
+const NotificationsPage = lazy(() => import('./components/NotificationsPage'))
 
 const LoadingFallback = () => (
   <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -42,7 +43,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'email-templates' | 'policies-list' | 'policy-detail' | 'policy-setup'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'email-templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -63,6 +64,7 @@ function App(): React.JSX.Element {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set<string>())
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0)
 
   // Restore sidebar state from DB when user session loads
   useEffect(() => {
@@ -119,6 +121,19 @@ function App(): React.JSX.Element {
     }
     return undefined
   }, [isAuthenticated, appVersion, user?.id])
+
+  // Poll for unread notification count every 30 seconds
+  useEffect(() => {
+    if (!isAuthenticated) { setUnreadNotifCount(0); return }
+    const fetchCount = () => {
+      window.api.notificationsGetUnreadCount().then(c => {
+        if (typeof c === 'number') setUnreadNotifCount(c)
+      }).catch(() => {})
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 30000)
+    return () => clearInterval(interval)
+  }, [isAuthenticated])
 
   useEffect(() => {
     const preventDefault = (e: DragEvent) => {
@@ -202,6 +217,51 @@ function App(): React.JSX.Element {
                 </div>
                 <ChevronDown size={13} style={{ opacity: 0.5, flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </>}
+            </div>
+
+            {/* Notification Bell */}
+            <div style={{ display: 'flex', justifyContent: sc ? 'center' : 'flex-end', marginTop: '6px' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setActiveTab('notifications') }}
+                style={{
+                  position: 'relative',
+                  background: activeTab === 'notifications' ? (theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)') : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: activeTab === 'notifications' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+                className="hover-effect"
+                title="Notifications"
+              >
+                <Bell size={16} />
+                {!sc && <span style={{ fontSize: '0.78rem' }}>Notifications</span>}
+                {unreadNotifCount > 0 && (
+                  <span style={{
+                    position: sc ? 'absolute' : 'static',
+                    top: sc ? '-2px' : undefined,
+                    right: sc ? '-2px' : undefined,
+                    background: 'var(--danger)',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    padding: '0 5px',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    minWidth: '16px',
+                    height: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                  }}>
+                    {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                  </span>
+                )}
+              </button>
             </div>
 
             {showUserMenu && (
@@ -415,6 +475,14 @@ function App(): React.JSX.Element {
             />
           </Suspense>}
           {activeTab === 'activity-log' && <Suspense fallback={<LoadingFallback />}><ActivityLog /></Suspense>}
+          {activeTab === 'notifications' && <Suspense fallback={<LoadingFallback />}>
+            <NotificationsPage onNavigate={(linkType, linkId) => {
+              if (linkType === 'vessel') { setNavigateToVesselId(linkId); setNavigateBackTab('notifications'); setActiveTab('vessels') }
+              else if (linkType === 'quotation') { setInitialQuotationId(linkId); setActiveTab('quotations') }
+              else if (linkType === 'policy') { setSelectedPolicyId(linkId); setActiveTab('policy-detail') }
+              else if (linkType === 'entity') { setNavigateBackTab('notifications'); setActiveTab('directory') }
+            }} />
+          </Suspense>}
           {activeTab === 'policy-setup' && policySetupQuotationId && <Suspense fallback={<LoadingFallback />}>
             <PolicySetupWizard
               quotationId={policySetupQuotationId}
