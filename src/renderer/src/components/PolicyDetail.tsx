@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   ArrowLeft,
   FileCheck,
@@ -22,8 +22,10 @@ import {
   Shield,
   ChevronRight,
   Copy,
-  FileSpreadsheet
+  FileSpreadsheet,
+  MoreHorizontal
 } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -32,7 +34,6 @@ import {
   exportPolicyDocx,
   exportDebitAdviceDocx,
   exportCreditAdviceDocx,
-  exportBlueCardsDocx,
   exportBlueCardDocx
 } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
@@ -203,11 +204,12 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [exportingPolicy, setExportingPolicy] = useState(false)
   const [exportingDA, setExportingDA] = useState(false)
   const [exportingCA, setExportingCA] = useState(false)
-  const [exportingBC, setExportingBC] = useState(false)
+  const [, setExportingBC] = useState(false)
   const [exportingQB, setExportingQB] = useState(false)
-  const [bcDropdownOpen, setBcDropdownOpen] = useState(false)
+  const [showActionsMenu, setShowActionsMenu] = useState(false)
+  const actionsMenuRef = useRef<HTMLDivElement>(null)
   const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
-  const [renewing, setRenewing] = useState(false)
+  const [, setRenewing] = useState(false)
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -987,6 +989,12 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     alignItems: 'center',
     gap: '5px'
   }
+  const actionItemStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+    padding: '8px 12px', border: 'none', borderRadius: '6px',
+    background: 'transparent', color: 'var(--text-primary)',
+    cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left'
+  }
 
   if (loading) {
     return (
@@ -1052,40 +1060,6 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       showError(err.message || 'Failed to export credit advice')
     } finally {
       setExportingCA(false)
-    }
-  }
-
-  const handleExportBC = async () => {
-    setExportingBC(true)
-    try {
-      if (blueCards.length === 0) {
-        showError('No blue cards found for this policy')
-        return
-      }
-      const cardTypes = blueCards.map((bc) => bc.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2')
-      const reportSettings = await getReportSettings()
-      await exportBlueCardsDocx(
-        {
-          policyNumber: policy.policyNumber || '',
-          vesselName: policy.vesselName || '',
-          imoNumber: policy.imoNumber || '',
-          flagState: policy.flagStateName || '',
-          grossTonnage: policy.grossTonnage || 0,
-          inceptionDate: policy.inceptionDate || '',
-          inceptionTime: policy.inceptionTime || '',
-          expiryDate: policy.expiryDate || '',
-          expiryTime: policy.expiryTime || '',
-          timezone: policy.timezone || 'GMT',
-          callSign: policy.callSign || '',
-          companyName: reportSettings.companyName || 'Insurance Company'
-        },
-        cardTypes
-      )
-      showSuccess('Blue cards exported')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export blue cards')
-    } finally {
-      setExportingBC(false)
     }
   }
 
@@ -1186,174 +1160,107 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {!isEditing && hasPermission('policies:manage') && policy.status === 'active' && (
-            <>
-              {!policy.exportedAt && (
-                <button
-                  className="btn-primary"
-                  style={{ ...exportBtnStyle, fontWeight: 700 }}
-                  onClick={enterEditMode}
-                  title="Edit Policy"
-                >
-                  <Edit3 size={14} /> Edit Policy
-                </button>
-              )}
-              <button
-                className="btn-secondary"
-                style={exportBtnStyle}
-                onClick={handleCreateRevision}
-                title="Create New Revision"
-              >
-                <Copy size={14} /> New Revision
-              </button>
-            </>
-          )}
-          {!isEditing && hasPermission('quotations:create') && policy.status === 'active' && (
+          {/* Edit Policy — primary action (only before first export) */}
+          {!isEditing && hasPermission('policies:manage') && policy.status === 'active' && !policy.exportedAt && (
             <button
-              className="btn-secondary"
-              style={{ ...exportBtnStyle, background: 'rgba(0, 200, 100, 0.12)', color: isLight ? '#008844' : '#00c864', border: '1px solid rgba(0, 200, 100, 0.3)' }}
-              disabled={renewing}
-              onClick={() => {
-                setConfirmation({
-                  show: true,
-                  title: 'Create Renewal Quotation?',
-                  message: 'Create a new quotation pre-filled from this policy for renewal? The period will be advanced by one year.',
-                  onConfirm: async () => {
-                    setConfirmation(prev => ({ ...prev, show: false }))
-                    setRenewing(true)
-                    try {
-                      const result = await window.api.policyRenew(policyId)
-                      if (result && result.quotationId) {
-                        showSuccess('Renewal quotation created')
-                        if (onNavigateToQuotation) {
-                          onNavigateToQuotation(result.quotationId)
-                        }
-                      } else {
-                        showError('Failed to create renewal quotation')
-                      }
-                    } catch (err: any) {
-                      showError(err.message || 'Failed to create renewal quotation')
-                    } finally {
-                      setRenewing(false)
-                    }
-                  }
-                })
-              }}
-              title="Create renewal quotation"
+              className="btn-primary"
+              style={{ ...exportBtnStyle, fontWeight: 700 }}
+              onClick={enterEditMode}
+              title="Edit Policy"
             >
-              {renewing ? <Loader2 size={14} className="spinner" /> : <RefreshCw size={14} />} Renew
+              <Edit3 size={14} /> Edit Policy
             </button>
           )}
-          <button
-            className="btn-secondary"
-            style={exportBtnStyle}
-            onClick={handleExportPolicy}
-            disabled={exportingPolicy}
-            title="Export Policy DOCX"
-          >
-            {exportingPolicy ? (
-              <Loader2 size={14} className="spinner" />
-            ) : (
-              <Download size={14} />
-            )}
-            Export Policy
-          </button>
-          <button
-            className="btn-secondary"
-            style={exportBtnStyle}
-            onClick={handleExportDA}
-            disabled={exportingDA}
-            title="Export Debit Advice DOCX"
-          >
-            {exportingDA ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
-            Export DA
-          </button>
-          {commissionAmount != null && commissionAmount > 0 && (
+
+          {/* Actions dropdown */}
+          <div style={{ position: 'relative' }} ref={actionsMenuRef}>
             <button
               className="btn-secondary"
-              style={exportBtnStyle}
-              onClick={handleExportCA}
-              disabled={exportingCA}
-              title="Export Credit Advice DOCX"
+              style={{ ...exportBtnStyle, display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setShowActionsMenu(!showActionsMenu)}
             >
-              {exportingCA ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
-              Export CA
+              <MoreHorizontal size={16} /> Actions
             </button>
-          )}
-          {isPIType && blueCards.length > 0 && (
-            <div style={{ position: 'relative' }}>
-              <button
-                className="btn-secondary"
-                style={exportBtnStyle}
-                onClick={() => setBcDropdownOpen(!bcDropdownOpen)}
-                disabled={exportingBC}
-                title="Export Blue Cards"
-              >
-                {exportingBC ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
-                Blue Cards ▾
-              </button>
-              {bcDropdownOpen && (
+            {showActionsMenu && createPortal(
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowActionsMenu(false)} />
                 <div style={{
-                  position: 'absolute', top: '100%', right: 0, marginTop: '4px',
-                  background: isLight ? '#ffffff' : '#1a1d28',
-                  border: '1px solid var(--glass-border)', borderRadius: '8px',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, minWidth: '200px',
-                  overflow: 'hidden'
+                  position: 'fixed',
+                  top: (actionsMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
+                  right: window.innerWidth - (actionsMenuRef.current?.getBoundingClientRect().right || 0),
+                  zIndex: 9999,
+                  background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                  borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                 }}>
-                  {blueCards.filter(bc => bc.status === 'active').map(bc => (
-                    <button
-                      key={bc.id}
-                      onClick={async () => {
-                        setBcDropdownOpen(false)
-                        setExportingBC(true)
-                        try {
-                          await handleExportSingleBC(bc)
-                          showSuccess(`${bc.cardType} exported`)
-                        } catch (err: any) { showError(err.message || 'Export failed') }
-                        finally { setExportingBC(false) }
-                      }}
-                      style={{
-                        display: 'block', width: '100%', textAlign: 'left',
-                        padding: '10px 16px', background: 'transparent',
-                        border: 'none', borderBottom: '1px solid var(--table-border)',
-                        cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)'
-                      }}
-                      className="hover-effect"
-                    >
-                      <Download size={13} style={{ marginRight: '8px', opacity: 0.6 }} />
-                      {bc.cardNumber || bc.cardType}
+                  {/* Revision & Renew */}
+                  {hasPermission('policies:manage') && policy.status === 'active' && (
+                    <button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={actionItemStyle} className="hover-effect">
+                      <Copy size={15} /> New Revision
                     </button>
-                  ))}
-                  <button
-                    onClick={async () => {
-                      setBcDropdownOpen(false)
-                      handleExportBC()
-                    }}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '10px 16px', background: 'transparent',
-                      border: 'none', cursor: 'pointer', fontSize: '0.85rem',
-                      color: isLight ? '#007a91' : '#00aac8', fontWeight: 600
-                    }}
-                    className="hover-effect"
-                  >
-                    <Download size={13} style={{ marginRight: '8px' }} />
-                    Export All Cards
+                  )}
+                  {hasPermission('quotations:create') && policy.status === 'active' && (
+                    <button onClick={() => {
+                      setShowActionsMenu(false)
+                      setConfirmation({
+                        show: true, title: 'Create Renewal Quotation?',
+                        message: 'Create a new quotation pre-filled from this policy? The period will be advanced by one year.',
+                        onConfirm: async () => {
+                          setConfirmation(prev => ({ ...prev, show: false }))
+                          setRenewing(true)
+                          try {
+                            const result = await window.api.policyRenew(policyId)
+                            if (result?.quotationId) { showSuccess('Renewal quotation created'); onNavigateToQuotation?.(result.quotationId) }
+                            else showError('Failed to create renewal')
+                          } catch (err: any) { showError(err.message || 'Failed') }
+                          finally { setRenewing(false) }
+                        }
+                      })
+                    }} style={{ ...actionItemStyle, color: isLight ? '#008844' : '#00c864' }} className="hover-effect">
+                      <RefreshCw size={15} /> Renew
+                    </button>
+                  )}
+
+                  <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+
+                  {/* Exports */}
+                  <button onClick={() => { setShowActionsMenu(false); handleExportPolicy() }} disabled={exportingPolicy} style={actionItemStyle} className="hover-effect">
+                    <Download size={15} /> Export Policy
+                  </button>
+                  <button onClick={() => { setShowActionsMenu(false); handleExportDA() }} disabled={exportingDA} style={actionItemStyle} className="hover-effect">
+                    <Download size={15} /> Export Debit Advice
+                  </button>
+                  {commissionAmount != null && commissionAmount > 0 && (
+                    <button onClick={() => { setShowActionsMenu(false); handleExportCA() }} disabled={exportingCA} style={actionItemStyle} className="hover-effect">
+                      <Download size={15} /> Export Credit Advice
+                    </button>
+                  )}
+                  {isPIType && blueCards.filter(bc => bc.status === 'active').length > 0 && (
+                    <>
+                      <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+                      <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Blue Cards</div>
+                      {blueCards.filter(bc => bc.status === 'active').map(bc => (
+                        <button key={bc.id} onClick={async () => {
+                          setShowActionsMenu(false); setExportingBC(true)
+                          try { await handleExportSingleBC(bc); showSuccess(`${bc.cardType} exported`) }
+                          catch (err: any) { showError(err.message || 'Export failed') }
+                          finally { setExportingBC(false) }
+                        }} style={actionItemStyle} className="hover-effect">
+                          <Download size={15} /> {bc.cardNumber || bc.cardType}
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+
+                  <button onClick={() => { setShowActionsMenu(false); handleExportQuickBooks() }} disabled={exportingQB} style={{ ...actionItemStyle, color: isLight ? '#007a91' : '#00aac8' }} className="hover-effect">
+                    <FileSpreadsheet size={15} /> Export to QuickBooks
                   </button>
                 </div>
-              )}
-            </div>
-          )}
-          <button
-            className="btn-secondary"
-            style={{ ...exportBtnStyle, background: 'rgba(0, 170, 200, 0.10)', color: isLight ? '#007a91' : '#00aac8', border: '1px solid rgba(0, 170, 200, 0.25)' }}
-            onClick={handleExportQuickBooks}
-            disabled={exportingQB}
-            title="Export to QuickBooks Excel"
-          >
-            {exportingQB ? <Loader2 size={14} className="spinner" /> : <FileSpreadsheet size={14} />}
-            QB Export
-          </button>
+              </>,
+              document.body
+            )}
+          </div>
           {hasPermission('policies:manage') && (
             <button
               onClick={() => setConfirmation({
