@@ -4626,7 +4626,16 @@ function NotesTab({ quotation, showSuccess, isLight }: { quotation: Quotation; s
     const { user } = useAuth()
 
     useEffect(() => { loadData() }, [])
-    useEffect(() => { window.api.notificationsGetUsernames().then(setAllUsers).catch(() => {}) }, [])
+    useEffect(() => {
+        window.api.notificationsGetUsernames()
+            .then(data => { if (Array.isArray(data)) setAllUsers(data) })
+            .catch(() => {
+                // Fallback: try getUsers if available
+                window.api.getUsers?.()
+                    .then((users: any[]) => setAllUsers(users.map(u => ({ id: u.id, username: u.username }))))
+                    .catch(() => {})
+            })
+    }, [])
 
     const loadData = async () => {
         const raw = await window.api.getQuotationNotes(quotation.id)
