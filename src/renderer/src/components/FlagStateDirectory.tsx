@@ -14,14 +14,14 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
     const [newName, setNewName] = useState('')
     const [newIso3, setNewIso3] = useState('')
-    const [newAddress, setNewAddress] = useState('')
+    // address field removed — use authorityName + authorityAddress instead
     const [newEmail, setNewEmail] = useState('')
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [expandedVessels, setExpandedVessels] = useState<{ id: string; name: string; imoNumber: string }[]>([])
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
     const [editIso3, setEditIso3] = useState('')
-    const [editAddress, setEditAddress] = useState('')
+    // editAddress removed — using authorityAddress instead
     const [editEmail, setEditEmail] = useState('')
     const [editRatifiedBunker, setEditRatifiedBunker] = useState(false)
     const [editRatifiedWreck, setEditRatifiedWreck] = useState(false)
@@ -61,10 +61,9 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
             return
         }
         try {
-            await window.api.addFlagState({ name: newName, iso3Code: newIso3.toUpperCase(), address: newAddress || undefined, email: newEmail || undefined })
+            await window.api.addFlagState({ name: newName, iso3Code: newIso3.toUpperCase(), email: newEmail || undefined })
             setNewName('')
             setNewIso3('')
-            setNewAddress('')
             setNewEmail('')
             showSuccess('Flag state added')
             loadData()
@@ -81,7 +80,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
         setEditingId(null)
         setEditName('')
         setEditIso3('')
-        setEditAddress('')
+        // setEditAddress removed('')
         setEditEmail('')
         setEditRatifiedBunker(false)
         setEditRatifiedWreck(false)
@@ -112,7 +111,7 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
         setEditingId(fs.id)
         setEditName(fs.name)
         setEditIso3(fs.iso3Code)
-        setEditAddress(fs.address || '')
+        // setEditAddress removed(fs.address || '')
         setEditEmail(fs.email || '')
         setEditRatifiedBunker(Boolean(fs.ratifiedBunker))
         setEditRatifiedWreck(Boolean(fs.ratifiedWreck))
@@ -130,7 +129,6 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
             await window.api.updateFlagState(id, {
                 name: editName,
                 iso3Code: editIso3.toUpperCase(),
-                address: editAddress || undefined,
                 email: editEmail || undefined,
                 ratifiedBunker: editRatifiedBunker,
                 ratifiedWreck: editRatifiedWreck,
@@ -256,14 +254,6 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <textarea
-                            value={newAddress}
-                            onChange={e => setNewAddress(e.target.value)}
-                            placeholder="Address (optional)"
-                            rows={2}
-                            style={{ flex: 1, resize: 'vertical' }}
-                            aria-label="Flag state address"
-                        />
-                        <textarea
                             value={newEmail}
                             onChange={e => setNewEmail(e.target.value)}
                             placeholder="Email addresses (comma-separated, optional)"
@@ -332,13 +322,6 @@ export default function FlagStateDirectory({ onNavigateToVessel }: FlagStateDire
                                                         onChange={e => setEditIso3(e.target.value.toUpperCase().slice(0, 3))}
                                                         style={{ width: '80px', textTransform: 'uppercase' }}
                                                         maxLength={3}
-                                                    />
-                                                    <textarea
-                                                        value={editAddress}
-                                                        onChange={e => setEditAddress(e.target.value)}
-                                                        placeholder="Address"
-                                                        rows={2}
-                                                        style={{ width: '100%', resize: 'vertical' }}
                                                     />
                                                     <input
                                                         type="text"
