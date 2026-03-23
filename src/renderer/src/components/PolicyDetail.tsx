@@ -902,7 +902,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           ownerAddress: card.ownerAddress || '',
           flagAuthorityName: card.addressedToName || '',
           flagAuthorityAddress: card.addressedToAddress || '',
-          companyName: reportSettings.companyName || 'Insurance Company'
+          companyName: reportSettings.companyName || 'Insurance Company',
+          cancelReplaceText: card.cancelReplaceText || ''
         },
         card.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2'
       )

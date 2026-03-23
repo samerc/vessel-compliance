@@ -13,12 +13,14 @@ import {
   Hash,
   Landmark,
   AlertTriangle,
-  DollarSign
+  DollarSign,
+  Shield
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import RichTextEditor from './RichTextEditor'
+import { BC_DEFAULTS } from '../services/PolicyExportService'
 
 type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -31,6 +33,7 @@ type PolicySettingsTab =
   | 'banks'
   | 'cancelReplace'
   | 'premiumIntro'
+  | 'blueCardTexts'
   | 'piOpening'
   | 'piClosing'
   | 'piNotice'
@@ -61,6 +64,7 @@ const CATEGORY_TABS: Record<PolicySettingsCategory, { id: PolicySettingsTab; lab
     { id: 'banks', label: 'Banks', icon: <Landmark size={15} /> },
     { id: 'cancelReplace', label: 'Cancel & Replace', icon: <AlertTriangle size={15} /> },
     { id: 'premiumIntro', label: 'Premium Intro', icon: <DollarSign size={15} /> },
+    { id: 'blueCardTexts', label: 'Blue Card Texts', icon: <Shield size={15} /> },
   ],
   pi: [
     { id: 'piOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
@@ -174,6 +178,7 @@ export default function PolicySettings() {
         {activeTab === 'banks' && <BanksTab showSuccess={showSuccess} showError={showError} />}
         {activeTab === 'cancelReplace' && <CancelReplaceTab showSuccess={showSuccess} />}
         {activeTab === 'premiumIntro' && <PremiumIntroTab showSuccess={showSuccess} />}
+        {activeTab === 'blueCardTexts' && <BlueCardTextsTab showSuccess={showSuccess} />}
         {activeTab === 'piOpening' && <RichTextSettingTab settingKey="policy_text_P_openingClause" label="P&I Opening Clause" description="The opening clause text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piClosing' && <RichTextSettingTab settingKey="policy_text_P_closingText" label="P&I Closing Text" description="The closing section text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piNotice' && <RichTextSettingTab settingKey="policy_text_P_importantNotice" label="P&I Important Notice" description="The important notice section for P&I policy documents." showSuccess={showSuccess} />}
@@ -790,6 +795,181 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
       />
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Save size={14} /> Save
+      </button>
+    </div>
+  )
+}
+
+// ==================== Blue Card Texts Tab ====================
+
+interface BcTextFieldDef {
+  key: keyof typeof BC_DEFAULTS
+  label: string
+  rows: number
+}
+
+const BC_CARD_SECTIONS: { cardType: string; color: string; fields: BcTextFieldDef[] }[] = [
+  {
+    cardType: 'BBC (Bunker)',
+    color: '#00aac8',
+    fields: [
+      { key: 'bc_text_BBC_title', label: 'Title', rows: 3 },
+      { key: 'bc_text_BBC_certify', label: 'Certification Text', rows: 4 },
+      { key: 'bc_text_BBC_cancel', label: 'Cancellation Text', rows: 4 },
+    ],
+  },
+  {
+    cardType: 'WRC (Wreck Removal)',
+    color: '#6464ff',
+    fields: [
+      { key: 'bc_text_WRC_title', label: 'Title', rows: 3 },
+      { key: 'bc_text_WRC_certify', label: 'Certification Text', rows: 4 },
+      { key: 'bc_text_WRC_cancel', label: 'Cancellation Text', rows: 4 },
+    ],
+  },
+  {
+    cardType: 'MLC 4.2',
+    color: '#ff64c8',
+    fields: [
+      { key: 'bc_text_MLC42_title', label: 'Title', rows: 3 },
+      { key: 'bc_text_MLC42_certify', label: 'Certification Text', rows: 4 },
+      { key: 'bc_text_MLC42_cancel', label: 'Cancellation Text', rows: 4 },
+    ],
+  },
+  {
+    cardType: 'MLC 2.5.2',
+    color: '#ffb020',
+    fields: [
+      { key: 'bc_text_MLC252_title', label: 'Title', rows: 3 },
+      { key: 'bc_text_MLC252_certify', label: 'Certification Text', rows: 4 },
+      { key: 'bc_text_MLC252_cancel', label: 'Cancellation Text', rows: 4 },
+    ],
+  },
+]
+
+const BC_CONTACT_FIELDS: BcTextFieldDef[] = [
+  { key: 'bc_mlc_company_address', label: 'Company Address (for MLC cards)', rows: 3 },
+  { key: 'bc_mlc_website', label: 'Company Website (for MLC cards)', rows: 1 },
+  { key: 'bc_mlc_email', label: 'MLC Contact Email', rows: 1 },
+  { key: 'bc_mlc_phone', label: 'MLC Contact Phone (one per line for multiple)', rows: 2 },
+]
+
+function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    ;(async () => {
+      const result: Record<string, string> = {}
+      const keys = Object.keys(BC_DEFAULTS) as (keyof typeof BC_DEFAULTS)[]
+      await Promise.all(keys.map(async (key) => {
+        try {
+          const val = await window.api.getSetting(key)
+          result[key] = val || BC_DEFAULTS[key]
+        } catch {
+          result[key] = BC_DEFAULTS[key]
+        }
+      }))
+      setValues(result)
+      setLoading(false)
+    })()
+  }, [])
+
+  const handleSave = async () => {
+    const keys = Object.keys(values)
+    await Promise.all(keys.map(async (key) => {
+      try {
+        await window.api.setSetting(key, values[key])
+      } catch { /* ignore */ }
+    }))
+    showSuccess('Blue card texts saved')
+  }
+
+  const handleReset = (key: string) => {
+    setValues(prev => ({ ...prev, [key]: BC_DEFAULTS[key as keyof typeof BC_DEFAULTS] }))
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+  return (
+    <div>
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Blue Card Texts</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+        Configurable text content for BBC, WRC, and MLC blue card DOCX exports.
+        For BBC/WRC title fields, use line breaks to separate &quot;CERTIFICATE OF INSURANCE&quot;, &quot;PURSUANT&quot;, and the convention reference.
+      </p>
+
+      {/* MLC Contact / Company Info */}
+      <div style={{
+        marginBottom: '24px',
+        padding: '16px',
+        borderRadius: '10px',
+        border: '1px solid var(--glass-border)',
+        background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.03)'
+      }}>
+        <h5 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', color: 'var(--accent-primary)' }}>
+          MLC Contact & Company Info
+        </h5>
+        {BC_CONTACT_FIELDS.map(f => (
+          <div key={f.key} style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>{f.label}</label>
+              <button
+                onClick={() => handleReset(f.key)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.72rem' }}
+              >
+                Reset
+              </button>
+            </div>
+            <textarea
+              value={values[f.key] || ''}
+              onChange={e => setValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+              rows={f.rows}
+              style={{ width: '100%', resize: 'vertical' }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Per-card-type sections */}
+      {BC_CARD_SECTIONS.map(section => (
+        <div key={section.cardType} style={{
+          marginBottom: '24px',
+          padding: '16px',
+          borderRadius: '10px',
+          border: '1px solid var(--glass-border)',
+          borderLeft: `3px solid ${section.color}`,
+          background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.03)'
+        }}>
+          <h5 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', color: section.color }}>
+            {section.cardType}
+          </h5>
+          {section.fields.map(f => (
+            <div key={f.key} style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>{f.label}</label>
+                <button
+                  onClick={() => handleReset(f.key)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.72rem' }}
+                >
+                  Reset to default
+                </button>
+              </div>
+              <textarea
+                value={values[f.key] || ''}
+                onChange={e => setValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+                rows={f.rows}
+                style={{ width: '100%', resize: 'vertical' }}
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+
+      <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Save size={14} /> Save All
       </button>
     </div>
   )
