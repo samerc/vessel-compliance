@@ -2247,6 +2247,18 @@ export class MySQLAdapter {
                 INDEX idx_fsp_flag (flag_state_id)
             )`)
 
+            // Migration: add renewed_from_policy_id and renewed_from_policy_number to quotations
+            {
+                const [qCols] = await this.pool.query('SHOW COLUMNS FROM quotations')
+                const qColNames = (qCols as any[]).map((c: any) => c.Field)
+                if (!qColNames.includes('renewed_from_policy_id')) {
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN renewed_from_policy_id VARCHAR(36) DEFAULT NULL')
+                }
+                if (!qColNames.includes('renewed_from_policy_number')) {
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN renewed_from_policy_number VARCHAR(50) DEFAULT NULL')
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -5754,6 +5766,7 @@ export class MySQLAdapter {
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride, q.section_order as sectionOrderRaw,
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked, q.export_snapshot as exportSnapshotRaw,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor,
+                q.renewed_from_policy_id as renewedFromPolicyId, q.renewed_from_policy_number as renewedFromPolicyNumber,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
@@ -6179,6 +6192,122 @@ export class MySQLAdapter {
         }
 
         return (await this.getQuotation(newId))!
+    }
+
+    async renewPolicy(policyId: string, createdBy: string): Promise<string> {
+        if (!this.pool) throw new Error('DB not connected')
+
+        // 1. Load policy document
+        const policy = await this.getPolicyDocumentById(policyId)
+        if (!policy) throw new Error('Policy not found')
+
+        // 2. Load the linked quotation (full record)
+        const source = await this.getQuotation(policy.quotationId)
+        if (!source) throw new Error('Linked quotation not found')
+
+        const newId = uuidv4()
+
+        // Auto-generate new reference number
+        let newRef: string | null = null
+        if (source.quotationTypeId) {
+            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [source.quotationTypeId]) as any[]
+            const typeCode = typeRow.length > 0 ? typeRow[0].code : '?'
+            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotations') as any[]
+            const seq = (countRow[0].cnt || 0) + 1
+            newRef = `Q/${typeCode}/${seq}`
+        }
+
+        // Calculate new period: add 1 year to inception/expiry
+        const addOneYear = (dateStr: string): string => {
+            const d = new Date(dateStr)
+            d.setFullYear(d.getFullYear() + 1)
+            return d.toISOString().split('T')[0]
+        }
+
+        let newPeriodText = source.periodText || null
+        if (policy.inceptionDate && policy.expiryDate) {
+            const newInception = addOneYear(policy.inceptionDate)
+            const newExpiry = addOneYear(policy.expiryDate)
+            newPeriodText = `${newInception} to ${newExpiry}`
+        }
+
+        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            // 3. Clone the main quotation row
+            await this.pool.execute(`
+                INSERT INTO quotations (
+                    id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
+                    is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
+                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
+                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
+                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
+                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
+                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
+                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
+                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
+                    hull_clause_id, iv_clause_id, co_name, title,
+                    section_texts_override, sanctions_text_override, section_order,
+                    revision_number, revision_group_id, is_locked, export_snapshot, created_by,
+                    renewed_from_policy_id, renewed_from_policy_number,
+                    trading_custom_mode, trading_custom_wording
+                )
+                SELECT
+                    ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
+                    TRUE, 'draft', ?, limit_of_liability_amount, limit_of_liability_currency,
+                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
+                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
+                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
+                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
+                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
+                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
+                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
+                    hull_clause_id, iv_clause_id, co_name, NULL,
+                    section_texts_override, sanctions_text_override, section_order,
+                    0, ?, FALSE, NULL, ?,
+                    ?, ?,
+                    trading_custom_mode, trading_custom_wording
+                FROM quotations WHERE id = ?
+            `, [newId, newRef, newPeriodText, newId, createdBy, policyId, policy.policyNumber || null, source.id])
+
+            // 4. Clone all junction tables
+            await this.cloneQuotationJunctions(source.id, newId)
+
+            // 5. Refresh vessel details from current DB data
+            const [qVessels] = await this.pool.query(
+                'SELECT id, vessel_id FROM quotation_vessels WHERE quotation_id = ?', [newId]
+            )
+            for (const qv of qVessels as any[]) {
+                if (!qv.vessel_id) continue
+                const [vRows] = await this.pool.query(
+                    'SELECT name, imo_number, built_year, gross_tonnage, flag_state_id, vessel_type, classification_society, call_sign FROM vessels WHERE id = ?',
+                    [qv.vessel_id]
+                )
+                const v = (vRows as any[])[0]
+                if (!v) continue
+                // Resolve flag name
+                let flagName = v.flag_state_id || ''
+                if (v.flag_state_id) {
+                    const [fRows] = await this.pool.query('SELECT name FROM flag_states WHERE id = ?', [v.flag_state_id])
+                    if ((fRows as any[]).length > 0) flagName = (fRows as any[])[0].name
+                }
+                // Resolve classification name
+                let className = v.classification_society || ''
+                if (v.classification_society) {
+                    const [cRows] = await this.pool.query('SELECT name FROM classification_societies WHERE id = ?', [v.classification_society])
+                    if ((cRows as any[]).length > 0) className = (cRows as any[])[0].name
+                }
+                await this.pool.execute(
+                    `UPDATE quotation_vessels SET name = ?, imo_number = ?, built_year = ?, gross_tonnage = ?, flag = ?, vessel_type = ?, classification = ?, call_sign = ? WHERE id = ?`,
+                    [v.name, v.imo_number, v.built_year, v.gross_tonnage, flagName, v.vessel_type, className, v.call_sign, qv.id]
+                )
+            }
+        } finally {
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+        }
+
+        return newId
     }
 
     async getQuotationRevisions(revisionGroupId: string): Promise<Quotation[]> {
@@ -7501,7 +7630,6 @@ export class MySQLAdapter {
             closingCity: r.closing_city || null,
             createdBy: r.created_by || null,
             exportedAt: r.exported_at || null,
-            createdBy: r.created_by,
             createdAt: r.created_at,
         }
     }

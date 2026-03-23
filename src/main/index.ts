@@ -2448,6 +2448,19 @@ app.whenReady().then(() => {
   safeHandle('policy:createRevision', async (event, policyId) => { const session = requireSession(event); await requirePermission(event, 'policies:manage'); return db.createPolicyRevision(policyId, session.id) })
   safeHandle('policy:delete', async (event, id) => { await requirePermission(event, 'policies:manage'); return db.deletePolicyDocument(id) })
 
+  safeHandle('policy:renew', async (event, policyId: string) => {
+    const user = await requirePermission(event, 'quotations:create')
+    const quotationId = await db.renewPolicy(policyId, user.id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'RENEW',
+      module: 'Policies',
+      details: `Created renewal quotation from policy ${policyId}`
+    })
+    return { quotationId }
+  })
+
   // Policy Expiry Alerts
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })

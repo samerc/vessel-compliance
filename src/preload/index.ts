@@ -709,6 +709,7 @@ const api = {
   policyCreateRevision: (policyId: string) => ipcRenderer.invoke('policy:createRevision', policyId),
   policyDelete: (id: string) => ipcRenderer.invoke('policy:delete', id),
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
+  policyRenew: (policyId: string) => ipcRenderer.invoke('policy:renew', policyId),
 }
 
 // Expose curated API to renderer via context bridge

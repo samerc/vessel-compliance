@@ -718,6 +718,7 @@ export interface Api {
     blueCards: string[]
     selectedAlternativeId?: string | null
   }) => Promise<any[]>
+  policyRenew: (policyId: string) => Promise<{ quotationId: string }>
 }
 
 declare global {

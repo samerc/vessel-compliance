@@ -997,6 +997,8 @@ export interface Quotation {
   workflowStepId?: string | null
   workflowStepName?: string
   workflowStepColor?: string
+  renewedFromPolicyId?: string | null
+  renewedFromPolicyNumber?: string | null
   createdAt?: string
   updatedAt?: string
   createdBy?: string

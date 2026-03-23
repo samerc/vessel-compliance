@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList, ClipboardCheck } from 'lucide-react'
+import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList, ClipboardCheck, ExternalLink } from 'lucide-react'
 import { Quotation, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -388,6 +388,26 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     color: isLight ? '#8a6400' : '#ffb020', fontSize: '0.85rem', fontWeight: 600
                 }}>
                     <Lock size={16} /> This is an older revision (read-only). {revisions.length > 1 && 'Switch to the latest revision to make changes.'}
+                </div>
+            )}
+
+            {/* Renewal indicator banner */}
+            {q.renewedFromPolicyId && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', marginBottom: '12px',
+                    borderRadius: '10px', background: 'rgba(0, 200, 100, 0.1)', border: '1px solid rgba(0, 200, 100, 0.3)',
+                    color: isLight ? '#008844' : '#00c864', fontSize: '0.85rem', fontWeight: 600
+                }}>
+                    <RefreshCw size={16} /> Renewal of Policy {q.renewedFromPolicyNumber || q.renewedFromPolicyId}
+                    {_onNavigateToPolicy && (
+                        <button
+                            onClick={() => _onNavigateToPolicy(q.renewedFromPolicyId!)}
+                            className="btn-secondary"
+                            style={{ marginLeft: 'auto', padding: '5px 14px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}
+                        >
+                            View Policy <ExternalLink size={12} />
+                        </button>
+                    )}
                 </div>
             )}
 

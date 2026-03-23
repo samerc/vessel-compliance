@@ -197,6 +197,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [exportingBC, setExportingBC] = useState(false)
   const [bcDropdownOpen, setBcDropdownOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
+  const [renewing, setRenewing] = useState(false)
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -1180,6 +1181,42 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 <Copy size={14} /> New Revision
               </button>
             </>
+          )}
+          {!isEditing && hasPermission('quotations:create') && policy.status === 'active' && (
+            <button
+              className="btn-secondary"
+              style={{ ...exportBtnStyle, background: 'rgba(0, 200, 100, 0.12)', color: isLight ? '#008844' : '#00c864', border: '1px solid rgba(0, 200, 100, 0.3)' }}
+              disabled={renewing}
+              onClick={() => {
+                setConfirmation({
+                  show: true,
+                  title: 'Create Renewal Quotation?',
+                  message: 'Create a new quotation pre-filled from this policy for renewal? The period will be advanced by one year.',
+                  onConfirm: async () => {
+                    setConfirmation(prev => ({ ...prev, show: false }))
+                    setRenewing(true)
+                    try {
+                      const result = await window.api.policyRenew(policyId)
+                      if (result && result.quotationId) {
+                        showSuccess('Renewal quotation created')
+                        if (onNavigateToQuotation) {
+                          onNavigateToQuotation(result.quotationId)
+                        }
+                      } else {
+                        showError('Failed to create renewal quotation')
+                      }
+                    } catch (err: any) {
+                      showError(err.message || 'Failed to create renewal quotation')
+                    } finally {
+                      setRenewing(false)
+                    }
+                  }
+                })
+              }}
+              title="Create renewal quotation"
+            >
+              {renewing ? <Loader2 size={14} className="spinner" /> : <RefreshCw size={14} />} Renew
+            </button>
           )}
           <button
             className="btn-secondary"
