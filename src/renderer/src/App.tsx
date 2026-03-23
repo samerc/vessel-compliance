@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -32,6 +32,7 @@ const ActivityLog = lazy(() => import('./components/ActivityLog'))
 const EmailTemplates = lazy(() => import('./components/EmailTemplates'))
 const PolicyList = lazy(() => import('./components/PolicyList'))
 const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
+const PolicySettings = lazy(() => import('./components/PolicySettings'))
 
 const LoadingFallback = () => (
   <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -55,6 +56,7 @@ function App(): React.JSX.Element {
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
   const [initialQuotationId, setInitialQuotationId] = useState<string | null>(null)
   const [quotationPolicyContext, setQuotationPolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
+  const [policyView, setPolicyView] = useState<'list' | 'settings'>('list')
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -356,11 +358,44 @@ function App(): React.JSX.Element {
           {activeTab === 'email-templates' && <Suspense fallback={<LoadingFallback />}><EmailTemplates /></Suspense>}
           {activeTab === 'policies-list' && <Suspense fallback={<LoadingFallback />}>
             <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
-              <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-                <FileCheck size={28} /> Policies
-              </h1>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '24px' }}>Insurance policy documents</p>
-              <PolicyList onSelectPolicy={(id) => { setSelectedPolicyId(id); setActiveTab('policy-detail') }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div>
+                  <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                    <FileCheck size={28} /> Policies
+                  </h1>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Insurance policy documents</p>
+                </div>
+                {hasPermission('admin:settings') && (
+                  <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', borderRadius: '10px', padding: '4px', border: '1px solid var(--glass-border)' }}>
+                    <button
+                      onClick={() => setPolicyView('list')}
+                      style={{
+                        padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.85rem',
+                        fontWeight: policyView === 'list' ? '600' : '400',
+                        background: policyView === 'list' ? 'var(--accent-primary)' : 'transparent',
+                        color: policyView === 'list' ? '#fff' : 'var(--text-secondary)',
+                        display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s'
+                      }}
+                    >
+                      <List size={16} /> Policies
+                    </button>
+                    <button
+                      onClick={() => setPolicyView('settings')}
+                      style={{
+                        padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.85rem',
+                        fontWeight: policyView === 'settings' ? '600' : '400',
+                        background: policyView === 'settings' ? 'var(--accent-primary)' : 'transparent',
+                        color: policyView === 'settings' ? '#fff' : 'var(--text-secondary)',
+                        display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s'
+                      }}
+                    >
+                      <Settings size={16} /> Settings
+                    </button>
+                  </div>
+                )}
+              </div>
+              {policyView === 'list' && <PolicyList onSelectPolicy={(id) => { setSelectedPolicyId(id); setActiveTab('policy-detail') }} />}
+              {policyView === 'settings' && <PolicySettings />}
             </div>
           </Suspense>}
           {activeTab === 'policy-detail' && selectedPolicyId && <Suspense fallback={<LoadingFallback />}>

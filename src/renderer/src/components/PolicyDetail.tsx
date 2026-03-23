@@ -395,6 +395,26 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         role: a.role,
         addressText: a.addressText
       })))
+      // Sync addresses to entity_addresses so they are available system-wide
+      for (const addr of editAddresses) {
+        if (addr.entityId && addr.addressText && addr.addressText.trim()) {
+          try {
+            const existing = await window.api.getEntityAddresses(addr.entityId)
+            const alreadyExists = Array.isArray(existing) && existing.some(
+              (ea: any) => ea.addressLine1?.trim() === addr.addressText?.trim()
+            )
+            if (!alreadyExists) {
+              await window.api.addEntityAddress({
+                entityId: addr.entityId,
+                label: addr.role || 'Policy Address',
+                addressLine1: addr.addressText
+              })
+            }
+          } catch {
+            // Non-critical: don't block policy save if entity address sync fails
+          }
+        }
+      }
       showSuccess('Policy updated')
       setIsEditing(false)
       await loadData()
