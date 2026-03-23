@@ -154,6 +154,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [showStepMenu, setShowStepMenu] = useState(false)
     const [showActionsMenu, setShowActionsMenu] = useState(false)
     const actionsRef = useRef<HTMLDivElement>(null)
+    const stepMenuRef = useRef<HTMLButtonElement>(null)
     const [stepComment, setStepComment] = useState('')
     const [showStepCommentModal, setShowStepCommentModal] = useState<string | null>(null)
     const [_workflowLog, setWorkflowLog] = useState<import('../../../shared/types').QuotationWorkflowLog[]>([])
@@ -413,6 +414,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     {q.workflowStepName && (
                         <div style={{ position: 'relative' }}>
                             <button
+                                ref={stepMenuRef}
                                 onClick={() => reachableSteps.length > 0 && setShowStepMenu(!showStepMenu)}
                                 style={{
                                     padding: '4px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700,
@@ -427,11 +429,14 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                 {q.workflowStepName}
                                 {reachableSteps.length > 0 && <ChevronDown size={12} />}
                             </button>
-                            {showStepMenu && (
+                            {showStepMenu && createPortal(
                                 <>
-                                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowStepMenu(false)} />
+                                    <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowStepMenu(false)} />
                                     <div style={{
-                                        position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 100,
+                                        position: 'fixed',
+                                        top: (stepMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
+                                        left: stepMenuRef.current?.getBoundingClientRect().left || 0,
+                                        zIndex: 9999,
                                         background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
                                         borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                     }}>
@@ -454,7 +459,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                             </button>
                                         ))}
                                     </div>
-                                </>
+                                </>,
+                                document.body
                             )}
                         </div>
                     )}
