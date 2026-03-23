@@ -986,6 +986,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     try {
       await exportPolicyDocx(policyId)
       showSuccess('Policy document exported')
+      await loadData() // Reload to update exportedAt (hides Edit button)
     } catch (err: any) {
       showError(err.message || 'Failed to export policy')
     } finally {
