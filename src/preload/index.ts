@@ -481,7 +481,7 @@ const api = {
 
   // Vessel Notes
   getVesselNotes: (vesselId: string) => ipcRenderer.invoke('vesselNotes:get', vesselId),
-  addVesselNote: (vesselId: string, note: string) => ipcRenderer.invoke('vesselNotes:add', vesselId, note),
+  addVesselNote: (vesselId: string, note: string, parentNoteId?: string) => ipcRenderer.invoke('vesselNotes:add', vesselId, note, parentNoteId),
   deleteVesselNote: (noteId: string) => ipcRenderer.invoke('vesselNotes:delete', noteId),
 
   // Quotation Types

@@ -332,6 +332,11 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
     const [newVesselNoteText, setNewVesselNoteText] = useState('')
     const [vesselNotesSaving, setVesselNotesSaving] = useState(false)
+    const [replyingToNoteId, setReplyingToNoteId] = useState<string | null>(null)
+    const [replyText, setReplyText] = useState('')
+    const [mentionUsers, setMentionUsers] = useState<{ id: string; username: string }[]>([])
+    const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+    const [mentionTarget, setMentionTarget] = useState<'new' | 'reply'>('new')
     const [vesselNoteCount, setVesselNoteCount] = useState(0)
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
     const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
@@ -519,12 +524,18 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         setShowNotesModal(true)
         setVesselNotesList([])
         setNewVesselNoteText('')
+        setReplyingToNoteId(null)
+        setReplyText('')
         setVesselNotesLoading(true)
         try {
-            const data = await window.api.getVesselNotes(vessel.id)
+            const [data, users] = await Promise.all([
+                window.api.getVesselNotes(vessel.id),
+                window.api.notificationsGetUsernames().catch(() => [])
+            ])
             const list = Array.isArray(data) ? data : []
             setVesselNotesList(list)
             setVesselNoteCount(list.length)
+            setMentionUsers(Array.isArray(users) ? users : [])
         } finally {
             setVesselNotesLoading(false)
         }
@@ -544,7 +555,89 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
     const handleDeleteVesselNote = async (noteId: string) => {
         await window.api.deleteVesselNote(noteId)
-        setVesselNotesList(prev => { const next = prev.filter(n => n.id !== noteId); setVesselNoteCount(next.length); return next })
+        setVesselNotesList(prev => { const next = prev.filter(n => n.id !== noteId && n.parentNoteId !== noteId); setVesselNoteCount(next.length); return next })
+    }
+
+    const handleAddReply = async (parentId: string) => {
+        if (!replyText.trim()) return
+        setVesselNotesSaving(true)
+        try {
+            const note = await window.api.addVesselNote(vessel.id, replyText.trim(), parentId)
+            setVesselNotesList(prev => [...prev, note])
+            setReplyText('')
+            setReplyingToNoteId(null)
+        } finally {
+            setVesselNotesSaving(false)
+        }
+    }
+
+    const handleMentionCheck = (text: string, target: 'new' | 'reply') => {
+        if (target === 'new') setNewVesselNoteText(text)
+        else setReplyText(text)
+        setMentionTarget(target)
+        const cursorEl = document.activeElement as HTMLTextAreaElement
+        const cursorPos = cursorEl?.selectionStart || 0
+        const textBefore = text.slice(0, cursorPos)
+        const atMatch = textBefore.match(/@(\w*)$/)
+        if (atMatch) setMentionQuery(atMatch[1].toLowerCase())
+        else setMentionQuery(null)
+    }
+
+    const insertMention = (username: string) => {
+        const getter = mentionTarget === 'new' ? newVesselNoteText : replyText
+        const setter = mentionTarget === 'new' ? setNewVesselNoteText : setReplyText
+        const cursorEl = document.activeElement as HTMLTextAreaElement
+        const cursorPos = cursorEl?.selectionStart || getter.length
+        const textBefore = getter.slice(0, cursorPos)
+        const atMatch = textBefore.match(/@(\w*)$/)
+        if (atMatch) {
+            const before = textBefore.slice(0, textBefore.length - atMatch[0].length)
+            const after = getter.slice(cursorPos)
+            setter(before + '@' + username + ' ' + after)
+        }
+        setMentionQuery(null)
+    }
+
+    const filteredMentionUsers = mentionQuery !== null
+        ? mentionUsers.filter(u => u.username.toLowerCase().includes(mentionQuery) && u.id !== user?.id).slice(0, 6)
+        : []
+
+    const renderMentionDropdown = () => {
+        if (mentionQuery === null || filteredMentionUsers.length === 0) return null
+        return (
+            <div style={{
+                position: 'absolute', bottom: '100%', left: 0, zIndex: 200,
+                background: isLight ? '#ffffff' : '#1a1d28',
+                border: '1px solid var(--glass-border)', borderRadius: '6px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)', maxHeight: '150px',
+                overflowY: 'auto', minWidth: '160px'
+            }}>
+                {filteredMentionUsers.map(u => (
+                    <div key={u.id} onClick={() => insertMention(u.username)}
+                        style={{ padding: '6px 12px', cursor: 'pointer', fontSize: '0.82rem' }}
+                        className="hover-effect"
+                    >@{u.username}</div>
+                ))}
+            </div>
+        )
+    }
+
+    const highlightMentions = (text: string) => {
+        const parts = text.split(/(@\w+)/g)
+        return parts.map((part, i) =>
+            part.startsWith('@') ? <span key={i} style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{part}</span> : part
+        )
+    }
+
+    // Group notes into threads
+    const parentVesselNotes = vesselNotesList.filter(n => !n.parentNoteId)
+    const vesselRepliesMap = new Map<string, any[]>()
+    for (const n of vesselNotesList) {
+        if (n.parentNoteId) {
+            const existing = vesselRepliesMap.get(n.parentNoteId) || []
+            existing.push(n)
+            vesselRepliesMap.set(n.parentNoteId, existing)
+        }
     }
 
     return (
@@ -1759,15 +1852,18 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         </div>
 
                         {/* New note input */}
-                        <div style={{ flexShrink: 0, marginBottom: '16px' }}>
-                            <textarea
-                                value={newVesselNoteText}
-                                onChange={e => setNewVesselNoteText(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote() }}
-                                rows={3}
-                                placeholder="Add a note about this vessel... (Ctrl+Enter to submit)"
-                                style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'none', fontFamily: 'inherit', fontSize: '0.9rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
-                            />
+                        <div style={{ flexShrink: 0, marginBottom: '16px', position: 'relative' }}>
+                            <div style={{ position: 'relative' }}>
+                                <textarea
+                                    value={newVesselNoteText}
+                                    onChange={e => handleMentionCheck(e.target.value, 'new')}
+                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote() }}
+                                    rows={3}
+                                    placeholder="Add a note... (use @ to mention, Ctrl+Enter to submit)"
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'none', fontFamily: 'inherit', fontSize: '0.9rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
+                                />
+                                {mentionTarget === 'new' && renderMentionDropdown()}
+                            </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                                 <button onClick={handleAddVesselNote} disabled={vesselNotesSaving || !newVesselNoteText.trim()} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
                                     {vesselNotesSaving ? 'Saving...' : 'Add Note'}
@@ -1779,29 +1875,64 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {vesselNotesLoading ? (
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px' }}>Loading...</p>
-                            ) : vesselNotesList.length === 0 ? (
+                            ) : parentVesselNotes.length === 0 ? (
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px', fontStyle: 'italic' }}>No notes yet for this vessel.</p>
-                            ) : vesselNotesList.map(n => (
-                                <div key={n.id} style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px', borderLeft: '3px solid var(--accent-primary)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                        <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
-                                            {(n.createdByUsername || '?').charAt(0).toUpperCase()}
+                            ) : parentVesselNotes.map(n => (
+                                <div key={n.id}>
+                                    {/* Parent note */}
+                                    <div style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px', borderLeft: '3px solid var(--accent-primary)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                            <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
+                                                {(n.createdByUsername || '?').charAt(0).toUpperCase()}
+                                            </div>
+                                            <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>{n.createdByUsername || 'Unknown'}</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{formatDateTime(n.createdAt)}</span>
+                                            <button onClick={() => setReplyingToNoteId(replyingToNoteId === n.id ? null : n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '0.72rem', fontWeight: 600, padding: '2px 6px' }}>Reply</button>
+                                            {n.createdByUserId === user?.id && (
+                                                <button onClick={() => handleDeleteVesselNote(n.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: '2px', flexShrink: 0 }}><Trash2 size={13} /></button>
+                                            )}
                                         </div>
-                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-primary)' }}>{n.createdByUsername || 'Unknown'}</span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-                                            {formatDateTime(n.createdAt)}
-                                        </span>
-                                        {n.createdByUserId === user?.id && (
-                                            <button
-                                                onClick={() => handleDeleteVesselNote(n.id)}
-                                                title="Delete note"
-                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: '2px', borderRadius: '4px', flexShrink: 0 }}
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
-                                        )}
+                                        <p style={{ margin: 0, fontSize: '0.88rem', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{highlightMentions(n.note)}</p>
                                     </div>
-                                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{n.note}</p>
+
+                                    {/* Replies */}
+                                    {(vesselRepliesMap.get(n.id) || []).map(reply => (
+                                        <div key={reply.id} style={{ marginLeft: '24px', marginTop: '6px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '10px 12px', borderLeft: '2px solid var(--glass-border)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
+                                                    {(reply.createdByUsername || '?').charAt(0).toUpperCase()}
+                                                </div>
+                                                <span style={{ fontWeight: '600', fontSize: '0.82rem' }}>{reply.createdByUsername || 'Unknown'}</span>
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{formatDateTime(reply.createdAt)}</span>
+                                                {reply.createdByUserId === user?.id && (
+                                                    <button onClick={() => handleDeleteVesselNote(reply.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: '2px', flexShrink: 0 }}><Trash2 size={12} /></button>
+                                                )}
+                                            </div>
+                                            <p style={{ margin: 0, fontSize: '0.84rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{highlightMentions(reply.note)}</p>
+                                        </div>
+                                    ))}
+
+                                    {/* Reply input */}
+                                    {replyingToNoteId === n.id && (
+                                        <div style={{ marginLeft: '24px', marginTop: '6px', position: 'relative' }}>
+                                            <div style={{ position: 'relative' }}>
+                                                <textarea
+                                                    value={replyText}
+                                                    onChange={e => handleMentionCheck(e.target.value, 'reply')}
+                                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddReply(n.id) }}
+                                                    rows={2}
+                                                    placeholder="Reply... (@ to mention)"
+                                                    autoFocus
+                                                    style={{ width: '100%', padding: '8px', borderRadius: '6px', resize: 'none', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
+                                                />
+                                                {mentionTarget === 'reply' && renderMentionDropdown()}
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                                                <button onClick={() => handleAddReply(n.id)} disabled={vesselNotesSaving || !replyText.trim()} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Reply</button>
+                                                <button onClick={() => { setReplyingToNoteId(null); setReplyText('') }} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Cancel</button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

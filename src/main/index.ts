@@ -2496,9 +2496,9 @@ app.whenReady().then(() => {
 
   // Vessel Notes
   safeHandle('vesselNotes:get', (event, vesselId: string) => { requireSession(event); return db.getVesselNotes(vesselId) })
-  safeHandle('vesselNotes:add', async (event, vesselId: string, note: string) => {
+  safeHandle('vesselNotes:add', async (event, vesselId: string, note: string, parentNoteId?: string) => {
     const user = await requirePermission(event, 'vessels:edit')
-    return db.addVesselNote(vesselId, note, user.id, user.username)
+    return db.addVesselNote(vesselId, note, user.id, user.username, parentNoteId)
   })
   safeHandle('vesselNotes:delete', async (event, noteId: string) => {
     const user = await requirePermission(event, 'vessels:edit')

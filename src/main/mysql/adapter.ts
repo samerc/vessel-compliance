@@ -8328,21 +8328,21 @@ export class MySQLAdapter {
     async getVesselNotes(vesselId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, vessel_id as vesselId, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt FROM vessel_notes WHERE vessel_id = ? ORDER BY created_at ASC',
+            'SELECT id, vessel_id as vesselId, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt, parent_note_id as parentNoteId FROM vessel_notes WHERE vessel_id = ? ORDER BY created_at ASC',
             [vesselId]
         )
         return rows as any[]
     }
 
-    async addVesselNote(vesselId: string, note: string, userId: string, username: string): Promise<any> {
+    async addVesselNote(vesselId: string, note: string, userId: string, username: string, parentNoteId?: string): Promise<any> {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         const now = new Date()
         await this.pool.execute(
-            'INSERT INTO vessel_notes (id, vessel_id, note, created_by_user_id, created_by_username, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, vesselId, note.trim(), userId, username, now]
+            'INSERT INTO vessel_notes (id, vessel_id, note, created_by_user_id, created_by_username, created_at, parent_note_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, vesselId, note.trim(), userId, username, now, parentNoteId || null]
         )
-        return { id, vesselId, note: note.trim(), createdByUserId: userId, createdByUsername: username, createdAt: now.toISOString() }
+        return { id, vesselId, note: note.trim(), createdByUserId: userId, createdByUsername: username, createdAt: now.toISOString(), parentNoteId: parentNoteId || null }
     }
 
     async deleteVesselNote(noteId: string, userId: string): Promise<void> {

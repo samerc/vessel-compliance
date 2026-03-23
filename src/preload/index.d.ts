@@ -469,7 +469,7 @@ export interface Api {
 
   // Vessel Notes
   getVesselNotes: (vesselId: string) => Promise<any[]>
-  addVesselNote: (vesselId: string, note: string) => Promise<any>
+  addVesselNote: (vesselId: string, note: string, parentNoteId?: string) => Promise<any>
   deleteVesselNote: (noteId: string) => Promise<void>
 
   // Quotation Types
