@@ -20,7 +20,7 @@ const DEFAULT_TIMEZONE_OPTIONS = [
   'PST'
 ]
 
-const STEP_LABELS = ['Vessel', 'Period', 'Instalments', 'Details', 'Cards', 'Review']
+const STEP_LABELS = ['Vessel', 'Period', 'Premium', 'Details', 'Cards', 'Review']
 const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck]
 
 interface WizardData {
@@ -269,16 +269,6 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     updateData({ selectedAltId: altId, totalPremium: pay, instalmentAmounts: newAmounts })
   }
 
-  const recalcInstalments = (newPremium: number) => {
-    const count = data.instalmentAmounts.length
-    if (count === 0) return data.instalmentAmounts
-    const perInstalment = Math.round((newPremium / count) * 100) / 100
-    return data.instalmentAmounts.map((_, i) => {
-      if (i === 0) return Math.round((newPremium - perInstalment * (count - 1)) * 100) / 100
-      return perInstalment
-    })
-  }
-
   const recalcPremiumFromInstalments = (amounts: number[]) => {
     const sum = amounts.reduce((s, a) => s + (a || 0), 0)
     updateData({ instalmentAmounts: amounts, totalPremium: Math.round(sum * 100) / 100 })
@@ -525,10 +515,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         {currentStep === 1 && (
           <StepPeriodPremium
             data={data}
-            quotation={quotation}
             timezoneOptions={timezoneOptions}
             onUpdate={updateData}
-            recalcInstalments={recalcInstalments}
             labelStyle={labelStyle}
             inputStyle={inputStyle}
           />
@@ -724,20 +712,18 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
   )
 }
 
-function StepPeriodPremium({ data, quotation, timezoneOptions, onUpdate, recalcInstalments, labelStyle, inputStyle }: {
+function StepPeriodPremium({ data, timezoneOptions, onUpdate, labelStyle, inputStyle }: {
   data: WizardData
-  quotation: Quotation
   timezoneOptions: string[]
   onUpdate: (partial: Partial<WizardData>) => void
-  recalcInstalments: (premium: number) => number[]
   labelStyle: React.CSSProperties
   inputStyle: React.CSSProperties
 }) {
   return (
     <div>
-      <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Period & Premium</h2>
+      <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Period</h2>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-        Set the policy inception and expiry dates along with the payable premium.
+        Set the policy inception and expiry dates.
       </p>
 
       {/* Inception */}
@@ -779,27 +765,6 @@ function StepPeriodPremium({ data, quotation, timezoneOptions, onUpdate, recalcI
         <div />
       </div>
 
-      {/* Premium */}
-      <div>
-        <label style={labelStyle}>Payable Premium</label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
-          <input
-            type="number"
-            value={data.totalPremium}
-            onChange={e => {
-              const val = parseFloat(e.target.value) || 0
-              const newAmounts = recalcInstalments(val)
-              onUpdate({ totalPremium: val, instalmentAmounts: newAmounts })
-            }}
-            style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
-            placeholder="Premium amount"
-          />
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{quotation.premiumCurrency || 'USD'}</span>
-        </div>
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
-          Changing premium will recalculate instalment amounts
-        </p>
-      </div>
     </div>
   )
 }
@@ -825,10 +790,38 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
 
   return (
     <div>
-      <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Instalment Schedule</h2>
+      <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Premium & Instalments</h2>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-        Review and adjust instalment dates and amounts. Dates are calculated from inception + quotation instalment days.
+        Set the payable premium and review instalment dates and amounts.
       </p>
+
+      {/* Premium */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }}>Payable Premium</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
+          <input
+            type="number"
+            value={data.totalPremium}
+            onChange={e => {
+              const val = parseFloat(e.target.value) || 0
+              const count = data.instalmentDates.length || 1
+              const perInst = Math.round((val / count) * 100) / 100
+              const newAmounts = Array.from({ length: count }, (_, idx) =>
+                idx === count - 1 ? Math.round((val - perInst * (count - 1)) * 100) / 100 : perInst
+              )
+              onUpdate({ totalPremium: val, instalmentAmounts: newAmounts })
+            }}
+            style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
+            placeholder="Premium amount"
+          />
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{quotation?.premiumCurrency || 'USD'}</span>
+        </div>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+          Changing premium will recalculate instalment amounts
+        </p>
+      </div>
+
+      <div style={{ height: '1px', background: 'var(--glass-border)', margin: '0 0 16px' }} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {data.instalmentDates.map((date, i) => (

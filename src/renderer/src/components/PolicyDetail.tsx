@@ -195,6 +195,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [exportingDA, setExportingDA] = useState(false)
   const [exportingCA, setExportingCA] = useState(false)
   const [exportingBC, setExportingBC] = useState(false)
+  const [bcDropdownOpen, setBcDropdownOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
 
   // Edit mode state
@@ -1216,16 +1217,68 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             </button>
           )}
           {isPIType && blueCards.length > 0 && (
-            <button
-              className="btn-secondary"
-              style={exportBtnStyle}
-              onClick={handleExportBC}
-              disabled={exportingBC}
-              title="Export Blue Cards DOCX"
-            >
-              {exportingBC ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
-              Export Blue Cards
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                className="btn-secondary"
+                style={exportBtnStyle}
+                onClick={() => setBcDropdownOpen(!bcDropdownOpen)}
+                disabled={exportingBC}
+                title="Export Blue Cards"
+              >
+                {exportingBC ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
+                Blue Cards ▾
+              </button>
+              {bcDropdownOpen && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '4px',
+                  background: isLight ? '#ffffff' : '#1a1d28',
+                  border: '1px solid var(--glass-border)', borderRadius: '8px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, minWidth: '200px',
+                  overflow: 'hidden'
+                }}>
+                  {blueCards.filter(bc => bc.status === 'active').map(bc => (
+                    <button
+                      key={bc.id}
+                      onClick={async () => {
+                        setBcDropdownOpen(false)
+                        setExportingBC(true)
+                        try {
+                          await handleExportSingleBC(bc)
+                          showSuccess(`${bc.cardType} exported`)
+                        } catch (err: any) { showError(err.message || 'Export failed') }
+                        finally { setExportingBC(false) }
+                      }}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '10px 16px', background: 'transparent',
+                        border: 'none', borderBottom: '1px solid var(--table-border)',
+                        cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)'
+                      }}
+                      className="hover-effect"
+                    >
+                      <Download size={13} style={{ marginRight: '8px', opacity: 0.6 }} />
+                      {bc.cardNumber || bc.cardType}
+                    </button>
+                  ))}
+                  <button
+                    onClick={async () => {
+                      setBcDropdownOpen(false)
+                      handleExportBC()
+                    }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '10px 16px', background: 'transparent',
+                      border: 'none', cursor: 'pointer', fontSize: '0.85rem',
+                      color: isLight ? '#007a91' : '#00aac8', fontWeight: 600
+                    }}
+                    className="hover-effect"
+                  >
+                    <Download size={13} style={{ marginRight: '8px' }} />
+                    Export All Cards
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           {hasPermission('policies:manage') && (
             <button
