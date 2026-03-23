@@ -2276,25 +2276,22 @@ export class MySQLAdapter {
             }
 
             // Migration: notifications table
-            {
-                const [ntTable] = await this.pool.query("SHOW TABLES LIKE 'notifications'")
-                if ((ntTable as any[]).length === 0) {
-                    await this.pool.query(`CREATE TABLE notifications (
-                        id VARCHAR(36) PRIMARY KEY,
-                        user_id VARCHAR(36) NOT NULL,
-                        type VARCHAR(50) NOT NULL,
-                        title VARCHAR(500) NOT NULL,
-                        message TEXT DEFAULT NULL,
-                        link_type VARCHAR(50) DEFAULT NULL,
-                        link_id VARCHAR(36) DEFAULT NULL,
-                        is_read BOOLEAN DEFAULT FALSE,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        INDEX idx_notif_user (user_id),
-                        INDEX idx_notif_user_read (user_id, is_read),
-                        INDEX idx_notif_created (created_at)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                }
-            }
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS notifications (
+                    id VARCHAR(36) PRIMARY KEY,
+                    user_id VARCHAR(36) NOT NULL,
+                    type VARCHAR(50) NOT NULL,
+                    title VARCHAR(500) NOT NULL,
+                    message TEXT DEFAULT NULL,
+                    link_type VARCHAR(50) DEFAULT NULL,
+                    link_id VARCHAR(36) DEFAULT NULL,
+                    is_read BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_notif_user (user_id),
+                    INDEX idx_notif_user_read (user_id, is_read),
+                    INDEX idx_notif_created (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch (e) { console.error('notifications table migration:', e) }
 
             // Migration: Add parent_note_id, author_user_id, author_username to quotation_notes
             {
