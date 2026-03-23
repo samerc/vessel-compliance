@@ -2997,10 +2997,16 @@ function RevisionHistorySection({ policyNumber, currentPolicyId, onViewRevision 
   const isLight = theme === 'light'
 
   useEffect(() => {
+    if (!policyNumber) { setLoading(false); return }
     (async () => {
       try {
         const revs = await window.api.policyGetRevisions(policyNumber)
-        setRevisions(Array.isArray(revs) ? revs : [])
+        if (Array.isArray(revs)) {
+          setRevisions(revs)
+        } else {
+          // Fallback: just show current policy info
+          setRevisions([])
+        }
       } catch { /* ignore */ }
       finally { setLoading(false) }
     })()
