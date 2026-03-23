@@ -180,7 +180,7 @@ function bcDetailRow(label: string, value: string): TableRow {
         borders: bcNoBorders(),
         children: [
           new Paragraph({
-            spacing: { before: 30, after: 30 },
+            spacing: { before: 60, after: 60 },
             children: [bcText(label, { caps: true })],
           }),
         ],
@@ -190,7 +190,7 @@ function bcDetailRow(label: string, value: string): TableRow {
         borders: bcNoBorders(),
         children: [
           new Paragraph({
-            spacing: { before: 30, after: 30 },
+            spacing: { before: 60, after: 60 },
             children: [bcText(`: ${value}`)],
           }),
         ],
@@ -219,17 +219,7 @@ function bcFormatDate(dateStr: string | null | undefined): string {
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
-/** Render multi-line title (split on \n) as centered bold paragraphs */
-function bcTitleBlock(titleText: string, spacingAfter: number = 300): Paragraph[] {
-  const lines = titleText.split('\n').filter(Boolean)
-  return lines.map((line, i) =>
-    bcParagraph(line.trim(), {
-      bold: true,
-      alignment: AlignmentType.CENTER,
-      spacingAfter: i === lines.length - 1 ? spacingAfter : 40,
-    })
-  )
-}
+// bcTitleBlock removed — title rendering inlined with per-line size control
 
 // ==================== BBC / WRC Page Builder ====================
 
@@ -255,24 +245,16 @@ function buildBbcWrcPage(
 
   const children: Paragraph[] = []
 
-  // 1. NOT TRANSFERABLE — bold, right-aligned
-  children.push(bcParagraph('NOT TRANSFERABLE', {
-    bold: true,
-    caps: true,
-    alignment: AlignmentType.RIGHT,
-    spacingAfter: 120,
+  // 1+2. REF (left) + NOT TRANSFERABLE (right) on same line
+  children.push(new Paragraph({
+    spacing: { after: 300 },
+    children: [
+      bcText(`REF: ${ref}`, { bold: true }),
+      new TextRun({ text: '\t', font: BC_FONT, size: BC_SIZE }),
+      bcText('NOT TRANSFERABLE', { bold: true }),
+    ],
+    tabStops: [{ type: 'right' as any, position: 9600 }],
   }))
-
-  // 2. REF line — bold
-  children.push(
-    new Paragraph({
-      spacing: { after: 300 },
-      children: [
-        bcText('REF: ', { bold: true }),
-        bcText(ref, { bold: true }),
-      ],
-    })
-  )
 
   // 3. To: flag authority
   children.push(bcParagraph('To:', { bold: true, spacingAfter: 40 }))
@@ -285,8 +267,18 @@ function buildBbcWrcPage(
     children.push(bcSpacer(200))
   }
 
-  // 4. Title lines — bold, centered (from settings, split on newlines)
-  children.push(...bcTitleBlock(settings[titleKey], 300))
+  // 4. Title lines — bold, centered, CERTIFICATE OF INSURANCE bigger
+  const titleLines = settings[titleKey].split('\n').filter(Boolean)
+  titleLines.forEach((line, i) => {
+    const isCertLine = line.trim().toUpperCase().startsWith('CERTIFICATE OF INSURANCE')
+    children.push(bcParagraph(line.trim(), {
+      bold: true,
+      alignment: AlignmentType.CENTER,
+      size: isCertLine ? 32 : BC_SIZE,
+      spacingBefore: i > 0 ? 120 : 0,
+      spacingAfter: i === titleLines.length - 1 ? 300 : 80,
+    }))
+  })
 
   // 5. Vessel details table (borderless key:value)
   const vesselRows = [
@@ -309,14 +301,23 @@ function buildBbcWrcPage(
   children.push(bcSpacer(240))
 
   // 6. Owner block
+  // 6. Owner label — NOT bold
   children.push(bcParagraph(
     'NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:',
-    { bold: true, caps: true, spacingAfter: 80 }
+    { bold: false, spacingAfter: 80 }
   ))
-  children.push(...bcAddressBlock([
-    data.ownerName || '',
-    ...(data.ownerAddress || '').split('\n'),
-  ], 240))
+  // 7. Owner name in bold + caps, address in normal
+  if (data.ownerName) {
+    children.push(bcParagraph(data.ownerName.toUpperCase(), { bold: true, spacingAfter: 40 }))
+  }
+  if (data.ownerAddress) {
+    children.push(...bcAddressBlock(
+      data.ownerAddress.split('\n').map(l => l.toUpperCase()),
+      240
+    ))
+  } else {
+    children.push(bcSpacer(240))
+  }
 
   // 7. Certification paragraph — justified (from settings)
   children.push(
@@ -330,54 +331,26 @@ function buildBbcWrcPage(
   // 8. Period of Insurance
   children.push(bcParagraph('Period of Insurance:', { bold: true, spacingAfter: 80 }))
 
-  // Period table: From | date | time | timezone (bold values)
+  // Period table: 3 columns — From/To (small) | date (bold) | time + timezone merged (bold)
+  const inceptionTimeTz = [data.inceptionTime, data.timezone].filter(Boolean).join(' ')
+  const expiryTimeTz = [data.expiryTime, data.timezone].filter(Boolean).join(' ')
+  const pLabelW = 600
+  const pDateW = 3400
+  const pTimeTzW = 6000
+
   const periodFromRow = new TableRow({
     children: [
-      new TableCell({
-        width: { size: 900, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText('From')] })],
-      }),
-      new TableCell({
-        width: { size: 3200, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText(inceptionFmt, { bold: true })] })],
-      }),
-      new TableCell({
-        width: { size: 1200, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText(data.inceptionTime || '', { bold: true })] })],
-      }),
-      new TableCell({
-        width: { size: 4700, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText(data.timezone || '', { bold: true })] })],
-      }),
+      new TableCell({ width: { size: pLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText('From', { bold: true })] })] }),
+      new TableCell({ width: { size: pDateW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(inceptionFmt, { bold: true })] })] }),
+      new TableCell({ width: { size: pTimeTzW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(inceptionTimeTz, { bold: true })] })] }),
     ],
   })
 
   const periodToRow = new TableRow({
     children: [
-      new TableCell({
-        width: { size: 900, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText('To')] })],
-      }),
-      new TableCell({
-        width: { size: 3200, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText(expiryFmt, { bold: true })] })],
-      }),
-      new TableCell({
-        width: { size: 1200, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText(data.expiryTime || '', { bold: true })] })],
-      }),
-      new TableCell({
-        width: { size: 4700, type: WidthType.DXA },
-        borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 30, after: 30 }, children: [bcText(data.timezone || '', { bold: true })] })],
-      }),
+      new TableCell({ width: { size: pLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText('To', { bold: true })] })] }),
+      new TableCell({ width: { size: pDateW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(expiryFmt, { bold: true })] })] }),
+      new TableCell({ width: { size: pTimeTzW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(expiryTimeTz, { bold: true })] })] }),
     ],
   })
 
@@ -402,7 +375,7 @@ function buildBbcWrcPage(
     new Paragraph({
       spacing: { after: 0 },
       children: [
-        bcText('PLACE & DATE:  ', { bold: true }),
+        bcText('PLACE & DATE:  '),
         bcText(`${city}${city ? ', ' : ''}${today}`),
       ],
     })
@@ -577,7 +550,7 @@ function buildMlcPage(
     new Paragraph({
       spacing: { after: 0 },
       children: [
-        bcText('PLACE & DATE:  ', { bold: true }),
+        bcText('PLACE & DATE:  '),
         bcText(`${city}${city ? ', ' : ''}${today}`),
       ],
     })
