@@ -4398,13 +4398,23 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
 
     const handleSaveInstalments = async (count: number) => {
         const adminDays = instalmentDefaults[String(count)]
+        const countChanged = count !== instalments.length
         const insts: { instalmentNumber: number; daysFromInception: number }[] = []
         for (let i = 0; i < count; i++) {
-            const existing = instalments.find(inst => inst.instalmentNumber === i + 1)
-            insts.push({
-                instalmentNumber: i + 1,
-                daysFromInception: existing?.daysFromInception ?? adminDays?.[i] ?? getDefaultDays(count, i) ?? 0
-            })
+            if (countChanged) {
+                // Count changed — always use admin defaults or hardcoded defaults
+                insts.push({
+                    instalmentNumber: i + 1,
+                    daysFromInception: adminDays?.[i] ?? getDefaultDays(count, i) ?? 0
+                })
+            } else {
+                // Count unchanged — preserve existing values
+                const existing = instalments.find(inst => inst.instalmentNumber === i + 1)
+                insts.push({
+                    instalmentNumber: i + 1,
+                    daysFromInception: existing?.daysFromInception ?? adminDays?.[i] ?? getDefaultDays(count, i) ?? 0
+                })
+            }
         }
         await window.api.setQuotationInstalments(quotation.id, insts)
         loadInstalments()
