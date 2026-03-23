@@ -387,7 +387,11 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     borderRadius: '10px', background: 'rgba(255, 176, 32, 0.12)', border: '1px solid rgba(255, 176, 32, 0.3)',
                     color: isLight ? '#8a6400' : '#ffb020', fontSize: '0.85rem', fontWeight: 600
                 }}>
-                    <Lock size={16} /> This is an older revision (read-only). {revisions.length > 1 && 'Switch to the latest revision to make changes.'}
+                    <Lock size={16} /> {q.workflowStepName?.toLowerCase() === 'converted'
+                        ? 'This quotation has been converted to a policy (read-only).'
+                        : (q.revisionNumber || 0) > 0 && revisions.some(r => (r.revisionNumber || 0) > (q.revisionNumber || 0))
+                            ? `This is an older revision (read-only). ${revisions.length > 1 ? 'Switch to the latest revision to make changes.' : ''}`
+                            : 'This quotation is locked (read-only).'}
                 </div>
             )}
 
