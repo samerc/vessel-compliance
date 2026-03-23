@@ -429,16 +429,8 @@ function buildMlcPage(
 
   const children: Paragraph[] = []
 
-  // 1. REF line — bold
-  children.push(
-    new Paragraph({
-      spacing: { after: 300 },
-      children: [
-        bcText('REF: ', { bold: true }),
-        bcText(ref, { bold: true }),
-      ],
-    })
-  )
+  // 1. REF line — bold, right-aligned
+  children.push(bcParagraph(`REF: ${ref}`, { bold: true, alignment: AlignmentType.RIGHT, spacingAfter: 300 }))
 
   // 2. Full title — bold, centered (from settings)
   children.push(bcParagraph(settings[titleKey], {
@@ -447,56 +439,70 @@ function buildMlcPage(
     spacingAfter: 300,
   }))
 
-  // 3. Vessel details table (borderless)
-  const vesselTable = new Table({
-    width: { size: 10000, type: WidthType.DXA },
-    rows: [
-      bcDetailRow('NAME OF SHIP', data.vesselName),
-      bcDetailRow('IMO NUMBER', data.imoNumber),
-      bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
-      bcDetailRow('PORT OF REGISTRY', portOfRegistry),
+  // 3. Vessel details table — 3 columns (label | : | value bold)
+  const mlcLabelW = 4000
+  const mlcColonW = 400
+  const mlcValueW = 5600
+  const mlcDetailRow = (label: string, value: string) => new TableRow({
+    children: [
+      new TableCell({ width: { size: mlcLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(label, { caps: true })] })] }),
+      new TableCell({ width: { size: mlcColonW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(':')] })] }),
+      new TableCell({ width: { size: mlcValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(value, { bold: true })] })] }),
     ],
   })
-  children.push(vesselTable as unknown as Paragraph)
 
-  children.push(bcSpacer(120))
+  const vesselRows = [
+    mlcDetailRow('NAME OF SHIP', data.vesselName),
+    mlcDetailRow('IMO NUMBER', data.imoNumber),
+    mlcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
+    mlcDetailRow('PORT OF REGISTRY', portOfRegistry),
+  ]
 
-  // 4. Period of insurance — inline
-  children.push(
-    new Paragraph({
-      spacing: { after: 240 },
-      children: [
-        bcText('PERIOD OF INSURANCE', { bold: true }),
-        bcText(`   :   FROM ${inceptionFmt.toUpperCase()} TO ${expiryFmt.toUpperCase()}`),
-      ],
-    })
-  )
+  // 3b. Period row inside the vessel table
+  vesselRows.push(new TableRow({
+    children: [
+      new TableCell({ width: { size: mlcLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText('PERIOD OF INSURANCE')] })] }),
+      new TableCell({ width: { size: mlcColonW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(':')] })] }),
+      new TableCell({ width: { size: mlcValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(`FROM ${inceptionFmt.toUpperCase()} TO ${expiryFmt.toUpperCase()}`, { bold: true })] })] }),
+    ],
+  }))
 
-  // 5. Shipowner block
+  children.push(new Table({
+    width: { size: 10000, type: WidthType.DXA },
+    rows: vesselRows,
+  }) as unknown as Paragraph)
+
+  children.push(bcSpacer(200))
+
+  // 5. Shipowner block — label NOT bold, entity bold + uppercase
   children.push(bcParagraph(
     'NAME OF THE SHIPOWNER ON WHOSE BEHALF FINANCIAL SECURITY HAS BEEN PROVIDED:',
-    { bold: true, caps: true, spacingAfter: 80 }
+    { bold: false, spacingAfter: 80 }
   ))
-  children.push(...bcAddressBlock([
-    data.ownerName || '',
-    ...(data.ownerAddress || '').split('\n'),
-  ], 240))
+  if (data.ownerName) {
+    children.push(bcParagraph(data.ownerName.toUpperCase(), { bold: true, spacingAfter: 40 }))
+  }
+  if (data.ownerAddress) {
+    children.push(...bcAddressBlock(data.ownerAddress.split('\n').map(l => l.toUpperCase()), 240))
+  } else {
+    children.push(bcSpacer(200))
+  }
 
-  // 6. Provider block
+  // 6. Provider block — label NOT bold, entity from settings
   children.push(bcParagraph(
-    'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY:',
-    { bold: true, caps: true, spacingAfter: 80 }
+    'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY',
+    { bold: false, spacingAfter: 80 }
   ))
   children.push(...bcAddressBlock([
     data.companyName,
     ...(mlcCompanyAddress || '').split('\n'),
     mlcWebsite,
-  ], 240))
+  ].filter(Boolean), 240))
 
-  // 7. Contact details
+  // 7. Contact details — label NOT bold, values bold
   children.push(bcParagraph(
     'CONTACT DETAILS OF THE PERSONS OR ENTITY RESPONSIBLE FOR HANDLING SEAFARERS\u2019 REQUEST FOR RELIEF:',
-    { bold: true, caps: true, spacingAfter: 80 }
+    { bold: false, spacingAfter: 80 }
   ))
   if (mlcEmail) {
     children.push(
@@ -545,7 +551,7 @@ function buildMlcPage(
     })
   )
 
-  // 10. Place & date
+  // 10. Place & date — NOT bold
   children.push(
     new Paragraph({
       spacing: { after: 0 },
@@ -603,6 +609,42 @@ export async function exportBlueCardDocx(
   const settings = await loadBcSettings()
   const children = await buildBlueCardPage(data, cardType, true, settings)
 
+  // Build header + footer matching policy style
+  const headerParas: Paragraph[] = []
+  try {
+    const sectionTexts = await window.api.piGetSectionTexts()
+    const headerHtml = sectionTexts?.docHeader
+    if (headerHtml) {
+      const hSpacing = (sectionTexts as any).docHeaderSpacing || undefined
+      headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hSpacing }))
+    }
+  } catch { /* no header */ }
+  // Add policy number + vessel name line
+  headerParas.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 40, after: 0 },
+    children: [
+      new TextRun({ text: data.policyNumber, size: BC_SIZE, font: BC_FONT, bold: true }),
+      new TextRun({ text: data.vesselName ? ` \u2014 ${data.vesselName}` : '', size: BC_SIZE, font: BC_FONT, bold: true }),
+    ],
+  }))
+
+  // Footer text from settings (no page number for blue cards)
+  const footerParas: Paragraph[] = []
+  try {
+    const raw = await window.api.getSetting('policyExportSettings')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.footerText) {
+        footerParas.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 0 },
+          children: [new TextRun({ text: parsed.footerText, size: 14, font: BC_FONT, color: '999999', italics: true })],
+        }))
+      }
+    }
+  } catch { /* no footer */ }
+
   const document = new Document({
     sections: [{
       properties: {
@@ -615,6 +657,8 @@ export async function exportBlueCardDocx(
           },
         },
       },
+      headers: headerParas.length > 0 ? { default: new Header({ children: headerParas }) } : undefined,
+      footers: footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
       children: children as any[],
     }],
   })
