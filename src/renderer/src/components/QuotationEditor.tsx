@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList, ClipboardCheck } from 'lucide-react'
-import { Quotation, PolicyType, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText } from '../../../shared/types'
+import { Quotation, Vessel, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIExclusion, PIAdditionalClause, PIAdditionalClauseSet, Entity, AssuredRole, QuotationAssured, QuotationDeductible, QuotationSubLimit, QuotationExcludedCountry, QuotationInstalment, QuotationNote, QuotationTextDeductible, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, PISectionTexts, PITextDeductible, PISanctionsVersion, InstalmentDefaults, QuotationVessel, PISubjectivity, QuotationSubjectivity, DocumentType, TradingWarrantyTemplate, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -143,7 +143,7 @@ interface QuotationEditorProps {
 export default function QuotationEditor({ quotation, onBack, onOpenQuotation, onNavigateToPolicy: _onNavigateToPolicy, onNavigateToPolicySetup, policyContext, onReturnToPolicy }: QuotationEditorProps) {
     const [activeTab, setActiveTab] = useState<EditorTab>('vessel')
     const [q, setQ] = useState<Quotation>(quotation)
-    const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
+    // policyTypes removed — type shown as badge, not editable
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [globalTexts, setGlobalTexts] = useState<PISectionTexts>(DEFAULT_SECTION_TEXTS)
     const [sanctionsVersions, setSanctionsVersions] = useState<PISanctionsVersion[]>([])
@@ -171,7 +171,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     }, [])
 
     const loadMasterData = async () => {
-        const [fullQ, pt, v, gt, sv] = await Promise.all([
+        const [fullQ, , v, gt, sv] = await Promise.all([
             window.api.getQuotation(quotation.id),
             window.api.getPolicyTypes(),
             window.api.getVessels(),
@@ -208,7 +208,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 if (safeAlts.length >= 2 && !selectedPIAltId) setSelectedPIAltId(safeAlts[0].id)
             }
         }
-        setPolicyTypes(Array.isArray(pt) ? pt : [])
+        // policyTypes removed
         setVessels(Array.isArray(v) ? v : [])
         if (gt && Object.keys(gt).length > 0) setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
         setSanctionsVersions(sv)
@@ -540,31 +540,19 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         )}
                     </div>
                 </div>
-                {/* Row 2: Fields */}
+                {/* Row 2: Minimal fields */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Date:</span>
                         <input type="date" value={q.quotationDate || ''} onChange={e => { setQ(prev => ({ ...prev, quotationDate: e.target.value })); updateField('quotationDate', e.target.value) }} disabled={isLocked || !canEdit} style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Policy:</span>
-                        <select value={q.policyTypeId || ''} onChange={e => { setQ(prev => ({ ...prev, policyTypeId: e.target.value })); updateField('policyTypeId', e.target.value || null) }} disabled={isLocked || !canEdit} style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}>
-                            <option value="">Select type</option>
-                            {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
-                        </select>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Currency:</span>
                         <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked || !canEdit} style={{ width: '60px', padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem' }} />
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={q.isRenewal} onChange={e => { setQ(prev => ({ ...prev, isRenewal: e.target.checked })); updateField('isRenewal', e.target.checked) }} disabled={isLocked || !canEdit} style={{ width: '15px', height: '15px', accentColor: 'var(--accent-primary)' }} />
-                        Renewal
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: '180px' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flexShrink: 0 }}>Title:</span>
-                        <input type="text" value={q.title || ''} onChange={e => setQ(prev => ({ ...prev, title: e.target.value }))} onBlur={e => updateField('title', e.target.value || null)} placeholder="Auto from vessel/fleet…" disabled={isLocked || !canEdit} style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem' }} />
-                    </div>
+                    {q.title && (
+                        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{q.title}</span>
+                    )}
                 </div>
             </div>
 
