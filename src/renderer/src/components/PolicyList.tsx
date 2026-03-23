@@ -29,13 +29,14 @@ interface PolicyListItem {
     premiumAmount?: number
     createdAt?: string
     updatedAt?: string
+    exportedAt?: string
 }
 
 interface PolicyListProps {
     onSelectPolicy: (policyId: string) => void
 }
 
-type SortField = 'policyNumber' | 'policyTypeName' | 'vesselName' | 'customerName' | 'inceptionDate' | 'expiryDate' | 'status' | 'premiumAmount'
+type SortField = 'policyNumber' | 'policyTypeName' | 'vesselName' | 'customerName' | 'inceptionDate' | 'expiryDate' | 'status' | 'premiumAmount' | 'createdAt' | 'exportedAt'
 type SortDir = 'asc' | 'desc'
 
 const PAGE_SIZE = 25
@@ -291,13 +292,19 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                             <th style={thStyle('premiumAmount', 'right')} onClick={() => toggleSort('premiumAmount')}>
                                 Premium <SortIcon field="premiumAmount" />
                             </th>
+                            <th style={thStyle('createdAt')} onClick={() => toggleSort('createdAt')}>
+                                Converted <SortIcon field="createdAt" />
+                            </th>
+                            <th style={thStyle('exportedAt')} onClick={() => toggleSort('exportedAt')}>
+                                Exported <SortIcon field="exportedAt" />
+                            </th>
                             <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {paginated.length === 0 ? (
                             <tr>
-                                <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <td colSpan={10} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                     <FileCheck size={36} style={{ opacity: 0.3, marginBottom: '10px' }} />
                                     <div style={{ fontSize: '0.9rem' }}>
                                         {loading ? 'Loading policies...' : policies.length === 0 ? 'No policies found' : 'No policies match your filters'}
@@ -349,6 +356,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     </td>
                                     <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.82rem', fontWeight: p.premiumAmount ? 600 : 400, whiteSpace: 'nowrap' }}>
                                         {formatCurrency(p.premiumAmount, p.currency)}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                        {p.createdAt ? formatDateShort(p.createdAt) : '-'}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: p.exportedAt ? (isLight ? '#047857' : '#34d399') : 'var(--text-secondary)' }}>
+                                        {p.exportedAt ? formatDateShort(p.exportedAt) : <span style={{ fontStyle: 'italic' }}>Not exported</span>}
                                     </td>
                                     <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                                         {hasPermission('policies:manage') && (

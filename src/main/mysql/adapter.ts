@@ -7430,6 +7430,7 @@ export class MySQLAdapter {
                     pd.timezone, pd.premium_amount as premiumAmount,
                     pd.commission_percent as commissionPercent,
                     pd.created_at as createdAt,
+                    pd.exported_at as exportedAt,
                     v.name as vesselName, v.imo_number as imoNumber,
                     e.name as customerName,
                     qt.code as quotationTypeCode, qt.name as quotationTypeName,
