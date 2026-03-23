@@ -1584,37 +1584,82 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     ? formatDateLong(data.quotation.quotationDate)
     : ''
 
-  // Paragraph helpers - 11pt Arial black, line spacing 1.0
-  const np = (text: string) => new Paragraph({
+  // ---- Renewal change-highlighting: load original quotation data ----
+  let origData: QuotationData | null = null
+  if (quotation.renewedFromPolicyId) {
+    try {
+      const policy = await window.api.policyGetById(quotation.renewedFromPolicyId)
+      if (policy?.quotationId) {
+        const origQuotation = await window.api.getQuotation(policy.quotationId)
+        if (origQuotation) {
+          origData = await gatherData(origQuotation)
+        }
+      }
+    } catch { /* no comparison available — export without highlights */ }
+  }
+
+  // Build sets from original data for quick lookups
+  const origWarrantyIds = new Set(origData?.selectedWarrantyIds || [])
+  const origCustomWarrantyTexts = new Set((origData?.customWarranties || []).map(cw => cw.text))
+  const origClauseIds = new Set(origData?.selectedClauseIds || [])
+  const origExclusionPiIds = new Set(
+    (origData?.selectedExclusions || []).filter(e => e.piExclusionId).map(e => e.piExclusionId!)
+  )
+  const origCustomExclusionTexts = new Set((origData?.customExclusions || []).map(ce => ce.text))
+  const origDeductiblePiIds = new Set((origData?.deductibles || []).map(d => d.piDeductibleId).filter(Boolean))
+  const origTextDeductibleTexts = new Set((origData?.textDeductibles || []).map(td => td.text))
+  const origSubjectivityPiIds = new Set(
+    (origData?.subjectivities || []).map(s => (s as any).piSubjectivityId).filter(Boolean)
+  )
+  const origAdditionalClauseIds = new Set(
+    (origData?.additionalClauses || []).filter(ac => ac.piAdditionalClauseId).map(ac => ac.piAdditionalClauseId!)
+  )
+  const origSurveyWarrantyTexts = new Set((origData?.surveyWarranties || []).map(sw => sw.text))
+  const origHullConditionIds = new Set((origData?.hullConditions || []).map(hc => hc.hullConditionId))
+  const origHullAdditionalConditionIds = new Set(
+    (origData?.hullAdditionalConditions || []).map(ha => ha.hullAdditionalConditionId)
+  )
+  const origWarConditionIds = new Set((origData?.warConditions || []).map(wc => wc.warConditionId))
+  const RED = 'FF0000'
+
+  // Paragraph helpers - 11pt Arial black, line spacing 1.0 (with optional color for change highlighting)
+  const np = (text: string, color?: string) => new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
+    children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
   })
 
-  const bp = (text: string) => new Paragraph({
+  const bp = (text: string, color?: string) => new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true })]
+    children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000', bold: true })]
   })
   const bup = (text: string) => new Paragraph({
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true, underline: {} })]
   })
 
-  const bulletP = (text: string) => new Paragraph({
+  const bulletP = (text: string, color?: string) => new Paragraph({
     numbering: { reference: 'dash-bullet', level: 0 },
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 40, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
+    children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
+  })
+
+  // Strikethrough red bullet for removed items
+  const strikeP = (text: string) => new Paragraph({
+    numbering: { reference: 'dash-bullet', level: 0 },
+    spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text, size: 22, font: 'Arial', color: RED, strike: true })]
   })
 
   const emptyP = () => new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [] })
 
-  const mp = (text: string): Paragraph[] => {
+  const mp = (text: string, color?: string): Paragraph[] => {
     if (!text) return []
-    if (isHtml(text)) return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+    if (isHtml(text)) return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED })
     return text.split('\n').map(p =>
-      p.trim() ? np(p) : emptyP()
+      p.trim() ? np(p, color) : emptyP()
     )
   }
 
@@ -1770,7 +1815,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   // ---- Period ----
   if (data.quotation.periodText) {
-    rowMap.set('period', makeRow('Period', mp(data.quotation.periodText)))
+    const periodChanged = origData && data.quotation.periodText !== origData.quotation.periodText
+    rowMap.set('period', makeRow('Period', mp(data.quotation.periodText, periodChanged ? RED : undefined)))
   }
 
   // ---- Conditions ----
@@ -1791,10 +1837,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const displayName = stripClauseRef(c.name || '')
         const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
         const rightText = (displayName ? `${displayName}${clauseDesc}` : (desc || '')) + cScope
+        const isNewClause = origData && !origClauseIds.has(c.id)
+        const clauseColor = isNewClause ? RED : '000000'
         return new TableRow({
           children: [
-            new TableCell({ width: { size: clauseRefW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Section B Cl.${c.clauseNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: clauseDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: rightText, size: 22, font: 'Arial', color: '000000' })] })] })
+            new TableCell({ width: { size: clauseRefW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Section B Cl.${c.clauseNumber}`, size: 22, font: 'Arial', color: clauseColor })] })] }),
+            new TableCell({ width: { size: clauseDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: rightText, size: 22, font: 'Arial', color: clauseColor })] })] })
           ]
         })
       })
@@ -1807,12 +1855,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const text = ac.customText || def?.text || ''
         const acScope = vesselScopeSuffix(ac.vesselScope, data.quotationVessels)
         if (!text) return null
+        const isNewAddl = origData && ac.piAdditionalClauseId && !origAdditionalClauseIds.has(ac.piAdditionalClauseId)
+        const addlColor = isNewAddl ? RED : '000000'
         return new Paragraph({
           numbering: { reference: 'dash-bullet', level: 0 },
           spacing: { after: 40 },
           children: [
-            ...(code ? [new TextRun({ text: code + ' ', size: 22, font: 'Arial', color: '000000' })] : []),
-            new TextRun({ text: text + acScope, size: 22, font: 'Arial', color: '000000' })
+            ...(code ? [new TextRun({ text: code + ' ', size: 22, font: 'Arial', color: addlColor })] : []),
+            new TextRun({ text: text + acScope, size: 22, font: 'Arial', color: addlColor })
           ]
         })
       }).filter(Boolean) as Paragraph[]
@@ -1957,10 +2007,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, data.quotation.premiumCurrency || 'USD'))
           }
           const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+          const isNewHC = origData && !origHullConditionIds.has(qc.hullConditionId)
+          const hcColor = isNewHC ? RED : '000000'
           return new TableRow({
             children: [
-              new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: '000000' })] })] }),
-              new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: '000000' })] })] })
+              new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: hcColor })] })] }),
+              new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: hcColor })] })] })
             ]
           })
         }).filter(Boolean) as TableRow[]
@@ -1971,10 +2023,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return def?.hullClauseId || ''
       }
 
-      const dAddlBullet = (condText: string) => new Paragraph({
+      const dAddlBullet = (condText: string, color?: string) => new Paragraph({
         numbering: { reference: 'dash-bullet', level: 0 },
         spacing: { after: 40 },
-        children: [new TextRun({ text: condText, size: 22, font: 'Arial', color: '000000' })]
+        children: [new TextRun({ text: condText, size: 22, font: 'Arial', color: color || '000000' })]
       })
 
       // Determine where each additional condition belongs
@@ -2007,7 +2059,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           }
           condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          paras.push(dAddlBullet(condText + scope))
+          const isNewHullAddl = origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
+          paras.push(dAddlBullet(condText + scope, isNewHullAddl ? RED : undefined))
         }
         return paras
       }
@@ -2179,7 +2232,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             }
             condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
             const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-            hcContent.push(dAddlBullet(condText + scope))
+            const isNewHullAddlInline = origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
+            hcContent.push(dAddlBullet(condText + scope, isNewHullAddlInline ? RED : undefined))
           }
         }
       }
@@ -2211,7 +2265,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (!def) continue
         const text = resolveWarText(qc.textOverride || def.text)
         const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
-        wcContent.push(bulletP(text + scope))
+        const isNewWarCond = origData && !origWarConditionIds.has(qc.warConditionId)
+        wcContent.push(bulletP(text + scope, isNewWarCond ? RED : undefined))
       }
       // T&C line
       if (data.warSettings?.tcText) {
@@ -2233,25 +2288,37 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const tradContent: (Paragraph | Table)[] = []
     const wExcCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
     const wDdqListStr = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
-    const numP = (text: string, level: number) => new Paragraph({
+    // Compare trading intro text with original
+    const tradIntroChanged = origData && wq.tradingWarrantyIntro !== origData.quotation.tradingWarrantyIntro
+    // Compare excluded countries lists
+    const origExcCountryNames = new Set((origData?.excludedCountries || []).filter(c => c.listType === 'excluded').map(c => c.name))
+    void ((origData?.excludedCountries || []).filter(c => c.listType === 'ddq')) // DDQ countries not compared individually
+    const numP = (text: string, level: number, color?: string) => new Paragraph({
       numbering: { reference: 'trading-numbered', level },
       spacing: { before: level === 0 ? 120 : 0, after: 80, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
+      children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
     })
-    if (wq.tradingWarrantyIntro) tradContent.push(...mp(wq.tradingWarrantyIntro))
+    if (wq.tradingWarrantyIntro) tradContent.push(...mp(wq.tradingWarrantyIntro, tradIntroChanged ? RED : undefined))
     if (wq.tradingCustomMode && wq.tradingCustomWording) {
       // Custom mode: output custom wording instead of numbered paragraphs
+      const customWordingChanged = origData && wq.tradingCustomWording !== origData.quotation.tradingCustomWording
       tradContent.push(emptyP())
-      tradContent.push(...mp(wq.tradingCustomWording))
+      tradContent.push(...mp(wq.tradingCustomWording, customWordingChanged ? RED : undefined))
     } else {
       // Standard mode: numbered paragraphs
       if (wq.tradingCustomText) {
+        const customTextChanged = origData && wq.tradingCustomText !== origData.quotation.tradingCustomText
         tradContent.push(emptyP())
-        tradContent.push(...mp(wq.tradingCustomText))
+        tradContent.push(...mp(wq.tradingCustomText, customTextChanged ? RED : undefined))
       }
       if (wExcCountries.length > 0) {
+        // Highlight if excluded countries list changed
+        const excCountriesChanged = origData && (
+          wExcCountries.length !== origExcCountryNames.size ||
+          wExcCountries.some(c => !origExcCountryNames.has(c.name))
+        )
         tradContent.push(emptyP())
-        tradContent.push(np('Excluding ' + wExcCountries.map(c => c.name).join(', ') + '.'))
+        tradContent.push(np('Excluding ' + wExcCountries.map(c => c.name).join(', ') + '.', excCountriesChanged ? RED : undefined))
       }
       if (wq.tradingShowDdqList && ddqCountries.length > 0) {
         let ddqIntroText = stripHtml(st(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
@@ -2300,15 +2367,36 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       for (const wid of warIds) {
         const w = data.allWarranties.find(ww => ww.id === wid)
         if (!w) continue
+        const isNewWar = origData && !origWarrantyIds.has(wid)
+        const warColor = isNewWar ? RED : undefined
         const wVesselScope = data.warrantyVesselScopes[wid]
         for (const entry of resolveIacsWarranty(w.text, wVesselScope, data)) {
-          paras.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels)))
+          paras.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels), warColor))
         }
       }
       for (const cw of customs) {
+        const isNewCW = origData && !origCustomWarrantyTexts.has(cw.text)
+        const cwColor = isNewCW ? RED : undefined
         for (const entry of resolveIacsWarranty(cw.text, cw.vesselScope, data)) {
-          paras.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels)))
+          paras.push(bulletP(entry.text + vesselScopeSuffix(entry.vesselScope, data.quotationVessels), cwColor))
         }
+      }
+      return paras
+    }
+
+    // Render removed warranties (from original but not in current) as strikethrough red
+    const renderRemovedWarranties = () => {
+      if (!origData) return []
+      const paras: Paragraph[] = []
+      const currentWarIds = new Set(data.selectedWarrantyIds)
+      for (const wid of origData.selectedWarrantyIds) {
+        if (currentWarIds.has(wid)) continue
+        const w = origData.allWarranties.find(ww => ww.id === wid)
+        if (w) paras.push(strikeP(w.text))
+      }
+      const currentCWTexts = new Set(data.customWarranties.map(cw => cw.text))
+      for (const cw of origData.customWarranties) {
+        if (!currentCWTexts.has(cw.text)) paras.push(strikeP(cw.text))
       }
       return paras
     }
@@ -2317,7 +2405,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dIsWar = data.quotation.quotationTypeCode === 'W'
     const renderSurveyWarBullets = (items: typeof data.surveyWarranties): Paragraph[] => {
       if (dIsWar) return []
-      return items.map(sw => bulletP(sw.text + vesselScopeSuffix(sw.vesselScope, data.quotationVessels)))
+      return items.map(sw => {
+        const isNewSW = origData && !origSurveyWarrantyTexts.has(sw.text)
+        return bulletP(sw.text + vesselScopeSuffix(sw.vesselScope, data.quotationVessels), isNewSW ? RED : undefined)
+      })
     }
 
     if (dPiMultiAltW) {
@@ -2344,6 +2435,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
     }
 
+    // Render removed warranties (from original but not in current)
+    const removedWars = renderRemovedWarranties()
+    if (removedWars.length > 0) warContent.push(...removedWars)
+
     if (st(data, 'warrantiesAdditionalText')) {
       warContent.push(emptyP())
       warContent.push(...mp(st(data, 'warrantiesAdditionalText')))
@@ -2369,18 +2464,23 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const dedRows: TableRow[] = []
       for (const d of deds) {
         const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
+        const isNewDed = origData && d.piDeductibleId && !origDeductiblePiIds.has(d.piDeductibleId)
+        // Also check if amount changed for existing deductibles
+        const origDed = origData && d.piDeductibleId ? origData.deductibles.find(od => od.piDeductibleId === d.piDeductibleId) : null
+        const amountChanged = origDed && origDed.amount !== d.amount
+        const dedColor = (isNewDed || amountChanged) ? RED : '000000'
         dedRows.push(new TableRow({
           children: [
-            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___') + dScope, size: 22, font: 'Arial', color: '000000' })] })] })
+            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: dedColor })] })] }),
+            new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___') + dScope, size: 22, font: 'Arial', color: dedColor })] })] })
           ]
         }))
         if (d.secondaryDescription) {
           const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
           dedRows.push(new TableRow({
             children: [
-              new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: '000000' })] })] }),
-              new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: '000000' })] })] })
+              new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: dedColor })] })] }),
+              new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: dedColor })] })] })
             ]
           }))
         }
@@ -2415,17 +2515,17 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dPiMultiAltTD = data.piAlternatives.length > 1 && hasAltScoping(data.textDeductibles)
     if (dPiMultiAltTD) {
       const sharedTds = data.textDeductibles.filter(td => !td.alternativeId)
-      for (const td of sharedTds) { dedContent.push(emptyP()); dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+      for (const td of sharedTds) { const tdColor = origData && !origTextDeductibleTexts.has(td.text) ? RED : undefined; dedContent.push(emptyP()); dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)) }
       for (const alt of data.piAlternatives) {
         const altTds = data.textDeductibles.filter(td => td.alternativeId === alt.id)
         if (altTds.length > 0) {
           dedContent.push(emptyP())
           dedContent.push(bup(`Applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
-          for (const td of altTds) { dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+          for (const td of altTds) { const tdColor = origData && !origTextDeductibleTexts.has(td.text) ? RED : undefined; dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)) }
         }
       }
     } else {
-      for (const td of data.textDeductibles) { dedContent.push(emptyP()); dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels))) }
+      for (const td of data.textDeductibles) { const tdColor = origData && !origTextDeductibleTexts.has(td.text) ? RED : undefined; dedContent.push(emptyP()); dedContent.push(np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)) }
     }
     if (st(data, 'deductiblesAdditionalText')) { dedContent.push(emptyP()); dedContent.push(...mp(st(data, 'deductiblesAdditionalText'))) }
     rowMap.set('deductibles', makeRow('Deductibles', dedContent))
@@ -2464,7 +2564,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const dCommonItems = allExclItems.filter(e => e.exclId && dCommonExclIds.has(e.exclId) && e.altId === dAltIds[0])
       const dBaseItems = [...dSharedItems, ...dCommonItems]
       if (dBaseItems.length > 0) {
-        exclContent.push(...dBaseItems.map(e => bulletP(e.text)))
+        exclContent.push(...dBaseItems.map(e => {
+          const isNewExcl = origData && e.exclId ? !origExclusionPiIds.has(e.exclId) : (origData && !e.exclId ? !origCustomExclusionTexts.has(e.text) : false)
+          return bulletP(e.text, isNewExcl ? RED : undefined)
+        }))
       }
       // Per-alternative additional exclusions
       for (const alt of data.piAlternatives) {
@@ -2472,12 +2575,43 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (altOnly.length > 0) {
           exclContent.push(emptyP())
           exclContent.push(bup(`Additional exclusions applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
-          exclContent.push(...altOnly.map(e => bulletP(e.text)))
+          exclContent.push(...altOnly.map(e => {
+            const isNewExcl = origData && e.exclId ? !origExclusionPiIds.has(e.exclId) : (origData && !e.exclId ? !origCustomExclusionTexts.has(e.text) : false)
+            return bulletP(e.text, isNewExcl ? RED : undefined)
+          }))
+        }
+      }
+      // Render removed exclusions from original
+      if (origData) {
+        const currentExclPiIds = new Set(data.selectedExclusions.filter(e => e.piExclusionId).map(e => e.piExclusionId!))
+        const currentCustomExclTexts = new Set(data.customExclusions.map(ce => ce.text))
+        for (const oe of origData.selectedExclusions) {
+          if (oe.piExclusionId && !currentExclPiIds.has(oe.piExclusionId)) {
+            const def = origData.allExclusions.find(e => e.id === oe.piExclusionId)
+            if (def) exclContent.push(strikeP(def.text))
+          }
+        }
+        for (const oce of origData.customExclusions) {
+          if (!currentCustomExclTexts.has(oce.text)) exclContent.push(strikeP(oce.text))
         }
       }
       rowMap.set('exclusions', makeRow('Exclusions', exclContent))
     } else {
-      rowMap.set('exclusions', makeRow('Exclusions', exclusionTexts.map(t => bulletP(t))))
+      // Simple exclusion rendering with change highlighting
+      const exclParas = exclusionTexts.map(t => {
+        // Check if this text is new (not in original exclusion texts)
+        if (!origData) return bulletP(t)
+        const origExclTexts = getExclusionTexts(origData)
+        return bulletP(t, origExclTexts.includes(t) ? undefined : RED)
+      })
+      // Add removed exclusion texts
+      if (origData) {
+        const origExclTexts = getExclusionTexts(origData)
+        for (const ot of origExclTexts) {
+          if (!exclusionTexts.includes(ot)) exclParas.push(strikeP(ot))
+        }
+      }
+      rowMap.set('exclusions', makeRow('Exclusions', exclParas))
     }
   }
 
@@ -2485,7 +2619,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   {
     const wordSanctionsText = getSanctionsText(data)
     if (wordSanctionsText) {
-      rowMap.set('sanctions', makeRow('Sanction Limitation and Exclusion Clause', mp(wordSanctionsText)))
+      const origSanctionsText = origData ? getSanctionsText(origData) : null
+      const sanctionsChanged = origData && origSanctionsText !== wordSanctionsText
+      rowMap.set('sanctions', makeRow('Sanction Limitation and Exclusion Clause', mp(wordSanctionsText, sanctionsChanged ? RED : undefined)))
     }
   }
 
@@ -2493,7 +2629,24 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   if (data.subjectivities.length > 0) {
     const subjContent: (Paragraph | Table)[] = []
     if (st(data, 'subjectivitiesIntro')) subjContent.push(...mp(st(data, 'subjectivitiesIntro')))
-    for (const s of data.subjectivities) { subjContent.push(bulletP(s.text + vesselScopeSuffix(s.vesselScope, data.quotationVessels))) }
+    for (const s of data.subjectivities) {
+      const isNewSubj = origData && s.piSubjectivityId && !origSubjectivityPiIds.has(s.piSubjectivityId)
+      const isNewCustomSubj = origData && s.isCustom && !(origData.subjectivities || []).some(os => os.text === s.text)
+      const subjColor = (isNewSubj || isNewCustomSubj) ? RED : undefined
+      subjContent.push(bulletP(s.text + vesselScopeSuffix(s.vesselScope, data.quotationVessels), subjColor))
+    }
+    // Render removed subjectivities
+    if (origData) {
+      const currentSubjPiIds = new Set(data.subjectivities.filter(s => s.piSubjectivityId).map(s => s.piSubjectivityId!))
+      const currentSubjTexts = new Set(data.subjectivities.map(s => s.text))
+      for (const os of origData.subjectivities) {
+        if (os.piSubjectivityId && !currentSubjPiIds.has(os.piSubjectivityId)) {
+          strikeP(os.text) && subjContent.push(strikeP(os.text))
+        } else if (os.isCustom && !currentSubjTexts.has(os.text)) {
+          subjContent.push(strikeP(os.text))
+        }
+      }
+    }
     if (st(data, 'subjectivitiesNote')) {
       subjContent.push(emptyP())
       subjContent.push(...mp(st(data, 'subjectivitiesNote')))
@@ -2627,7 +2780,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         premContent.push(emptyP())
       } else {
         // Single premium, no discount — plain bold text
-        premContent.push(bp(`${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`))
+        const premChanged = origData && origData.quotation.premiumAmount !== wq.premiumAmount
+        premContent.push(bp(`${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`, premChanged ? RED : undefined))
         premContent.push(emptyP())
       }
     }
