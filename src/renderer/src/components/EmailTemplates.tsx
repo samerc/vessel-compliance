@@ -37,7 +37,7 @@ export default function EmailTemplates(): React.JSX.Element {
   const { hasPermission } = useAuth()
   const { showSuccess, showError } = useToast()
   const isLight = theme === 'light'
-  const canManage = hasPermission('admin:settings')
+  const canManage = hasPermission('email:manage')
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)

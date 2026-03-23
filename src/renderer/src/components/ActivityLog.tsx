@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ScrollText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Filter } from 'lucide-react'
+import { ScrollText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Filter, ShieldAlert } from 'lucide-react'
 import { ActivityLogEntry, ActivityLogFilters } from '../../../shared/types'
+import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 
@@ -49,8 +50,21 @@ function getModuleColor(module: string) {
 }
 
 export default function ActivityLog() {
+  const { hasPermission } = useAuth()
   const { theme } = useTheme()
   const isLight = theme === 'light'
+
+  if (!hasPermission('admin:activityLog')) {
+    return (
+      <div style={{ padding: '64px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px' }}>
+        <ShieldAlert size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.3 }} />
+        <div style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+          Access Denied
+        </div>
+        <p style={{ color: 'var(--text-secondary)' }}>You do not have permission to view the activity log.</p>
+      </div>
+    )
+  }
 
   const [entries, setEntries] = useState<ActivityLogEntry[]>([])
   const [total, setTotal] = useState(0)

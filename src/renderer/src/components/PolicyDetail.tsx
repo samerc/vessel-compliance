@@ -981,13 +981,13 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     fontSize: '0.85rem'
   }
 
-  const exportBtnStyle: React.CSSProperties = {
-    padding: '6px 12px',
-    fontSize: '0.75rem',
+  const headerBtnStyle: React.CSSProperties = {
+    padding: '10px 20px',
+    fontSize: '0.9rem',
     fontWeight: 600,
-    display: 'inline-flex',
+    display: 'flex',
     alignItems: 'center',
-    gap: '5px'
+    gap: '8px'
   }
   const actionItemStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
@@ -1164,11 +1164,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           {!isEditing && hasPermission('policies:manage') && policy.status === 'active' && !policy.exportedAt && (
             <button
               className="btn-primary"
-              style={{ ...exportBtnStyle, fontWeight: 700 }}
+              style={{ ...headerBtnStyle }}
               onClick={enterEditMode}
               title="Edit Policy"
             >
-              <Edit3 size={14} /> Edit Policy
+              <Edit3 size={16} /> Edit Policy
             </button>
           )}
 
@@ -1176,7 +1176,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           <div style={{ position: 'relative' }} ref={actionsMenuRef}>
             <button
               className="btn-secondary"
-              style={{ ...exportBtnStyle, display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ ...headerBtnStyle }}
               onClick={() => setShowActionsMenu(!showActionsMenu)}
             >
               <MoreHorizontal size={16} /> Actions
@@ -1220,42 +1220,46 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     </button>
                   )}
 
-                  <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
-
-                  {/* Exports */}
-                  <button onClick={() => { setShowActionsMenu(false); handleExportPolicy() }} disabled={exportingPolicy} style={actionItemStyle} className="hover-effect">
-                    <Download size={15} /> Export Policy
-                  </button>
-                  <button onClick={() => { setShowActionsMenu(false); handleExportDA() }} disabled={exportingDA} style={actionItemStyle} className="hover-effect">
-                    <Download size={15} /> Export Debit Advice
-                  </button>
-                  {commissionAmount != null && commissionAmount > 0 && (
-                    <button onClick={() => { setShowActionsMenu(false); handleExportCA() }} disabled={exportingCA} style={actionItemStyle} className="hover-effect">
-                      <Download size={15} /> Export Credit Advice
-                    </button>
-                  )}
-                  {isPIType && blueCards.filter(bc => bc.status === 'active').length > 0 && (
+                  {hasPermission('reports:export') && (
                     <>
                       <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
-                      <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Blue Cards</div>
-                      {blueCards.filter(bc => bc.status === 'active').map(bc => (
-                        <button key={bc.id} onClick={async () => {
-                          setShowActionsMenu(false); setExportingBC(true)
-                          try { await handleExportSingleBC(bc); showSuccess(`${bc.cardType} exported`) }
-                          catch (err: any) { showError(err.message || 'Export failed') }
-                          finally { setExportingBC(false) }
-                        }} style={actionItemStyle} className="hover-effect">
-                          <Download size={15} /> {bc.cardNumber || bc.cardType}
+
+                      {/* Exports */}
+                      <button onClick={() => { setShowActionsMenu(false); handleExportPolicy() }} disabled={exportingPolicy} style={actionItemStyle} className="hover-effect">
+                        <Download size={15} /> Export Policy
+                      </button>
+                      <button onClick={() => { setShowActionsMenu(false); handleExportDA() }} disabled={exportingDA} style={actionItemStyle} className="hover-effect">
+                        <Download size={15} /> Export Debit Advice
+                      </button>
+                      {commissionAmount != null && commissionAmount > 0 && (
+                        <button onClick={() => { setShowActionsMenu(false); handleExportCA() }} disabled={exportingCA} style={actionItemStyle} className="hover-effect">
+                          <Download size={15} /> Export Credit Advice
                         </button>
-                      ))}
+                      )}
+                      {isPIType && blueCards.filter(bc => bc.status === 'active').length > 0 && (
+                        <>
+                          <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+                          <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Blue Cards</div>
+                          {blueCards.filter(bc => bc.status === 'active').map(bc => (
+                            <button key={bc.id} onClick={async () => {
+                              setShowActionsMenu(false); setExportingBC(true)
+                              try { await handleExportSingleBC(bc); showSuccess(`${bc.cardType} exported`) }
+                              catch (err: any) { showError(err.message || 'Export failed') }
+                              finally { setExportingBC(false) }
+                            }} style={actionItemStyle} className="hover-effect">
+                              <Download size={15} /> {bc.cardNumber || bc.cardType}
+                            </button>
+                          ))}
+                        </>
+                      )}
+
+                      <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+
+                      <button onClick={() => { setShowActionsMenu(false); handleExportQuickBooks() }} disabled={exportingQB} style={{ ...actionItemStyle, color: isLight ? '#007a91' : '#00aac8' }} className="hover-effect">
+                        <FileSpreadsheet size={15} /> Export to QuickBooks
+                      </button>
                     </>
                   )}
-
-                  <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
-
-                  <button onClick={() => { setShowActionsMenu(false); handleExportQuickBooks() }} disabled={exportingQB} style={{ ...actionItemStyle, color: isLight ? '#007a91' : '#00aac8' }} className="hover-effect">
-                    <FileSpreadsheet size={15} /> Export to QuickBooks
-                  </button>
                 </div>
               </>,
               document.body
@@ -1279,20 +1283,20 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   }
                 }
               })}
+              className="btn-secondary"
               style={{
-                background: 'transparent',
-                border: '1px solid var(--danger)',
+                background: 'rgba(255, 77, 77, 0.12)',
+                border: '1px solid rgba(255, 77, 77, 0.35)',
                 color: 'var(--danger)',
-                padding: '6px 14px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.82rem',
+                padding: '10px 20px',
+                fontSize: '0.9rem',
+                fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '8px'
               }}
             >
-              <Trash2 size={14} /> Delete
+              <Trash2 size={16} /> Delete
             </button>
           )}
         </div>
