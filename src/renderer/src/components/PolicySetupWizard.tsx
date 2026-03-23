@@ -908,21 +908,20 @@ function StepDetails({ data, banks, hasBroker, onUpdate, labelStyle, inputStyle 
       </p>
 
       {/* Commission */}
-      {hasBroker && (
-        <div style={{ marginBottom: '20px' }}>
-          <label style={labelStyle}>Commission %</label>
-          <input
-            type="number"
-            value={data.commissionPercent}
-            onChange={e => onUpdate({ commissionPercent: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-            min={0}
-            max={100}
-            step={0.01}
-            placeholder="e.g. 15"
-            style={{ ...inputStyle, width: '160px' }}
-          />
-        </div>
-      )}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={labelStyle}>Commission %{hasBroker ? '' : ' (optional)'}</label>
+        <input
+          type="number"
+          value={data.commissionPercent}
+          onChange={e => onUpdate({ commissionPercent: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+          min={0}
+          max={100}
+          step={0.01}
+          placeholder={hasBroker ? 'e.g. 15' : '0'}
+          style={{ ...inputStyle, width: '160px' }}
+        />
+        {hasBroker && <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Broker commission — will generate Credit Advice</p>}
+      </div>
 
       {/* Bank */}
       <div style={{ marginBottom: '20px' }}>
