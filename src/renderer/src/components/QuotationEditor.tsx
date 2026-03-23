@@ -506,6 +506,15 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                             )}
                         </div>
                     )}
+                    {/* Date + Currency inline */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Date:</span>
+                        <input type="date" value={q.quotationDate || ''} onChange={e => { setQ(prev => ({ ...prev, quotationDate: e.target.value })); updateField('quotationDate', e.target.value) }} disabled={isLocked || !canEdit} style={{ padding: '4px 6px', borderRadius: '6px', fontSize: '0.8rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Currency:</span>
+                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked || !canEdit} style={{ width: '50px', padding: '4px 6px', borderRadius: '6px', fontSize: '0.8rem' }} />
+                    </div>
                     {/* Spacer */}
                     <div style={{ flex: 1 }} />
                     {/* Actions dropdown */}
@@ -539,20 +548,6 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                             document.body
                         )}
                     </div>
-                </div>
-                {/* Row 2: Minimal fields */}
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Date:</span>
-                        <input type="date" value={q.quotationDate || ''} onChange={e => { setQ(prev => ({ ...prev, quotationDate: e.target.value })); updateField('quotationDate', e.target.value) }} disabled={isLocked || !canEdit} style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }} />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Currency:</span>
-                        <input type="text" value={q.premiumCurrency || 'USD'} onChange={e => setQ(p => ({ ...p, premiumCurrency: e.target.value }))} onBlur={e => updateField('premiumCurrency', e.target.value)} disabled={isLocked || !canEdit} style={{ width: '60px', padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem' }} />
-                    </div>
-                    {q.title && (
-                        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{q.title}</span>
-                    )}
                 </div>
             </div>
 
