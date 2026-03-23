@@ -2433,6 +2433,7 @@ app.whenReady().then(() => {
   safeHandle('policy:getInstalments', (event, policyId) => { requireSession(event); return db.getPolicyInstalments(policyId) })
   safeHandle('policy:getAddresses', (event, policyId) => { requireSession(event); return db.getPolicyAddresses(policyId) })
   safeHandle('policy:getBlueCards', (event, policyId) => { requireSession(event); return db.getPolicyBlueCards(policyId) })
+  safeHandle('policy:getRevisions', (event, policyNumber) => { requireSession(event); return db.getPolicyRevisions(policyNumber) })
   safeHandle('policy:addBlueCard', (event, data) => { requireSession(event); return db.addPolicyBlueCard(data) })
   safeHandle('policy:updateBlueCard', (event, id, data) => { requireSession(event); return db.updatePolicyBlueCard(id, data) })
   safeHandle('policy:supersedeBlueCard', (event, id) => { requireSession(event); return db.supersedePolicyBlueCard(id) })

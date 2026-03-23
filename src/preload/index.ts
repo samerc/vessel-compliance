@@ -699,6 +699,7 @@ const api = {
   policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),
   policyGetAddresses: (policyId: string) => ipcRenderer.invoke('policy:getAddresses', policyId),
   policyGetBlueCards: (policyId: string) => ipcRenderer.invoke('policy:getBlueCards', policyId),
+  policyGetRevisions: (policyNumber: string) => ipcRenderer.invoke('policy:getRevisions', policyNumber),
   policyAddBlueCard: (data: any) => ipcRenderer.invoke('policy:addBlueCard', data),
   policyUpdateBlueCard: (id: string, data: any) => ipcRenderer.invoke('policy:updateBlueCard', id, data),
   policySupersedeBlueCard: (id: string) => ipcRenderer.invoke('policy:supersedeBlueCard', id),

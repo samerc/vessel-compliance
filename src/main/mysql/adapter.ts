@@ -7536,6 +7536,20 @@ export class MySQLAdapter {
         return rows as any[]
     }
 
+    async getPolicyRevisions(policyNumber: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT pd.id, pd.policy_number as policyNumber, pd.revision_number as revisionNumber,
+                   pd.status, pd.created_at as createdAt, pd.exported_at as exportedAt,
+                   u.username as createdByName
+            FROM policy_documents pd
+            LEFT JOIN users u ON pd.created_by = u.id
+            WHERE pd.policy_number = ?
+            ORDER BY pd.revision_number DESC
+        `, [policyNumber])
+        return (rows as any[]).map(r => ({ ...r, revisionNumber: Number(r.revisionNumber || 0) }))
+    }
+
     async getPolicyBlueCards(policyId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`

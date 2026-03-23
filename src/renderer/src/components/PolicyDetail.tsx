@@ -2967,29 +2967,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           <Clock size={18} style={{ color: 'var(--text-secondary)' }} />
           <span style={cardTitleStyle}>Revision History</span>
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '12px',
-            marginBottom: '8px'
-          }}
-        >
-          <div>
-            <div style={labelStyle}>Revision</div>
-            <div style={valueStyle}>{policy.revisionNumber}</div>
-          </div>
-          <div>
-            <div style={labelStyle}>Created</div>
-            <div style={valueStyle}>
-              {policy.createdAt ? formatDate(policy.createdAt) : '-'}
-            </div>
-          </div>
-          <div>
-            <div style={labelStyle}>Created By</div>
-            <div style={valueStyle}>{policy.createdBy || '-'}</div>
-          </div>
-        </div>
+        <RevisionHistorySection policyNumber={policy.policyNumber} currentPolicyId={policyId} onViewRevision={onNavigateToPolicy} />
       </div>
         </>
       )}
@@ -3005,5 +2983,88 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         />
       )}
     </div>
+  )
+}
+
+function RevisionHistorySection({ policyNumber, currentPolicyId, onViewRevision }: {
+  policyNumber: string
+  currentPolicyId: string
+  onViewRevision?: (policyId: string) => void
+}) {
+  const [revisions, setRevisions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const revs = await window.api.policyGetRevisions(policyNumber)
+        setRevisions(Array.isArray(revs) ? revs : [])
+      } catch { /* ignore */ }
+      finally { setLoading(false) }
+    })()
+  }, [policyNumber])
+
+  if (loading) return <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Loading...</div>
+  if (revisions.length === 0) return <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>No revision history</div>
+
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+      <thead>
+        <tr style={{ borderBottom: '1px solid var(--table-border)', textAlign: 'left' }}>
+          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Rev</th>
+          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Status</th>
+          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Created</th>
+          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>By</th>
+          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Exported</th>
+          <th style={{ padding: '8px 12px' }}></th>
+        </tr>
+      </thead>
+      <tbody>
+        {revisions.map(rev => {
+          const isCurrent = rev.id === currentPolicyId
+          return (
+            <tr key={rev.id} style={{
+              borderBottom: '1px solid var(--table-border)',
+              background: isCurrent ? (isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,170,200,0.08)') : 'transparent'
+            }}>
+              <td style={{ padding: '8px 12px', fontWeight: isCurrent ? 700 : 400 }}>
+                R{rev.revisionNumber}
+                {isCurrent && <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 700 }}>CURRENT</span>}
+              </td>
+              <td style={{ padding: '8px 12px' }}>
+                <span style={{
+                  padding: '2px 8px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 600,
+                  background: rev.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(150,150,150,0.1)',
+                  color: rev.status === 'active' ? '#22c55e' : 'var(--text-secondary)',
+                  border: `1px solid ${rev.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(150,150,150,0.2)'}`
+                }}>{(rev.status || '').toUpperCase()}</span>
+              </td>
+              <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
+                {rev.createdAt ? formatDate(rev.createdAt) : '-'}
+              </td>
+              <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
+                {rev.createdByName || '-'}
+              </td>
+              <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
+                {rev.exportedAt ? formatDate(rev.exportedAt) : '-'}
+              </td>
+              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                {!isCurrent && onViewRevision && (
+                  <button
+                    onClick={() => onViewRevision(rev.id)}
+                    className="btn-secondary"
+                    style={{ padding: '3px 10px', fontSize: '0.75rem' }}
+                  >
+                    View
+                  </button>
+                )}
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }

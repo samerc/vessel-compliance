@@ -695,6 +695,7 @@ export interface Api {
   policyGetInstalments: (policyId: string) => Promise<any[]>
   policyGetAddresses: (policyId: string) => Promise<any[]>
   policyGetBlueCards: (policyId: string) => Promise<any[]>
+  policyGetRevisions: (policyNumber: string) => Promise<{ id: string; policyNumber: string; revisionNumber: number; status: string; createdAt: string; exportedAt: string | null; createdByName: string }[]>
   policyAddBlueCard: (data: any) => Promise<any>
   policyUpdateBlueCard: (id: string, data: any) => Promise<void>
   policySupersedeBlueCard: (id: string) => Promise<void>
