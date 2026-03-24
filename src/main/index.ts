@@ -2478,20 +2478,55 @@ app.whenReady().then(() => {
 
   // Renewal Status Types
   safeHandle('renewalStates:getAll', (event) => { requireSession(event); return db.getRenewalStatusTypes() })
-  safeHandle('renewalStates:add', async (event, name: string, color: string) => { await requirePermission(event, 'renewals:manage'); return db.addRenewalStatusType(name, color) })
-  safeHandle('renewalStates:update', async (event, id: string, name: string, color: string) => { await requirePermission(event, 'renewals:manage'); return db.updateRenewalStatusType(id, name, color) })
-  safeHandle('renewalStates:delete', async (event, id: string) => { await requirePermission(event, 'renewals:manage'); return db.deleteRenewalStatusType(id) })
-  safeHandle('renewalStates:setForPolicy', async (event, policyId: string, statusId: string | null) => { await requirePermission(event, 'renewals:manage'); return db.setRenewalStatusForPolicy(policyId, statusId) })
+  safeHandle('renewalStates:add', async (event, name: string, color: string) => {
+    const user = await requirePermission(event, 'renewals:manage')
+    const result = await db.addRenewalStatusType(name, color)
+    db.logActivity({ userId: user.id, username: user.username, action: 'CREATE', module: 'Renewals', entityType: 'renewal_status', entityName: name, details: `Created renewal status "${name}"` }).catch(() => {})
+    return result
+  })
+  safeHandle('renewalStates:update', async (event, id: string, name: string, color: string) => {
+    const user = await requirePermission(event, 'renewals:manage')
+    const result = await db.updateRenewalStatusType(id, name, color)
+    db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Renewals', entityType: 'renewal_status', entityName: name, details: `Updated renewal status "${name}"` }).catch(() => {})
+    return result
+  })
+  safeHandle('renewalStates:delete', async (event, id: string) => {
+    const user = await requirePermission(event, 'renewals:manage')
+    const result = await db.deleteRenewalStatusType(id)
+    db.logActivity({ userId: user.id, username: user.username, action: 'DELETE', module: 'Renewals', entityType: 'renewal_status', entityId: id, details: 'Deleted renewal status' }).catch(() => {})
+    return result
+  })
+  safeHandle('renewalStates:setForPolicy', async (event, policyId: string, statusId: string | null) => {
+    const user = await requirePermission(event, 'renewals:manage')
+    // Resolve policy number and status name
+    let policyNumber = policyId
+    let statusName = statusId ? 'changed' : 'cleared'
+    try {
+      const [pRows] = await db.pool!.query('SELECT policy_number FROM vessel_dynamic_policies WHERE id = ?', [policyId]) as any[]
+      if (pRows.length > 0) policyNumber = pRows[0].policy_number || policyId
+      if (statusId) {
+        const [sRows] = await db.pool!.query('SELECT name FROM renewal_status_types WHERE id = ?', [statusId]) as any[]
+        if (sRows.length > 0) statusName = sRows[0].name
+      }
+    } catch { /* use defaults */ }
+    const result = await db.setRenewalStatusForPolicy(policyId, statusId)
+    db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Renewals', entityType: 'policy', entityName: policyNumber, details: `Set renewal status to "${statusName}" for ${policyNumber}` }).catch(() => {})
+    return result
+  })
 
   // Policy Renewal Notes
   safeHandle('renewalNotes:get', (event, policyId: string, policyNumber: string) => { requireSession(event); return db.getPolicyRenewalNotes(policyId, policyNumber) })
   safeHandle('renewalNotes:add', async (event, policyId: string, policyNumber: string, note: string) => {
     const user = await requirePermission(event, 'renewals:notes')
-    return db.addPolicyRenewalNote(policyId, policyNumber, note, user.id, user.username)
+    const result = await db.addPolicyRenewalNote(policyId, policyNumber, note, user.id, user.username)
+    db.logActivity({ userId: user.id, username: user.username, action: 'CREATE', module: 'Renewals', entityType: 'renewal_note', entityName: policyNumber, details: `Added note on ${policyNumber}: ${note.substring(0, 100)}${note.length > 100 ? '...' : ''}` }).catch(() => {})
+    return result
   })
   safeHandle('renewalNotes:delete', async (event, noteId: string) => {
     const user = await requirePermission(event, 'renewals:notes')
-    return db.deletePolicyRenewalNote(noteId, user.id)
+    const result = await db.deletePolicyRenewalNote(noteId, user.id)
+    db.logActivity({ userId: user.id, username: user.username, action: 'DELETE', module: 'Renewals', entityType: 'renewal_note', entityId: noteId, details: 'Deleted renewal note' }).catch(() => {})
+    return result
   })
 
   // Vessel Notes
