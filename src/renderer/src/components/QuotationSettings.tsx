@@ -1870,7 +1870,151 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
                     ))}
                 </section>
             </div>
+
+            {/* Default Excluded Countries per Type */}
+            <DefaultExcludedCountriesPerType countries={countries} showSuccess={showSuccess} showError={showError} isLight={isLight} />
         </div>
+    )
+}
+
+function DefaultExcludedCountriesPerType({ countries, showSuccess, showError }: { countries: TradingExcludedCountry[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean }) {
+    const TYPE_CODES = [
+        { code: 'P', label: 'P&I', color: '#6464ff' },
+        { code: 'H', label: 'H&M', color: '#ff64c8' },
+        { code: 'W', label: 'War', color: '#ff8c32' },
+    ]
+    const [activeType, setActiveType] = useState('P')
+    const [typeDefaults, setTypeDefaults] = useState<Record<string, { name: string; listType: string }[]>>({})
+    const [collapsed, setCollapsed] = useState(true)
+
+    useEffect(() => { loadDefaults() }, [])
+
+    const loadDefaults = async () => {
+        const result: Record<string, { name: string; listType: string }[]> = {}
+        for (const tc of TYPE_CODES) {
+            try {
+                const raw = await window.api.getSetting(`default_excluded_countries_${tc.code}`)
+                if (raw) {
+                    result[tc.code] = JSON.parse(raw)
+                }
+            } catch {}
+        }
+        setTypeDefaults(result)
+    }
+
+    const currentDefaults = typeDefaults[activeType] || []
+    const allCountries = countries
+
+    const isSelected = (name: string, listType: string) =>
+        currentDefaults.some(d => d.name === name && d.listType === listType)
+
+    const toggleCountry = (name: string, listType: string) => {
+        let updated: { name: string; listType: string }[]
+        if (isSelected(name, listType)) {
+            updated = currentDefaults.filter(d => !(d.name === name && d.listType === listType))
+        } else {
+            updated = [...currentDefaults, { name, listType }]
+        }
+        setTypeDefaults(prev => ({ ...prev, [activeType]: updated }))
+    }
+
+    const saveDefaults = async () => {
+        try {
+            await window.api.setSetting(
+                `default_excluded_countries_${activeType}`,
+                JSON.stringify(typeDefaults[activeType] || [])
+            )
+            showSuccess(`Default countries saved for ${TYPE_CODES.find(t => t.code === activeType)?.label}`)
+        } catch (err: any) {
+            showError(err.message || 'Failed to save')
+        }
+    }
+
+    const selectAll = () => {
+        const all = allCountries.map(c => ({ name: c.name, listType: c.listType }))
+        setTypeDefaults(prev => ({ ...prev, [activeType]: all }))
+    }
+
+    const deselectAll = () => {
+        setTypeDefaults(prev => ({ ...prev, [activeType]: [] }))
+    }
+
+    const excluded = allCountries.filter(c => c.listType === 'excluded')
+    const ddq = allCountries.filter(c => c.listType === 'ddq')
+
+    return (
+        <section className="glass-card" style={{ padding: '20px', marginTop: '20px' }}>
+            <div
+                onClick={() => setCollapsed(!collapsed)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: collapsed ? 0 : '14px' }}
+            >
+                {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                <h3 style={{ fontSize: '1rem', margin: 0 }}>Default Excluded Countries per Type</h3>
+            </div>
+            {!collapsed && (
+                <>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                        Configure which countries are pre-selected when creating a new quotation of each type. If not configured, all master countries are used.
+                    </p>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+                        {TYPE_CODES.map(tc => (
+                            <button
+                                key={tc.code}
+                                onClick={() => setActiveType(tc.code)}
+                                style={{
+                                    padding: '6px 16px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: activeType === tc.code ? 600 : 400,
+                                    border: activeType === tc.code ? `1px solid ${tc.color}` : '1px solid var(--glass-border)',
+                                    background: activeType === tc.code ? `${tc.color}1f` : 'transparent',
+                                    color: activeType === tc.code ? tc.color : 'var(--text-secondary)',
+                                    cursor: 'pointer'
+                                }}
+                            >{tc.label}</button>
+                        ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <button onClick={selectAll} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 10px' }}>Select All</button>
+                        <button onClick={deselectAll} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 10px' }}>Deselect All</button>
+                        <div style={{ flex: 1 }} />
+                        <button onClick={saveDefaults} className="btn-primary" style={{ fontSize: '0.78rem', padding: '4px 12px' }}>Save</button>
+                    </div>
+
+                    {excluded.length > 0 && (
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Excluded</label>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {excluded.map(c => (
+                                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', border: isSelected(c.name, c.listType) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: isSelected(c.name, c.listType) ? 'rgba(0,170,200,0.08)' : 'transparent' }}>
+                                        <input type="checkbox" checked={isSelected(c.name, c.listType)} onChange={() => toggleCountry(c.name, c.listType)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
+                                        {c.name}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {ddq.length > 0 && (
+                        <div>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>DDQ Required</label>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {ddq.map(c => (
+                                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', border: isSelected(c.name, c.listType) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: isSelected(c.name, c.listType) ? 'rgba(0,170,200,0.08)' : 'transparent' }}>
+                                        <input type="checkbox" checked={isSelected(c.name, c.listType)} onChange={() => toggleCountry(c.name, c.listType)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
+                                        {c.name}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {allCountries.length === 0 && (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                            No master countries configured. Add countries above first.
+                        </div>
+                    )}
+                </>
+            )}
+        </section>
     )
 }
 

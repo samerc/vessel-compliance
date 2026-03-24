@@ -2312,6 +2312,14 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('vessel_notes parent_note_id migration:', e) }
 
+            // Migration: add order_index to pi_warranty_set_items
+            try {
+                const [wsiCols] = await this.pool.query("SHOW COLUMNS FROM pi_warranty_set_items LIKE 'order_index'") as any[]
+                if (wsiCols.length === 0) {
+                    await this.pool.query('ALTER TABLE pi_warranty_set_items ADD COLUMN order_index INT DEFAULT 0')
+                }
+            } catch (e) { console.error('pi_warranty_set_items order_index migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -5082,7 +5090,7 @@ export class MySQLAdapter {
             set.defaultSelected = !!set.defaultSelected
             set.alternativeScope = set.alternativeScope || null
             set.typeScope = set.typeScope || 'all'
-            const [items] = await this.pool.query('SELECT warranty_id FROM pi_warranty_set_items WHERE set_id = ?', [set.id])
+            const [items] = await this.pool.query('SELECT warranty_id FROM pi_warranty_set_items WHERE set_id = ? ORDER BY order_index ASC', [set.id])
             set.warrantyIds = (items as any[]).map(i => i.warranty_id)
         }
         return sets
@@ -5095,9 +5103,10 @@ export class MySQLAdapter {
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         const [existing] = await this.pool.query('SELECT id FROM pi_warranties') as any[]
         const validIds = new Set((existing as any[]).map((r: any) => r.id))
+        let orderIdx = 0
         for (const wid of warrantyIds) {
             if (validIds.has(wid)) {
-                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id) VALUES (?, ?, ?)', [uuidv4(), id, wid])
+                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, wid, orderIdx++])
             }
         }
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
@@ -5111,9 +5120,10 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM pi_warranty_set_items WHERE set_id = ?', [id])
         const [existing] = await this.pool.query('SELECT id FROM pi_warranties') as any[]
         const validIds = new Set((existing as any[]).map((r: any) => r.id))
+        let updOrderIdx = 0
         for (const wid of warrantyIds) {
             if (validIds.has(wid)) {
-                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id) VALUES (?, ?, ?)', [uuidv4(), id, wid])
+                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, wid, updOrderIdx++])
             }
         }
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')

@@ -11,6 +11,7 @@ import { DEFAULT_SECTION_TEXTS, SECTION_LABELS, getDefaultSectionOrder } from '.
 import RichTextEditor from './RichTextEditor'
 import VesselScopeChips from './VesselScopeChips'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+import { stripHtml } from '../utils/htmlToPdfText'
 
 const ALT_COLORS = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
 
@@ -1052,6 +1053,8 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
             }
 
             setSelectedVesselId('')
+            setVesselSearch('')
+            setNewData(EMPTY_NEW_VESSEL)
             setShowAddForm(false)
             showSuccess(`Vessel added${toAdd.length > 0 ? ` — ${toAdd.length} assured(s) loaded` : ''}`)
             loadData()
@@ -1917,10 +1920,22 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
         setCountries(qc)
         if (qc.length === 0 && masterCountries.length > 0 && !initRef.current) {
             initRef.current = true
-            // For Hull type, default excluded to Israel only but keep all DDQ countries
-            const countriesToSet = quotation.quotationTypeCode === 'H'
-                ? masterCountries.filter(c => c.listType === 'ddq' || c.name.toLowerCase() === 'israel')
-                : masterCountries
+            // Check for type-specific default excluded countries
+            const typeCode = quotation.quotationTypeCode || 'P'
+            let countriesToSet: { name: string; listType: string }[] = masterCountries
+            try {
+                const typeDefaultsRaw = await window.api.getSetting(`default_excluded_countries_${typeCode}`)
+                if (typeDefaultsRaw) {
+                    const typeDefaults: { name: string; listType: string }[] = JSON.parse(typeDefaultsRaw)
+                    if (typeDefaults.length > 0) {
+                        countriesToSet = typeDefaults
+                    }
+                }
+            } catch {}
+            // Fallback: For Hull type with no type-specific defaults, use Israel + DDQ only
+            if (countriesToSet === masterCountries && typeCode === 'H') {
+                countriesToSet = masterCountries.filter(c => c.listType === 'ddq' || c.name.toLowerCase() === 'israel')
+            }
             await window.api.setQuotationExcludedCountries(quotation.id, countriesToSet.map(c => ({ name: c.name, listType: c.listType })))
             const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
             setCountries(refreshed)
@@ -1986,8 +2001,12 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                             onChange={e => {
                                 const tpl = templates.find(t => t.id === e.target.value)
                                 if (tpl) {
-                                    setQ(p => ({ ...p, tradingWarrantyIntro: tpl.text }))
-                                    updateField('tradingWarrantyIntro', tpl.text)
+                                    // Clear first to ensure RichTextEditor detects the change
+                                    setQ(p => ({ ...p, tradingWarrantyIntro: '' }))
+                                    setTimeout(() => {
+                                        setQ(p => ({ ...p, tradingWarrantyIntro: tpl.text }))
+                                        updateField('tradingWarrantyIntro', tpl.text)
+                                    }, 0)
                                 }
                             }}
                             style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.84rem', width: '100%' }}
@@ -2021,7 +2040,7 @@ function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveTex
                             Standard text uses <code>{'{ddq_countries}'}</code> variable. Countries managed below.
                         </p>
                         <div style={{ fontSize: '0.82rem', padding: '8px 12px', borderRadius: '6px', background: 'var(--table-header-bg)', marginBottom: '8px', whiteSpace: 'pre-wrap' }}>
-                            {(getEffectiveText('ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
+                            {stripHtml(getEffectiveText('ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
                                 .replace(/\{ddq_countries\}/g, ddq.map(c => c.name).join(', ') || '(none)')}
                         </div>
                     </>
@@ -4247,8 +4266,8 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Non-refundable sentence (appears in export after 1st instalment)</label>
                         <textarea
                             value={quotation.nonRefundableType === 'first_instalment'
-                                ? (quotation.sectionTextsOverride?.nonRefundableFirstText ?? getEffectiveText('nonRefundableFirstText'))
-                                : (quotation.sectionTextsOverride?.nonRefundablePercentText ?? getEffectiveText('nonRefundablePercentText')).replace(/\{percent\}/g, String(quotation.nonRefundablePercent || '___'))
+                                ? stripHtml(quotation.sectionTextsOverride?.nonRefundableFirstText ?? getEffectiveText('nonRefundableFirstText'))
+                                : stripHtml(quotation.sectionTextsOverride?.nonRefundablePercentText ?? getEffectiveText('nonRefundablePercentText')).replace(/\{percent\}/g, String(quotation.nonRefundablePercent || '___'))
                             }
                             onChange={e => {
                                 const key = quotation.nonRefundableType === 'first_instalment' ? 'nonRefundableFirstText' : 'nonRefundablePercentText'
@@ -5270,7 +5289,10 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
         await saveItems(updated)
     }
 
-    const unusedTexts = allTexts.filter(t => !items.some(it => it.hullTextId === t.id))
+    const visibleItems = quotation.ivEnabled ? items : items.filter(it => it.section !== 'iv')
+    const unusedTexts = allTexts
+        .filter(t => !items.some(it => it.hullTextId === t.id))
+        .filter(t => quotation.ivEnabled || (t.section || 'hm') !== 'iv')
 
     return (
         <div>
@@ -5354,14 +5376,16 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
             {/* Selected items */}
             <div style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                    Value Text Items ({items.length})
+                    Value Text Items ({visibleItems.length})
                 </label>
-                {items.length === 0 ? (
+                {visibleItems.length === 0 ? (
                     <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
                         No text items yet. Add from templates above or write custom text below.
                     </div>
                 ) : (
-                    items.map((it, idx) => (
+                    visibleItems.map((it, _vIdx) => {
+                        const idx = items.indexOf(it)
+                        return (
                         <div key={it.id || idx} style={{ marginBottom: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', background: it.hullTextId ? 'transparent' : 'rgba(160,100,255,0.04)' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '4px' }}>
@@ -5391,7 +5415,8 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
                                 )}
                             </div>
                         </div>
-                    ))
+                        )
+                    })
                 )}
             </div>
 
@@ -6205,6 +6230,32 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
             // If single alternative, sync to quotation
             if (alternatives.length === 1) {
                 try { updateField('hullClauseId', clauseId) } catch {}
+            }
+            // Auto-select default conditions for the new clause
+            const clauseConds = allConditions.filter(c => c.hullClauseId === clauseId)
+            const defaults = clauseConds.filter(c => c.defaultSelected)
+            if (defaults.length > 0) {
+                const existingForAlt = qConditions.filter(c => c.alternativeId === altId)
+                const existingCondIds = new Set(existingForAlt.map(c => c.hullConditionId))
+                const toAdd = defaults.filter(c => !existingCondIds.has(c.id))
+                if (toAdd.length > 0) {
+                    const updated = [
+                        ...qConditions,
+                        ...toAdd.map(c => ({
+                            id: '',
+                            quotationId: quotation.id,
+                            hullConditionId: c.id,
+                            order: qConditions.length,
+                            conditionSection: c.conditionSection || 'both',
+                            alternativeId: altId
+                        } as QuotationHullCondition))
+                    ]
+                    try {
+                        await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
+                        const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
+                        setQConditions(Array.isArray(fresh) ? fresh : [])
+                    } catch {}
+                }
             }
         } catch {}
     }
