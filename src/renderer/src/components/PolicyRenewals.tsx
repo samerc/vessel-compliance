@@ -331,13 +331,13 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         const notesByKey = new Map<string, string>()
         try {
             const notePromises = sortedRenewals.map(async r => {
-                if (!r.id || !r.policyNumber) return
-                const notes = await window.api.getPolicyRenewalNotes(r.id, r.policyNumber)
+                if (!r.id) return
+                const notes = await window.api.getPolicyRenewalNotes(r.id, r.policyNumber || '')
                 if (Array.isArray(notes) && notes.length > 0) {
                     const formatted = notes.map((n: any) =>
                         `[${n.createdByUsername || 'unknown'} ${formatDateTime(n.createdAt)}] ${n.note}`
                     ).join('\n')
-                    notesByKey.set(`${r.id}::${r.policyNumber}`, formatted)
+                    notesByKey.set(`${r.id}::${r.policyNumber || ''}`, formatted)
                 }
             })
             await Promise.all(notePromises)
@@ -354,7 +354,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             'Premium': r.premium != null ? Number(r.premium) : '',
             'Renewal Status': r.renewalStatusName || '',
             'Quotation Sent': r.quotationSentDate || '',
-            'Notes': notesByKey.get(`${r.id}::${r.policyNumber}`) || ''
+            'Notes': notesByKey.get(`${r.id}::${r.policyNumber || ''}`) || ''
         }))
         const ws = XLSX.utils.json_to_sheet(rows)
         // Set wider column width for Notes

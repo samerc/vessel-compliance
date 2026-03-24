@@ -8302,8 +8302,8 @@ export class MySQLAdapter {
     async getPolicyRenewalNotes(policyId: string, policyNumber: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, policy_id as policyId, policy_number as policyNumber, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt FROM policy_renewal_notes WHERE policy_id = ? AND policy_number = ? ORDER BY created_at ASC',
-            [policyId, policyNumber ?? '']
+            'SELECT id, policy_id as policyId, policy_number as policyNumber, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt FROM policy_renewal_notes WHERE policy_id = ? ORDER BY created_at ASC',
+            [policyId]
         )
         return rows as any[]
     }
