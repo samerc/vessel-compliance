@@ -17,6 +17,20 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '6.5.0',
+    date: 'March 2026',
+    items: [
+      { tag: 'New', text: 'Policy System — convert quotations to policies with 6-step wizard, DOCX export, debit/credit advice, and blue card certificates' },
+      { tag: 'New', text: 'Blue Card Management — issue, reissue, edit BBC/WRC/MLC certificates with flag ratification checks and cancel & replace' },
+      { tag: 'New', text: 'Policy Renewals — create renewal quotation from expiring policy with change highlighting in red' },
+      { tag: 'New', text: 'Notification System — personal notifications for note replies, @mentions, workflow transitions, and policy conversions' },
+      { tag: 'New', text: 'Threaded Note Replies — reply to notes with indented threads, @mention users with autocomplete' },
+      { tag: 'New', text: 'QuickBooks Excel Export — 64-column accounting format with deductible encoding and exchange rates' },
+      { tag: 'New', text: 'Policy Settings — dedicated settings page with per-type opening clause, closing text, and document configuration' },
+      { tag: 'Improved', text: 'Flag State Directory — redesigned with ratification tracking, maritime authority, and ports of registry' },
+    ],
+  },
+  {
     version: '6.4.3',
     date: 'March 2026',
     items: [
