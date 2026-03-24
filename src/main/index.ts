@@ -2486,11 +2486,11 @@ app.whenReady().then(() => {
   // Policy Renewal Notes
   safeHandle('renewalNotes:get', (event, policyId: string, policyNumber: string) => { requireSession(event); return db.getPolicyRenewalNotes(policyId, policyNumber) })
   safeHandle('renewalNotes:add', async (event, policyId: string, policyNumber: string, note: string) => {
-    const user = await requirePermission(event, 'renewals:manage')
+    const user = await requirePermission(event, 'renewals:notes')
     return db.addPolicyRenewalNote(policyId, policyNumber, note, user.id, user.username)
   })
   safeHandle('renewalNotes:delete', async (event, noteId: string) => {
-    const user = await requirePermission(event, 'renewals:manage')
+    const user = await requirePermission(event, 'renewals:notes')
     return db.deletePolicyRenewalNote(noteId, user.id)
   })
 

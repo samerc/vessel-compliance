@@ -252,6 +252,7 @@ export const PERMISSION_CATEGORIES = [
       { key: 'analytics:presets', label: 'Save / delete analytics presets' },
       { key: 'renewals:view', label: 'View renewals' },
       { key: 'renewals:manage', label: 'Manage renewal statuses' },
+      { key: 'renewals:notes', label: 'Add/delete renewal notes' },
     ],
   },
   {

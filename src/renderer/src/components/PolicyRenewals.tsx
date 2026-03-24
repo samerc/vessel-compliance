@@ -35,6 +35,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const { theme } = useTheme()
     const { user, hasPermission } = useAuth()
     const canManage = hasPermission('renewals:manage')
+    const canNotes = hasPermission('renewals:notes') || canManage
     const isLight = theme === 'light'
     const now = new Date()
     const [selectedYear, setSelectedYear] = useState(now.getFullYear())
@@ -325,7 +326,23 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         return Array.from(map.values())
     }, [renewals])
 
-    const exportToExcel = () => {
+    const exportToExcel = async () => {
+        // Load notes for all renewals
+        const notesByKey = new Map<string, string>()
+        try {
+            const notePromises = sortedRenewals.map(async r => {
+                if (!r.policyId || !r.policyNumber) return
+                const notes = await window.api.getPolicyRenewalNotes(r.policyId, r.policyNumber)
+                if (Array.isArray(notes) && notes.length > 0) {
+                    const formatted = notes.map((n: any) =>
+                        `[${n.createdByUsername || 'unknown'} ${formatDateTime(n.createdAt)}] ${n.note}`
+                    ).join('\n')
+                    notesByKey.set(`${r.policyId}::${r.policyNumber}`, formatted)
+                }
+            })
+            await Promise.all(notePromises)
+        } catch { /* proceed without notes */ }
+
         const rows = sortedRenewals.map(r => ({
             'Vessel': r.vesselName,
             'IMO': r.imoNumber,
@@ -336,9 +353,13 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             'End Date': r.endDate || '',
             'Premium': r.premium != null ? Number(r.premium) : '',
             'Renewal Status': r.renewalStatusName || '',
-            'Quotation Sent': r.quotationSentDate || ''
+            'Quotation Sent': r.quotationSentDate || '',
+            'Notes': notesByKey.get(`${r.policyId}::${r.policyNumber}`) || ''
         }))
         const ws = XLSX.utils.json_to_sheet(rows)
+        // Set wider column width for Notes
+        const colWidths = Object.keys(rows[0] || {}).map((k, i) => ({ wch: k === 'Notes' ? 60 : i === 0 ? 20 : 15 }))
+        ws['!cols'] = colWidths
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, 'Renewals')
         XLSX.writeFile(wb, `Renewals_${MONTH_NAMES[selectedMonth - 1]}_${selectedYear}.xlsx`)
@@ -805,6 +826,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                         </div>
 
                         {/* New note input */}
+                        {canNotes && (
                         <div style={{ flexShrink: 0, marginBottom: '16px' }}>
                             <textarea
                                 value={newNoteText}
@@ -820,6 +842,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                 </button>
                             </div>
                         </div>
+                        )}
 
                         {/* Notes thread */}
                         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
