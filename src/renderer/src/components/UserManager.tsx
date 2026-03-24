@@ -315,10 +315,23 @@ export default function UserManager() {
     const regularCount = users.filter(u => u.role === 'user').length
     const onLatestCount = users.filter(u => u.lastAppVersion === currentVersion).length
 
+    // Theme-aware colors
+    const adminColor = isLight ? '#7c3aed' : '#d8b4fe'
+    const adminBg = isLight ? 'rgba(124,58,237,0.1)' : 'rgba(147,51,234,0.1)'
+    const adminBorder = isLight ? 'rgba(124,58,237,0.25)' : 'rgba(147,51,234,0.2)'
+    const userColor = isLight ? '#16a34a' : '#86efac'
+    const userBg = isLight ? 'rgba(22,163,74,0.1)' : 'rgba(34,197,94,0.1)'
+    const userBorder = isLight ? 'rgba(22,163,74,0.25)' : 'rgba(34,197,94,0.2)'
+    const grantColor = isLight ? '#16a34a' : '#86efac'
+    const grantBg = isLight ? 'rgba(22,163,74,0.1)' : 'rgba(34,197,94,0.1)'
+    const grantBorder = isLight ? 'rgba(22,163,74,0.25)' : 'rgba(34,197,94,0.2)'
+    const groupColor = isLight ? '#4f46e5' : '#a5b4fc'
+    const groupBg = isLight ? 'rgba(79,70,229,0.1)' : 'rgba(99,102,241,0.1)'
+
     const getVersionColor = (v?: string) => {
         if (!v) return { color: 'var(--text-secondary)', bg: 'transparent', border: '1px solid var(--table-border)' }
-        if (v === currentVersion) return { color: '#86efac', bg: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }
-        if (isOldVersion(v)) return { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)' }
+        if (v === currentVersion) return { color: isLight ? '#16a34a' : '#86efac', bg: isLight ? 'rgba(22,163,74,0.1)' : 'rgba(34,197,94,0.1)', border: `1px solid ${isLight ? 'rgba(22,163,74,0.25)' : 'rgba(34,197,94,0.2)'}` }
+        if (isOldVersion(v)) return { color: isLight ? '#d97706' : '#fbbf24', bg: isLight ? 'rgba(217,119,6,0.1)' : 'rgba(251,191,36,0.1)', border: `1px solid ${isLight ? 'rgba(217,119,6,0.25)' : 'rgba(251,191,36,0.2)'}` }
         return { color: 'var(--text-secondary)', bg: 'transparent', border: '1px solid var(--table-border)' }
     }
 
@@ -412,7 +425,7 @@ export default function UserManager() {
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
                         New password for <strong>{resettingUser}</strong>:
                     </p>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#86efac', margin: '8px 0' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: isLight ? '#16a34a' : '#86efac', margin: '8px 0' }}>
                         {tempPassword}
                     </div>
                     <button
@@ -466,9 +479,9 @@ export default function UserManager() {
                                                     <span style={{
                                                         display: 'inline-block', marginTop: '2px',
                                                         padding: '1px 8px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '600',
-                                                        background: uIsAdmin ? 'rgba(147,51,234,0.1)' : 'rgba(34,197,94,0.1)',
-                                                        color: uIsAdmin ? '#d8b4fe' : '#86efac',
-                                                        border: `1px solid ${uIsAdmin ? 'rgba(147,51,234,0.2)' : 'rgba(34,197,94,0.2)'}`
+                                                        background: uIsAdmin ? adminBg : userBg,
+                                                        color: uIsAdmin ? adminColor : userColor,
+                                                        border: `1px solid ${uIsAdmin ? adminBorder : userBorder}`
                                                     }}>
                                                         {user.role.toUpperCase()}
                                                     </span>
@@ -483,7 +496,7 @@ export default function UserManager() {
                                                     groupIds.map(gId => (
                                                         <span key={gId} style={{
                                                             padding: '1px 8px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: '600',
-                                                            background: 'rgba(99,102,241,0.1)', color: isLight ? '#6366f1' : '#a5b4fc',
+                                                            background: groupBg, color: groupColor,
                                                             border: '1px solid rgba(99,102,241,0.2)'
                                                         }}>
                                                             {groupNameMap[gId] || gId}
@@ -587,8 +600,8 @@ export default function UserManager() {
                                     {modalUser.username}
                                     <span style={{
                                         marginLeft: '8px', padding: '2px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '600',
-                                        background: modalUser.role === 'admin' ? 'rgba(147,51,234,0.1)' : 'rgba(34,197,94,0.1)',
-                                        color: modalUser.role === 'admin' ? '#d8b4fe' : '#86efac'
+                                        background: modalUser.role === 'admin' ? adminBg : userBg,
+                                        color: modalUser.role === 'admin' ? adminColor : userColor
                                     }}>
                                         {modalUser.role.toUpperCase()}
                                     </span>
@@ -624,7 +637,7 @@ export default function UserManager() {
                                             {group.description && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginLeft: '8px' }}>{group.description}</span>}
                                         </div>
                                         {group.isSystem && (
-                                            <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '700', background: 'rgba(147,51,234,0.1)', color: '#d8b4fe', border: '1px solid rgba(147,51,234,0.2)' }}>
+                                            <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '700', background: adminBg, color: adminColor, border: `1px solid ${adminBorder}` }}>
                                                 SYSTEM
                                             </span>
                                         )}
@@ -707,7 +720,7 @@ export default function UserManager() {
                                                                     <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-primary)' }}>{perm.label}</span>
                                                                     <button
                                                                         onClick={() => handleAddOverride(perm.key, true)}
-                                                                        style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: '600', color: '#86efac', cursor: 'pointer' }}
+                                                                        style={{ background: grantBg, border: `1px solid ${grantBorder}`, borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: '600', color: grantColor, cursor: 'pointer' }}
                                                                         title="Grant this permission"
                                                                     >
                                                                         Grant
@@ -744,13 +757,13 @@ export default function UserManager() {
                                         <div key={override.permissionKey} style={{
                                             display: 'flex', alignItems: 'center', gap: '10px',
                                             padding: '8px 12px', borderRadius: '8px',
-                                            border: override.granted ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(255,77,77,0.2)',
-                                            background: override.granted ? 'rgba(34,197,94,0.04)' : 'rgba(255,77,77,0.04)'
+                                            border: override.granted ? `1px solid ${grantBorder}` : '1px solid rgba(255,77,77,0.2)',
+                                            background: override.granted ? grantBg : 'rgba(255,77,77,0.04)'
                                         }}>
                                             <span style={{
                                                 padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.5px',
-                                                background: override.granted ? 'rgba(34,197,94,0.15)' : 'rgba(255,77,77,0.15)',
-                                                color: override.granted ? '#86efac' : 'var(--danger)'
+                                                background: override.granted ? grantBg : 'rgba(255,77,77,0.15)',
+                                                color: override.granted ? grantColor : 'var(--danger)'
                                             }}>
                                                 {override.granted ? 'GRANT' : 'REVOKE'}
                                             </span>
