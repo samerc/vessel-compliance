@@ -2863,6 +2863,19 @@ app.whenReady().then(() => {
     await db.setSetting('userSectionAccess', JSON.stringify(sectionIds))
   })
 
+  // Generic file save (for exports that need save dialog in Electron)
+  safeHandle('file:saveDocx', async (_event, data: number[], defaultName: string) => {
+    const { dialog } = require('electron')
+    const result = await dialog.showSaveDialog({
+      title: 'Save Document',
+      defaultPath: defaultName,
+      filters: [{ name: 'Word Documents', extensions: ['docx'] }]
+    })
+    if (result.canceled || !result.filePath) return { success: false }
+    writeFileSync(result.filePath, Buffer.from(data))
+    return { success: true, filePath: result.filePath }
+  })
+
   // Database Backup & Restore
   safeHandle('db:backup', async (event) => {
     const user = await requirePermission(event, 'admin:backup')

@@ -780,6 +780,7 @@ export interface Api {
   reportBuilderRun: (dataSource: string, config: ReportConfig) => Promise<any[]>
 
   // Document Templates
+  fileSaveDocx: (data: number[], defaultName: string) => Promise<{ success: boolean; filePath?: string }>
   docTemplateGetAll: (category?: string) => Promise<DocumentTemplate[]>
   docTemplateGetById: (id: string) => Promise<(DocumentTemplate & { fileData: Buffer }) | null>
   docTemplateAdd: (data: {

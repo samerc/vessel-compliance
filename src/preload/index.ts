@@ -756,6 +756,7 @@ const api = {
   reportBuilderRun: (dataSource: string, config: any) => ipcRenderer.invoke('reports:run', dataSource, config),
 
   // Document Templates
+  fileSaveDocx: (data: number[], defaultName: string) => ipcRenderer.invoke('file:saveDocx', data, defaultName),
   docTemplateGetAll: (category?: string) => ipcRenderer.invoke('docTemplate:getAll', category),
   docTemplateGetById: (id: string) => ipcRenderer.invoke('docTemplate:getById', id),
   docTemplateAdd: (data: any) => ipcRenderer.invoke('docTemplate:add', data),
