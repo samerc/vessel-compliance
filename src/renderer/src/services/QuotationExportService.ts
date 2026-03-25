@@ -1676,7 +1676,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
-            spacing: { before: 60, after: 60 },
+            spacing: { before: 0, after: 0 },
             children: [new TextRun({ text: title, bold: true, size: 22, font: 'Arial', color: '000000' })]
           })]
         }),
@@ -1711,7 +1711,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             children: [
               ...(wordHasVesselLabels ? [new TableCell({
                 borders: noBorders(),
-                width: { size: 0, type: WidthType.AUTO },
+                width: { size: 600, type: WidthType.DXA },
                 children: [new Paragraph({ children: [new TextRun({ text: isFirstOfLabel ? labelKey : '', size: 22, font: 'Arial', color: '000000', bold: true })] })]
               })] : []),
               new TableCell({
@@ -1769,7 +1769,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         })
       ]
     })
-    rowMap.set('vessel', makeRow('Insured Vessel', [vesselTable]))
+    const vesselTitle = data.quotationVessels.length > 1 ? 'Insured Vessels' : 'Insured Vessel'
+    rowMap.set('vessel', makeRow(vesselTitle, [vesselTable]))
   }
 
   // ---- Limit of Liability ----
@@ -1859,7 +1860,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const addlColor = isNewAddl ? RED : '000000'
         return new Paragraph({
           numbering: { reference: 'dash-bullet', level: 0 },
-          spacing: { after: 40 },
+          spacing: { after: 100 },
           children: [
             ...(code ? [new TextRun({ text: code + ' ', size: 22, font: 'Arial', color: addlColor })] : []),
             new TextRun({ text: text + acScope, size: 22, font: 'Arial', color: addlColor })
@@ -2025,7 +2026,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       const dAddlBullet = (condText: string, color?: string) => new Paragraph({
         numbering: { reference: 'dash-bullet', level: 0 },
-        spacing: { after: 40 },
+        spacing: { after: 100 },
         children: [new TextRun({ text: condText, size: 22, font: 'Arial', color: color || '000000' })]
       })
 
@@ -2676,44 +2677,47 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     if (wHasVesselPremiums) {
       const techLabel = wHasDiscount ? 'Technical Premium' : 'Premium'
+      const premColW = wHasDiscount ? [Math.round(BODY_W * 0.35), Math.round(BODY_W * 0.30), BODY_W - Math.round(BODY_W * 0.35) - Math.round(BODY_W * 0.30)] : [Math.round(BODY_W * 0.35), BODY_W - Math.round(BODY_W * 0.35)]
+      const noBordersNoTop = () => noBorders()
+      const topBorderOnly = () => ({ top: { style: BorderStyle.SINGLE, size: 4, color: '000000' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } })
       const headerCells = [
-        new TableCell({ width: { size: 3000, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: 'Vessel', size: 20, font: 'Arial', bold: true, color: '000000' })] })] }),
-        new TableCell({ width: { size: 2500, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: techLabel, size: 20, font: 'Arial', bold: true, color: '000000' })] })] })
+        new TableCell({ width: { size: premColW[0], type: WidthType.DXA }, borders: noBordersNoTop(), children: [new Paragraph({ children: [new TextRun({ text: 'Vessel', size: 20, font: 'Arial', bold: true, color: '000000' })] })] }),
+        new TableCell({ width: { size: premColW[1], type: WidthType.DXA }, borders: noBordersNoTop(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: techLabel, size: 20, font: 'Arial', bold: true, color: '000000' })] })] })
       ]
       if (wHasDiscount) {
-        headerCells.push(new TableCell({ width: { size: 2500, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Payable Premium', size: 20, font: 'Arial', bold: true, color: '000000' })] })] }))
+        headerCells.push(new TableCell({ width: { size: premColW[2], type: WidthType.DXA }, borders: noBordersNoTop(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Payable Premium', size: 20, font: 'Arial', bold: true, color: '000000' })] })] }))
       }
       const premTableRows = [new TableRow({ children: headerCells })]
       for (const v of data.quotationVessels) {
         const pvName = (v.name || v.vesselLabel).toUpperCase()
         const vPrem = v.premiumAmount || 0
         const rowCells = [
-          new TableCell({ borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: pvName, size: 22, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(vPrem, wq.premiumCurrency), size: 22, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ borders: noBordersNoTop(), children: [new Paragraph({ children: [new TextRun({ text: pvName, size: 22, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ borders: noBordersNoTop(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(vPrem, wq.premiumCurrency), size: 22, font: 'Arial', color: '000000' })] })] })
         ]
         if (wHasDiscount) {
           const vPayable = wComputePayable(vPrem)
-          rowCells.push(new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: vPrem > 0 ? formatCurrency(vPayable, wq.premiumCurrency) : '-', size: 22, font: 'Arial', color: '000000' })] })] }))
+          rowCells.push(new TableCell({ borders: noBordersNoTop(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: vPrem > 0 ? formatCurrency(vPayable, wq.premiumCurrency) : '-', size: 22, font: 'Arial', color: '000000' })] })] }))
         }
         premTableRows.push(new TableRow({ children: rowCells }))
       }
       const totalTech = data.quotationVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
       const totalCells = [
-        new TableCell({ borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: 'Total', size: 22, font: 'Arial', bold: true, color: '000000' })] })] }),
-        new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(totalTech, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })] })] })
+        new TableCell({ borders: topBorderOnly(), children: [new Paragraph({ children: [new TextRun({ text: 'Total', size: 22, font: 'Arial', bold: true, color: '000000' })] })] }),
+        new TableCell({ borders: topBorderOnly(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(totalTech, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })] })] })
       ]
       if (wHasDiscount) {
         const totalPayable = wComputePayable(totalTech)
-        totalCells.push(new TableCell({ borders: noBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(totalPayable, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })] })] }))
+        totalCells.push(new TableCell({ borders: topBorderOnly(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatCurrency(totalPayable, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })] })] }))
       }
       premTableRows.push(new TableRow({ children: totalCells }))
-      premContent.push(new Table({ rows: premTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }))
+      premContent.push(new Table({ rows: premTableRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: premColW, layout: TableLayoutType.FIXED }))
       premContent.push(np('per annum'))
       premContent.push(emptyP())
     } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.piAlternatives.length > 1) {
       const wMultiAlt = data.hullAlternatives.length > 1
       const wPiMultiAlt = data.piAlternatives.length > 1
-      const premLabelW = Math.round(BODY_W * 0.40)
+      const premLabelW = Math.round(BODY_W * 0.35)
       const premAmtW = BODY_W - premLabelW
       const premCell = (text: string, bold = false, align?: typeof AlignmentType.RIGHT, w?: number) => new TableCell({
         borders: noBorders(),
@@ -2762,21 +2766,22 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const rows: TableRow[] = []
           rows.push(premRow(lines.length > 1 ? 'Technical Premium' : '', '', true))
           for (const l of lines) {
-            rows.push(premRow(l.label || 'Technical Premium', `${formatCurrency(l.tech, wq.premiumCurrency)} per annum`))
+            rows.push(premRow(l.label || 'Technical Premium', formatCurrency(l.tech, wq.premiumCurrency)))
           }
           rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', '', true))
           for (const l of lines) {
-            rows.push(premRow(l.label || 'Payable Premium', `${formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)} per annum`))
+            rows.push(premRow(l.label || 'Payable Premium', formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)))
           }
           premContent.push(premTable(rows))
         } else {
           // Simple table: just amounts
           const rows: TableRow[] = []
           for (const l of lines) {
-            rows.push(premRow(l.label, `${formatCurrency(l.tech, wq.premiumCurrency)} per annum`))
+            rows.push(premRow(l.label, formatCurrency(l.tech, wq.premiumCurrency)))
           }
           premContent.push(premTable(rows))
         }
+        premContent.push(np('per annum'))
         premContent.push(emptyP())
       } else {
         // Single premium, no discount — plain bold text

@@ -36,12 +36,12 @@ export function formatDateShort(dateStr: string | Date | null | undefined): stri
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-/** 16 March 2026 — long display with full month name */
+/** April 13, 2026 — long display with full month name (US format) */
 export function formatDateLong(dateStr: string | Date | null | undefined): string {
   if (!dateStr) return ''
   const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 /** YYYY-MM-DD — ISO format for filenames and storage */
