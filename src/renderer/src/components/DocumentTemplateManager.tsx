@@ -1,13 +1,20 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  FileText, Trash2, Save, Upload, Download, ChevronUp, ChevronDown,
-  Tag, RefreshCw, X, File
+  FileText, Trash2, Save, ChevronUp, ChevronDown,
+  Tag, X, Plus, Copy, FileDown
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import type { DocumentTemplate } from '../../../shared/types'
 import { TEMPLATE_PLACEHOLDERS, TEMPLATE_CATEGORIES } from '../../../shared/types'
+import RichTextEditor from './RichTextEditor'
+import {
+  resolveTemplatePlaceholders,
+  htmlToPlainText,
+  buildTemplateContext,
+  generateTemplateDocx
+} from '../services/DocumentTemplateExportService'
 
 const CATEGORY_TABS = [
   { id: 'all', label: 'All' },
@@ -28,31 +35,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   certificate: '#10b981',
 }
 
-function detectPlaceholders(xmlContent: string): string[] {
-  const matches = xmlContent.match(/\{\{(\w+)\}\}/g)
-  return [...new Set(matches || [])]
-}
-
-async function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as ArrayBuffer)
-    reader.onerror = reject
-    reader.readAsArrayBuffer(file)
-  })
-}
-
-// Extract text from docx XML to detect placeholders — handles split runs
-function extractTextFromDocx(xml: string): string {
-  // Get all <w:t> content
-  const texts: string[] = []
-  const re = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(xml)) !== null) {
-    texts.push(m[1])
-  }
-  return texts.join('')
-}
+const PLACEHOLDER_ITEMS = TEMPLATE_PLACEHOLDERS.map(p => ({
+  key: p.key,
+  label: p.label,
+  category: p.category
+}))
 
 export default function DocumentTemplateManager(): React.JSX.Element {
   const { theme } = useTheme()
@@ -70,25 +57,20 @@ export default function DocumentTemplateManager(): React.JSX.Element {
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editCategory, setEditCategory] = useState('general')
+  const [editBody, setEditBody] = useState('')
   const [dirty, setDirty] = useState(false)
   const skipDirtyRef = useRef(false)
 
-  // Upload modal
-  const [showUpload, setShowUpload] = useState(false)
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [uploadName, setUploadName] = useState('')
-  const [uploadDescription, setUploadDescription] = useState('')
-  const [uploadCategory, setUploadCategory] = useState('general')
-  const [uploadPlaceholders, setUploadPlaceholders] = useState<string[]>([])
-  const [uploading, setUploading] = useState(false)
+  // Create modal
+  const [showCreate, setShowCreate] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createDescription, setCreateDescription] = useState('')
+  const [createCategory, setCreateCategory] = useState('general')
+  const [creating, setCreating] = useState(false)
 
-  // Generate modal
+  // Generate/Copy modal
   const [showGenerate, setShowGenerate] = useState(false)
-  const [generateTemplateId, setGenerateTemplateId] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const replaceFileInputRef = useRef<HTMLInputElement>(null)
+  const [generateMode, setGenerateMode] = useState<'docx' | 'copy'>('docx')
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -116,6 +98,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
       setEditName(selected.name)
       setEditDescription(selected.description || '')
       setEditCategory(selected.category)
+      setEditBody(selected.body || '')
       setDirty(false)
       setTimeout(() => { skipDirtyRef.current = false }, 50)
     }
@@ -128,9 +111,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
       const changed = editName !== selected.name
         || editDescription !== (selected.description || '')
         || editCategory !== selected.category
+        || editBody !== (selected.body || '')
       setDirty(changed)
     }
-  }, [editName, editDescription, editCategory])
+  }, [editName, editDescription, editCategory, editBody])
 
   const handleSave = async () => {
     if (!selected || !dirty) return
@@ -138,7 +122,8 @@ export default function DocumentTemplateManager(): React.JSX.Element {
       await window.api.docTemplateUpdate(selected.id, {
         name: editName.trim(),
         description: editDescription.trim() || null,
-        category: editCategory
+        category: editCategory,
+        body: editBody || null
       })
       setDirty(false)
       showSuccess('Template updated')
@@ -161,123 +146,27 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     }
   }
 
-  // Handle file selection for upload
-  const handleFileSelected = async (file: File) => {
-    if (!file.name.endsWith('.docx')) {
-      showError('Only .docx files are supported')
-      return
-    }
-
-    setUploadFile(file)
-    setUploadName(file.name.replace('.docx', ''))
-
-    // Read file and detect placeholders
+  const handleCreate = async () => {
+    if (!createName.trim()) return
     try {
-      const buffer = await readFileAsArrayBuffer(file)
-      const JSZip = (await import('jszip')).default
-      const zip = await JSZip.loadAsync(buffer)
-      const docXml = zip.file('word/document.xml')
-      if (docXml) {
-        const xml = await docXml.async('string')
-        const fullText = extractTextFromDocx(xml)
-        const detected = detectPlaceholders(fullText)
-        setUploadPlaceholders(detected)
-      }
-    } catch {
-      // Placeholder detection is best-effort
-      setUploadPlaceholders([])
-    }
-
-    setShowUpload(true)
-  }
-
-  const handleUpload = async () => {
-    if (!uploadFile || !uploadName.trim()) return
-    try {
-      setUploading(true)
-      const buffer = await readFileAsArrayBuffer(uploadFile)
-      const fileData = Array.from(new Uint8Array(buffer))
-      await window.api.docTemplateAdd({
-        name: uploadName.trim(),
-        description: uploadDescription.trim() || null,
-        category: uploadCategory,
-        fileName: uploadFile.name,
-        fileData,
-        placeholders: uploadPlaceholders.length > 0 ? uploadPlaceholders : null
+      setCreating(true)
+      const result = await window.api.docTemplateAdd({
+        name: createName.trim(),
+        description: createDescription.trim() || null,
+        category: createCategory,
+        body: null
       })
-      showSuccess('Template uploaded')
-      setShowUpload(false)
-      setUploadFile(null)
-      setUploadName('')
-      setUploadDescription('')
-      setUploadCategory('general')
-      setUploadPlaceholders([])
-      loadTemplates()
+      showSuccess('Template created')
+      setShowCreate(false)
+      setCreateName('')
+      setCreateDescription('')
+      setCreateCategory('general')
+      await loadTemplates()
+      if (result?.id) setSelectedId(result.id)
     } catch {
-      showError('Failed to upload template')
+      showError('Failed to create template')
     } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleReplaceFile = async (file: File) => {
-    if (!selected) return
-    if (!file.name.endsWith('.docx')) {
-      showError('Only .docx files are supported')
-      return
-    }
-    try {
-      const buffer = await readFileAsArrayBuffer(file)
-      const JSZip = (await import('jszip')).default
-      const zip = await JSZip.loadAsync(buffer)
-      let placeholders: string[] = []
-      const docXml = zip.file('word/document.xml')
-      if (docXml) {
-        const xml = await docXml.async('string')
-        const fullText = extractTextFromDocx(xml)
-        placeholders = detectPlaceholders(fullText)
-      }
-      const fileData = Array.from(new Uint8Array(buffer))
-      await window.api.docTemplateReplaceFile(selected.id, {
-        fileName: file.name,
-        fileData,
-        placeholders: placeholders.length > 0 ? placeholders : null
-      })
-      showSuccess('Template file replaced')
-      loadTemplates()
-    } catch {
-      showError('Failed to replace file')
-    }
-  }
-
-  const handleGenerate = async (templateId: string) => {
-    setGenerateTemplateId(templateId)
-    setShowGenerate(true)
-  }
-
-  const doGenerate = async (context: { vesselId?: string; policyId?: string; entityId?: string }) => {
-    if (!generateTemplateId) return
-    try {
-      setGenerating(true)
-      const result = await window.api.docTemplateGenerate(generateTemplateId, context)
-      if (result && result.data) {
-        // Download the generated file
-        const blob = new Blob([new Uint8Array(result.data)], {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = result.fileName.replace('.docx', '_generated.docx')
-        a.click()
-        URL.revokeObjectURL(url)
-        showSuccess('Document generated and downloaded')
-        setShowGenerate(false)
-      }
-    } catch {
-      showError('Failed to generate document')
-    } finally {
-      setGenerating(false)
+      setCreating(false)
     }
   }
 
@@ -300,7 +189,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     ? templates
     : templates.filter(t => t.category === activeCategory)
 
-  // Grouped placeholders
+  // Grouped placeholders for reference
   const groupedPlaceholders = TEMPLATE_PLACEHOLDERS.reduce<Record<string, typeof TEMPLATE_PLACEHOLDERS[number][]>>((acc, p) => {
     if (!acc[p.category]) acc[p.category] = []
     acc[p.category].push(p)
@@ -316,30 +205,17 @@ export default function DocumentTemplateManager(): React.JSX.Element {
             <FileText size={28} /> Document Templates
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Upload Word templates with {'{{placeholder}}'} markers for auto-filled document generation
+            Create rich text templates with {'{{placeholder}}'} fields for auto-filled document generation
           </p>
         </div>
         {canManage && (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload size={16} /> Upload Template
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".docx"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) handleFileSelected(file)
-                e.target.value = ''
-              }}
-            />
-          </div>
+          <button
+            className="btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={() => setShowCreate(true)}
+          >
+            <Plus size={16} /> New Template
+          </button>
         )}
       </div>
 
@@ -377,7 +253,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
       <div style={{ display: 'flex', gap: '20px', minHeight: '500px' }}>
         {/* Left: Template List */}
         <div style={{
-          width: '380px',
+          width: '340px',
           flexShrink: 0,
           borderRadius: '12px',
           border: 'var(--glass-border)',
@@ -394,7 +270,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               <p>No templates found</p>
               {canManage && (
                 <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>
-                  Upload a .docx file to get started
+                  Click &quot;New Template&quot; to get started
                 </p>
               )}
             </div>
@@ -428,7 +304,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                     justifyContent: 'center',
                     flexShrink: 0
                   }}>
-                    <File size={18} style={{ color: CATEGORY_COLORS[t.category] || '#6b7280' }} />
+                    <FileText size={18} style={{ color: CATEGORY_COLORS[t.category] || '#6b7280' }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -445,12 +321,9 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       }}>
                         {t.category}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {t.fileName}
-                      </span>
-                      {t.placeholders && t.placeholders.length > 0 && (
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                          {t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}
+                      {t.body && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          Rich text
                         </span>
                       )}
                     </div>
@@ -517,7 +390,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
           ) : (
             <div style={{ padding: '24px', maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
               {/* Template Info */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
                     Template Name
@@ -538,6 +411,29 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       fontWeight: 500
                     }}
                   />
+                </div>
+                <div style={{ width: '140px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+                    Category
+                  </label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    disabled={!canManage}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'var(--input-bg)',
+                      border: '1px solid var(--input-border)',
+                      borderRadius: '8px',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.88rem'
+                    }}
+                  >
+                    {TEMPLATE_CATEGORIES.map(c => (
+                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -563,65 +459,27 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
-                    Category
-                  </label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                    disabled={!canManage}
-                    style={{
-                      padding: '8px 12px',
-                      background: 'var(--input-bg)',
-                      border: '1px solid var(--input-border)',
-                      borderRadius: '8px',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.88rem'
-                    }}
-                  >
-                    {TEMPLATE_CATEGORIES.map(c => (
-                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
-                    File
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                      {selected.fileName}
-                    </span>
-                    {canManage && (
-                      <>
-                        <button
-                          className="btn-secondary"
-                          style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                          onClick={() => replaceFileInputRef.current?.click()}
-                        >
-                          <RefreshCw size={12} /> Replace
-                        </button>
-                        <input
-                          ref={replaceFileInputRef}
-                          type="file"
-                          accept=".docx"
-                          style={{ display: 'none' }}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) handleReplaceFile(file)
-                            e.target.value = ''
-                          }}
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
+              {/* Rich Text Body */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+                  Template Body
+                </label>
+                <RichTextEditor
+                  value={editBody}
+                  onChange={setEditBody}
+                  placeholder="Write your template content here... Use Insert Field to add placeholders."
+                  minHeight={250}
+                  showFontSize
+                  showFontFamily
+                  showAlignment
+                  showLineSpacing
+                  showPlaceholders
+                  placeholderItems={PLACEHOLDER_ITEMS}
+                />
               </div>
 
               {/* Action buttons */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
                 {canManage && dirty && (
                   <button
                     className="btn-primary"
@@ -634,9 +492,18 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 <button
                   className="btn-secondary"
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                  onClick={() => handleGenerate(selected.id)}
+                  onClick={() => { setGenerateMode('docx'); setShowGenerate(true) }}
+                  disabled={!editBody}
                 >
-                  <Download size={14} /> Generate Preview
+                  <FileDown size={14} /> Generate DOCX
+                </button>
+                <button
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                  onClick={() => { setGenerateMode('copy'); setShowGenerate(true) }}
+                  disabled={!editBody}
+                >
+                  <Copy size={14} /> Copy Text
                 </button>
                 {canManage && (
                   <button
@@ -649,51 +516,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 )}
               </div>
 
-              {/* Detected Placeholders */}
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Tag size={14} /> Detected Placeholders
-                </h3>
-                {selected.placeholders && selected.placeholders.length > 0 ? (
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {selected.placeholders.map(p => {
-                      const known = TEMPLATE_PLACEHOLDERS.find(tp => tp.key === p)
-                      return (
-                        <span
-                          key={p}
-                          style={{
-                            padding: '3px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
-                            fontFamily: 'monospace',
-                            background: known
-                              ? 'rgba(0,210,255,0.1)'
-                              : 'rgba(255,204,0,0.1)',
-                            border: known
-                              ? '1px solid rgba(0,210,255,0.3)'
-                              : '1px solid rgba(255,204,0,0.3)',
-                            color: known
-                              ? 'var(--accent-primary)'
-                              : 'var(--warning)'
-                          }}
-                          title={known ? known.label : 'Custom placeholder'}
-                        >
-                          {p}
-                        </span>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                    No placeholders detected in template
-                  </p>
-                )}
-              </div>
-
               {/* Available Placeholders Reference */}
               <div>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '12px' }}>
-                  Available Placeholders Reference
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Tag size={14} /> Available Placeholders Reference
                 </h3>
                 {Object.entries(groupedPlaceholders).map(([category, items]) => (
                   <div key={category} style={{ marginBottom: '12px' }}>
@@ -735,8 +561,8 @@ export default function DocumentTemplateManager(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Upload Modal */}
-      {showUpload && (
+      {/* Create Modal */}
+      {showCreate && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -750,16 +576,16 @@ export default function DocumentTemplateManager(): React.JSX.Element {
             background: isLight ? '#ffffff' : '#1a1d28',
             borderRadius: '12px',
             padding: '24px',
-            width: '500px',
+            width: '460px',
             maxWidth: '90vw',
             border: 'var(--glass-border)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Upload size={20} /> Upload Template
+                <Plus size={20} /> New Template
               </h2>
               <button
-                onClick={() => { setShowUpload(false); setUploadFile(null) }}
+                onClick={() => setShowCreate(false)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
               >
                 <X size={20} />
@@ -768,28 +594,13 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
-                File
-              </label>
-              <div style={{
-                padding: '8px 12px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                borderRadius: '8px',
-                fontSize: '0.88rem',
-                color: 'var(--text-primary)'
-              }}>
-                {uploadFile?.name || 'No file selected'}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
                 Name
               </label>
               <input
                 type="text"
-                value={uploadName}
-                onChange={(e) => setUploadName(e.target.value)}
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="Template name"
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -807,8 +618,8 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 Description (optional)
               </label>
               <textarea
-                value={uploadDescription}
-                onChange={(e) => setUploadDescription(e.target.value)}
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
                 rows={2}
                 style={{
                   width: '100%',
@@ -823,13 +634,13 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               />
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{ marginBottom: '20px' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
                 Category
               </label>
               <select
-                value={uploadCategory}
-                onChange={(e) => setUploadCategory(e.target.value)}
+                value={createCategory}
+                onChange={(e) => setCreateCategory(e.target.value)}
                 style={{
                   padding: '8px 12px',
                   background: 'var(--input-bg)',
@@ -845,75 +656,48 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               </select>
             </div>
 
-            {uploadPlaceholders.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>
-                  Detected Placeholders ({uploadPlaceholders.length})
-                </label>
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {uploadPlaceholders.map(p => (
-                    <span
-                      key={p}
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontFamily: 'monospace',
-                        background: 'rgba(0,210,255,0.1)',
-                        border: '1px solid rgba(0,210,255,0.3)',
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      {p}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                className="btn-secondary"
-                onClick={() => { setShowUpload(false); setUploadFile(null) }}
-              >
+              <button className="btn-secondary" onClick={() => setShowCreate(false)}>
                 Cancel
               </button>
               <button
                 className="btn-primary"
-                onClick={handleUpload}
-                disabled={uploading || !uploadName.trim()}
+                onClick={handleCreate}
+                disabled={creating || !createName.trim()}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {uploading ? 'Uploading...' : <><Upload size={14} /> Upload</>}
+                {creating ? 'Creating...' : <><Plus size={14} /> Create</>}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Generate Modal */}
-      {showGenerate && (
+      {/* Generate / Copy Modal */}
+      {showGenerate && selected && (
         <GenerateModal
           isLight={isLight}
-          generating={generating}
-          templateId={generateTemplateId}
-          templates={templates}
-          onGenerate={doGenerate}
-          onClose={() => { setShowGenerate(false); setGenerateTemplateId(null) }}
+          mode={generateMode}
+          templateName={selected.name}
+          bodyHtml={editBody}
+          onClose={() => setShowGenerate(false)}
+          showSuccess={showSuccess}
+          showError={showError}
         />
       )}
     </div>
   )
 }
 
-// Separate generate modal component
-function GenerateModal({ isLight, generating, templateId, templates, onGenerate, onClose }: {
+// Separate generate/copy modal component
+function GenerateModal({ isLight, mode, templateName, bodyHtml, onClose, showSuccess, showError }: {
   isLight: boolean
-  generating: boolean
-  templateId: string | null
-  templates: DocumentTemplate[]
-  onGenerate: (context: { vesselId?: string; policyId?: string; entityId?: string }) => void
+  mode: 'docx' | 'copy'
+  templateName: string
+  bodyHtml: string
   onClose: () => void
+  showSuccess: (msg: string) => void
+  showError: (msg: string) => void
 }) {
   const [vessels, setVessels] = useState<{ id: string; name: string }[]>([])
   const [entities, setEntities] = useState<{ id: string; name: string }[]>([])
@@ -921,8 +705,7 @@ function GenerateModal({ isLight, generating, templateId, templates, onGenerate,
   const [selectedEntityId, setSelectedEntityId] = useState('')
   const [policies, setPolicies] = useState<{ id: string; label: string }[]>([])
   const [selectedPolicyId, setSelectedPolicyId] = useState('')
-
-  const template = templates.find(t => t.id === templateId)
+  const [processing, setProcessing] = useState(false)
 
   useEffect(() => {
     window.api.getVessels().then(v => {
@@ -946,6 +729,43 @@ function GenerateModal({ isLight, generating, templateId, templates, onGenerate,
     }).catch(() => {})
   }, [selectedVesselId])
 
+  const handleAction = async () => {
+    try {
+      setProcessing(true)
+      const ctx = await buildTemplateContext({
+        vesselId: selectedVesselId || undefined,
+        policyId: selectedPolicyId || undefined,
+        entityId: selectedEntityId || undefined
+      })
+      const resolvedHtml = resolveTemplatePlaceholders(bodyHtml, ctx)
+
+      if (mode === 'docx') {
+        const fileName = `${templateName.replace(/[^a-zA-Z0-9 _-]/g, '')}_generated.docx`
+        await generateTemplateDocx(resolvedHtml, fileName)
+        showSuccess('Document generated and downloaded')
+      } else {
+        const plainText = htmlToPlainText(resolvedHtml)
+        await navigator.clipboard.writeText(plainText)
+        showSuccess('Text copied to clipboard')
+      }
+      onClose()
+    } catch {
+      showError(mode === 'docx' ? 'Failed to generate document' : 'Failed to copy text')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const selectStyle = {
+    width: '100%',
+    padding: '8px 12px',
+    background: 'var(--input-bg)',
+    border: '1px solid var(--input-border)',
+    borderRadius: '8px',
+    color: 'var(--text-primary)',
+    fontSize: '0.88rem'
+  }
+
   return (
     <div style={{
       position: 'fixed',
@@ -966,7 +786,10 @@ function GenerateModal({ isLight, generating, templateId, templates, onGenerate,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Download size={20} /> Generate Document
+            {mode === 'docx'
+              ? <><FileDown size={20} /> Generate DOCX</>
+              : <><Copy size={20} /> Copy Text</>
+            }
           </h2>
           <button
             onClick={onClose}
@@ -976,42 +799,25 @@ function GenerateModal({ isLight, generating, templateId, templates, onGenerate,
           </button>
         </div>
 
-        {template && (
-          <div style={{
-            padding: '10px 14px',
-            borderRadius: '8px',
-            background: 'var(--input-bg)',
-            marginBottom: '16px',
-            fontSize: '0.88rem'
-          }}>
-            <strong>{template.name}</strong>
-            <span style={{ color: 'var(--text-secondary)', marginLeft: '8px', fontSize: '0.8rem' }}>
-              {template.fileName}
-            </span>
-          </div>
-        )}
+        <div style={{
+          padding: '10px 14px',
+          borderRadius: '8px',
+          background: 'var(--input-bg)',
+          marginBottom: '16px',
+          fontSize: '0.88rem'
+        }}>
+          <strong>{templateName}</strong>
+        </div>
 
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-          Select context data to fill template placeholders. Leave empty for sample/blank values.
+          Select context data to fill template placeholders. Leave empty for blank values.
         </p>
 
         <div style={{ marginBottom: '12px' }}>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
             Vessel
           </label>
-          <select
-            value={selectedVesselId}
-            onChange={(e) => setSelectedVesselId(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              background: 'var(--input-bg)',
-              border: '1px solid var(--input-border)',
-              borderRadius: '8px',
-              color: 'var(--text-primary)',
-              fontSize: '0.88rem'
-            }}
-          >
+          <select value={selectedVesselId} onChange={(e) => setSelectedVesselId(e.target.value)} style={selectStyle}>
             <option value="">-- None --</option>
             {vessels.map(v => (
               <option key={v.id} value={v.id}>{v.name}</option>
@@ -1024,19 +830,7 @@ function GenerateModal({ isLight, generating, templateId, templates, onGenerate,
             <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
               Policy
             </label>
-            <select
-              value={selectedPolicyId}
-              onChange={(e) => setSelectedPolicyId(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                borderRadius: '8px',
-                color: 'var(--text-primary)',
-                fontSize: '0.88rem'
-              }}
-            >
+            <select value={selectedPolicyId} onChange={(e) => setSelectedPolicyId(e.target.value)} style={selectStyle}>
               <option value="">-- None --</option>
               {policies.map(p => (
                 <option key={p.id} value={p.id}>{p.label}</option>
@@ -1049,19 +843,7 @@ function GenerateModal({ isLight, generating, templateId, templates, onGenerate,
           <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
             Entity
           </label>
-          <select
-            value={selectedEntityId}
-            onChange={(e) => setSelectedEntityId(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              background: 'var(--input-bg)',
-              border: '1px solid var(--input-border)',
-              borderRadius: '8px',
-              color: 'var(--text-primary)',
-              fontSize: '0.88rem'
-            }}
-          >
+          <select value={selectedEntityId} onChange={(e) => setSelectedEntityId(e.target.value)} style={selectStyle}>
             <option value="">-- None --</option>
             {entities.map(e => (
               <option key={e.id} value={e.id}>{e.name}</option>
@@ -1073,15 +855,16 @@ function GenerateModal({ isLight, generating, templateId, templates, onGenerate,
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
           <button
             className="btn-primary"
-            disabled={generating}
-            onClick={() => onGenerate({
-              vesselId: selectedVesselId || undefined,
-              policyId: selectedPolicyId || undefined,
-              entityId: selectedEntityId || undefined
-            })}
+            disabled={processing}
+            onClick={handleAction}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            {generating ? 'Generating...' : <><Download size={14} /> Generate</>}
+            {processing
+              ? (mode === 'docx' ? 'Generating...' : 'Copying...')
+              : mode === 'docx'
+                ? <><FileDown size={14} /> Generate</>
+                : <><Copy size={14} /> Copy</>
+            }
           </button>
         </div>
       </div>

@@ -1439,7 +1439,8 @@ export interface DocumentTemplate {
   name: string
   description?: string | null
   category: string
-  fileName: string
+  fileName?: string | null
+  body?: string | null
   placeholders?: string[] | null
   createdBy?: string | null
   order: number

@@ -786,14 +786,16 @@ export interface Api {
     name: string
     description?: string | null
     category: string
-    fileName: string
-    fileData: number[]
+    fileName?: string | null
+    fileData?: number[] | null
     placeholders?: string[] | null
+    body?: string | null
   }) => Promise<DocumentTemplate>
   docTemplateUpdate: (id: string, data: {
     name?: string
     description?: string | null
     category?: string
+    body?: string | null
   }) => Promise<void>
   docTemplateReplaceFile: (id: string, data: {
     fileName: string

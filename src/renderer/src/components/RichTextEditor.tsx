@@ -106,6 +106,12 @@ const LINE_SPACINGS = [
   { label: '3.0', value: '3' },
 ]
 
+export interface PlaceholderItem {
+  key: string
+  label: string
+  category: string
+}
+
 interface RichTextEditorProps {
   value: string
   onChange: (html: string) => void
@@ -116,9 +122,11 @@ interface RichTextEditorProps {
   showFontFamily?: boolean
   showAlignment?: boolean
   showLineSpacing?: boolean
+  showPlaceholders?: boolean
+  placeholderItems?: PlaceholderItem[]
 }
 
-export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showFontFamily, showAlignment, showLineSpacing }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showFontFamily, showAlignment, showLineSpacing, showPlaceholders, placeholderItems }: RichTextEditorProps) {
   const { theme } = useTheme()
   const iconColor = useMemo(() => theme === 'light' ? '#606770' : 'rgba(255,255,255,0.6)', [theme])
   const activeIconColor = '#ffffff'
@@ -126,9 +134,11 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   const [fontSizeOpen, setFontSizeOpen] = useState(false)
   const [fontFamilyOpen, setFontFamilyOpen] = useState(false)
   const [lineSpacingOpen, setLineSpacingOpen] = useState(false)
+  const [placeholderOpen, setPlaceholderOpen] = useState(false)
   const fontSizeRef = useRef<HTMLDivElement>(null)
   const fontFamilyRef = useRef<HTMLDivElement>(null)
   const lineSpacingRef = useRef<HTMLDivElement>(null)
+  const placeholderRef = useRef<HTMLDivElement>(null)
 
   const extensions = useMemo(() => {
     const exts: any[] = [
@@ -184,15 +194,16 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
 
   // Close dropdowns on outside click
   useEffect(() => {
-    if (!fontSizeOpen && !fontFamilyOpen && !lineSpacingOpen) return
+    if (!fontSizeOpen && !fontFamilyOpen && !lineSpacingOpen && !placeholderOpen) return
     const handler = (e: MouseEvent) => {
       if (fontSizeOpen && fontSizeRef.current && !fontSizeRef.current.contains(e.target as Node)) setFontSizeOpen(false)
       if (fontFamilyOpen && fontFamilyRef.current && !fontFamilyRef.current.contains(e.target as Node)) setFontFamilyOpen(false)
       if (lineSpacingOpen && lineSpacingRef.current && !lineSpacingRef.current.contains(e.target as Node)) setLineSpacingOpen(false)
+      if (placeholderOpen && placeholderRef.current && !placeholderRef.current.contains(e.target as Node)) setPlaceholderOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [fontSizeOpen, fontFamilyOpen, lineSpacingOpen])
+  }, [fontSizeOpen, fontFamilyOpen, lineSpacingOpen, placeholderOpen])
 
   const toggleLink = useCallback(() => {
     if (!editor) return
@@ -372,6 +383,57 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         <button type="button" className={btn(editor.isActive('orderedList'))} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered List">
           <ListOrdered size={14} color={editor.isActive('orderedList') ? activeIconColor : iconColor} strokeWidth={2.5} />
         </button>
+        {showPlaceholders && placeholderItems && placeholderItems.length > 0 && (
+          <>
+            <div className="rte-separator" />
+            <div ref={placeholderRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="rte-btn rte-font-size-btn"
+                onClick={() => setPlaceholderOpen(!placeholderOpen)}
+                title="Insert Field"
+                style={{ minWidth: '90px', gap: '4px' }}
+              >
+                <span style={{ fontSize: '13px', lineHeight: 1 }}>&#8853;</span>
+                <span style={{ fontSize: '11px', color: iconColor, fontWeight: 600 }}>Insert Field</span>
+                <ChevronDown size={10} color={iconColor} />
+              </button>
+              {placeholderOpen && (
+                <div className="rte-font-size-dropdown" style={{ minWidth: '220px', maxHeight: '320px', overflowY: 'auto', right: 0, left: 'auto' }}>
+                  {(() => {
+                    const grouped = placeholderItems.reduce<Record<string, PlaceholderItem[]>>((acc, p) => {
+                      if (!acc[p.category]) acc[p.category] = []
+                      acc[p.category].push(p)
+                      return acc
+                    }, {})
+                    return Object.entries(grouped).map(([cat, items]) => (
+                      <div key={cat}>
+                        <div style={{ padding: '4px 10px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', borderBottom: '1px solid var(--table-border)' }}>
+                          {cat}
+                        </div>
+                        {items.map(item => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            className="rte-font-size-option"
+                            onClick={() => {
+                              editor.chain().focus().insertContent(item.key).run()
+                              setPlaceholderOpen(false)
+                            }}
+                            style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', width: '100%' }}
+                          >
+                            <span>{item.label}</span>
+                            <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{item.key}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))
+                  })()}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
       <div className="rte-content" style={{ minHeight }} data-placeholder={placeholder || ''}>
         <EditorContent editor={editor} />

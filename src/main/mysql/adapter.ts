@@ -2428,6 +2428,20 @@ export class MySQLAdapter {
                 `)
             } catch (e) { console.error('saved_reports migration:', e) }
 
+            // Add body column to document_templates
+            try {
+                const [dtCols] = await this.pool.query('SHOW COLUMNS FROM document_templates LIKE \'body\'') as any[]
+                if (dtCols.length === 0) {
+                    await this.pool.query('ALTER TABLE document_templates ADD COLUMN body TEXT DEFAULT NULL')
+                }
+            } catch (e) { console.error('document_templates body migration:', e) }
+
+            // Make file_name and file_data nullable for rich-text-only templates
+            try {
+                await this.pool.query('ALTER TABLE document_templates MODIFY COLUMN file_name VARCHAR(255) DEFAULT NULL')
+                await this.pool.query('ALTER TABLE document_templates MODIFY COLUMN file_data LONGBLOB DEFAULT NULL')
+            } catch (e) { console.error('document_templates nullable file migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -10226,7 +10240,7 @@ export class MySQLAdapter {
     async getDocumentTemplates(category?: string): Promise<any[]> {
         if (!this.pool) return []
         let query = `SELECT id, name, description, category, file_name AS fileName,
-            placeholders, created_by AS createdBy, order_index AS \`order\`, created_at AS createdAt
+            placeholders, body, created_by AS createdBy, order_index AS \`order\`, created_at AS createdAt
             FROM document_templates`
         const params: any[] = []
         if (category) {
@@ -10245,7 +10259,7 @@ export class MySQLAdapter {
         if (!this.pool) return null
         const [rows] = await this.pool.query(
             `SELECT id, name, description, category, file_name AS fileName,
-                file_data AS fileData, placeholders, created_by AS createdBy,
+                file_data AS fileData, placeholders, body, created_by AS createdBy,
                 order_index AS \`order\`, created_at AS createdAt
             FROM document_templates WHERE id = ?`,
             [id]
@@ -10263,9 +10277,10 @@ export class MySQLAdapter {
         name: string
         description?: string | null
         category: string
-        fileName: string
-        fileData: Buffer
+        fileName?: string | null
+        fileData?: Buffer | null
         placeholders?: string[] | null
+        body?: string | null
         createdBy?: string | null
     }): Promise<any> {
         if (!this.pool) throw new Error('DB Not connected')
@@ -10273,16 +10288,17 @@ export class MySQLAdapter {
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM document_templates') as any[]
         const nextOrder = maxRow[0]?.nextOrder ?? 0
         await this.pool.execute(
-            `INSERT INTO document_templates (id, name, description, category, file_name, file_data, placeholders, created_by, order_index)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO document_templates (id, name, description, category, file_name, file_data, placeholders, body, created_by, order_index)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id,
                 data.name,
                 data.description || null,
                 data.category,
-                data.fileName,
-                data.fileData,
+                data.fileName || null,
+                data.fileData || null,
                 data.placeholders ? JSON.stringify(data.placeholders) : null,
+                data.body || null,
                 data.createdBy || null,
                 nextOrder
             ]
@@ -10292,8 +10308,9 @@ export class MySQLAdapter {
             name: data.name,
             description: data.description || null,
             category: data.category,
-            fileName: data.fileName,
+            fileName: data.fileName || null,
             placeholders: data.placeholders || null,
+            body: data.body || null,
             createdBy: data.createdBy || null,
             order: nextOrder
         }
@@ -10303,6 +10320,7 @@ export class MySQLAdapter {
         name?: string
         description?: string | null
         category?: string
+        body?: string | null
     }): Promise<void> {
         if (!this.pool) return
         const sets: string[] = []
@@ -10310,6 +10328,7 @@ export class MySQLAdapter {
         if (data.name !== undefined) { sets.push('name = ?'); params.push(data.name) }
         if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description) }
         if (data.category !== undefined) { sets.push('category = ?'); params.push(data.category) }
+        if (data.body !== undefined) { sets.push('body = ?'); params.push(data.body) }
         if (sets.length === 0) return
         params.push(id)
         await this.pool.execute(`UPDATE document_templates SET ${sets.join(', ')} WHERE id = ?`, params)

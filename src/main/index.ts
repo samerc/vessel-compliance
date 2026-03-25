@@ -3377,19 +3377,21 @@ app.whenReady().then(() => {
     name: string
     description?: string | null
     category: string
-    fileName: string
-    fileData: number[] // Uint8Array serialized as number array through IPC
+    fileName?: string | null
+    fileData?: number[] | null // Uint8Array serialized as number array through IPC
     placeholders?: string[] | null
+    body?: string | null
   }) => {
     const user = await requirePermission(event, 'admin:settings')
-    const buf = Buffer.from(data.fileData)
+    const buf = data.fileData ? Buffer.from(data.fileData) : null
     return db.addDocumentTemplate({
       name: data.name,
       description: data.description,
       category: data.category,
-      fileName: data.fileName,
+      fileName: data.fileName || null,
       fileData: buf,
       placeholders: data.placeholders,
+      body: data.body,
       createdBy: user.id
     })
   })
@@ -3398,6 +3400,7 @@ app.whenReady().then(() => {
     name?: string
     description?: string | null
     category?: string
+    body?: string | null
   }) => {
     await requirePermission(event, 'admin:settings')
     return db.updateDocumentTemplate(id, data)
