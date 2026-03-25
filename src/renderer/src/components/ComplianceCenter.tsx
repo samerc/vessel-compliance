@@ -47,7 +47,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                 window.api.getVesselDocuments(),
                 window.api.getDocumentTypes()
             ])
-            setVessels(Array.isArray(vData) ? vData : [])
+            setVessels(Array.isArray(vData) ? vData.filter((v: any) => v.isActive !== false) : [])
             setDocs(Array.isArray(dData) ? dData : [])
             setDocTypes(Array.isArray(tData) ? tData : [])
         } catch (error) {
