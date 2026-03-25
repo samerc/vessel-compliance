@@ -2356,6 +2356,7 @@ export class MySQLAdapter {
 
             // Recent Items table
             try {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS = 0')
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS user_recent_items (
                     id VARCHAR(36) PRIMARY KEY,
                     user_id VARCHAR(36) NOT NULL,
@@ -2367,7 +2368,19 @@ export class MySQLAdapter {
                     INDEX idx_uri_user (user_id),
                     UNIQUE KEY uk_uri_user_item (user_id, item_type, item_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-            } catch (e) { console.error('user_recent_items migration:', e) }
+                await this.pool.query('SET FOREIGN_KEY_CHECKS = 1')
+            } catch (e) {
+                try { await this.pool.query('SET FOREIGN_KEY_CHECKS = 1') } catch {}
+                console.error('user_recent_items migration:', e)
+            }
+
+            // Dashboard onboarded column
+            try {
+                const [dboCols] = await this.pool.query('SHOW COLUMNS FROM users LIKE \'dashboard_onboarded\'') as any[]
+                if (dboCols.length === 0) {
+                    await this.pool.query('ALTER TABLE users ADD COLUMN dashboard_onboarded BOOLEAN DEFAULT FALSE')
+                }
+            } catch (e) { console.error('dashboard_onboarded migration:', e) }
 
         } catch (error) {
             console.error('Schema initialization failed:', error)
@@ -3591,7 +3604,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -3614,7 +3627,7 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt, last_login_at as lastLoginAt FROM users ORDER BY username ASC'
+            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
@@ -3670,10 +3683,18 @@ export class MySQLAdapter {
         )
     }
 
+    async updateUserDashboardOnboarded(userId: string, onboarded: boolean): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE users SET dashboard_onboarded = ? WHERE id = ?',
+            [onboarded ? 1 : 0, userId]
+        )
+    }
+
     async getUserById(userId: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, created_at as createdAt FROM users WHERE id = ?',
+            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt FROM users WHERE id = ?',
             [userId]
         )
         return rows.length > 0 ? (rows[0] as User) : null

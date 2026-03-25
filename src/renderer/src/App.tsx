@@ -59,6 +59,7 @@ function App(): React.JSX.Element {
   const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
   const [initialQuotationId, setInitialQuotationId] = useState<string | null>(null)
+  const [initialEntityId, setInitialEntityId] = useState<string | null>(null)
   const [quotationPolicyContext, setQuotationPolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
   const [policyView, setPolicyView] = useState<'list' | 'settings'>('list')
   const [policySetupQuotationId, setPolicySetupQuotationId] = useState<string | null>(null)
@@ -89,6 +90,7 @@ function App(): React.JSX.Element {
       setNavigateBackTab(undefined)
       setActiveTab('vessels')
     } else if (type === 'entity') {
+      setInitialEntityId(id)
       setActiveTab('directory')
     } else if (type === 'quotation') {
       setInitialQuotationId(id)
@@ -515,7 +517,7 @@ function App(): React.JSX.Element {
         </aside>
 
         <main id="main-content" className="main-content">
-          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} />}
+          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} onNavigate={(tab) => setActiveTab(tab as any)} />}
           {activeTab === 'vessels' && <VesselManager
             initialVesselId={navigateToVesselId}
             initialVesselSection={navigateToVesselSection}
@@ -538,7 +540,7 @@ function App(): React.JSX.Element {
           {activeTab === 'fleets' && <FleetManager />}
           {activeTab === 'admin' && <AdminPanel isAdmin={isAdmin} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
           {activeTab === 'users' && isAdmin && <UserManager />}
-          {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} />}
+          {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} initialEntityId={initialEntityId} onInitialEntityConsumed={() => setInitialEntityId(null)} />}
           {activeTab === 'compliance' && (hasPermission('compliance:view') ? <ComplianceCenter onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} /> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'sanctions-search' && (hasPermission('sanctions:search') ? <Suspense fallback={<LoadingFallback />}><SanctionsSearch /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'reminders' && <Suspense fallback={<LoadingFallback />}><ReminderCenter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('documents'); setNavigateBackTab('reminders'); setActiveTab('vessels') }} /></Suspense>}

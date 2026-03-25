@@ -63,7 +63,7 @@ function jaroWinkler(s1: string, s2: string): number {
   return jaro + prefix * 0.1 * (1 - jaro)
 }
 
-export default function EntityDirectory() {
+export default function EntityDirectory({ initialEntityId, onInitialEntityConsumed }: { initialEntityId?: string | null; onInitialEntityConsumed?: () => void }) {
   const [entities, setEntities] = useState<Entity[]>([])
   const [allEntities, setAllEntities] = useState<Entity[]>([])
   const [vessels, setVessels] = useState<Vessel[]>([])
@@ -345,6 +345,15 @@ export default function EntityDirectory() {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [sanctionsModal.show, showMergeModal, showCreateModal, editingEntity, handleGlobalEscape])
+
+  // Auto-select entity from global search or recent items
+  useEffect(() => {
+    if (initialEntityId && allEntities.length > 0) {
+      const entity = allEntities.find(e => e.id === initialEntityId)
+      if (entity) setSelectedEntity(entity)
+      onInitialEntityConsumed?.()
+    }
+  }, [initialEntityId, allEntities])
 
   const [hasInitialized, setHasInitialized] = useState(false)
   useEffect(() => {

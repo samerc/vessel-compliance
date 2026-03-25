@@ -7,9 +7,11 @@ import DynamicAddressBook from './DynamicAddressBook'
 
 interface DirectoryProps {
     onNavigateToVessel?: (vesselId: string) => void
+    initialEntityId?: string | null
+    onInitialEntityConsumed?: () => void
 }
 
-export default function Directory({ onNavigateToVessel }: DirectoryProps) {
+export default function Directory({ onNavigateToVessel, initialEntityId, onInitialEntityConsumed }: DirectoryProps) {
     const [activeView, setActiveView] = useState<'entities' | 'surveyors' | 'flag-states' | 'address-book'>('entities')
 
     return (
@@ -104,7 +106,7 @@ export default function Directory({ onNavigateToVessel }: DirectoryProps) {
             </div>
 
             {/* Active view content */}
-            {activeView === 'entities' && <EntityDirectory />}
+            {activeView === 'entities' && <EntityDirectory initialEntityId={initialEntityId} onInitialEntityConsumed={onInitialEntityConsumed} />}
             {activeView === 'surveyors' && <SurveyorDirectory />}
             {activeView === 'flag-states' && <FlagStateDirectory onNavigateToVessel={onNavigateToVessel} />}
             {activeView === 'address-book' && <DynamicAddressBook />}
