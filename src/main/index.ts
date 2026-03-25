@@ -1037,7 +1037,7 @@ app.whenReady().then(() => {
       'SELECT name FROM document_types WHERE id = ? UNION SELECT name FROM vessel_custom_doc_types WHERE id = ?',
       [doc.docTypeId, doc.docTypeId]
     )
-    const docTypeName = (dtRows as any[])[0]?.name || doc.docTypeId
+    const docTypeName = (dtRows as any[])[0]?.name || 'document'
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -2566,21 +2566,8 @@ app.whenReady().then(() => {
     return result
   })
   safeHandle('db:updateQuotation', async (event, id, updates) => {
-    const user = await requirePermission(event, 'quotations:edit')
-    const existing = await db.getQuotation(id)
-    const ref = existing?.referenceNumber || id
-    const result = await db.updateQuotation(id, updates)
-    db.logActivity({
-      userId: user.id,
-      username: user.username,
-      action: 'UPDATE',
-      module: 'Quotations',
-      entityType: 'quotation',
-      entityId: id,
-      entityName: ref,
-      details: `Updated quotation ${ref}`
-    }).catch(() => {})
-    return result
+    await requirePermission(event, 'quotations:edit')
+    return db.updateQuotation(id, updates)
   })
   safeHandle('db:deleteQuotation', async (event, id) => {
     const user = await requirePermission(event, 'quotations:delete')
