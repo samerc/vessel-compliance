@@ -406,14 +406,6 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         })
     }, [sortedRenewals, groupByFleet])
 
-    const vesselSummary = useMemo(() => {
-        const map = new Map<string, { vesselName: string; imoNumber: string; vesselId: string; policies: any[] }>()
-        for (const r of renewals) {
-            if (!map.has(r.vesselId)) map.set(r.vesselId, { vesselName: r.vesselName, imoNumber: r.imoNumber, vesselId: r.vesselId, policies: [] })
-            map.get(r.vesselId)!.policies.push(r)
-        }
-        return Array.from(map.values())
-    }, [renewals])
 
     const G = {
         blue: 'linear-gradient(135deg, #0ea5e9, #2563eb)',
@@ -817,7 +809,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                         </button>
                     ))}
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
-                        {sortedRenewals.length} of {renewals.length} renewals | {vesselSummary.length} vessels
+                        {sortedRenewals.length} of {renewals.length} renewals | {new Set(sortedRenewals.map((r: any) => r.vesselId)).size} vessels
                     </span>
                 </div>
             )}
