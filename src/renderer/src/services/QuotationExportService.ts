@@ -327,16 +327,22 @@ function formatAmountOnly(amount: number | undefined): string {
   return amount.toLocaleString('en-US', { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })
 }
 
-interface VesselInfo { imo?: string; built?: number; gt?: number; type?: string; flag?: string; classification?: string; callSign?: string; name: string }
+interface VesselInfo { imo?: string; built?: number; rebuilt?: number | null; gt?: number; type?: string; flag?: string; classification?: string; callSign?: string; name: string }
+
+function formatBuiltYear(built?: number | null, rebuilt?: number | null): string {
+  if (!built) return '-'
+  if (rebuilt) return `${built}/${rebuilt}`
+  return String(built)
+}
 
 function getVesselInfo(qv: QuotationVessel, allVessels: Vessel[], flagStates?: { id: string; name: string }[]): VesselInfo {
   const reg = qv.vesselId ? allVessels.find(v => v.id === qv.vesselId) : null
   if (reg) {
     // Resolve flag name from system vessel's flagStateId
     const flagName = reg.flagStateId && flagStates ? (flagStates.find(f => f.id === reg.flagStateId)?.name || qv.flag) : qv.flag
-    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, classification: reg.classificationSociety, callSign: reg.callSign }
+    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, rebuilt: reg.rebuiltYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, classification: reg.classificationSociety, callSign: reg.callSign }
   }
-  return { name: qv.name || 'Unknown', imo: qv.imoNumber, built: qv.builtYear, gt: qv.grossTonnage, type: qv.vesselType, flag: qv.flag, classification: qv.classification, callSign: qv.callSign }
+  return { name: qv.name || 'Unknown', imo: qv.imoNumber, built: qv.builtYear, rebuilt: qv.rebuiltYear, gt: qv.grossTonnage, type: qv.vesselType, flag: qv.flag, classification: qv.classification, callSign: qv.callSign }
 }
 
 /**
@@ -598,7 +604,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const vesselLines = data.quotationVessels.map(qv => {
       const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
       const prefix = data.quotationVessels.length > 1 ? `${qv.vesselLabel}: ` : ''
-      return `${prefix}${vi.name}  |  IMO: ${vi.imo || '-'}  |  Built: ${vi.built || '-'}  |  GT: ${vi.gt ? Number(vi.gt).toLocaleString() : '-'}  |  Type: ${vi.type || '-'}  |  Class: ${vi.classification || '-'}`
+      return `${prefix}${vi.name}  |  IMO: ${vi.imo || '-'}  |  Built: ${formatBuiltYear(vi.built, vi.rebuilt)}  |  GT: ${vi.gt ? Number(vi.gt).toLocaleString() : '-'}  |  Type: ${vi.type || '-'}  |  Class: ${vi.classification || '-'}`
     })
     if (vesselLines.length > 0) sectionMap.set('vessel', ['Insured Vessel', vesselLines.join('\n')])
   }
@@ -1777,8 +1783,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         ...data.quotationVessels.map(qv => {
           const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
           const cells = showVesselLabel
-            ? [qv.vesselLabel, vi.name, vi.imo || '-', vi.built ? String(vi.built) : '-', vi.gt ? Number(vi.gt).toLocaleString() : '-', vi.flag || '-', vi.type || '-', vi.classification || '-']
-            : [vi.name, vi.imo || '-', vi.built ? String(vi.built) : '-', vi.gt ? Number(vi.gt).toLocaleString() : '-', vi.flag || '-', vi.type || '-', vi.classification || '-']
+            ? [qv.vesselLabel, vi.name, vi.imo || '-', formatBuiltYear(vi.built, vi.rebuilt), vi.gt ? Number(vi.gt).toLocaleString() : '-', vi.flag || '-', vi.type || '-', vi.classification || '-']
+            : [vi.name, vi.imo || '-', formatBuiltYear(vi.built, vi.rebuilt), vi.gt ? Number(vi.gt).toLocaleString() : '-', vi.flag || '-', vi.type || '-', vi.classification || '-']
           return new TableRow({ children: cells.map(v => makeVCell(v)) })
         })
       ]

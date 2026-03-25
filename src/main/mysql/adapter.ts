@@ -570,6 +570,9 @@ export class MySQLAdapter {
             if (!vesselColNames.includes('built_year')) {
                 await this.pool.query('ALTER TABLE vessels ADD COLUMN built_year INT NULL')
             }
+            if (!vesselColNames.includes('rebuilt_year')) {
+                await this.pool.query('ALTER TABLE vessels ADD COLUMN rebuilt_year INT NULL')
+            }
             if (!vesselColNames.includes('gross_tonnage')) {
                 await this.pool.query('ALTER TABLE vessels ADD COLUMN gross_tonnage DECIMAL(12,2) NULL')
             }
@@ -693,6 +696,7 @@ export class MySQLAdapter {
                 name VARCHAR(255) NULL,
                 imo_number VARCHAR(50) NULL,
                 built_year INT NULL,
+                rebuilt_year INT NULL,
                 gross_tonnage DECIMAL(12,2) NULL,
                 flag VARCHAR(100) NULL,
                 vessel_type VARCHAR(100) NULL,
@@ -738,6 +742,14 @@ export class MySQLAdapter {
                 const [qvPremCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'premium_amount'") as any[]
                 if (qvPremCol.length === 0) {
                     await this.pool.query('ALTER TABLE quotation_vessels ADD COLUMN premium_amount DECIMAL(15,2) NULL')
+                }
+            }
+
+            // Migration: Add rebuilt_year to quotation_vessels
+            {
+                const [qvRebuiltCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'rebuilt_year'") as any[]
+                if (qvRebuiltCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_vessels ADD COLUMN rebuilt_year INT NULL')
                 }
             }
 
@@ -2542,8 +2554,8 @@ export class MySQLAdapter {
     // --- Vessels ---
     async getVessels(): Promise<Vessel[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels')
-        return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
+        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, rebuilt_year as rebuiltYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels')
+        return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, rebuiltYear: r.rebuiltYear ? Number(r.rebuiltYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
     }
 
     async getVesselsPaginated(params: VesselQueryParams): Promise<PaginatedResult<Vessel>> {
@@ -2552,7 +2564,7 @@ export class MySQLAdapter {
         const { page = 1, limit = 10, search, fleetId, customerId, status, sortField = 'name', sortOrder = 'asc' } = params
         const offset = (page - 1) * limit
 
-        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels'
+        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, rebuilt_year as rebuiltYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels'
         let countQuery = 'SELECT COUNT(*) as total FROM vessels'
         const conditions: string[] = []
         const values: any[] = []
@@ -2611,7 +2623,7 @@ export class MySQLAdapter {
         // Execute Main
         const [rows] = await this.pool.query(query, values)
 
-        const data = (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
+        const data = (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, rebuiltYear: r.rebuiltYear ? Number(r.rebuiltYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
 
         return {
             data,
@@ -2644,7 +2656,7 @@ export class MySQLAdapter {
 
         // Fetch current vessel for audit logging
         const [currentRows]: any[] = await this.pool.query(
-            'SELECT name, imo_number, fleet_id, flag_state_id, built_year, gross_tonnage, vessel_type, classification_society, call_sign, is_active, customer_id, customer_type FROM vessels WHERE id = ?',
+            'SELECT name, imo_number, fleet_id, flag_state_id, built_year, rebuilt_year, gross_tonnage, vessel_type, classification_society, call_sign, is_active, customer_id, customer_type FROM vessels WHERE id = ?',
             [id]
         )
         const current = currentRows.length > 0 ? currentRows[0] : null
@@ -2658,6 +2670,7 @@ export class MySQLAdapter {
             { updateKey: 'imoNumber', dbCol: 'imo_number', label: 'IMO Number' },
             { updateKey: 'flagStateId', dbCol: 'flag_state_id', label: 'Flag State' },
             { updateKey: 'builtYear', dbCol: 'built_year', label: 'Built Year' },
+            { updateKey: 'rebuiltYear', dbCol: 'rebuilt_year', label: 'Rebuilt Year' },
             { updateKey: 'grossTonnage', dbCol: 'gross_tonnage', label: 'Gross Tonnage' },
             { updateKey: 'vesselType', dbCol: 'vessel_type', label: 'Vessel Type' },
             { updateKey: 'classificationSociety', dbCol: 'classification_society', label: 'Classification' },
@@ -2689,6 +2702,7 @@ export class MySQLAdapter {
         if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes || null) }
         if (updates.flagStateId !== undefined) { fields.push('flag_state_id = ?'); values.push(updates.flagStateId || null) }
         if (updates.builtYear !== undefined) { fields.push('built_year = ?'); values.push(updates.builtYear || null) }
+        if (updates.rebuiltYear !== undefined) { fields.push('rebuilt_year = ?'); values.push(updates.rebuiltYear || null) }
         if (updates.grossTonnage !== undefined) { fields.push('gross_tonnage = ?'); values.push(updates.grossTonnage || null) }
         if (updates.vesselType !== undefined) { fields.push('vessel_type = ?'); values.push(updates.vesselType || null) }
         if (updates.classificationSociety !== undefined) { fields.push('classification_society = ?'); values.push(updates.classificationSociety || null) }
@@ -2701,7 +2715,7 @@ export class MySQLAdapter {
         // Log audit entries for tracked fields
         if (current) {
             const who = changedBy || 'system'
-            const numericAuditKeys: string[] = ['builtYear', 'grossTonnage']
+            const numericAuditKeys: string[] = ['builtYear', 'rebuiltYear', 'grossTonnage']
             for (const af of auditFields) {
                 if (updates[af.updateKey] !== undefined) {
                     const oldVal = current[af.dbCol] != null ? String(current[af.dbCol]) : null
@@ -5600,6 +5614,7 @@ export class MySQLAdapter {
                     COALESCE(v.name, qv.name) as name,
                     COALESCE(v.imo_number, qv.imo_number) as imoNumber,
                     COALESCE(v.built_year, qv.built_year) as builtYear,
+                    COALESCE(v.rebuilt_year, qv.rebuilt_year) as rebuiltYear,
                     COALESCE(v.gross_tonnage, qv.gross_tonnage) as grossTonnage,
                     qv.flag, qv.vessel_type as vesselType, qv.classification, qv.call_sign as callSign,
                     qv.premium_amount as premiumAmount
@@ -5612,27 +5627,28 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({
             ...r,
             builtYear: r.builtYear != null ? Number(r.builtYear) : undefined,
+            rebuiltYear: r.rebuiltYear != null ? Number(r.rebuiltYear) : undefined,
             grossTonnage: r.grossTonnage != null ? Number(r.grossTonnage) : undefined,
             premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined
         }))
     }
 
-    async addQuotationVessel(data: { quotationId: string; vesselId?: string; vesselLabel: string; order: number; name?: string; imoNumber?: string; builtYear?: number; grossTonnage?: number; flag?: string; vesselType?: string; classification?: string; callSign?: string }): Promise<QuotationVessel> {
+    async addQuotationVessel(data: { quotationId: string; vesselId?: string; vesselLabel: string; order: number; name?: string; imoNumber?: string; builtYear?: number; rebuiltYear?: number | null; grossTonnage?: number; flag?: string; vesselType?: string; classification?: string; callSign?: string }): Promise<QuotationVessel> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, gross_tonnage, flag, vessel_type, classification, call_sign)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.quotationId, data.vesselId || null, data.vesselLabel, data.order, data.name || null, data.imoNumber || null, data.builtYear || null, data.grossTonnage || null, data.flag || null, data.vesselType || null, data.classification || null, data.callSign || null]
+            `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.quotationId, data.vesselId || null, data.vesselLabel, data.order, data.name || null, data.imoNumber || null, data.builtYear || null, data.rebuiltYear || null, data.grossTonnage || null, data.flag || null, data.vesselType || null, data.classification || null, data.callSign || null]
         )
-        return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign }
+        return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, rebuiltYear: data.rebuiltYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign }
     }
 
-    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; premiumAmount: number }>): Promise<void> {
+    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; rebuiltYear: number | null; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; premiumAmount: number }>): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', premiumAmount: 'premium_amount' }
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', premiumAmount: 'premium_amount' }
         for (const [key, col] of Object.entries(colMap)) {
             if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
         }
@@ -6104,9 +6120,9 @@ export class MySQLAdapter {
             const newVId = uuidv4()
             vesselIdMap[v.id] = newVId
             await this.pool.execute(
-                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount]
+                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount]
             )
         }
 
@@ -6485,7 +6501,7 @@ export class MySQLAdapter {
             for (const qv of qVessels as any[]) {
                 if (!qv.vessel_id) continue
                 const [vRows] = await this.pool.query(
-                    'SELECT name, imo_number, built_year, gross_tonnage, flag_state_id, vessel_type, classification_society, call_sign FROM vessels WHERE id = ?',
+                    'SELECT name, imo_number, built_year, rebuilt_year, gross_tonnage, flag_state_id, vessel_type, classification_society, call_sign FROM vessels WHERE id = ?',
                     [qv.vessel_id]
                 )
                 const v = (vRows as any[])[0]
@@ -6503,8 +6519,8 @@ export class MySQLAdapter {
                     if ((cRows as any[]).length > 0) className = (cRows as any[])[0].name
                 }
                 await this.pool.execute(
-                    `UPDATE quotation_vessels SET name = ?, imo_number = ?, built_year = ?, gross_tonnage = ?, flag = ?, vessel_type = ?, classification = ?, call_sign = ? WHERE id = ?`,
-                    [v.name, v.imo_number, v.built_year, v.gross_tonnage, flagName, v.vessel_type, className, v.call_sign, qv.id]
+                    `UPDATE quotation_vessels SET name = ?, imo_number = ?, built_year = ?, rebuilt_year = ?, gross_tonnage = ?, flag = ?, vessel_type = ?, classification = ?, call_sign = ? WHERE id = ?`,
+                    [v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, flagName, v.vessel_type, className, v.call_sign, qv.id]
                 )
             }
         } finally {
@@ -7798,7 +7814,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(`
             SELECT pd.*, qt.code as quotationTypeCode, qt.name as quotationTypeName,
                    v.name as vesselName, v.imo_number as imoNumber, v.vessel_type as vesselType,
-                   v.flag_state_id as flagStateId, v.built_year as builtYear, v.gross_tonnage as grossTonnage,
+                   v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage,
                    v.classification_society as classificationSociety, v.fleet_id as fleetId, v.customer_type as customerType, v.call_sign as callSign,
                    fs.name as flagStateName, fs.iso3_code as flagIso3Code,
                    e.name as customerName,
@@ -9159,7 +9175,7 @@ export class MySQLAdapter {
         // Main vessel query
         const [vessels] = await this.pool.execute(
             `SELECT v.id, v.name, v.imo_number AS imoNumber, v.fleet_id AS fleetId, v.flag_state_id AS flagStateId,
-                    v.built_year AS builtYear, v.gross_tonnage AS grossTonnage, v.vessel_type AS vesselType,
+                    v.built_year AS builtYear, v.rebuilt_year AS rebuiltYear, v.gross_tonnage AS grossTonnage, v.vessel_type AS vesselType,
                     v.is_active AS isActive, v.customer_id AS customerId, v.customer_type AS customerType,
                     v.ofac_status AS ofacStatus, v.classification_society AS classificationSociety
              FROM vessels v ${where}`,
@@ -10454,6 +10470,7 @@ export class MySQLAdapter {
                     vesselType: 'v.vessel_type AS vesselType',
                     flagState: 'fs.name AS flagState',
                     builtYear: 'v.built_year AS builtYear',
+                    rebuiltYear: 'v.rebuilt_year AS rebuiltYear',
                     grossTonnage: 'v.gross_tonnage AS grossTonnage',
                     classification: 'v.classification_society AS classification',
                     customer: 'cust.name AS customer',

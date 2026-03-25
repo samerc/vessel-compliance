@@ -818,6 +818,7 @@ interface PolVesselInfo {
   name: string
   imo?: string
   built?: number
+  rebuilt?: number | null
   gt?: number
   type?: string
   flag?: string
@@ -924,6 +925,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
         name: realVessel.name || vesselInfo.name,
         imo: realVessel.imoNumber || vesselInfo.imo,
         built: realVessel.builtYear || vesselInfo.built,
+        rebuilt: realVessel.rebuiltYear ?? vesselInfo.rebuilt,
         gt: realVessel.grossTonnage || vesselInfo.gt,
         type: realVessel.vesselType || vesselInfo.type,
         flag: flagName || vesselInfo.flag,
@@ -1086,9 +1088,9 @@ function polGetVesselInfo(qv: QuotationVessel, allVessels: Vessel[], flagStates?
   const reg = qv.vesselId ? allVessels.find(v => v.id === qv.vesselId) : null
   if (reg) {
     const flagName = reg.flagStateId && flagStates ? (flagStates.find(f => f.id === reg.flagStateId)?.name || qv.flag) : qv.flag
-    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, classification: reg.classificationSociety, callSign: reg.callSign }
+    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, rebuilt: reg.rebuiltYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, classification: reg.classificationSociety, callSign: reg.callSign }
   }
-  return { name: qv.name || 'Unknown', imo: qv.imoNumber, built: qv.builtYear, gt: qv.grossTonnage, type: qv.vesselType, flag: qv.flag, classification: qv.classification, callSign: qv.callSign }
+  return { name: qv.name || 'Unknown', imo: qv.imoNumber, built: qv.builtYear, rebuilt: qv.rebuiltYear, gt: qv.grossTonnage, type: qv.vesselType, flag: qv.flag, classification: qv.classification, callSign: qv.callSign }
 }
 
 function polOrdinal(n: number): string {
@@ -1394,7 +1396,7 @@ function polBuildVesselTable(data: PolicyExportData): Table {
     ['Vessel Name', vi.name.toUpperCase()],
     ['Vessel Type', vi.type || '-'],
     ['Flag', vi.flag || '-'],
-    ['Year Built', vi.built ? String(vi.built) : '-'],
+    ['Year Built', vi.built ? (vi.rebuilt ? `${vi.built} - Rebuilt: ${vi.rebuilt}` : String(vi.built)) : '-'],
     ['GT', vi.gt ? Number(vi.gt).toLocaleString() : '-'],
     ['IMO Number', vi.imo || '-'],
     ['Classification', vi.classification || '-']

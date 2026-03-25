@@ -63,6 +63,7 @@ export async function buildTemplateContext(opts: {
         ctx['{{vesselType}}'] = vessel.vesselType || ''
         ctx['{{grossTonnage}}'] = vessel.grossTonnage ? String(vessel.grossTonnage) : ''
         ctx['{{builtYear}}'] = vessel.builtYear ? String(vessel.builtYear) : ''
+        ctx['{{rebuiltYear}}'] = vessel.rebuiltYear ? String(vessel.rebuiltYear) : ''
         ctx['{{classification}}'] = vessel.classificationSociety || ''
 
         // Flag state

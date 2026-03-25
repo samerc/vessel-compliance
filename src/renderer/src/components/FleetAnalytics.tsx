@@ -954,7 +954,7 @@ export default function FleetAnalytics() {
       // ── Sheet 9: Vessels (raw data) ──
       if (sections.rawVesselData) {
         const vesselData = [
-          ['Name', 'IMO', 'Type', 'Flag', 'Built Year', 'Age', 'Gross Tonnage',
+          ['Name', 'IMO', 'Type', 'Flag', 'Built Year', 'Rebuilt Year', 'Age', 'Gross Tonnage',
             'Active', 'Customer Type', 'OFAC Status'],
           ...pool.map((v: any) => {
             const fs = flagMap.get(v.flagStateId)
@@ -965,6 +965,7 @@ export default function FleetAnalytics() {
               v.vesselType || '',
               fs?.name ?? '',
               v.builtYear || '',
+              v.rebuiltYear || '',
               age,
               v.grossTonnage ? Number(v.grossTonnage) : '',
               v.isActive ? 'Yes' : 'No',

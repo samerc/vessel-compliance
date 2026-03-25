@@ -35,6 +35,7 @@ interface FilterDef {
   type: 'select' | 'text' | 'date'
   options?: { value: string; label: string }[]
   loadOptions?: () => Promise<{ value: string; label: string }[]>
+  placeholder?: string
 }
 
 interface GroupByDef {
@@ -59,6 +60,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'vesselType', label: 'Vessel Type', defaultSelected: true },
       { key: 'flagState', label: 'Flag State', defaultSelected: true },
       { key: 'builtYear', label: 'Built Year' },
+      { key: 'rebuiltYear', label: 'Rebuilt Year' },
       { key: 'grossTonnage', label: 'Gross Tonnage' },
       { key: 'classification', label: 'Classification' },
       { key: 'customer', label: 'Customer', defaultSelected: true },
@@ -1224,7 +1226,7 @@ export default function ReportBuilder() {
                         type="text"
                         value={filters[f.key] || ''}
                         onChange={(e) => updateFilter(f.key, e.target.value)}
-                        placeholder={(f as any).placeholder || 'Search...'}
+                        placeholder={f.placeholder || 'Search...'}
                         style={inputStyle}
                       />
                     )}

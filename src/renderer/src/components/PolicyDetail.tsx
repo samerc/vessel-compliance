@@ -90,6 +90,7 @@ interface PolicyRecord {
   vesselType: string
   flagStateId: string
   builtYear: number | null
+  rebuiltYear: number | null
   grossTonnage: number | null
   flagStateName: string
   flagIso3Code: string | null
@@ -1366,7 +1367,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   {policy.imoNumber && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>IMO {policy.imoNumber}</span>}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  {[policy.vesselType, policy.flagStateName, policy.builtYear ? `Built ${policy.builtYear}` : null, policy.grossTonnage ? `GT ${Number(policy.grossTonnage).toLocaleString()}` : null].filter(Boolean).join(' | ')}
+                  {[policy.vesselType, policy.flagStateName, policy.builtYear ? (policy.rebuiltYear ? `Built ${policy.builtYear} / Rebuilt ${policy.rebuiltYear}` : `Built ${policy.builtYear}`) : null, policy.grossTonnage ? `GT ${Number(policy.grossTonnage).toLocaleString()}` : null].filter(Boolean).join(' | ')}
                 </div>
                 {policy.customerName && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Customer: {policy.customerName}</div>}
               </div>
@@ -1964,7 +1965,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             {policy.builtYear && (
               <div>
                 <div style={labelStyle}>Built</div>
-                <div style={valueStyle}>{policy.builtYear}</div>
+                <div style={valueStyle}>{policy.rebuiltYear ? `${policy.builtYear} / Rebuilt ${policy.rebuiltYear}` : policy.builtYear}</div>
               </div>
             )}
             {policy.grossTonnage && (

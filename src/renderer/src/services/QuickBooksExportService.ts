@@ -221,7 +221,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
     policy.imoNumber || '', // IMO #
     policy.vesselType || '', // M/V Type
     flagStr, // Flag
-    policy.builtYear || '', // Built
+    policy.builtYear ? (policy.rebuiltYear ? `${policy.builtYear}/${policy.rebuiltYear}` : policy.builtYear) : '', // Built
     policy.grossTonnage || '', // GT
     policy.classificationSociety || '', // M/V Class
     commPct, // Ex.Com

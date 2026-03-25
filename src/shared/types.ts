@@ -35,6 +35,7 @@ export interface Vessel {
   notes?: string
   flagStateId?: string
   builtYear?: number
+  rebuiltYear?: number | null
   grossTonnage?: number
   vesselType?: string
   classificationSociety?: string
@@ -1015,6 +1016,7 @@ export interface QuotationNewVessel {
   name: string
   imoNumber?: string
   builtYear?: number
+  rebuiltYear?: number | null
   grossTonnage?: number
   flag?: string
   vesselType?: string
@@ -1042,6 +1044,7 @@ export interface QuotationVessel {
   name?: string
   imoNumber?: string
   builtYear?: number
+  rebuiltYear?: number | null
   grossTonnage?: number
   flag?: string
   vesselType?: string
@@ -1467,6 +1470,7 @@ export const TEMPLATE_PLACEHOLDERS = [
   { key: '{{flagState}}', label: 'Flag State', category: 'Vessel' },
   { key: '{{grossTonnage}}', label: 'Gross Tonnage', category: 'Vessel' },
   { key: '{{builtYear}}', label: 'Built Year', category: 'Vessel' },
+  { key: '{{rebuiltYear}}', label: 'Rebuilt Year', category: 'Vessel' },
   { key: '{{classification}}', label: 'Classification', category: 'Vessel' },
   // Entity
   { key: '{{customerName}}', label: 'Customer Name', category: 'Entity' },

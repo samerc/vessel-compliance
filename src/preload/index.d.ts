@@ -503,7 +503,7 @@ export interface Api {
   reorderQuotationAssureds: (ids: string[]) => Promise<void>
 
   getQuotationVessels: (qId: string) => Promise<QuotationVessel[]>
-  addQuotationVessel: (data: { quotationId: string; vesselId?: string; vesselLabel: string; order: number; name?: string; imoNumber?: string; builtYear?: number; grossTonnage?: number; flag?: string; vesselType?: string; classification?: string; callSign?: string }) => Promise<QuotationVessel>
+  addQuotationVessel: (data: { quotationId: string; vesselId?: string; vesselLabel: string; order: number; name?: string; imoNumber?: string; builtYear?: number; rebuiltYear?: number | null; grossTonnage?: number; flag?: string; vesselType?: string; classification?: string; callSign?: string }) => Promise<QuotationVessel>
   updateQuotationVessel: (id: string, data: Partial<QuotationVessel>) => Promise<void>
   deleteQuotationVessel: (id: string) => Promise<void>
   reorderQuotationVessels: (ids: string[]) => Promise<void>

@@ -221,7 +221,7 @@ export async function exportCustomerPortfolioPDF(
       imo: vessel.imoNumber || '',
       flag: fs ? `${(fs as any).name}` : '—',
       type: vessel.vesselType || '—',
-      built: vessel.builtYear ? String(vessel.builtYear) : '—',
+      built: vessel.builtYear ? (vessel.rebuiltYear ? `${vessel.builtYear}/${vessel.rebuiltYear}` : String(vessel.builtYear)) : '—',
       grt: vessel.grossTonnage ? String(vessel.grossTonnage) : '—',
       policyTypeNames: ptNames,
       compliant,

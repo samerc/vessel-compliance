@@ -3548,6 +3548,7 @@ app.whenReady().then(() => {
           replacements['{{flagState}}'] = vessel.flagStateName || ''
           replacements['{{grossTonnage}}'] = vessel.gross_tonnage ? String(vessel.gross_tonnage) : ''
           replacements['{{builtYear}}'] = vessel.built_year ? String(vessel.built_year) : ''
+          replacements['{{rebuiltYear}}'] = vessel.rebuilt_year ? String(vessel.rebuilt_year) : ''
           replacements['{{classification}}'] = vessel.classification_society || ''
 
           // Load customer entity

@@ -354,6 +354,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [newFlagAddress, setNewFlagAddress] = useState('')
     const [newFlagEmail, setNewFlagEmail] = useState('')
     const [editBuiltYear, setEditBuiltYear] = useState(vessel.builtYear?.toString() || '')
+    const [editRebuiltYear, setEditRebuiltYear] = useState(vessel.rebuiltYear?.toString() || '')
+    const [showRebuiltYear, setShowRebuiltYear] = useState(!!vessel.rebuiltYear)
     const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
     const [editVesselType, setEditVesselType] = useState(vessel.vesselType || '')
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
@@ -473,6 +475,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             name: editName,
             imoNumber: editImo,
             builtYear: editBuiltYear ? parseInt(editBuiltYear) : null,
+            rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : null,
             grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : null,
             vesselType: editVesselType || null,
             classificationSociety: editClassification || null,
@@ -482,6 +485,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         vessel.name = editName
         vessel.imoNumber = editImo
         vessel.builtYear = editBuiltYear ? parseInt(editBuiltYear) : undefined
+        vessel.rebuiltYear = editRebuiltYear ? parseInt(editRebuiltYear) : undefined
         vessel.grossTonnage = editGrossTonnage ? parseFloat(editGrossTonnage) : undefined
         vessel.vesselType = editVesselType || undefined
         vessel.classificationSociety = editClassification || undefined
@@ -679,6 +683,14 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Built:</span>
                                     <input type="number" value={editBuiltYear} onChange={e => setEditBuiltYear(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', width: '80px' }} aria-label="Built year" />
+                                    {showRebuiltYear ? (
+                                        <>
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Rebuilt:</span>
+                                            <input type="number" value={editRebuiltYear} onChange={e => setEditRebuiltYear(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', width: '80px' }} aria-label="Rebuilt year" />
+                                        </>
+                                    ) : (
+                                        <button type="button" onClick={() => setShowRebuiltYear(true)} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.78rem', padding: '2px 4px' }}>+ Rebuilt Year</button>
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>GT:</span>
@@ -853,10 +865,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 })()}
                             </h1>
                             <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
-                            {(vessel.builtYear || vessel.grossTonnage || vessel.vesselType || vesselClassificationIds.size > 0 || vessel.classificationSociety || vessel.callSign) && (
+                            {(vessel.builtYear || vessel.rebuiltYear || vessel.grossTonnage || vessel.vesselType || vesselClassificationIds.size > 0 || vessel.classificationSociety || vessel.callSign) && (
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
                                     {[
-                                        vessel.builtYear && `Built ${vessel.builtYear}`,
+                                        vessel.builtYear && (vessel.rebuiltYear ? `Built ${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}` : `Built ${vessel.builtYear}`),
                                         vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
                                         vessel.vesselType && (() => { const vt = vesselTypes.find(t => t.name === vessel.vesselType); return vt?.description ? `${vt.name} (${vt.description})` : vt?.name || vessel.vesselType })(),
                                         vesselClassificationIds.size > 0
@@ -886,7 +898,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             <button onClick={handleSaveVessel} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <CheckCircle size={18} /> Save Changes
                             </button>
-                            <button onClick={async () => { setIsEditing(false); setEditName(vessel.name); setEditImo(vessel.imoNumber); setEditBuiltYear(vessel.builtYear?.toString() || ''); setEditGrossTonnage(vessel.grossTonnage?.toString() || ''); setEditVesselType(vessel.vesselType || ''); setEditClassification(vessel.classificationSociety || ''); setEditCallSign(vessel.callSign || ''); const vcs = await window.api.getVesselClassifications(vessel.id); setVesselClassificationIds(new Set((vcs || []).map((vc: any) => vc.classificationSocietyId))); }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button onClick={async () => { setIsEditing(false); setEditName(vessel.name); setEditImo(vessel.imoNumber); setEditBuiltYear(vessel.builtYear?.toString() || ''); setEditRebuiltYear(vessel.rebuiltYear?.toString() || ''); setShowRebuiltYear(!!vessel.rebuiltYear); setEditGrossTonnage(vessel.grossTonnage?.toString() || ''); setEditVesselType(vessel.vesselType || ''); setEditClassification(vessel.classificationSociety || ''); setEditCallSign(vessel.callSign || ''); const vcs = await window.api.getVesselClassifications(vessel.id); setVesselClassificationIds(new Set((vcs || []).map((vc: any) => vc.classificationSocietyId))); }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 Cancel
                             </button>
                         </>

@@ -978,7 +978,7 @@ function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateFie
 
 // ==================== Vessel Tab ====================
 
-const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
+const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
 
 function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean }) {
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
@@ -1027,6 +1027,7 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                 name: v?.name,
                 imoNumber: v?.imoNumber,
                 builtYear: v?.builtYear,
+                rebuiltYear: v?.rebuiltYear,
                 grossTonnage: v?.grossTonnage,
                 flag: flagName,
                 vesselType: v?.vesselType,
@@ -1080,6 +1081,7 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                 name: newData.name,
                 imoNumber: newData.imoNumber || undefined,
                 builtYear: newData.builtYear ? parseInt(newData.builtYear) : undefined,
+                rebuiltYear: newData.rebuiltYear ? parseInt(newData.rebuiltYear) : undefined,
                 grossTonnage: newData.grossTonnage ? parseFloat(newData.grossTonnage) : undefined,
                 flag: newData.flag || undefined,
                 vesselType: newData.vesselType || undefined,
@@ -1163,6 +1165,7 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                                     ['name', 'Name *', 'text', true],
                                     ['imoNumber', 'IMO Number', 'text', false],
                                     ['builtYear', 'Built Year', 'number', false],
+                                    ['rebuiltYear', 'Rebuilt Year', 'number', false],
                                     ['grossTonnage', 'Gross Tonnage', 'number', false],
                                     ['callSign', 'Call Sign', 'text', false]
                                 ] as [keyof typeof EMPTY_NEW_VESSEL, string, string, boolean][]).map(([field, label, type, upper]) => (
@@ -1291,6 +1294,7 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                 const name = reg?.name || qv.name || '(unnamed)'
                 const imo = reg?.imoNumber || qv.imoNumber
                 const built = reg?.builtYear || qv.builtYear
+                const rebuilt = reg?.rebuiltYear || qv.rebuiltYear
                 const gt = reg?.grossTonnage || qv.grossTonnage
                 const vtype = reg?.vesselType || qv.vesselType
                 const classif = reg?.classificationSociety || qv.classification
@@ -1303,7 +1307,7 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                             <div style={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase' }}>{name}</div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
                                 {imo && <span>IMO: {imo}</span>}
-                                {built && <span>Built: {built}</span>}
+                                {built && <span>Built: {rebuilt ? `${built}/${rebuilt}` : built}</span>}
                                 {gt && <span>GT: {Number(gt).toLocaleString()}</span>}
                                 {vtype && <span>Type: {vtype}</span>}
                                 {classif && <span>Class: {classif}</span>}
