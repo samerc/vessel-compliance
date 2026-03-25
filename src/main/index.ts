@@ -3383,7 +3383,7 @@ app.whenReady().then(() => {
     body?: string | null
   }) => {
     const user = await requirePermission(event, 'admin:settings')
-    const buf = data.fileData ? Buffer.from(data.fileData) : null
+    const buf = data.fileData && Array.isArray(data.fileData) ? Buffer.from(data.fileData) : null
     return db.addDocumentTemplate({
       name: data.name,
       description: data.description,
