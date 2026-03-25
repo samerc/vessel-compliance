@@ -421,6 +421,37 @@ function App(): React.JSX.Element {
                   <KeyRound size={14} /> Change Password
                 </button>
                 <div style={{ borderBottom: '1px solid var(--glass-border)', padding: '6px 14px' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Table Density</div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {(['compact', 'normal', 'spacious'] as const).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setDensity(d)}
+                        style={{
+                          flex: 1, padding: '5px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                          background: density === d ? 'rgba(0,210,255,0.1)' : 'transparent',
+                          border: density === d ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                          borderRadius: '6px', cursor: 'pointer',
+                          color: density === d ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          fontSize: '0.72rem', fontWeight: density === d ? 600 : 400
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: d === 'compact' ? '1px' : d === 'normal' ? '2px' : '3px' }}>
+                          {[0, 1, 2].map((i) => (
+                            <span key={i} style={{
+                              display: 'block', width: '3px',
+                              height: d === 'compact' ? '6px' : d === 'normal' ? '8px' : '10px',
+                              borderRadius: '1px',
+                              background: density === d ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            }} />
+                          ))}
+                        </div>
+                        {d.charAt(0).toUpperCase() + d.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ borderBottom: '1px solid var(--glass-border)', padding: '6px 14px' }}>
                   <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Theme</div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {([
@@ -564,41 +595,8 @@ function App(): React.JSX.Element {
             </>
           </nav>
 
-          {/* Footer: density toggle + version + collapse toggle */}
-          {!sc && (
-            <div style={{ paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
-              {(['compact', 'normal', 'spacious'] as const).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDensity(d)}
-                  title={`${d.charAt(0).toUpperCase() + d.slice(1)} density`}
-                  style={{
-                    background: density === d ? 'var(--accent-primary)' : 'transparent',
-                    border: `1px solid ${density === d ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    padding: '3px 6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: d === 'compact' ? '1px' : d === 'normal' ? '2px' : '3px',
-                    opacity: density === d ? 1 : 0.5,
-                  }}
-                  className="hover-effect"
-                >
-                  {[0, 1, 2].map((i) => (
-                    <span key={i} style={{
-                      display: 'block',
-                      width: '3px',
-                      height: d === 'compact' ? '6px' : d === 'normal' ? '8px' : '10px',
-                      borderRadius: '1px',
-                      background: density === d ? '#fff' : 'var(--text-secondary)',
-                    }} />
-                  ))}
-                </button>
-              ))}
-            </div>
-          )}
-          <div style={{ paddingTop: '4px', display: 'flex', alignItems: 'center', justifyContent: sc ? 'center' : 'space-between', gap: '4px' }}>
+          {/* Footer: version + collapse toggle */}
+          <div style={{ paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: sc ? 'center' : 'space-between', gap: '4px' }}>
             {!sc && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: 'var(--text-secondary)', opacity: 0.5 }}>
                 v{appVersion}

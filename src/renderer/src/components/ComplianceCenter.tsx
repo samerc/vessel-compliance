@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon } from 'lucide-react'
+import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -39,11 +39,18 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     }[]>([])
     const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set())
     const [validationLoading, setValidationLoading] = useState(false)
+    const [showRuleSettings, setShowRuleSettings] = useState(false)
+    const [ruleToggles, setRuleToggles] = useState<Record<string, boolean>>({})
 
     useEffect(() => {
         loadData()
         loadSanctionsData()
         loadPolicyAlerts()
+        window.api.getSetting('data_validation_rules').then(raw => {
+            if (raw) {
+                try { setRuleToggles(JSON.parse(raw)) } catch { /* ignore */ }
+            }
+        })
     }, [])
 
     useEffect(() => { loadSanctionsData() }, [resultsPage, resultsLimit])
@@ -122,6 +129,12 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
             else next.add(ruleId)
             return next
         })
+    }
+
+    const toggleRuleEnabled = (ruleId: string) => {
+        const next = { ...ruleToggles, [ruleId]: !(ruleToggles[ruleId] !== false) }
+        setRuleToggles(next)
+        window.api.setSetting('data_validation_rules', JSON.stringify(next))
     }
 
     const handleDecideMatch = async (resultId: string, decision: 'sanctioned' | 'cleared') => {
@@ -459,7 +472,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                             <Database size={20} color="var(--accent-primary)" />
                             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Data Quality</h3>
                             {validationRules.length > 0 && (() => {
-                                const totalIssues = validationRules.reduce((sum, r) => sum + r.count, 0)
+                                const totalIssues = validationRules.filter(r => ruleToggles[r.id] !== false).reduce((sum, r) => sum + r.count, 0)
                                 return (
                                     <span style={{
                                         padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '700',
@@ -471,16 +484,86 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                 )
                             })()}
                         </div>
-                        <button
-                            onClick={loadDataValidation}
-                            disabled={validationLoading}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
-                        >
-                            <RefreshCw size={14} style={{ animation: validationLoading ? 'spin 1s linear infinite' : 'none' }} />
-                            Refresh
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                onClick={() => setShowRuleSettings(!showRuleSettings)}
+                                title="Validation Rules Settings"
+                                style={{
+                                    background: showRuleSettings ? 'rgba(0,210,255,0.1)' : 'transparent',
+                                    border: showRuleSettings ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                    borderRadius: '6px', cursor: 'pointer', padding: '7px 10px',
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    color: showRuleSettings ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                    fontSize: '0.82rem'
+                                }}
+                                className="hover-effect"
+                            >
+                                <Settings size={14} />
+                            </button>
+                            <button
+                                onClick={loadDataValidation}
+                                disabled={validationLoading}
+                                className="btn-secondary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
+                            >
+                                <RefreshCw size={14} style={{ animation: validationLoading ? 'spin 1s linear infinite' : 'none' }} />
+                                Refresh
+                            </button>
+                        </div>
                     </div>
+
+                    {showRuleSettings && validationRules.length > 0 && (
+                        <div style={{
+                            marginBottom: '16px', padding: '16px 20px', borderRadius: '10px',
+                            background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+                            border: '1px solid var(--glass-border)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                <Settings size={16} color="var(--accent-primary)" />
+                                <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Validation Rules Settings</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {validationRules.map(rule => {
+                                    const enabled = ruleToggles[rule.id] !== false
+                                    return (
+                                        <div
+                                            key={rule.id}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '8px 12px', borderRadius: '8px',
+                                                background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
+                                                border: '1px solid var(--glass-border)',
+                                                opacity: enabled ? 1 : 0.5
+                                            }}
+                                        >
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontWeight: '600', fontSize: '0.84rem' }}>{rule.name}</div>
+                                                <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: '1px' }}>{rule.description}</div>
+                                            </div>
+                                            <button
+                                                onClick={() => toggleRuleEnabled(rule.id)}
+                                                style={{
+                                                    width: '40px', height: '22px', borderRadius: '11px', border: 'none',
+                                                    background: enabled ? 'var(--accent-primary)' : (isLight ? '#ccc' : 'rgba(255,255,255,0.15)'),
+                                                    cursor: 'pointer', position: 'relative', flexShrink: 0,
+                                                    transition: 'background 0.2s'
+                                                }}
+                                                title={enabled ? 'Disable rule' : 'Enable rule'}
+                                            >
+                                                <span style={{
+                                                    position: 'absolute', top: '2px',
+                                                    left: enabled ? '20px' : '2px',
+                                                    width: '18px', height: '18px', borderRadius: '50%',
+                                                    background: '#fff', transition: 'left 0.2s',
+                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                                                }} />
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {validationLoading && validationRules.length === 0 ? (
                         <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
@@ -500,7 +583,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {validationRules.map(rule => {
+                                    {validationRules.filter(r => ruleToggles[r.id] !== false).map(rule => {
                                         const isExpanded = expandedRules.has(rule.id)
                                         const hasIssues = rule.count > 0
                                         return (
