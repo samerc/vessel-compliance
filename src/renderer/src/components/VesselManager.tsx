@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X } from 'lucide-react'
+import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X, CheckSquare, Square, Download } from 'lucide-react'
 import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import VesselDetail from './VesselDetail'
 import SanctionsModal from './SanctionsModal'
 import { formatDateTime } from '../utils/dateUtils'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 
 // Simple debounce hook implementation if not available
@@ -22,7 +23,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string } = {}) {
+export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
@@ -63,8 +64,24 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
 
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
 
+    // Bulk selection state
+    const [selectedVesselIds, setSelectedVesselIds] = useState<Set<string>>(new Set())
+    const [bulkFleetDropdown, setBulkFleetDropdown] = useState(false)
+
+    // Column preferences
+    const VESSEL_COLUMNS: ColumnDef[] = [
+        { id: 'name', label: 'Vessel Name', defaultVisible: true },
+        { id: 'imo', label: 'IMO Number', defaultVisible: true },
+        { id: 'sanctions', label: 'Sanctions', defaultVisible: true },
+        { id: 'customer', label: 'Customer', defaultVisible: true },
+        { id: 'fleet', label: 'Fleet', defaultVisible: true },
+        { id: 'actions', label: 'Actions', defaultVisible: true }
+    ]
+    const { visibleColumns, setVisibleColumns } = useColumnPrefs('vessels', VESSEL_COLUMNS)
+    const visibleSet = new Set(visibleColumns)
+
     // Section and back-navigation tracking for external navigation
-    const [appliedSection, setAppliedSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
+    const [appliedSection, setAppliedSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | undefined>(undefined)
     const [navigatedExternally, setNavigatedExternally] = useState(false)
 
     // Sanctions checking state
@@ -264,6 +281,71 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
         }
         setSanctionsModal({ show: false, searchedName: '', matches: [] })
         loadData()
+    }
+
+    // Bulk operations
+    const toggleSelectVessel = (vesselId: string) => {
+        setSelectedVesselIds(prev => {
+            const next = new Set(prev)
+            if (next.has(vesselId)) next.delete(vesselId)
+            else next.add(vesselId)
+            return next
+        })
+    }
+
+    const toggleSelectAll = () => {
+        if (selectedVesselIds.size === vessels.length) {
+            setSelectedVesselIds(new Set())
+        } else {
+            setSelectedVesselIds(new Set(vessels.map(v => v.id)))
+        }
+    }
+
+    const handleBulkAssignFleet = async (fleetId: string) => {
+        try {
+            await window.api.bulkAssignFleet([...selectedVesselIds], fleetId)
+            showSuccess(`Assigned ${selectedVesselIds.size} vessel(s) to fleet`)
+            setSelectedVesselIds(new Set())
+            setBulkFleetDropdown(false)
+            loadData()
+        } catch (err: any) {
+            showError(err.message || 'Failed to assign fleet')
+        }
+    }
+
+    const handleBulkChangeStatus = async (isActive: boolean) => {
+        try {
+            await window.api.bulkSetVesselStatus([...selectedVesselIds], isActive)
+            showSuccess(`Updated ${selectedVesselIds.size} vessel(s) to ${isActive ? 'active' : 'inactive'}`)
+            setSelectedVesselIds(new Set())
+            loadData()
+        } catch (err: any) {
+            showError(err.message || 'Failed to update status')
+        }
+    }
+
+    const handleBulkExport = () => {
+        const selected = vessels.filter(v => selectedVesselIds.has(v.id))
+        if (selected.length === 0) return
+        // Build CSV content
+        const headers = ['Name', 'IMO Number', 'Fleet', 'Customer', 'Status', 'Sanctions']
+        const rows = selected.map(v => [
+            v.name,
+            v.imoNumber,
+            fleets.find(f => f.id === v.fleetId)?.name || 'Standalone',
+            entities.find(e => e.id === v.customerId)?.name || '',
+            v.isActive ? 'Active' : 'Inactive',
+            v.ofacStatus || 'NOT CHECKED'
+        ])
+        const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(','))].join('\n')
+        const blob = new Blob([csv], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `vessels-export-${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        showSuccess(`Exported ${selected.length} vessel(s)`)
     }
 
     const handleViewPotentialMatch = async (vessel: Vessel) => {
@@ -555,6 +637,104 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                 </div>
             </div>
 
+            {/* Bulk Action Toolbar */}
+            {selectedVesselIds.size > 0 && (
+                <div className="glass-card fade-in" style={{
+                    padding: '10px 20px',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(0,210,255,0.06)',
+                    border: '1px solid var(--accent-primary)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10
+                }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--accent-primary)' }}>
+                        {selectedVesselIds.size} selected
+                    </span>
+                    <div style={{ width: '1px', height: '20px', background: 'var(--glass-border)' }} />
+                    {hasPermission('vessels:edit') && (
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="btn-secondary"
+                                onClick={() => setBulkFleetDropdown(!bulkFleetDropdown)}
+                                style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                                Assign to Fleet <ChevronDown size={13} />
+                            </button>
+                            {bulkFleetDropdown && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    marginTop: '4px',
+                                    padding: '4px',
+                                    minWidth: '180px',
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    background: isLight ? '#ffffff' : '#1e222a',
+                                    border: '1px solid var(--glass-border)',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                                    zIndex: 100
+                                }}>
+                                    <div
+                                        onClick={() => handleBulkAssignFleet('')}
+                                        style={{ padding: '8px 10px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}
+                                        className="hover-effect"
+                                    >
+                                        Standalone
+                                    </div>
+                                    {fleets.map(f => (
+                                        <div
+                                            key={f.id}
+                                            onClick={() => handleBulkAssignFleet(f.id)}
+                                            style={{ padding: '8px 10px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.85rem' }}
+                                            className="hover-effect"
+                                        >
+                                            {f.name}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {hasPermission('vessels:edit') && (
+                        <div style={{ position: 'relative' }}>
+                            <select
+                                onChange={e => {
+                                    if (e.target.value === 'active') handleBulkChangeStatus(true)
+                                    else if (e.target.value === 'inactive') handleBulkChangeStatus(false)
+                                    e.target.value = ''
+                                }}
+                                defaultValue=""
+                                style={{ padding: '6px 10px', fontSize: '0.82rem', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+                            >
+                                <option value="" disabled>Change Status</option>
+                                <option value="active">Set Active</option>
+                                <option value="inactive">Set Inactive</option>
+                            </select>
+                        </div>
+                    )}
+                    <button
+                        className="btn-secondary"
+                        onClick={handleBulkExport}
+                        style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <Download size={13} /> Export Selected
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <button
+                        onClick={() => setSelectedVesselIds(new Set())}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.82rem', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <X size={13} /> Clear
+                    </button>
+                </div>
+            )}
+
             <div className="glass-card" style={{ padding: '0', overflowX: 'auto', minHeight: '300px' }}>
                 {isLoading && (
                     <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -580,26 +760,80 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                         <caption className="sr-only">Vessel registry</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                        Vessel Name <ArrowUpDown size={13} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
-                                    </span>
+                                <th scope="col" style={{ padding: '14px 8px 14px 16px', width: '40px' }}>
+                                    <div
+                                        onClick={toggleSelectAll}
+                                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--accent-primary)' }}
+                                        title={selectedVesselIds.size === vessels.length ? 'Deselect all' : 'Select all'}
+                                    >
+                                        {selectedVesselIds.size === vessels.length && vessels.length > 0
+                                            ? <CheckSquare size={16} />
+                                            : <Square size={16} style={{ opacity: 0.4 }} />
+                                        }
+                                    </div>
                                 </th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                        IMO Number <ArrowUpDown size={13} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
-                                    </span>
-                                </th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', width: '120px' }}>Sanctions</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Customer</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Fleet</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'right' }}>Actions</th>
+                                {visibleSet.has('name') && (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            Vessel Name <ArrowUpDown size={13} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
+                                        </span>
+                                    </th>
+                                )}
+                                {visibleSet.has('imo') && (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => toggleSort('imoNumber')}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            IMO Number <ArrowUpDown size={13} style={{ opacity: sortField === 'imoNumber' ? 1 : 0.3 }} />
+                                        </span>
+                                    </th>
+                                )}
+                                {visibleSet.has('sanctions') && (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', width: '120px' }}>Sanctions</th>
+                                )}
+                                {visibleSet.has('customer') && (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Customer</th>
+                                )}
+                                {visibleSet.has('fleet') && (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Fleet</th>
+                                )}
+                                {visibleSet.has('actions') && (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                                            Actions
+                                            <ColumnSelector
+                                                pageKey="vessels"
+                                                allColumns={VESSEL_COLUMNS}
+                                                visibleColumns={visibleColumns}
+                                                onChange={setVisibleColumns}
+                                            />
+                                        </div>
+                                    </th>
+                                )}
+                                {!visibleSet.has('actions') && (
+                                    <th scope="col" style={{ padding: '14px 16px', textAlign: 'right' }}>
+                                        <ColumnSelector
+                                            pageKey="vessels"
+                                            allColumns={VESSEL_COLUMNS}
+                                            visibleColumns={visibleColumns}
+                                            onChange={setVisibleColumns}
+                                        />
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
                             {vessels.map(v => {
+                                const isBulkChecked = selectedVesselIds.has(v.id)
                                 return (
-                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)', background: isBulkChecked ? (isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.04)') : undefined }} className="hover-effect">
+                                        <td style={{ padding: '16px 8px 16px 16px', width: '40px' }}>
+                                            <div
+                                                onClick={(e) => { e.stopPropagation(); toggleSelectVessel(v.id) }}
+                                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: isBulkChecked ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                                            >
+                                                {isBulkChecked ? <CheckSquare size={16} /> : <Square size={16} style={{ opacity: 0.4 }} />}
+                                            </div>
+                                        </td>
+                                        {visibleSet.has('name') && (
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '28px' }}>
@@ -641,12 +875,18 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                 </span>
                                             </div>
                                         </td>
+                                        )}
+                                        {visibleSet.has('imo') && (
                                         <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                                             <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
                                         </td>
+                                        )}
+                                        {visibleSet.has('sanctions') && (
                                         <td style={{ padding: '16px' }}>
                                             <OfacBadge vessel={v} />
                                         </td>
+                                        )}
+                                        {visibleSet.has('customer') && (
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ position: 'relative' }}>
                                                 {editingCustomerVesselId === v.id ? (
@@ -709,6 +949,8 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                 )}
                                             </div>
                                         </td>
+                                        )}
+                                        {visibleSet.has('fleet') && (
                                         <td style={{ padding: '16px' }}>
                                             <select
                                                 value={v.fleetId || ''}
@@ -722,11 +964,14 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                 ))}
                                             </select>
                                         </td>
+                                        )}
+                                        {visibleSet.has('actions') && (
                                         <td style={{ padding: '16px', textAlign: 'right' }}>
                                             <button onClick={() => setSelectedVessel(v)} className="btn-secondary" style={{ padding: '6px 8px', display: 'inline-flex', alignItems: 'center' }} aria-label="View details">
                                                 <ChevronRight size={16} />
                                             </button>
                                         </td>
+                                        )}
                                     </tr>
                                 )
                             })}

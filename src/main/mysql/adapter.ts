@@ -2382,6 +2382,18 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('dashboard_onboarded migration:', e) }
 
+            // User column preferences table
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS user_column_prefs (
+                        user_id VARCHAR(36) NOT NULL,
+                        page_key VARCHAR(50) NOT NULL,
+                        visible_columns TEXT NOT NULL,
+                        PRIMARY KEY (user_id, page_key)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                `)
+            } catch (e) { console.error('user_column_prefs migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -10019,6 +10031,56 @@ export class MySQLAdapter {
         return rows as any[]
     }
 
+    async getDatabaseHealth(): Promise<{
+        connected: boolean
+        version: string
+        databaseSize: string
+        tableCount: number
+        largestTables: { name: string; rows: number; sizeMB: number }[]
+        lastBackup: string | null
+    }> {
+        if (!this.pool) {
+            return { connected: false, version: '', databaseSize: '0', tableCount: 0, largestTables: [], lastBackup: null }
+        }
+        try {
+            const [[versionRow]] = await this.pool.query('SELECT VERSION() as version') as any
+            const version = versionRow?.version || 'Unknown'
+
+            const [tableRows] = await this.pool.query(
+                `SELECT table_name AS name,
+                        table_rows AS \`rows\`,
+                        ROUND(data_length / 1024 / 1024, 2) AS sizeMB
+                 FROM information_schema.tables
+                 WHERE table_schema = DATABASE()
+                 ORDER BY data_length DESC`
+            ) as any
+
+            const tables = Array.isArray(tableRows) ? tableRows : []
+            const tableCount = tables.length
+            const totalSizeMB = tables.reduce((sum: number, t: any) => sum + (parseFloat(t.sizeMB) || 0), 0)
+            const databaseSize = totalSizeMB < 1
+                ? `${(totalSizeMB * 1024).toFixed(0)} KB`
+                : `${totalSizeMB.toFixed(2)} MB`
+
+            const largestTables = tables.slice(0, 10).map((t: any) => ({
+                name: t.name,
+                rows: parseInt(t.rows) || 0,
+                sizeMB: parseFloat(t.sizeMB) || 0
+            }))
+
+            let lastBackup: string | null = null
+            try {
+                const val = await this.getSetting('last_backup_date')
+                lastBackup = val || null
+            } catch { /* ignore */ }
+
+            return { connected: true, version, databaseSize, tableCount, largestTables, lastBackup }
+        } catch (error) {
+            console.error('getDatabaseHealth error:', error)
+            return { connected: false, version: '', databaseSize: '0', tableCount: 0, largestTables: [], lastBackup: null }
+        }
+    }
+
     async addRecentItem(userId: string, itemType: string, itemId: string, itemLabel: string, itemSublabel?: string): Promise<void> {
         if (!this.pool) return
         const id = uuidv4()
@@ -10038,6 +10100,84 @@ export class MySQLAdapter {
              )`,
             [userId, userId]
         )
+    }
+    // --- User Column Preferences ---
+    async getUserColumnPrefs(userId: string, pageKey: string): Promise<string[] | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.execute(
+            'SELECT visible_columns FROM user_column_prefs WHERE user_id = ? AND page_key = ?',
+            [userId, pageKey]
+        )
+        const arr = rows as any[]
+        if (arr.length === 0) return null
+        try {
+            return JSON.parse(arr[0].visible_columns)
+        } catch {
+            return null
+        }
+    }
+
+    async setUserColumnPrefs(userId: string, pageKey: string, columnIds: string[]): Promise<void> {
+        if (!this.pool) throw new Error('DB not connected')
+        await this.pool.execute(
+            `INSERT INTO user_column_prefs (user_id, page_key, visible_columns)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE visible_columns = VALUES(visible_columns)`,
+            [userId, pageKey, JSON.stringify(columnIds)]
+        )
+    }
+
+    // --- Bulk Vessel Operations ---
+    async bulkAssignFleet(vesselIds: string[], fleetId: string): Promise<void> {
+        if (!this.pool || vesselIds.length === 0) return
+        const placeholders = vesselIds.map(() => '?').join(',')
+        await this.pool.execute(
+            `UPDATE vessels SET fleet_id = ? WHERE id IN (${placeholders})`,
+            [fleetId || null, ...vesselIds]
+        )
+    }
+
+    async bulkSetVesselStatus(vesselIds: string[], isActive: boolean): Promise<void> {
+        if (!this.pool || vesselIds.length === 0) return
+        const placeholders = vesselIds.map(() => '?').join(',')
+        await this.pool.execute(
+            `UPDATE vessels SET is_active = ? WHERE id IN (${placeholders})`,
+            [isActive, ...vesselIds]
+        )
+        // If deactivating, also deactivate their policies
+        if (!isActive) {
+            await this.pool.execute(
+                `UPDATE vessel_dynamic_policies SET status = 'inactive' WHERE vessel_id IN (${placeholders}) AND status = 'active'`,
+                vesselIds
+            )
+        }
+    }
+
+    // --- Bulk Entity Operations ---
+    async bulkDeleteEntities(entityIds: string[]): Promise<number> {
+        if (!this.pool || entityIds.length === 0) return 0
+        const placeholders = entityIds.map(() => '?').join(',')
+        // Clear customer references
+        await this.pool.execute(
+            `UPDATE vessels SET customer_id = NULL, customer_type = NULL WHERE customer_id IN (${placeholders})`,
+            entityIds
+        )
+        // Delete assured links
+        await this.pool.execute(
+            `DELETE FROM vessel_assureds WHERE entity_id IN (${placeholders})`,
+            entityIds
+        )
+        // Delete UBO links
+        await this.pool.execute(
+            `DELETE FROM entity_ubos WHERE assured_entity_id IN (${placeholders}) OR ubo_entity_id IN (${placeholders})`,
+            [...entityIds, ...entityIds]
+        )
+        // Delete entities
+        const [result] = await this.pool.execute(
+            `DELETE FROM entities WHERE id IN (${placeholders})`,
+            entityIds
+        )
+        return (result as any).affectedRows || 0
     }
 }
 

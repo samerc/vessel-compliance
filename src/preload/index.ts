@@ -737,6 +737,18 @@ const api = {
   notificationsDelete: (id: string) => ipcRenderer.invoke('notifications:delete', id),
   notificationsGetUsernames: () => ipcRenderer.invoke('notifications:getUsernames'),
 
+  // Database Health
+  getDatabaseHealth: () => ipcRenderer.invoke('db:getHealth'),
+
+  // Column Preferences
+  columnPrefsGet: (pageKey: string) => ipcRenderer.invoke('columnPrefs:get', pageKey),
+  columnPrefsSet: (pageKey: string, columnIds: string[]) => ipcRenderer.invoke('columnPrefs:set', pageKey, columnIds),
+
+  // Bulk Operations
+  bulkAssignFleet: (vesselIds: string[], fleetId: string) => ipcRenderer.invoke('bulk:assignFleet', vesselIds, fleetId),
+  bulkSetVesselStatus: (vesselIds: string[], isActive: boolean) => ipcRenderer.invoke('bulk:setVesselStatus', vesselIds, isActive),
+  bulkDeleteEntities: (entityIds: string[]) => ipcRenderer.invoke('bulk:deleteEntities', entityIds),
+
   // Global Search
   globalSearch: (query: string) => ipcRenderer.invoke('global:search', query),
 

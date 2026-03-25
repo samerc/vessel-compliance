@@ -747,6 +747,25 @@ export interface Api {
   notificationsDelete: (id: string) => Promise<void>
   notificationsGetUsernames: () => Promise<{ id: string; username: string }[]>
 
+  // Database Health
+  getDatabaseHealth: () => Promise<{
+    connected: boolean
+    version: string
+    databaseSize: string
+    tableCount: number
+    largestTables: { name: string; rows: number; sizeMB: number }[]
+    lastBackup: string | null
+  }>
+
+  // Column Preferences
+  columnPrefsGet: (pageKey: string) => Promise<string[] | null>
+  columnPrefsSet: (pageKey: string, columnIds: string[]) => Promise<void>
+
+  // Bulk Operations
+  bulkAssignFleet: (vesselIds: string[], fleetId: string) => Promise<void>
+  bulkSetVesselStatus: (vesselIds: string[], isActive: boolean) => Promise<void>
+  bulkDeleteEntities: (entityIds: string[]) => Promise<number>
+
   // Global Search
   globalSearch: (query: string) => Promise<{
     vessels: Array<{ id: string; name: string; imoNumber: string; isActive: boolean }>

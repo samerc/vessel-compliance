@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, Tag, FolderSearch, FolderOpen } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, Tag, FolderSearch, FolderOpen, GitCommit, Edit3, Loader2 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -22,7 +22,7 @@ interface VesselDetailProps {
     vessel: Vessel
     onBack: () => void
     backLabel?: string
-    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history'
+    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline'
     initialEditing?: boolean
 }
 
@@ -322,7 +322,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
     const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
-    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history'>(initialSection || 'documents')
+    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline'>(initialSection || 'documents')
     useEffect(() => {
         if (initialSection) {
             setDetailView(initialSection)
@@ -1051,7 +1051,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 marginBottom: '16px',
                 alignItems: 'center'
             }}>
-                {(['documents', 'assureds', 'surveys', 'policies', 'history'] as const).map(view => (
+                {(['documents', 'assureds', 'surveys', 'policies', 'history', 'timeline'] as const).map(view => (
                     <button
                         key={view}
                         onClick={() => {
@@ -1080,6 +1080,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         {view === 'surveys' && <ClipboardList size={18} />}
                         {view === 'policies' && <Shield size={18} />}
                         {view === 'history' && <Calendar size={18} />}
+                        {view === 'timeline' && <Clock size={18} />}
                         {view === 'assureds' ? 'Assured' : view.charAt(0).toUpperCase() + view.slice(1)}
                     </button>
                 ))}
@@ -1711,6 +1712,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
             {detailView === 'history' && (
                 <VesselHistoryView auditLog={auditLog} isLight={isLight} flagStates={flagStates} />
+            )}
+
+            {detailView === 'timeline' && (
+                <VesselTimeline vesselId={vessel.id} isLight={isLight} />
             )}
 
             {confirmation.show && (
@@ -2756,6 +2761,330 @@ function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: Vessel
                     </div>
                 ))}
             </div>
+        </div>
+    )
+}
+
+// ==================== Vessel Timeline ====================
+
+interface TimelineEvent {
+    date: string
+    type: 'audit' | 'document' | 'policy' | 'survey' | 'warranty' | 'sanctions'
+    title: string
+    subtitle?: string
+    iconType: string
+    color: string
+}
+
+const TIMELINE_PAGE_SIZE = 50
+
+function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: boolean }) {
+    const [events, setEvents] = useState<TimelineEvent[]>([])
+    const [loading, setLoading] = useState(true)
+    const [visibleCount, setVisibleCount] = useState(TIMELINE_PAGE_SIZE)
+
+    useEffect(() => {
+        let cancelled = false
+        setLoading(true)
+        setVisibleCount(TIMELINE_PAGE_SIZE)
+
+        const load = async () => {
+            const allEvents: TimelineEvent[] = []
+
+            try {
+                const [auditLog, docs, policies, surveys, warranties, sanctionsResults] = await Promise.all([
+                    window.api.getVesselAuditLog(vesselId).catch(() => []),
+                    window.api.getVesselDocuments(vesselId).catch(() => []),
+                    window.api.getVesselDynamicPolicies(vesselId).catch(() => []),
+                    window.api.getConditionSurveys(vesselId).catch(() => []),
+                    window.api.surveyWarrantyGetByVessel(vesselId).catch(() => []),
+                    window.api.complianceGetCheckResults().catch(() => [])
+                ])
+
+                // Audit log entries
+                if (Array.isArray(auditLog)) {
+                    for (const entry of auditLog) {
+                        allEvents.push({
+                            date: entry.changedAt || '',
+                            type: 'audit',
+                            title: `${entry.fieldName} changed`,
+                            subtitle: entry.newValue ? `New: ${entry.newValue}` : undefined,
+                            iconType: 'audit',
+                            color: '#6495ed'
+                        })
+                    }
+                }
+
+                // Document uploads
+                if (Array.isArray(docs)) {
+                    for (const doc of docs) {
+                        if (doc.uploadedDate) {
+                            allEvents.push({
+                                date: doc.uploadedDate,
+                                type: 'document',
+                                title: 'Document uploaded',
+                                subtitle: doc.uploadedBy ? `by ${doc.uploadedBy}` : undefined,
+                                iconType: 'document',
+                                color: '#00aac8'
+                            })
+                        }
+                    }
+                }
+
+                // Policies
+                if (Array.isArray(policies)) {
+                    for (const p of policies) {
+                        if (p.createdAt) {
+                            allEvents.push({
+                                date: p.createdAt,
+                                type: 'policy',
+                                title: `Policy created`,
+                                subtitle: p.policyNumber || undefined,
+                                iconType: 'policy',
+                                color: '#9370db'
+                            })
+                        }
+                    }
+                }
+
+                // Surveys
+                if (Array.isArray(surveys)) {
+                    for (const s of surveys) {
+                        if (s.surveyDate) {
+                            allEvents.push({
+                                date: s.surveyDate,
+                                type: 'survey',
+                                title: `Survey: ${s.surveyType || 'Condition'}`,
+                                subtitle: s.location || undefined,
+                                iconType: 'survey',
+                                color: '#22c55e'
+                            })
+                        }
+                    }
+                }
+
+                // Warranties
+                if (Array.isArray(warranties)) {
+                    for (const w of warranties) {
+                        if (w.createdAt) {
+                            const statusLabel = w.status === 'completed' ? 'Completed' : w.status === 'waived' ? 'Waived' : 'Open'
+                            allEvents.push({
+                                date: w.createdAt,
+                                type: 'warranty',
+                                title: `Warranty: ${w.description || 'Created'}`,
+                                subtitle: statusLabel,
+                                iconType: 'warranty',
+                                color: '#f59e0b'
+                            })
+                        }
+                    }
+                }
+
+                // Sanctions check results for this vessel
+                if (Array.isArray(sanctionsResults)) {
+                    const vesselResults = sanctionsResults.filter((r: any) => r.entityType === 'vessel' && r.entityId === vesselId)
+                    for (const r of vesselResults) {
+                        const isPending = r.status === 'pending_review'
+                        allEvents.push({
+                            date: r.createdAt || '',
+                            type: 'sanctions',
+                            title: `Sanctions check: ${r.entityName || 'Unknown'}`,
+                            subtitle: `Score: ${r.matchScore || 0}%`,
+                            iconType: 'sanctions',
+                            color: isPending ? 'var(--danger)' : '#22c55e'
+                        })
+                    }
+                }
+            } catch { /* ignore */ }
+
+            // Sort by date descending
+            allEvents.sort((a, b) => {
+                const da = new Date(a.date).getTime() || 0
+                const db = new Date(b.date).getTime() || 0
+                return db - da
+            })
+
+            if (!cancelled) {
+                setEvents(allEvents)
+                setLoading(false)
+            }
+        }
+
+        load()
+        return () => { cancelled = true }
+    }, [vesselId])
+
+    const visibleEvents = events.slice(0, visibleCount)
+
+    // Group by year
+    const yearGroups: { year: string; items: TimelineEvent[] }[] = []
+    let currentYear = ''
+    for (const ev of visibleEvents) {
+        const y = ev.date ? new Date(ev.date).getFullYear().toString() : 'Unknown'
+        if (y !== currentYear) {
+            currentYear = y
+            yearGroups.push({ year: y, items: [] })
+        }
+        yearGroups[yearGroups.length - 1].items.push(ev)
+    }
+
+    const getIcon = (iconType: string) => {
+        switch (iconType) {
+            case 'audit': return <Edit3 size={14} />
+            case 'document': return <FileText size={14} />
+            case 'policy': return <Shield size={14} />
+            case 'survey': return <ClipboardList size={14} />
+            case 'warranty': return <AlertCircle size={14} />
+            case 'sanctions': return <Search size={14} />
+            default: return <GitCommit size={14} />
+        }
+    }
+
+    if (loading) {
+        return (
+            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
+                <Loader2 size={24} className="spin" style={{ marginBottom: '12px' }} />
+                <div>Loading timeline...</div>
+            </div>
+        )
+    }
+
+    if (events.length === 0) {
+        return (
+            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
+                No timeline events found for this vessel.
+            </div>
+        )
+    }
+
+    return (
+        <div className="fade-in" style={{ maxWidth: '800px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <GitCommit size={20} color="var(--accent-primary)" />
+                <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Vessel Timeline</span>
+                <span style={{
+                    marginLeft: '8px',
+                    padding: '2px 10px',
+                    borderRadius: '12px',
+                    background: 'rgba(0,210,255,0.1)',
+                    color: 'var(--accent-primary)',
+                    fontSize: '0.78rem',
+                    fontWeight: 600
+                }}>
+                    {events.length} events
+                </span>
+            </div>
+
+            <div style={{ position: 'relative', paddingLeft: '32px' }}>
+                {/* Vertical line */}
+                <div style={{
+                    position: 'absolute',
+                    left: '11px',
+                    top: '0',
+                    bottom: '0',
+                    width: '2px',
+                    background: isLight ? 'rgba(0,170,200,0.2)' : 'rgba(0,210,255,0.15)'
+                }} />
+
+                {yearGroups.map(group => (
+                    <div key={group.year}>
+                        {/* Year header */}
+                        <div style={{
+                            position: 'relative',
+                            marginBottom: '16px',
+                            marginTop: '8px'
+                        }}>
+                            <div style={{
+                                position: 'absolute',
+                                left: '-32px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '50%',
+                                background: 'var(--accent-primary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <Calendar size={12} color="#fff" />
+                            </div>
+                            <span style={{
+                                fontWeight: 700,
+                                fontSize: '1rem',
+                                color: 'var(--text-primary)',
+                                background: isLight ? '#f4f6fb' : '#14172a',
+                                padding: '4px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--glass-border)'
+                            }}>
+                                {group.year}
+                            </span>
+                        </div>
+
+                        {group.items.map((ev, idx) => (
+                            <div key={`${group.year}-${idx}`} style={{
+                                position: 'relative',
+                                marginBottom: '12px',
+                                padding: '10px 16px',
+                                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                                borderRadius: '8px',
+                                borderLeft: `3px solid ${ev.color}`,
+                                transition: 'background 0.15s'
+                            }}>
+                                {/* Dot on the line */}
+                                <div style={{
+                                    position: 'absolute',
+                                    left: '-37px',
+                                    top: '14px',
+                                    width: '12px',
+                                    height: '12px',
+                                    borderRadius: '50%',
+                                    background: ev.color,
+                                    border: `2px solid ${isLight ? '#f4f6fb' : '#14172a'}`
+                                }} />
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                    <span style={{ color: ev.color, display: 'flex', alignItems: 'center' }}>
+                                        {getIcon(ev.iconType)}
+                                    </span>
+                                    <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                                        {ev.title}
+                                    </span>
+                                    <span style={{
+                                        marginLeft: 'auto',
+                                        fontSize: '0.75rem',
+                                        color: 'var(--text-secondary)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}>
+                                        <Clock size={11} />
+                                        {ev.date ? formatDate(ev.date) : 'Unknown'}
+                                    </span>
+                                </div>
+                                {ev.subtitle && (
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '22px' }}>
+                                        {ev.subtitle}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
+
+            {visibleCount < events.length && (
+                <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                    <button
+                        onClick={() => setVisibleCount(prev => prev + TIMELINE_PAGE_SIZE)}
+                        className="btn-secondary"
+                        style={{ padding: '8px 24px', fontSize: '0.85rem' }}
+                    >
+                        Load more ({events.length - visibleCount} remaining)
+                    </button>
+                </div>
+            )}
         </div>
     )
 }

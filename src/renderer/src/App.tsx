@@ -55,7 +55,7 @@ function App(): React.JSX.Element {
   const { isAuthenticated, isAdmin, logout, user, hasPermission } = useAuth()
   const { theme, setThemeTo } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
-  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | undefined>(undefined)
+  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | undefined>(undefined)
   const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
   const [initialQuotationId, setInitialQuotationId] = useState<string | null>(null)
@@ -63,6 +63,9 @@ function App(): React.JSX.Element {
   const [quotationPolicyContext, setQuotationPolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
   const [policyView, setPolicyView] = useState<'list' | 'settings'>('list')
   const [policySetupQuotationId, setPolicySetupQuotationId] = useState<string | null>(null)
+  const [breadcrumbVesselName, setBreadcrumbVesselName] = useState<string | null>(null)
+  const [breadcrumbQuotationRef, setBreadcrumbQuotationRef] = useState<string | null>(null)
+  const [breadcrumbPolicyRef, setBreadcrumbPolicyRef] = useState<string | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -70,6 +73,25 @@ function App(): React.JSX.Element {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [recentItems, setRecentItems] = useState<RecentItem[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
+
+  // Resolve breadcrumb vessel name when navigating
+  useEffect(() => {
+    if (navigateToVesselId && activeTab === 'vessels') {
+      window.api.getVessels().then(vessels => {
+        const v = vessels.find((v: any) => v.id === navigateToVesselId)
+        if (v) setBreadcrumbVesselName(v.name)
+      }).catch(() => {})
+    } else if (activeTab !== 'vessels') {
+      setBreadcrumbVesselName(null)
+    }
+  }, [navigateToVesselId, activeTab])
+
+  // Clear breadcrumb context on top-level tab change
+  useEffect(() => {
+    if (!navigateToVesselId && activeTab === 'vessels') setBreadcrumbVesselName(null)
+    if (!initialQuotationId && activeTab === 'quotations') setBreadcrumbQuotationRef(null)
+    if (!selectedPolicyId && activeTab !== 'policy-detail') setBreadcrumbPolicyRef(null)
+  }, [activeTab, navigateToVesselId, initialQuotationId, selectedPolicyId])
 
   // Ctrl+K global search shortcut
   useEffect(() => {
@@ -233,6 +255,39 @@ function App(): React.JSX.Element {
       sidebarCollapsed={sc}
     />
   )
+
+  // Derive breadcrumbs from current state
+  const breadcrumbs: { label: string; onClick?: () => void }[] = []
+  const TAB_LABELS: Record<string, string> = {
+    dashboard: 'Dashboard', vessels: 'Vessels', fleets: 'Fleets', admin: 'Settings',
+    directory: 'Directory', compliance: 'Compliance', users: 'Users',
+    'sanctions-search': 'Sanctions Search', reminders: 'Reminders', surveys: 'Surveys',
+    'survey-followup': 'Survey Follow-Up', calculators: 'Calculators',
+    quotations: 'Quotations', 'vessel-filter': 'Vessel Filter', renewals: 'Renewals',
+    reports: 'Reports', analytics: 'Fleet Analytics', 'activity-log': 'Activity Log',
+    'email-templates': 'Email Templates', 'policies-list': 'Policies',
+    'policy-detail': 'Policies', notifications: 'Notifications', 'policy-setup': 'Policy Setup'
+  }
+
+  if (activeTab === 'vessels' && navigateToVesselId && breadcrumbVesselName) {
+    if (navigateBackTab) {
+      breadcrumbs.push({
+        label: TAB_LABELS[navigateBackTab] || navigateBackTab,
+        onClick: () => { setActiveTab(navigateBackTab as any); setNavigateBackTab(undefined); setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }
+      })
+    } else {
+      breadcrumbs.push({ label: 'Vessels', onClick: () => { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) } })
+    }
+    breadcrumbs.push({ label: breadcrumbVesselName })
+  } else if (activeTab === 'policy-detail' && selectedPolicyId) {
+    breadcrumbs.push({ label: 'Policies', onClick: () => { setSelectedPolicyId(null); setActiveTab('policies-list') } })
+    if (breadcrumbPolicyRef) breadcrumbs.push({ label: breadcrumbPolicyRef })
+    else breadcrumbs.push({ label: 'Policy Detail' })
+  } else if (activeTab === 'quotations' && initialQuotationId) {
+    breadcrumbs.push({ label: 'Quotations', onClick: () => { setInitialQuotationId(null) } })
+    if (breadcrumbQuotationRef) breadcrumbs.push({ label: breadcrumbQuotationRef })
+    else breadcrumbs.push({ label: 'Editor' })
+  }
 
   return (
     <ErrorBoundary>
@@ -517,6 +572,36 @@ function App(): React.JSX.Element {
         </aside>
 
         <main id="main-content" className="main-content">
+          {breadcrumbs.length >= 2 && (
+            <nav aria-label="Breadcrumb" style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 32px 0', fontSize: '0.82rem',
+              color: 'var(--text-secondary)'
+            }}>
+              {breadcrumbs.map((bc, i) => (
+                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {i > 0 && <ChevronRight size={12} style={{ opacity: 0.5 }} />}
+                  {bc.onClick ? (
+                    <button
+                      onClick={bc.onClick}
+                      style={{
+                        background: 'none', border: 'none', padding: 0,
+                        color: 'var(--text-secondary)', cursor: 'pointer',
+                        fontSize: '0.82rem', textDecoration: 'none'
+                      }}
+                      className="hover-effect"
+                      onMouseEnter={(e) => { (e.target as HTMLElement).style.color = 'var(--accent-primary)' }}
+                      onMouseLeave={(e) => { (e.target as HTMLElement).style.color = 'var(--text-secondary)' }}
+                    >
+                      {bc.label}
+                    </button>
+                  ) : (
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{bc.label}</span>
+                  )}
+                </span>
+              ))}
+            </nav>
+          )}
           {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} onNavigate={(tab) => setActiveTab(tab as any)} />}
           {activeTab === 'vessels' && <VesselManager
             initialVesselId={navigateToVesselId}

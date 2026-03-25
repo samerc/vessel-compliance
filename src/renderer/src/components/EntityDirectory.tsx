@@ -3,7 +3,7 @@ import {
   Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X,
   Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload, Merge, Link2,
-  ScanSearch, MapPin
+  ScanSearch, MapPin, CheckSquare, Square, Download
 } from 'lucide-react'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress } from '../../../shared/types'
 import { CaseToggleBtn } from './CaseToggle'
@@ -129,6 +129,10 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false)
   const [dupThreshold, setDupThreshold] = useState(85)
 
+  // Bulk selection state
+  const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set())
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+
   const openMergeModal = async (entity: Entity) => {
     setMergeSource(entity)
     setMergeTarget(null)
@@ -229,6 +233,60 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       showError(error.message || 'Failed to delete entity')
     } finally {
       setDeleteConfirmation({ show: false, entity: null, message: '' })
+    }
+  }
+
+  // Bulk operations
+  const toggleSelectEntity = (entityId: string) => {
+    setSelectedEntityIds(prev => {
+      const next = new Set(prev)
+      if (next.has(entityId)) next.delete(entityId)
+      else next.add(entityId)
+      return next
+    })
+  }
+
+  const toggleSelectAllEntities = () => {
+    if (selectedEntityIds.size === entities.length) {
+      setSelectedEntityIds(new Set())
+    } else {
+      setSelectedEntityIds(new Set(entities.map(e => e.id)))
+    }
+  }
+
+  const handleBulkExportEntities = () => {
+    const selected = allEntities.filter(e => selectedEntityIds.has(e.id))
+    if (selected.length === 0) return
+    const headers = ['Name', 'Type', 'Identifier', 'Email', 'Phone', 'Sanctions Status']
+    const rows = selected.map(e => [
+      e.name,
+      e.type,
+      e.identifier || '',
+      e.email || '',
+      e.phone || '',
+      e.ofacStatus || 'NOT CHECKED'
+    ])
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `entities-export-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    showSuccess(`Exported ${selected.length} entity(ies)`)
+  }
+
+  const handleBulkDeleteEntities = async () => {
+    try {
+      const count = await window.api.bulkDeleteEntities([...selectedEntityIds])
+      showSuccess(`Deleted ${count} entity(ies)`)
+      setSelectedEntityIds(new Set())
+      setShowBulkDeleteConfirm(false)
+      setSelectedEntity(null)
+      loadData()
+    } catch (error: any) {
+      showError(error.message || 'Failed to delete entities')
     }
   }
 
@@ -777,6 +835,50 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
         </div>
       </div>
 
+      {/* Bulk Action Toolbar */}
+      {selectedEntityIds.size > 0 && (
+        <div className="glass-card fade-in" style={{
+          padding: '10px 20px',
+          marginBottom: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(0,210,255,0.06)',
+          border: '1px solid var(--accent-primary)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10
+        }}>
+          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--accent-primary)' }}>
+            {selectedEntityIds.size} selected
+          </span>
+          <div style={{ width: '1px', height: '20px', background: 'var(--glass-border)' }} />
+          <button
+            className="btn-secondary"
+            onClick={handleBulkExportEntities}
+            style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <Download size={13} /> Export Selected
+          </button>
+          {hasPermission('entities:delete') && (
+            <button
+              className="btn-secondary"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}
+            >
+              <Trash2 size={13} /> Delete Selected
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={() => setSelectedEntityIds(new Set())}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.82rem', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <X size={13} /> Clear
+          </button>
+        </div>
+      )}
+
       {/* Main: table + slide-in panel */}
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
 
@@ -785,6 +887,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
+                <col style={{ width: '40px' }} />
                 <col style={{ width: 'auto' }} />
                 <col style={{ width: '110px' }} />
                 <col style={{ width: '150px' }} />
@@ -793,6 +896,18 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)', position: 'sticky', top: 0, zIndex: 1 }}>
+                  <th style={{ padding: '10px 8px 10px 16px', width: '40px' }}>
+                    <div
+                      onClick={toggleSelectAllEntities}
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--accent-primary)' }}
+                      title={selectedEntityIds.size === entities.length ? 'Deselect all' : 'Select all'}
+                    >
+                      {selectedEntityIds.size === entities.length && entities.length > 0
+                        ? <CheckSquare size={15} />
+                        : <Square size={15} style={{ opacity: 0.4 }} />
+                      }
+                    </div>
+                  </th>
                   {['Name', 'Type', 'Sanctions', 'Documents', 'Vessels'].map(col => (
                     <th key={col} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{col}</th>
                   ))}
@@ -800,17 +915,18 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
               </thead>
               <tbody>
                 {isLoading && entities.length === 0 ? (
-                  <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <Loader2 size={22} className="spinner" style={{ marginBottom: '10px', display: 'block', margin: '0 auto 10px' }} />
                     Loading entities...
                   </td></tr>
                 ) : entities.length === 0 ? (
-                  <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <Shield size={30} style={{ marginBottom: '10px', opacity: 0.25, display: 'block', margin: '0 auto 10px' }} />
                     No entities found
                   </td></tr>
                 ) : entities.map(entity => {
                   const isSelected = selectedEntity?.id === entity.id
+                  const isBulkChecked = selectedEntityIds.has(entity.id)
                   const score = getDocScore(entity)
                   const vcount = getVesselCount(entity.id)
                   const docColor = score.have === score.total
@@ -827,11 +943,20 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                       style={{
                         cursor: 'pointer',
                         borderBottom: '1px solid var(--table-border)',
-                        background: isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(0,210,255,0.07)') : 'transparent',
+                        background: isBulkChecked ? (isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.04)') : isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(0,210,255,0.07)') : 'transparent',
                         borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
                         transition: 'background 0.12s, border-color 0.12s'
                       }}
                     >
+                      {/* Checkbox */}
+                      <td style={{ padding: '11px 8px 11px 16px', width: '40px' }} onClick={e => e.stopPropagation()}>
+                        <div
+                          onClick={() => toggleSelectEntity(entity.id)}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: isBulkChecked ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                        >
+                          {isBulkChecked ? <CheckSquare size={15} /> : <Square size={15} style={{ opacity: 0.4 }} />}
+                        </div>
+                      </td>
                       {/* Name */}
                       <td style={{ padding: '11px 16px', overflow: 'hidden' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1326,6 +1451,18 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Delete Confirmation */}
+      {showBulkDeleteConfirm && (
+        <ConfirmationModal
+          title="Delete Selected Entities?"
+          message={`Delete ${selectedEntityIds.size} entity(ies)? This will remove all assured links and customer assignments. This cannot be undone.`}
+          confirmLabel="Delete All"
+          isDangerous={true}
+          onConfirm={handleBulkDeleteEntities}
+          onCancel={() => setShowBulkDeleteConfirm(false)}
+        />
       )}
 
       {/* Duplicate Finder Modal */}

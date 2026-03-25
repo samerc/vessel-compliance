@@ -141,6 +141,17 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [editNotifGroupName, setEditNotifGroupName] = useState('')
     const [editNotifGroupDesc, setEditNotifGroupDesc] = useState('')
 
+    // Database Health state
+    const [dbHealth, setDbHealth] = useState<{
+        connected: boolean
+        version: string
+        databaseSize: string
+        tableCount: number
+        largestTables: { name: string; rows: number; sizeMB: number }[]
+        lastBackup: string | null
+    } | null>(null)
+    const [loadingDbHealth, setLoadingDbHealth] = useState(false)
+
     // Daily Alerts state
     const [dailyAlertsEnabled, setDailyAlertsEnabled] = useState(false)
     const [dailyAlertsTime, setDailyAlertsTime] = useState('08:00')
@@ -1240,6 +1251,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
             { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
+            { id: 'dbHealth', label: 'Database Health', icon: <Database size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
         ] : []),
     ]
@@ -2417,6 +2429,109 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             )}
 
             {/* 6. Database Configuration */}
+            {effectiveSection === 'dbHealth' && (
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Database size={20} color="var(--accent-primary)" /> Database Health
+                    </h3>
+                    <button
+                        className="btn-primary"
+                        disabled={loadingDbHealth}
+                        onClick={async () => {
+                            setLoadingDbHealth(true)
+                            try {
+                                const result = await window.api.getDatabaseHealth()
+                                setDbHealth(result)
+                            } catch { showError('Failed to load database health') }
+                            setLoadingDbHealth(false)
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
+                    >
+                        {loadingDbHealth ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
+                        {dbHealth ? 'Refresh' : 'Check Health'}
+                    </button>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
+                    View database connection status, version, size, and table statistics.
+                </p>
+
+                {dbHealth && (
+                    <>
+                        {/* KPI cards */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Status</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                        width: '10px', height: '10px', borderRadius: '50%',
+                                        background: dbHealth.connected ? '#22c55e' : 'var(--danger)',
+                                        boxShadow: dbHealth.connected ? '0 0 6px #22c55e' : '0 0 6px var(--danger)'
+                                    }} />
+                                    <span style={{ fontWeight: 600, fontSize: '1rem', color: dbHealth.connected ? '#22c55e' : 'var(--danger)' }}>
+                                        {dbHealth.connected ? 'Connected' : 'Disconnected'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Version</div>
+                                <div style={{ fontWeight: 600, fontSize: '1rem' }}>{dbHealth.version || 'N/A'}</div>
+                            </div>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Database Size</div>
+                                <div style={{ fontWeight: 600, fontSize: '1rem' }}>{dbHealth.databaseSize}</div>
+                            </div>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Tables</div>
+                                <div style={{ fontWeight: 600, fontSize: '1rem' }}>{dbHealth.tableCount}</div>
+                            </div>
+                        </div>
+
+                        {/* Largest tables */}
+                        {dbHealth.largestTables.length > 0 && (
+                            <div>
+                                <h4 style={{ marginBottom: '12px', fontSize: '0.92rem', color: 'var(--text-primary)' }}>Top 10 Largest Tables</h4>
+                                <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <caption className="sr-only">Largest database tables</caption>
+                                        <thead>
+                                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                                <th scope="col" style={{ padding: '12px 16px' }}>#</th>
+                                                <th scope="col" style={{ padding: '12px 16px' }}>Table</th>
+                                                <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>Rows</th>
+                                                <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>Size (MB)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {dbHealth.largestTables.map((t, i) => (
+                                                <tr key={t.name} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                                    <td style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{i + 1}</td>
+                                                    <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: '0.85rem' }}>{t.name}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: '0.85rem' }}>{t.rows.toLocaleString()}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: '0.85rem' }}>{t.sizeMB.toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Last backup */}
+                        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.15)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            Last backup: {dbHealth.lastBackup || 'No backup recorded'}
+                        </div>
+                    </>
+                )}
+
+                {!dbHealth && !loadingDbHealth && (
+                    <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                        Click &quot;Check Health&quot; to view database statistics.
+                    </div>
+                )}
+            </section>
+            )}
+
             {effectiveSection === 'dbConfig' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>

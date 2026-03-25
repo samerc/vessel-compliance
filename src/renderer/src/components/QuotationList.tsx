@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateShort } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
@@ -40,6 +41,22 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
     const isLight = theme === 'light'
+
+    // Column preferences
+    const QUOTATION_COLUMNS: ColumnDef[] = [
+        { id: 'referenceNumber', label: 'Reference', defaultVisible: true },
+        { id: 'quotationTypeName', label: 'Type', defaultVisible: true },
+        { id: 'quotationDate', label: 'Date', defaultVisible: true },
+        { id: 'vesselName', label: 'Vessel', defaultVisible: true },
+        { id: 'coName', label: 'Customer', defaultVisible: true },
+        { id: 'conditions', label: 'Conditions', defaultVisible: true },
+        { id: 'premiumAmount', label: 'Premium', defaultVisible: true },
+        { id: 'status', label: 'Status', defaultVisible: true },
+        { id: 'updatedAt', label: 'Updated', defaultVisible: true },
+        { id: 'actions', label: 'Actions', defaultVisible: true }
+    ]
+    const { visibleColumns: qVisibleColumns, setVisibleColumns: setQVisibleColumns } = useColumnPrefs('quotations', QUOTATION_COLUMNS)
+    const qVisibleSet = new Set(qVisibleColumns)
 
     useEffect(() => { loadData() }, [])
 
@@ -310,35 +327,43 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                         <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                            <th style={thStyle('referenceNumber')} onClick={() => toggleSort('referenceNumber')}>
+                            {qVisibleSet.has('referenceNumber') && <th style={thStyle('referenceNumber')} onClick={() => toggleSort('referenceNumber')}>
                                 Ref <SortIcon field="referenceNumber" />
-                            </th>
-                            <th style={thStyle('quotationTypeName')} onClick={() => toggleSort('quotationTypeName')}>
+                            </th>}
+                            {qVisibleSet.has('quotationTypeName') && <th style={thStyle('quotationTypeName')} onClick={() => toggleSort('quotationTypeName')}>
                                 Type <SortIcon field="quotationTypeName" />
-                            </th>
-                            <th style={thStyle('quotationDate')} onClick={() => toggleSort('quotationDate')}>
+                            </th>}
+                            {qVisibleSet.has('quotationDate') && <th style={thStyle('quotationDate')} onClick={() => toggleSort('quotationDate')}>
                                 Date <SortIcon field="quotationDate" />
-                            </th>
-                            <th style={thStyle('vesselName')} onClick={() => toggleSort('vesselName')}>
+                            </th>}
+                            {qVisibleSet.has('vesselName') && <th style={thStyle('vesselName')} onClick={() => toggleSort('vesselName')}>
                                 Vessel <SortIcon field="vesselName" />
-                            </th>
-                            <th style={thStyle('coName')} onClick={() => toggleSort('coName')}>
+                            </th>}
+                            {qVisibleSet.has('coName') && <th style={thStyle('coName')} onClick={() => toggleSort('coName')}>
                                 Customer <SortIcon field="coName" />
-                            </th>
-                            <th style={thStyle('conditions')} onClick={() => toggleSort('conditions')}>
+                            </th>}
+                            {qVisibleSet.has('conditions') && <th style={thStyle('conditions')} onClick={() => toggleSort('conditions')}>
                                 Conditions <SortIcon field="conditions" />
-                            </th>
-                            <th style={thStyle('premiumAmount', 'right')} onClick={() => toggleSort('premiumAmount')}>
+                            </th>}
+                            {qVisibleSet.has('premiumAmount') && <th style={thStyle('premiumAmount', 'right')} onClick={() => toggleSort('premiumAmount')}>
                                 Premium <SortIcon field="premiumAmount" />
-                            </th>
-                            <th style={thStyle('status')} onClick={() => toggleSort('status')}>
+                            </th>}
+                            {qVisibleSet.has('status') && <th style={thStyle('status')} onClick={() => toggleSort('status')}>
                                 Status <SortIcon field="status" />
-                            </th>
-                            <th style={thStyle('updatedAt')} onClick={() => toggleSort('updatedAt')}>
+                            </th>}
+                            {qVisibleSet.has('updatedAt') && <th style={thStyle('updatedAt')} onClick={() => toggleSort('updatedAt')}>
                                 Updated <SortIcon field="updatedAt" />
-                            </th>
+                            </th>}
                             <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                Actions
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                                    {qVisibleSet.has('actions') && 'Actions'}
+                                    <ColumnSelector
+                                        pageKey="quotations"
+                                        allColumns={QUOTATION_COLUMNS}
+                                        visibleColumns={qVisibleColumns}
+                                        onChange={setQVisibleColumns}
+                                    />
+                                </div>
                             </th>
                         </tr>
                     </thead>
@@ -361,7 +386,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                     className="hover-effect"
                                     onClick={() => onOpenQuotation(q)}
                                 >
-                                    <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem' }}>
+                                    {qVisibleSet.has('referenceNumber') && <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem' }}>
                                         {q.referenceNumber || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>}
                                         {(q.revisionNumber || 0) > 0 && (
                                             <span style={{
@@ -379,8 +404,8 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                                 color: isLight ? '#007a91' : '#00aac8'
                                             }}>REN</span>
                                         )}
-                                    </td>
-                                    <td style={{ padding: '12px 14px' }}>
+                                    </td>}
+                                    {qVisibleSet.has('quotationTypeName') && <td style={{ padding: '12px 14px' }}>
                                         {q.quotationTypeCode ? (
                                             <span style={{
                                                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -390,11 +415,11 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                                 color: isLight ? '#007a91' : '#00aac8'
                                             }}>{q.quotationTypeCode}</span>
                                         ) : '-'}
-                                    </td>
-                                    <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                    </td>}
+                                    {qVisibleSet.has('quotationDate') && <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                                         {formatDate(q.quotationDate)}
-                                    </td>
-                                    <td style={{ padding: '12px 14px', fontSize: '0.85rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    </td>}
+                                    {qVisibleSet.has('vesselName') && <td style={{ padding: '12px 14px', fontSize: '0.85rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {q.vesselName ? (
                                             <>
                                                 {q.vesselName}
@@ -403,19 +428,19 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                                 )}
                                             </>
                                         ) : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>}
-                                    </td>
-                                    <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: 'var(--text-secondary)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    </td>}
+                                    {qVisibleSet.has('coName') && <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: 'var(--text-secondary)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {q.coName || <span style={{ fontStyle: 'italic' }}>—</span>}
-                                    </td>
-                                    <td style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--text-secondary)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    </td>}
+                                    {qVisibleSet.has('conditions') && <td style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--text-secondary)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                                         title={getConditions(q) || undefined}
                                     >
                                         {getConditions(q) || <span style={{ fontStyle: 'italic' }}>—</span>}
-                                    </td>
-                                    <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.82rem', fontWeight: q.premiumAmount ? 600 : 400, whiteSpace: 'nowrap' }}>
+                                    </td>}
+                                    {qVisibleSet.has('premiumAmount') && <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.82rem', fontWeight: q.premiumAmount ? 600 : 400, whiteSpace: 'nowrap' }}>
                                         {formatCurrency(q.premiumAmount, q.premiumCurrency)}
-                                    </td>
-                                    <td style={{ padding: '12px 14px' }}>
+                                    </td>}
+                                    {qVisibleSet.has('status') && <td style={{ padding: '12px 14px' }}>
                                         {q.workflowStepName ? (
                                             <span style={{
                                                 padding: '3px 9px', borderRadius: '10px',
@@ -438,10 +463,10 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                                 {q.status}
                                             </span>
                                         )}
-                                    </td>
-                                    <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                    </td>}
+                                    {qVisibleSet.has('updatedAt') && <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                                         {formatDate(q.updatedAt)}
-                                    </td>
+                                    </td>}
                                     <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                         {hasPermission('quotations:create') && (
                                             <button

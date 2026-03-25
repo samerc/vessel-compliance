@@ -3198,6 +3198,12 @@ app.whenReady().then(() => {
     return users.map((u: any) => ({ id: u.id, username: u.username }))
   })
 
+  // ==================== Database Health ====================
+  safeHandle('db:getHealth', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    return db.getDatabaseHealth()
+  })
+
   // ==================== Recent Items ====================
   safeHandle('recent:get', async (event) => {
     const user = requireSession(event)
@@ -3282,6 +3288,33 @@ app.whenReady().then(() => {
   safeHandle('global:search', async (event, query: string) => {
     requireSession(event)
     return db.globalSearch(query)
+  })
+
+  // ==================== Column Preferences ====================
+  safeHandle('columnPrefs:get', async (event, pageKey: string) => {
+    const user = requireSession(event)
+    return db.getUserColumnPrefs(user.id, pageKey)
+  })
+
+  safeHandle('columnPrefs:set', async (event, pageKey: string, columnIds: string[]) => {
+    const user = requireSession(event)
+    return db.setUserColumnPrefs(user.id, pageKey, columnIds)
+  })
+
+  // ==================== Bulk Operations ====================
+  safeHandle('bulk:assignFleet', async (event, vesselIds: string[], fleetId: string) => {
+    await requirePermission(event, 'vessels:edit')
+    await db.bulkAssignFleet(vesselIds, fleetId)
+  })
+
+  safeHandle('bulk:setVesselStatus', async (event, vesselIds: string[], isActive: boolean) => {
+    await requirePermission(event, 'vessels:edit')
+    await db.bulkSetVesselStatus(vesselIds, isActive)
+  })
+
+  safeHandle('bulk:deleteEntities', async (event, entityIds: string[]) => {
+    await requirePermission(event, 'entities:delete')
+    return db.bulkDeleteEntities(entityIds)
   })
 
   // Initialize update service with main window
