@@ -87,7 +87,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
         loadOptions: loadFlagStateOptions
       },
       { key: 'customerId', label: 'Customer', type: 'select', loadOptions: loadEntityOptions },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel name, IMO...' }
     ],
     groupBy: [
       { key: 'customer', label: 'Customer' },
@@ -143,7 +143,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       },
       { key: 'dateFrom', label: 'Inception From', type: 'date' },
       { key: 'dateTo', label: 'Inception To', type: 'date' },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, policy #, customer...' }
     ],
     groupBy: [
       { key: 'policyType', label: 'Policy Type' },
@@ -175,7 +175,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
           { value: 'person', label: 'Person' }
         ]
       },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
     ],
     groupBy: [{ key: 'type', label: 'Type' }],
     defaultSort: 'name'
@@ -212,7 +212,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       },
       { key: 'dateFrom', label: 'End Date From', type: 'date' },
       { key: 'dateTo', label: 'End Date To', type: 'date' },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, policy #, customer...' }
     ],
     groupBy: [
       { key: 'policyType', label: 'Policy Type' },
@@ -250,7 +250,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       },
       { key: 'dateFrom', label: 'Date From', type: 'date' },
       { key: 'dateTo', label: 'Date To', type: 'date' },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Name, email, identifier...' }
     ],
     groupBy: [
       { key: 'type', label: 'Type' },
@@ -292,7 +292,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       },
       { key: 'dateFrom', label: 'Inception From', type: 'date' },
       { key: 'dateTo', label: 'Inception To', type: 'date' },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
     ],
     groupBy: [
       { key: 'typeName', label: 'Type' },
@@ -335,7 +335,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
           { value: 'inactive', label: 'Inactive Vessels' }
         ]
       },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
     ],
     groupBy: [
       { key: 'vesselName', label: 'Vessel' },
@@ -359,7 +359,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
     filters: [
       { key: 'dateFrom', label: 'Date From', type: 'date' },
       { key: 'dateTo', label: 'Date To', type: 'date' },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
     ],
     groupBy: [
       { key: 'vesselName', label: 'Vessel' },
@@ -393,7 +393,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
           { value: 'waived', label: 'Waived' }
         ]
       },
-      { key: 'search', label: 'Search', type: 'text' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
     ],
     groupBy: [
       { key: 'vesselName', label: 'Vessel' },
