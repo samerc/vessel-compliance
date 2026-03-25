@@ -479,7 +479,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
                     style={itemStyle(idx)}
                     onMouseEnter={() => setHighlightIndex(idx)}
                     onClick={() => {
-                      onNavigate('policy', p.id, p)
+                      onNavigate(p.source === 'vessel_policy' ? 'vessel_policy' : 'policy', p.source === 'vessel_policy' ? p.vesselId : p.id, p)
                       onClose()
                     }}
                   >

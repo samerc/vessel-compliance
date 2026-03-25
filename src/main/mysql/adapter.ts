@@ -9971,16 +9971,24 @@ export class MySQLAdapter {
             ).then(([rows]) => rows as any[]),
 
             this.pool.query(
-                `SELECT vdp.id, vdp.policy_number AS policyNumber,
+                `(SELECT pd.id, pd.policy_number AS policyNumber,
+                        pd.vessel_id AS vesselId, v.name AS vesselName,
+                        'policy_document' AS source, pd.status
+                 FROM policy_documents pd
+                 LEFT JOIN vessels v ON pd.vessel_id = v.id
+                 WHERE pd.policy_number LIKE ?
+                 ORDER BY pd.created_at DESC
+                 LIMIT ?)
+                 UNION ALL
+                 (SELECT vdp.id, vdp.policy_number AS policyNumber,
                         vdp.vessel_id AS vesselId, v.name AS vesselName,
-                        pt.name AS policyTypeName, vdp.status
+                        'vessel_policy' AS source, vdp.status
                  FROM vessel_dynamic_policies vdp
                  LEFT JOIN vessels v ON vdp.vessel_id = v.id
-                 LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
                  WHERE vdp.policy_number LIKE ? OR v.name LIKE ?
                  ORDER BY vdp.status ASC, v.name ASC
-                 LIMIT ?`,
-                [like, like, perCategory]
+                 LIMIT ?)`,
+                [like, perCategory, like, like, perCategory]
             ).then(([rows]) => rows as any[])
         ])
 

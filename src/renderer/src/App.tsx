@@ -120,6 +120,11 @@ function App(): React.JSX.Element {
     } else if (type === 'policy') {
       setSelectedPolicyId(id)
       setActiveTab('policy-detail')
+    } else if (type === 'vessel_policy') {
+      setNavigateToVesselId(id)
+      setNavigateToVesselSection('policies')
+      setNavigateBackTab(undefined)
+      setActiveTab('vessels')
     }
   }, [])
 
