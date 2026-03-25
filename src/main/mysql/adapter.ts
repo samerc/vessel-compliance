@@ -570,9 +570,11 @@ export class MySQLAdapter {
             if (!vesselColNames.includes('built_year')) {
                 await this.pool.query('ALTER TABLE vessels ADD COLUMN built_year INT NULL')
             }
-            if (!vesselColNames.includes('rebuilt_year')) {
-                await this.pool.query('ALTER TABLE vessels ADD COLUMN rebuilt_year INT NULL')
-            }
+            try {
+                if (!vesselColNames.includes('rebuilt_year')) {
+                    await this.pool.query('ALTER TABLE vessels ADD COLUMN rebuilt_year INT NULL')
+                }
+            } catch (e) { console.error('rebuilt_year migration:', e) }
             if (!vesselColNames.includes('gross_tonnage')) {
                 await this.pool.query('ALTER TABLE vessels ADD COLUMN gross_tonnage DECIMAL(12,2) NULL')
             }

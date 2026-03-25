@@ -6,6 +6,17 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 
+const STATIC_RULES = [
+    { id: 'vessels_no_customer', name: 'Vessels without customer', description: 'Active vessels with no customer assigned' },
+    { id: 'vessels_no_fleet', name: 'Vessels without fleet', description: 'Active vessels not assigned to any fleet' },
+    { id: 'entities_no_email', name: 'Entities without email', description: 'Entities missing email address' },
+    { id: 'entities_no_phone', name: 'Entities without phone', description: 'Entities missing phone number' },
+    { id: 'policies_no_premium', name: 'Policies without premium', description: 'Active policies with no premium amount' },
+    { id: 'vessels_no_policies', name: 'Vessels without policies', description: 'Active vessels with no active policies' },
+    { id: 'orphaned_entities', name: 'Orphaned entities', description: 'Entities not linked to any vessel' },
+    { id: 'empty_fleets', name: 'Empty fleets', description: 'Fleets with no vessels assigned' },
+]
+
 interface ComplianceCenterProps {
     onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
 }
@@ -512,7 +523,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                         </div>
                     </div>
 
-                    {showRuleSettings && validationRules.length > 0 && (
+                    {showRuleSettings && (
                         <div style={{
                             marginBottom: '16px', padding: '16px 20px', borderRadius: '10px',
                             background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
@@ -523,7 +534,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                 <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Validation Rules Settings</span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {validationRules.map(rule => {
+                                {STATIC_RULES.map(rule => {
                                     const enabled = ruleToggles[rule.id] !== false
                                     return (
                                         <div
