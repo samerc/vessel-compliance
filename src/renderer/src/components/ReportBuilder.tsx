@@ -175,7 +175,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
           { value: 'person', label: 'Person' }
         ]
       },
-      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Name, email, identifier...' }
     ],
     groupBy: [{ key: 'type', label: 'Type' }],
     defaultSort: 'name'
@@ -292,7 +292,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       },
       { key: 'dateFrom', label: 'Inception From', type: 'date' },
       { key: 'dateTo', label: 'Inception To', type: 'date' },
-      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Policy #, vessel, customer...' }
     ],
     groupBy: [
       { key: 'typeName', label: 'Type' },
@@ -335,7 +335,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
           { value: 'inactive', label: 'Inactive Vessels' }
         ]
       },
-      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, document type...' }
     ],
     groupBy: [
       { key: 'vesselName', label: 'Vessel' },
@@ -359,7 +359,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
     filters: [
       { key: 'dateFrom', label: 'Date From', type: 'date' },
       { key: 'dateTo', label: 'Date To', type: 'date' },
-      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, surveyor, location...' }
     ],
     groupBy: [
       { key: 'vesselName', label: 'Vessel' },
@@ -393,7 +393,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
           { value: 'waived', label: 'Waived' }
         ]
       },
-      { key: 'search', label: 'Search', type: 'text', placeholder: 'Search...' }
+      { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, description...' }
     ],
     groupBy: [
       { key: 'vesselName', label: 'Vessel' },
@@ -1224,7 +1224,7 @@ export default function ReportBuilder() {
                         type="text"
                         value={filters[f.key] || ''}
                         onChange={(e) => updateFilter(f.key, e.target.value)}
-                        placeholder={`Search...`}
+                        placeholder={(f as any).placeholder || 'Search...'}
                         style={inputStyle}
                       />
                     )}
