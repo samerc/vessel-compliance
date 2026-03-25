@@ -658,12 +658,12 @@ export interface Api {
   activityGetCount: () => Promise<number>
   updateUserAppVersion: (version: string) => Promise<void>
   updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => Promise<void>
-  onUpdateChecking: (callback: () => void) => void
-  onUpdateAvailable: (callback: (info: { version: string; releaseDate?: string; releaseName?: string; releaseNotes?: string }) => void) => void
-  onUpdateNotAvailable: (callback: (info: { version: string }) => void) => void
-  onUpdateDownloadProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => void
-  onUpdateDownloaded: (callback: (info: { version: string; releaseDate?: string }) => void) => void
-  onUpdateError: (callback: (error: { message: string }) => void) => void
+  onUpdateChecking: (callback: () => void) => () => void
+  onUpdateAvailable: (callback: (info: { version: string; releaseDate?: string; releaseName?: string; releaseNotes?: string }) => void) => () => void
+  onUpdateNotAvailable: (callback: (info: { version: string }) => void) => () => void
+  onUpdateDownloadProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => () => void
+  onUpdateDownloaded: (callback: (info: { version: string; releaseDate?: string }) => void) => () => void
+  onUpdateError: (callback: (error: { message: string }) => void) => () => void
 
   // Email Templates
   emailGetTemplates: (category?: string) => Promise<import('../shared/types').EmailTemplate[]>

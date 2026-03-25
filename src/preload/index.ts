@@ -227,12 +227,12 @@ const api = {
   updateQuitAndInstall: () => ipcRenderer.invoke('update:quitAndInstall'),
   updateGetCurrentVersion: () => ipcRenderer.invoke('update:getCurrentVersion'),
   updateGetChangelogs: () => ipcRenderer.invoke('update:getChangelogs'),
-  onUpdateChecking: (callback) => ipcRenderer.on('update:checking', () => callback()),
-  onUpdateAvailable: (callback) => ipcRenderer.on('update:available', (_, info) => callback(info)),
-  onUpdateNotAvailable: (callback) => ipcRenderer.on('update:not-available', (_, info) => callback(info)),
-  onUpdateDownloadProgress: (callback) => ipcRenderer.on('update:download-progress', (_, progress) => callback(progress)),
-  onUpdateDownloaded: (callback) => ipcRenderer.on('update:downloaded', (_, info) => callback(info)),
-  onUpdateError: (callback) => ipcRenderer.on('update:error', (_, error) => callback(error)),
+  onUpdateChecking: (callback) => { const h = () => callback(); ipcRenderer.on('update:checking', h); return () => ipcRenderer.removeListener('update:checking', h) },
+  onUpdateAvailable: (callback) => { const h = (_, info) => callback(info); ipcRenderer.on('update:available', h); return () => ipcRenderer.removeListener('update:available', h) },
+  onUpdateNotAvailable: (callback) => { const h = (_, info) => callback(info); ipcRenderer.on('update:not-available', h); return () => ipcRenderer.removeListener('update:not-available', h) },
+  onUpdateDownloadProgress: (callback) => { const h = (_, progress) => callback(progress); ipcRenderer.on('update:download-progress', h); return () => ipcRenderer.removeListener('update:download-progress', h) },
+  onUpdateDownloaded: (callback) => { const h = (_, info) => callback(info); ipcRenderer.on('update:downloaded', h); return () => ipcRenderer.removeListener('update:downloaded', h) },
+  onUpdateError: (callback) => { const h = (_, error) => callback(error); ipcRenderer.on('update:error', h); return () => ipcRenderer.removeListener('update:error', h) },
 
   // Reminders
   remindersGetSettings: () => ipcRenderer.invoke('reminders:getSettings'),

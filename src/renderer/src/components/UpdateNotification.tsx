@@ -43,26 +43,25 @@ export function UpdateNotification(): React.ReactElement | null {
     const [showPreview, setShowPreview] = useState(false)
 
     useEffect(() => {
-        // Listen for update events
-        window.api.onUpdateChecking(() => {
+        // Listen for update events — store cleanup functions
+        const unsub1 = window.api.onUpdateChecking(() => {
             setUpdateState({ type: 'checking' })
             setDismissed(false)
         })
 
-        window.api.onUpdateAvailable((info) => {
+        const unsub2 = window.api.onUpdateAvailable((info) => {
             setUpdateState({ type: 'available', info })
             setDismissed(false)
-            // Auto-show preview if release notes available
             if (info.releaseNotes) {
                 setShowPreview(true)
             }
         })
 
-        window.api.onUpdateNotAvailable(() => {
+        const unsub3 = window.api.onUpdateNotAvailable(() => {
             setUpdateState({ type: 'idle' })
         })
 
-        window.api.onUpdateDownloadProgress((progress) => {
+        const unsub4 = window.api.onUpdateDownloadProgress((progress) => {
             setUpdateState((prev) => {
                 if (prev.type === 'available' || prev.type === 'downloading') {
                     return { type: 'downloading', progress, info: prev.info }
@@ -71,15 +70,24 @@ export function UpdateNotification(): React.ReactElement | null {
             })
         })
 
-        window.api.onUpdateDownloaded((info) => {
+        const unsub5 = window.api.onUpdateDownloaded((info) => {
             setUpdateState({ type: 'ready', info })
             setDismissed(false)
         })
 
-        window.api.onUpdateError((error) => {
+        const unsub6 = window.api.onUpdateError((error) => {
             setUpdateState({ type: 'error', message: error.message })
             setDismissed(false)
         })
+
+        return () => {
+            unsub1?.()
+            unsub2?.()
+            unsub3?.()
+            unsub4?.()
+            unsub5?.()
+            unsub6?.()
+        }
     }, [])
 
     const handleInstall = () => {
