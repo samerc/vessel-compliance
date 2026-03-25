@@ -31,8 +31,7 @@ const PolicyRenewals = lazy(() => import('./components/PolicyRenewals'))
 const Reports = lazy(() => import('./components/Reports'))
 const FleetAnalytics = lazy(() => import('./components/FleetAnalytics'))
 const ActivityLog = lazy(() => import('./components/ActivityLog'))
-const EmailTemplates = lazy(() => import('./components/EmailTemplates'))
-const DocumentTemplateManager = lazy(() => import('./components/DocumentTemplateManager'))
+const TemplatesPage = lazy(() => import('./components/TemplatesPage'))
 const PolicyList = lazy(() => import('./components/PolicyList'))
 const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
 const PolicySettings = lazy(() => import('./components/PolicySettings'))
@@ -46,7 +45,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'email-templates' | 'document-templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -271,7 +270,7 @@ function App(): React.JSX.Element {
     'survey-followup': 'Survey Follow-Up', calculators: 'Calculators',
     quotations: 'Quotations', 'vessel-filter': 'Vessel Filter', renewals: 'Renewals',
     reports: 'Reports', analytics: 'Fleet Analytics', 'activity-log': 'Activity Log',
-    'email-templates': 'Email Templates', 'document-templates': 'Document Templates',
+    templates: 'Templates',
     'policies-list': 'Policies',
     'policy-detail': 'Policies', notifications: 'Notifications', 'policy-setup': 'Policy Setup'
   }
@@ -545,8 +544,7 @@ function App(): React.JSX.Element {
               {navItem('calculators', <Calculator size={18} />, 'Calculators')}
               {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
               {hasPermission('policies:view') && navItem('policies-list', <FileCheck size={18} />, 'Policies')}
-              {hasPermission('email:view') && navItem('email-templates', <Mail size={18} />, 'Email Templates')}
-              {navItem('document-templates', <FileText size={18} />, 'Doc Templates')}
+              {navItem('templates', <Mail size={18} />, 'Templates')}
               {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
             </NavGroup>
 
@@ -652,8 +650,7 @@ function App(): React.JSX.Element {
           {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
-          {activeTab === 'email-templates' && <Suspense fallback={<LoadingFallback />}><EmailTemplates /></Suspense>}
-          {activeTab === 'document-templates' && <Suspense fallback={<LoadingFallback />}><DocumentTemplateManager /></Suspense>}
+          {activeTab === 'templates' && <Suspense fallback={<LoadingFallback />}><TemplatesPage /></Suspense>}
           {activeTab === 'policies-list' && <Suspense fallback={<LoadingFallback />}>
             <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
