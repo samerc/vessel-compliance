@@ -355,7 +355,11 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const sortedRenewals = useMemo(() => {
         let filtered = renewals
         if (policyTypeFilter !== 'all') {
-            filtered = filtered.filter(r => r.policyTypeId === policyTypeFilter)
+            const filterPt = policyTypes.find(pt => pt.id === policyTypeFilter)
+            filtered = filtered.filter(r =>
+                r.policyTypeId === policyTypeFilter ||
+                (filterPt && r.policyTypeName === filterPt.name)
+            )
         }
         if (search.trim()) {
             const q = search.toLowerCase()
@@ -419,8 +423,9 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     }
 
     const kpis = useMemo(() => {
+        const filterPt = policyTypeFilter !== 'all' ? policyTypes.find(pt => pt.id === policyTypeFilter) : null
         const data = policyTypeFilter !== 'all'
-            ? renewals.filter(r => r.policyTypeId === policyTypeFilter)
+            ? renewals.filter(r => r.policyTypeId === policyTypeFilter || (filterPt && r.policyTypeName === filterPt.name))
             : renewals
         const total = data.length
         const totalPremium = data.reduce((sum: number, r: any) => sum + (Number(r.premium) || 0), 0)
