@@ -73,6 +73,14 @@ function App(): React.JSX.Element {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [recentItems, setRecentItems] = useState<RecentItem[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
+  const [density, setDensity] = useState<'compact' | 'normal' | 'spacious'>(() => {
+    return (localStorage.getItem('tableDensity') as 'compact' | 'normal' | 'spacious') || 'normal'
+  })
+
+  useEffect(() => {
+    document.body.className = document.body.className.replace(/density-\w+/g, '').trim() + ` density-${density}`
+    localStorage.setItem('tableDensity', density)
+  }, [density])
 
   // Resolve breadcrumb vessel name when navigating
   useEffect(() => {
@@ -556,8 +564,41 @@ function App(): React.JSX.Element {
             </>
           </nav>
 
-          {/* Footer: version + collapse toggle */}
-          <div style={{ paddingTop: '8px', display: 'flex', alignItems: 'center', justifyContent: sc ? 'center' : 'space-between', gap: '4px' }}>
+          {/* Footer: density toggle + version + collapse toggle */}
+          {!sc && (
+            <div style={{ paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+              {(['compact', 'normal', 'spacious'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDensity(d)}
+                  title={`${d.charAt(0).toUpperCase() + d.slice(1)} density`}
+                  style={{
+                    background: density === d ? 'var(--accent-primary)' : 'transparent',
+                    border: `1px solid ${density === d ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    padding: '3px 6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: d === 'compact' ? '1px' : d === 'normal' ? '2px' : '3px',
+                    opacity: density === d ? 1 : 0.5,
+                  }}
+                  className="hover-effect"
+                >
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} style={{
+                      display: 'block',
+                      width: '3px',
+                      height: d === 'compact' ? '6px' : d === 'normal' ? '8px' : '10px',
+                      borderRadius: '1px',
+                      background: density === d ? '#fff' : 'var(--text-secondary)',
+                    }} />
+                  ))}
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ paddingTop: '4px', display: 'flex', alignItems: 'center', justifyContent: sc ? 'center' : 'space-between', gap: '4px' }}>
             {!sc && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: 'var(--text-secondary)', opacity: 0.5 }}>
                 v{appVersion}

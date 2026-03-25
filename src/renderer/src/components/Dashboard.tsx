@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Activity, AlertTriangle, CheckCircle, Clock, AlertCircle,
   Ship, FileText, Users, Shield, Wrench, Calendar, FileWarning,
-  RefreshCw, Building2, User, TrendingUp, ChevronRight, Database,
+  RefreshCw, Building2, User, TrendingUp, ChevronLeft, ChevronRight, Database,
   Settings, BarChart3, GitBranch, Zap, Layers,
   ChevronUp, ChevronDown, RotateCcw, History
 } from 'lucide-react'
@@ -38,6 +38,7 @@ const WIDGET_REGISTRY: WidgetDef[] = [
   { id: 'quickActions', name: 'Quick Actions', description: 'Shortcuts to create vessels, quotations, entities', icon: Zap, category: 'overview', defaultEnabled: false, defaultOrder: 9, size: 'third' },
   { id: 'quotationPipeline', name: 'Quotation Pipeline', description: 'Quotations by workflow status', icon: GitBranch, category: 'operations', defaultEnabled: false, defaultOrder: 10, size: 'half' },
   { id: 'fleetOverview', name: 'Fleet Overview', description: 'Vessel count by fleet with compliance rate', icon: Layers, category: 'overview', defaultEnabled: false, defaultOrder: 11, size: 'third' },
+  { id: 'deadlineCalendar', name: 'Deadline Calendar', description: 'Monthly calendar showing policy expirations, survey dates, warranty deadlines', icon: Calendar, category: 'operations', defaultEnabled: false, defaultOrder: 12, size: 'full' },
 ]
 
 interface WidgetLayout {
@@ -715,6 +716,7 @@ function WidgetRenderer({ id, data, cardStyle }: { id: string; data: WidgetData;
     case 'quotationPipeline': return <QuotationPipelineWidget cardStyle={cardStyle} data={data} />
     case 'quickActions': return <QuickActionsWidget cardStyle={cardStyle} data={data} />
     case 'fleetOverview': return <FleetOverviewWidget cardStyle={cardStyle} data={data} />
+    case 'deadlineCalendar': return <DeadlineCalendarWidget cardStyle={cardStyle} data={data} />
     default: return null
   }
 }
@@ -1347,6 +1349,226 @@ function FleetOverviewWidget({ cardStyle, data }: { cardStyle: React.CSSProperti
             </div>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── Deadline Calendar Widget ─────────────────────────────────────────────
+
+interface CalendarEvent {
+  date: string
+  type: 'policy' | 'document' | 'survey' | 'warranty'
+  label: string
+  vesselName: string
+}
+
+function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSProperties; data: WidgetData }) {
+  const { isLight } = data
+  const [currentDate, setCurrentDate] = useState(() => new Date())
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
+
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth() // 0-indexed
+
+  useEffect(() => {
+    setLoading(true)
+    setSelectedDay(null)
+    window.api.dashboardGetCalendarEvents(year, month + 1).then(result => {
+      if (!result || typeof result !== 'object') { setEvents([]); setLoading(false); return }
+      const evts: CalendarEvent[] = []
+      if (Array.isArray(result.policies)) {
+        for (const p of result.policies) {
+          if (p.endDate) evts.push({ date: p.endDate, type: 'policy', label: p.policyTypeName, vesselName: p.vesselName })
+        }
+      }
+      if (Array.isArray(result.documents)) {
+        for (const d of result.documents) {
+          if (d.expiryDate) evts.push({ date: d.expiryDate, type: 'document', label: d.documentName, vesselName: d.vesselName })
+        }
+      }
+      if (Array.isArray(result.surveys)) {
+        for (const s of result.surveys) {
+          if (s.surveyDate) evts.push({ date: s.surveyDate, type: 'survey', label: s.surveyType || 'Survey', vesselName: s.vesselName })
+        }
+      }
+      if (Array.isArray(result.warranties)) {
+        for (const w of result.warranties) {
+          if (w.deadlineDate) evts.push({ date: w.deadlineDate, type: 'warranty', label: w.description || 'Warranty', vesselName: w.vesselName })
+        }
+      }
+      setEvents(evts)
+      setLoading(false)
+    }).catch(() => { setEvents([]); setLoading(false) })
+  }, [year, month])
+
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1))
+  const goToday = () => setCurrentDate(new Date())
+
+  const monthLabel = currentDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  const firstDayOfMonth = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1 // Monday start
+
+  const today = new Date()
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month
+  const todayDay = today.getDate()
+
+  const getEventsForDay = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    return events.filter(e => e.date.startsWith(dateStr))
+  }
+
+  const dayHasType = (dayEvents: CalendarEvent[], type: string) => dayEvents.some(e => e.type === type)
+
+  const DOT_COLORS = {
+    policy: '#ef4444',
+    document: '#f59e0b',
+    survey: '#3b82f6',
+    warranty: '#8b5cf6'
+  }
+
+  const selectedDayEvents = selectedDay ? getEventsForDay(selectedDay) : []
+
+  return (
+    <div style={{ ...cardStyle, maxHeight: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Calendar size={13} color="#fff" />
+          </div>
+          Deadline Calendar
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={prevMonth} className="btn-secondary" style={{ padding: '4px 8px' }} aria-label="Previous month">
+            <ChevronLeft size={14} />
+          </button>
+          <span style={{ fontWeight: '700', fontSize: '0.88rem', minWidth: '140px', textAlign: 'center' }}>{monthLabel}</span>
+          <button onClick={nextMonth} className="btn-secondary" style={{ padding: '4px 8px' }} aria-label="Next month">
+            <ChevronRight size={14} />
+          </button>
+          <button onClick={goToday} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem', marginLeft: '4px' }}>Today</button>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+        {Object.entries(DOT_COLORS).map(([type, color]) => (
+          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
+            {type.charAt(0).toUpperCase() + type.slice(1)}
+          </div>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <div className="skeleton" style={{ width: '100%', height: '200px', borderRadius: '8px' }} />
+        </div>
+      ) : (
+        <>
+          {/* Calendar Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+            {/* Day of week headers */}
+            {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: '0.68rem', fontWeight: '700', color: 'var(--text-secondary)', padding: '4px 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {d}
+              </div>
+            ))}
+            {/* Empty cells before first day */}
+            {Array.from({ length: startOffset }).map((_, i) => (
+              <div key={`empty-${i}`} />
+            ))}
+            {/* Day cells */}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1
+              const dayEvents = getEventsForDay(day)
+              const isToday = isCurrentMonth && day === todayDay
+              const isSelected = selectedDay === day
+              const hasEvents = dayEvents.length > 0
+
+              return (
+                <div
+                  key={day}
+                  onClick={() => setSelectedDay(isSelected ? null : day)}
+                  style={{
+                    width: '100%',
+                    aspectRatio: '1',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2px',
+                    background: isSelected
+                      ? 'rgba(0,170,200,0.18)'
+                      : isToday
+                        ? 'rgba(0,170,200,0.08)'
+                        : 'transparent',
+                    borderRadius: '6px',
+                    cursor: hasEvents ? 'pointer' : 'default',
+                    border: isSelected ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                    transition: 'all 0.1s ease'
+                  }}
+                >
+                  <span style={{
+                    fontSize: '0.8rem',
+                    fontWeight: isToday ? '800' : hasEvents ? '600' : '400',
+                    color: isToday ? 'var(--accent-primary)' : hasEvents ? 'var(--text-primary)' : 'var(--text-secondary)'
+                  }}>
+                    {day}
+                  </span>
+                  <div style={{ display: 'flex', gap: '2px', marginTop: '2px', minHeight: '6px' }}>
+                    {dayHasType(dayEvents, 'policy') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.policy }} />}
+                    {dayHasType(dayEvents, 'document') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.document }} />}
+                    {dayHasType(dayEvents, 'survey') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.survey }} />}
+                    {dayHasType(dayEvents, 'warranty') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.warranty }} />}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Selected Day Events */}
+          {selectedDay !== null && (
+            <div style={{
+              marginTop: '12px',
+              padding: '12px',
+              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+              borderRadius: '8px',
+              border: '1px solid var(--table-border)'
+            }}>
+              <div style={{ fontWeight: '700', fontSize: '0.82rem', marginBottom: '8px' }}>
+                {new Date(year, month, selectedDay).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                <span style={{ marginLeft: '8px', fontWeight: '400', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                  {selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {selectedDayEvents.length === 0 ? (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>No events on this day</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {selectedDayEvents.map((evt, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px', background: isLight ? '#fff' : 'rgba(255,255,255,0.03)' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: DOT_COLORS[evt.type], flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: '600', textTransform: 'uppercase' }}>{evt.vesselName}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{evt.label}</span>
+                      <span style={{
+                        marginLeft: 'auto', fontSize: '0.66rem', fontWeight: '700', textTransform: 'uppercase',
+                        padding: '1px 6px', borderRadius: '4px',
+                        background: `${DOT_COLORS[evt.type]}18`, color: DOT_COLORS[evt.type]
+                      }}>
+                        {evt.type}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

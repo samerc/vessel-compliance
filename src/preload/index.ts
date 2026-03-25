@@ -205,6 +205,8 @@ const api = {
   // Dashboard
   dashboardGetActivity: () => ipcRenderer.invoke('dashboard:getActivity'),
   dashboardGetDataQualityAlerts: () => ipcRenderer.invoke('dashboard:getDataQualityAlerts'),
+  dashboardGetCalendarEvents: (year: number, month: number) => ipcRenderer.invoke('dashboard:getCalendarEvents', year, month),
+  complianceGetDataValidation: () => ipcRenderer.invoke('compliance:getDataValidation'),
   dashboardGetLayout: () => ipcRenderer.invoke('dashboard:getLayout'),
   dashboardSaveLayout: (layout: any) => ipcRenderer.invoke('dashboard:saveLayout', layout),
   dashboardSetOnboarded: () => ipcRenderer.invoke('dashboard:setOnboarded'),

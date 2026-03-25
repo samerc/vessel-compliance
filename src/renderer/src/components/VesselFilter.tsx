@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown, Ship, X, Loader2 } from 'lucide-react'
+import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown, Ship, X, Loader2, GitCompareArrows } from 'lucide-react'
 import { Vessel, PolicyType, FlagState, ClassificationSociety, Entity, VesselDynamicPolicy, VesselType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -265,6 +265,12 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     const [gtFrom, setGtFrom] = useState(_cache.gtFrom)
     const [gtTo, setGtTo] = useState(_cache.gtTo)
 
+    // Vessel comparison state
+    const [comparedVesselIds, setComparedVesselIds] = useState<string[]>([])
+    const [showCompare, setShowCompare] = useState(false)
+    const [compareData, setCompareData] = useState<any>(null)
+    const [compareLoading, setCompareLoading] = useState(false)
+
     // Save filter state to module cache on every change
     useEffect(() => {
         _cache.hasSearched = hasSearched
@@ -366,6 +372,93 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
         setYearFrom(''); setYearTo(''); setGtFrom(''); setGtTo('')
         setHasSearched(false); setNameSearch('')
         setVesselPolicies(new Map()); setVesselClassifications(new Map())
+    }
+
+    const toggleCompareVessel = (id: string) => {
+        setComparedVesselIds(prev => {
+            if (prev.includes(id)) return prev.filter(x => x !== id)
+            if (prev.length >= 2) return prev
+            return [...prev, id]
+        })
+    }
+
+    const openCompare = async () => {
+        if (comparedVesselIds.length !== 2) return
+        setCompareLoading(true)
+        setShowCompare(true)
+        try {
+            const [v1, v2] = comparedVesselIds
+            const vessel1 = vessels.find(v => v.id === v1)
+            const vessel2 = vessels.find(v => v.id === v2)
+            if (!vessel1 || !vessel2) return
+
+            const [p1, p2, d1, d2, dt, cls1, cls2] = await Promise.all([
+                window.api.getVesselDynamicPolicies(v1),
+                window.api.getVesselDynamicPolicies(v2),
+                window.api.getVesselDocuments(v1),
+                window.api.getVesselDocuments(v2),
+                window.api.getDocumentTypes(),
+                window.api.getVesselClassifications(v1),
+                window.api.getVesselClassifications(v2),
+            ])
+
+            const policyTypes_ = await window.api.getPolicyTypes()
+            const ptMap = new Map((Array.isArray(policyTypes_) ? policyTypes_ : []).map((pt: any) => [pt.id, pt.name]))
+
+            const buildPolicySummary = (policies: any[]) => {
+                const active = (Array.isArray(policies) ? policies : []).filter((p: any) => p.status === 'active')
+                return active.map((p: any) => ({
+                    typeName: ptMap.get(p.policyTypeId) || 'Unknown',
+                    policyNumber: p.policyNumber || '-',
+                    status: p.status
+                }))
+            }
+
+            const buildDocStats = (docs: any[], types: any[]) => {
+                const safeTypes = Array.isArray(types) ? types : []
+                const safeDocs = Array.isArray(docs) ? docs : []
+                const total = safeTypes.length
+                let compliant = 0, missing = 0, expired = 0
+                const today = new Date()
+                for (const t of safeTypes) {
+                    const doc = safeDocs.find((d: any) => d.documentTypeId === t.id)
+                    if (!doc?.filePath) { missing++; continue }
+                    if (doc.expiryDate && new Date(doc.expiryDate) < today) { expired++; continue }
+                    compliant++
+                }
+                return { compliant, total, missing, expired, pct: total > 0 ? Math.round((compliant / total) * 100) : 100 }
+            }
+
+            const classMap = new Map(classSocieties.map(cs => [cs.id, cs.abbreviation || cs.name]))
+            const getClassNames = (clsList: any[]) =>
+                (Array.isArray(clsList) ? clsList : []).map((c: any) => classMap.get(c.classificationSocietyId) || 'Unknown').join(', ') || '-'
+
+            const fleetMap = new Map<string, string>()
+            try {
+                const fleets = await window.api.getFleets()
+                if (Array.isArray(fleets)) fleets.forEach((f: any) => fleetMap.set(f.id, f.name))
+            } catch { /* ignore */ }
+
+            setCompareData({
+                vessel1, vessel2,
+                policies1: buildPolicySummary(p1),
+                policies2: buildPolicySummary(p2),
+                docs1: buildDocStats(d1, dt),
+                docs2: buildDocStats(d2, dt),
+                class1: getClassNames(cls1),
+                class2: getClassNames(cls2),
+                fleet1: vessel1.fleetId ? (fleetMap.get(vessel1.fleetId) || '-') : '-',
+                fleet2: vessel2.fleetId ? (fleetMap.get(vessel2.fleetId) || '-') : '-',
+                customer1: vessel1.customerId ? (customerMap.get(vessel1.customerId) || '-') : '-',
+                customer2: vessel2.customerId ? (customerMap.get(vessel2.customerId) || '-') : '-',
+                flag1: vessel1.flagStateId ? (flagMap.get(vessel1.flagStateId) || '-') : '-',
+                flag2: vessel2.flagStateId ? (flagMap.get(vessel2.flagStateId) || '-') : '-',
+            })
+        } catch (err: any) {
+            showError(err.message || 'Failed to load comparison data')
+        } finally {
+            setCompareLoading(false)
+        }
     }
 
     const filteredVessels = useMemo(() => {
@@ -696,6 +789,22 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                             </div>
                         )}
 
+                        {hasSearched && comparedVesselIds.length === 2 && (
+                            <button
+                                onClick={openCompare}
+                                className="btn-primary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 14px', fontSize: '0.78rem' }}
+                            >
+                                <GitCompareArrows size={14} />
+                                Compare ({comparedVesselIds.length})
+                            </button>
+                        )}
+                        {hasSearched && comparedVesselIds.length > 0 && comparedVesselIds.length < 2 && (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                Select {2 - comparedVesselIds.length} more to compare
+                            </span>
+                        )}
+
                         <div style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                             {hasSearched && (
                                 <span>
@@ -721,6 +830,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                 <caption className="sr-only">Filtered vessel results</caption>
                                 <thead>
                                     <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                        <th scope="col" style={{ ...th, width: '36px', padding: '11px 8px' }}></th>
                                         <th scope="col" style={th}>Vessel</th>
                                         <th scope="col" style={th}>IMO</th>
                                         <th scope="col" style={th}>Type</th>
@@ -734,22 +844,32 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                 <tbody>
                                     {loading ? (
                                         <tr>
-                                            <td colSpan={8} style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                            <td colSpan={9} style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                                 <Loader2 size={32} className="spinner" style={{ opacity: 0.4, display: 'block', margin: '0 auto 14px' }} />
                                                 <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Searching...</div>
                                             </td>
                                         </tr>
                                     ) : displayedVessels.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                            <td colSpan={9} style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                                 <Search size={40} style={{ opacity: 0.15, marginBottom: '14px', display: 'block', margin: '0 auto 14px' }} />
                                                 <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>No vessels match your criteria</div>
                                                 <p style={{ fontSize: '0.85rem', margin: '4px 0 0' }}>Try adjusting the filters or switching to <strong>OR</strong> logic.</p>
                                             </td>
                                         </tr>
                                     ) : displayedVessels.map(v => (
-                                        <tr key={v.id} onClick={() => { if (onNavigateToVessel) { _cache.preserveOnReturn = true; onNavigateToVessel(v.id) } }} className="hover-effect" style={{ borderBottom: '1px solid var(--table-border)', cursor: onNavigateToVessel ? 'pointer' : 'default' }}>
-                                            <td style={{ padding: '12px 16px' }}>
+                                        <tr key={v.id} className="hover-effect" style={{ borderBottom: '1px solid var(--table-border)', cursor: onNavigateToVessel ? 'pointer' : 'default', background: comparedVesselIds.includes(v.id) ? 'rgba(0,210,255,0.06)' : undefined }}>
+                                            <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={comparedVesselIds.includes(v.id)}
+                                                    onChange={() => toggleCompareVessel(v.id)}
+                                                    onClick={e => e.stopPropagation()}
+                                                    disabled={!comparedVesselIds.includes(v.id) && comparedVesselIds.length >= 2}
+                                                    style={{ accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                                                />
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }} onClick={() => { if (onNavigateToVessel) { _cache.preserveOnReturn = true; onNavigateToVessel(v.id) } }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
                                                     <Ship size={14} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
                                                     {v.name}
@@ -776,6 +896,133 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                     </div>
                 </div>
             </div>
+
+            {/* Vessel Comparison Modal */}
+            {showCompare && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{
+                        background: isLight ? '#ffffff' : '#1a1d28',
+                        borderRadius: '16px', padding: '28px', width: '90%', maxWidth: '800px', maxHeight: '85vh', overflowY: 'auto',
+                        border: `1px solid ${isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)'}`
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <GitCompareArrows size={22} color="var(--accent-primary)" />
+                                Vessel Comparison
+                            </h2>
+                            <button onClick={() => { setShowCompare(false); setCompareData(null) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {compareLoading ? (
+                            <div style={{ padding: '60px', textAlign: 'center' }}>
+                                <Loader2 size={32} className="spinner" style={{ opacity: 0.4, display: 'block', margin: '0 auto 14px' }} />
+                                <div style={{ color: 'var(--text-secondary)' }}>Loading comparison data...</div>
+                            </div>
+                        ) : compareData ? (() => {
+                            const { vessel1, vessel2, policies1, policies2, docs1, docs2, class1, class2, fleet1, fleet2, customer1, customer2, flag1, flag2 } = compareData
+
+                            const CompareRow = ({ label, val1, val2, highlight }: { label: string; val1: React.ReactNode; val2: React.ReactNode; highlight?: boolean }) => (
+                                <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                                    <td style={{ padding: '10px 14px', fontWeight: '600', fontSize: '0.82rem', color: 'var(--text-secondary)', width: '160px' }}>{label}</td>
+                                    <td style={{ padding: '10px 14px', fontSize: '0.88rem', fontWeight: highlight ? '700' : '400' }}>{val1}</td>
+                                    <td style={{ padding: '10px 14px', fontSize: '0.88rem', fontWeight: highlight ? '700' : '400' }}>{val2}</td>
+                                </tr>
+                            )
+
+                            const SectionHeader = ({ label }: { label: string }) => (
+                                <tr>
+                                    <td colSpan={3} style={{ padding: '14px 14px 6px', fontWeight: '800', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-primary)' }}>
+                                        {label}
+                                    </td>
+                                </tr>
+                            )
+
+                            const allPolicyTypes = new Set([
+                                ...policies1.map((p: any) => p.typeName),
+                                ...policies2.map((p: any) => p.typeName)
+                            ])
+
+                            const pctColor = (pct: number) => pct === 100 ? '#10b981' : pct >= 80 ? '#f59e0b' : 'var(--danger)'
+
+                            return (
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid var(--table-border)', background: 'var(--table-header-bg)' }}>
+                                            <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>Field</th>
+                                            <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: '700', fontSize: '0.88rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Ship size={14} color="var(--accent-primary)" />
+                                                    {vessel1.name}
+                                                </div>
+                                            </th>
+                                            <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: '700', fontSize: '0.88rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Ship size={14} color="var(--accent-primary)" />
+                                                    {vessel2.name}
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <SectionHeader label="General" />
+                                        <CompareRow label="Name" val1={vessel1.name} val2={vessel2.name} highlight />
+                                        <CompareRow label="IMO" val1={vessel1.imoNumber} val2={vessel2.imoNumber} />
+                                        <CompareRow label="Type" val1={vessel1.vesselType || '-'} val2={vessel2.vesselType || '-'} />
+                                        <CompareRow label="Flag" val1={flag1} val2={flag2} />
+                                        <CompareRow label="Built" val1={vessel1.builtYear || '-'} val2={vessel2.builtYear || '-'} />
+                                        <CompareRow label="Gross Tonnage" val1={vessel1.grossTonnage?.toLocaleString() || '-'} val2={vessel2.grossTonnage?.toLocaleString() || '-'} />
+                                        <CompareRow label="Classification" val1={class1} val2={class2} />
+                                        <CompareRow label="Customer" val1={customer1} val2={customer2} />
+                                        <CompareRow label="Fleet" val1={fleet1} val2={fleet2} />
+
+                                        <SectionHeader label="Policies" />
+                                        {allPolicyTypes.size > 0 ? Array.from(allPolicyTypes).map(typeName => {
+                                            const p1 = policies1.find((p: any) => p.typeName === typeName)
+                                            const p2 = policies2.find((p: any) => p.typeName === typeName)
+                                            const fmtPolicy = (p: any) => p
+                                                ? <span style={{ color: p.status === 'active' ? '#10b981' : 'var(--text-secondary)' }}>{p.policyNumber} ({p.status})</span>
+                                                : <span style={{ opacity: 0.3 }}>-</span>
+                                            return <CompareRow key={typeName} label={typeName} val1={fmtPolicy(p1)} val2={fmtPolicy(p2)} />
+                                        }) : (
+                                            <tr><td colSpan={3} style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>No active policies</td></tr>
+                                        )}
+
+                                        <SectionHeader label="Documents" />
+                                        <CompareRow label="Compliant" val1={
+                                            <span style={{ color: pctColor(docs1.pct) }}>{docs1.compliant}/{docs1.total} ({docs1.pct}%)</span>
+                                        } val2={
+                                            <span style={{ color: pctColor(docs2.pct) }}>{docs2.compliant}/{docs2.total} ({docs2.pct}%)</span>
+                                        } />
+                                        <CompareRow label="Missing" val1={
+                                            <span style={{ color: docs1.missing > 0 ? 'var(--danger)' : '#10b981' }}>{docs1.missing}</span>
+                                        } val2={
+                                            <span style={{ color: docs2.missing > 0 ? 'var(--danger)' : '#10b981' }}>{docs2.missing}</span>
+                                        } />
+                                        <CompareRow label="Expired" val1={
+                                            <span style={{ color: docs1.expired > 0 ? 'var(--danger)' : '#10b981' }}>{docs1.expired}</span>
+                                        } val2={
+                                            <span style={{ color: docs2.expired > 0 ? 'var(--danger)' : '#10b981' }}>{docs2.expired}</span>
+                                        } />
+
+                                        <SectionHeader label="Sanctions" />
+                                        <CompareRow label="Status" val1={
+                                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600', background: 'rgba(0,255,136,0.1)', color: '#10b981' }}>
+                                                {(vessel1 as any).sanctionsStatus?.toUpperCase() || 'PENDING'}
+                                            </span>
+                                        } val2={
+                                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600', background: 'rgba(0,255,136,0.1)', color: '#10b981' }}>
+                                                {(vessel2 as any).sanctionsStatus?.toUpperCase() || 'PENDING'}
+                                            </span>
+                                        } />
+                                    </tbody>
+                                </table>
+                            )
+                        })() : null}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

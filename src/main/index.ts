@@ -1435,6 +1435,8 @@ app.whenReady().then(() => {
   // Dashboard
   safeHandle('dashboard:getActivity', (event) => { requireSession(event); return db.getDashboardActivity() })
   safeHandle('dashboard:getDataQualityAlerts', (event) => { requireSession(event); return db.getDataQualityAlerts() })
+  safeHandle('dashboard:getCalendarEvents', (event, year: number, month: number) => { requireSession(event); return db.getCalendarEvents(year, month) })
+  safeHandle('compliance:getDataValidation', (event) => { requireSession(event); return db.getDataValidationResults() })
 
   safeHandle('dashboard:getLayout', async (event) => {
     const user = requireSession(event)

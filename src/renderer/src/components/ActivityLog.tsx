@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ScrollText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Filter, ShieldAlert } from 'lucide-react'
+import { ScrollText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Filter, ShieldAlert, FileText } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { ActivityLogEntry, ActivityLogFilters } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../utils/dateUtils'
+import { getReportSettings } from '../services/ReportSettingsService'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
@@ -51,8 +55,9 @@ function getModuleColor(module: string) {
 }
 
 export default function ActivityLog() {
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const { theme } = useTheme()
+  const { showSuccess, showError } = useToast()
   const isLight = theme === 'light'
 
   if (!hasPermission('admin:activityLog')) {
@@ -166,6 +171,83 @@ export default function ActivityLog() {
     setPage(1)
   }
 
+  const handleExportPDF = async () => {
+    try {
+      // Fetch all entries matching current filters (up to 5000)
+      const filters: ActivityLogFilters = { page: 1, limit: 5000 }
+      if (moduleFilter) filters.module = moduleFilter
+      if (actionFilter) filters.action = actionFilter
+      if (userFilter) filters.userId = userFilter
+      if (dateFrom) filters.dateFrom = dateFrom
+      if (dateTo) filters.dateTo = dateTo
+      if (search) filters.search = search
+
+      const result = await window.api.activityGetLog(filters)
+      const allEntries: ActivityLogEntry[] = result?.data || []
+      if (allEntries.length === 0) {
+        showError('No entries to export')
+        return
+      }
+
+      const settings = await getReportSettings()
+      const doc = new jsPDF({ orientation: 'landscape' })
+      const pageW = doc.internal.pageSize.getWidth()
+
+      // Header
+      doc.setFillColor(10, 22, 40)
+      doc.rect(0, 0, pageW, 22, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text(settings.companyName || 'Activity Audit Report', 14, 14)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Activity Audit Report', pageW - 14, 10, { align: 'right' })
+      const rangeLabel = dateFrom || dateTo
+        ? `${dateFrom || 'Start'} to ${dateTo || 'Present'}`
+        : 'All Time'
+      doc.text(rangeLabel, pageW - 14, 16, { align: 'right' })
+
+      const tableData = allEntries.map(e => [
+        formatDateTime(e.createdAt),
+        e.username || '',
+        e.action?.replace(/_/g, ' ') || '',
+        e.module || '',
+        e.entityName || e.entityType || '',
+        (e.details || '').slice(0, 80),
+      ])
+
+      autoTable(doc, {
+        startY: 28,
+        head: [['Date / Time', 'User', 'Action', 'Module', 'Entity', 'Details']],
+        body: tableData,
+        styles: { fontSize: 7, cellPadding: 3 },
+        headStyles: { fillColor: [10, 22, 40], textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { left: 14, right: 14 },
+      })
+
+      // Footer on each page
+      const pageCount = doc.getNumberOfPages()
+      const now = new Date().toLocaleDateString()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        const pageH = doc.internal.pageSize.getHeight()
+        doc.setDrawColor(180, 180, 180)
+        doc.line(14, pageH - 12, pageW - 14, pageH - 12)
+        doc.setFontSize(7)
+        doc.setTextColor(120, 120, 120)
+        doc.text(`Generated on ${now} by ${user?.username || 'Unknown'}`, 14, pageH - 7)
+        doc.text(`Page ${i} of ${pageCount}`, pageW - 14, pageH - 7, { align: 'right' })
+      }
+
+      doc.save('Activity_Audit_Report.pdf')
+      showSuccess('Audit report exported')
+    } catch (err: any) {
+      showError(err.message || 'Failed to export report')
+    }
+  }
+
   const selectStyle: React.CSSProperties = {
     padding: '6px 10px',
     borderRadius: '6px',
@@ -203,6 +285,19 @@ export default function ActivityLog() {
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
               {total} {total === 1 ? 'entry' : 'entries'}
             </span>
+            <button
+              onClick={handleExportPDF}
+              style={{
+                background: 'transparent', border: '1px solid var(--glass-border)',
+                borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
+                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '0.8rem',
+              }}
+              className="hover-effect"
+              title="Export filtered entries to PDF"
+            >
+              <FileText size={14} /> Export PDF
+            </button>
             <button
               onClick={() => { loadData(); loadFilters() }}
               style={{

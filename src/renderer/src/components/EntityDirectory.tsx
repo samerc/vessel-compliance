@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X,
@@ -128,6 +128,8 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', type: 'company' as 'company' | 'person', identifier: '', email: '', phone: '' })
   const [isCreating, setIsCreating] = useState(false)
+  const [similarEntities, setSimilarEntities] = useState<{ name: string; score: number }[]>([])
+  const similarCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [showMergeModal, setShowMergeModal] = useState(false)
   const [mergeSource, setMergeSource] = useState<Entity | null>(null)
@@ -400,6 +402,26 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
   useEffect(() => { loadData() }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode])
   useEffect(() => { setPage(1) }, [debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
+
+  // Debounced duplicate detection when typing in create modal
+  useEffect(() => {
+    if (similarCheckTimer.current) clearTimeout(similarCheckTimer.current)
+    const name = createForm.name.trim()
+    if (!showCreateModal || name.length < 3) {
+      setSimilarEntities([])
+      return
+    }
+    similarCheckTimer.current = setTimeout(() => {
+      const matches: { name: string; score: number }[] = []
+      for (const ent of allEntities) {
+        const score = jaroWinkler(name, ent.name)
+        if (score >= 0.8) matches.push({ name: ent.name, score })
+      }
+      matches.sort((a, b) => b.score - a.score)
+      setSimilarEntities(matches.slice(0, 5))
+    }, 500)
+    return () => { if (similarCheckTimer.current) clearTimeout(similarCheckTimer.current) }
+  }, [createForm.name, showCreateModal, allEntities])
 
   // Escape key — close topmost open modal first (priority order: sanctions > merge > create > edit)
   const handleGlobalEscape = useCallback(() => {
@@ -1384,6 +1406,26 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                   <input type="text" value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%', paddingRight: '44px' }} placeholder="Entity name" autoFocus />
                   <CaseToggleBtn value={createForm.name} onChange={v => setCreateForm(f => ({ ...f, name: v }))} />
                 </div>
+                {similarEntities.length > 0 && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
+                    border: isLight ? '1px solid rgba(200,120,0,0.2)' : '1px solid rgba(255,193,7,0.15)',
+                    fontSize: '0.8rem',
+                    color: isLight ? '#8a6d00' : '#ffc107',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: 600 }}>
+                      <AlertTriangle size={14} /> Similar entities found:
+                    </div>
+                    {similarEntities.map((s, i) => (
+                      <div key={i} style={{ paddingLeft: '20px', lineHeight: 1.6 }}>
+                        &bull; &ldquo;{s.name}&rdquo; ({Math.round(s.score * 100)}% match)
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Type</label>

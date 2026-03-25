@@ -661,6 +661,32 @@ header h1::after {
 }
 
 /* ── Print-friendly styles ── */
+/* ── Table density ─────────────────────────────────────────────────────── */
+body.density-compact table td,
+body.density-compact table th {
+  padding: 6px 8px !important;
+  font-size: 0.82rem !important;
+}
+
+body.density-normal table td,
+body.density-normal table th {
+  padding: 12px 16px !important;
+}
+
+body.density-spacious table td,
+body.density-spacious table th {
+  padding: 16px 20px !important;
+  font-size: 0.95rem !important;
+}
+
+body.density-compact .glass-card {
+  padding: 16px !important;
+}
+
+body.density-spacious .glass-card {
+  padding: 28px !important;
+}
+
 @media print {
   /* Hide non-printable elements */
   .sidebar,

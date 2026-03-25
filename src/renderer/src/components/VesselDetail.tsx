@@ -9,6 +9,7 @@ import { formatDate, formatDateTime, formatDateShort, formatDateLong } from '../
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import 'flag-icons/css/flag-icons.min.css'
 
+import * as XLSX from 'xlsx'
 import { ReportService } from '../services/ReportService'
 import { ReportServiceV2 } from '../services/ReportServiceV2'
 import VesselDocumentsView from './VesselDocumentsView'
@@ -142,6 +143,53 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             const log = await window.api.getVesselAuditLog(vessel.id)
             setAuditLog(Array.isArray(log) ? log : [])
         } catch { /* ignore */ }
+    }
+
+    const handleExportAllPolicies = async () => {
+        try {
+            const policies = await window.api.getVesselDynamicPolicies(vessel.id)
+            if (!Array.isArray(policies) || policies.length === 0) {
+                showError('No policies found for this vessel')
+                return
+            }
+            const allChars = await window.api.getPolicyTypeCharacteristics()
+            const rows: Record<string, string>[] = []
+            for (const p of policies) {
+                const chars = Array.isArray(allChars) ? allChars.filter(c => c.policyTypeId === p.policyTypeId) : []
+                const inceptionChar = chars.find(c => /inception|start/i.test(c.name) && c.fieldType === 'date')
+                const expiryChar = chars.find(c => /expiry|end/i.test(c.name) && c.fieldType === 'date')
+                const premiumChar = chars.find(c => /premium|amount/i.test(c.name) && (c.fieldType === 'amount' || c.fieldType === 'text'))
+                const deductibleChar = chars.find(c => /deductible|excess/i.test(c.name))
+                const vals = Array.isArray(p.values) ? p.values : []
+                const getVal = (charId?: string) => {
+                    if (!charId) return ''
+                    const v = vals.find(v => v.characteristicId === charId)
+                    if (!v) return ''
+                    return v.valueDate || (v.valueAmount != null ? String(v.valueAmount) : '') || v.valueText || ''
+                }
+                rows.push({
+                    'Policy Type': p.policyTypeName || '',
+                    'Policy Number': p.policyNumber || '',
+                    'Status': p.status,
+                    'Inception': getVal(inceptionChar?.id),
+                    'Expiry': getVal(expiryChar?.id),
+                    'Premium': getVal(premiumChar?.id),
+                    'Currency': p.currency || '',
+                    'Broker': p.brokerName || '',
+                    'Deductible': getVal(deductibleChar?.id),
+                    'Condition': p.conditionName || '',
+                    'Notes': p.notes || '',
+                })
+            }
+            const wb = XLSX.utils.book_new()
+            const ws = XLSX.utils.json_to_sheet(rows)
+            ws['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 18 }))
+            XLSX.utils.book_append_sheet(wb, ws, 'Policies')
+            XLSX.writeFile(wb, `${vessel.name.replace(/[^a-zA-Z0-9]/g, '_')}_Policies.xlsx`)
+            showSuccess('Policies exported to Excel')
+        } catch (err: any) {
+            showError(err.message || 'Failed to export policies')
+        }
     }
 
     const handleDragOver = (e: React.DragEvent, id: string) => {
@@ -1049,6 +1097,26 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             className="hover-effect"
                                         >
                                             <FileText size={16} /> From Template
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowExportMenu(false); handleExportAllPolicies() }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px 16px',
+                                                textAlign: 'left',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                borderTop: '1px solid var(--glass-border)',
+                                                color: 'var(--text-primary)',
+                                                cursor: 'pointer',
+                                                fontSize: '0.85rem'
+                                            }}
+                                            className="hover-effect"
+                                        >
+                                            <FileSpreadsheet size={16} /> All Policies (Excel)
                                         </button>
                                     </div>
                                 )}

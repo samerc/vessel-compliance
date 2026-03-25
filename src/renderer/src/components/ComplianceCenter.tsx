@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning } from 'lucide-react'
+import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -15,7 +15,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [docs, setDocs] = useState<VesselDocument[]>([])
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
-    const [activeTab, setActiveTab] = useState<'documents' | 'policies' | 'sanctions'>('documents')
+    const [activeTab, setActiveTab] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>('documents')
     const { showSuccess } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
@@ -31,6 +31,14 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [resultsLimit, setResultsLimit] = useState(10)
     const [resultsTotal, setResultsTotal] = useState(0)
     const [resultsTotalPages, setResultsTotalPages] = useState(0)
+
+    // Data Quality state
+    const [validationRules, setValidationRules] = useState<{
+        id: string; name: string; description: string; category: string
+        count: number; items: { id: string; name: string; type: string }[]
+    }[]>([])
+    const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set())
+    const [validationLoading, setValidationLoading] = useState(false)
 
     useEffect(() => {
         loadData()
@@ -89,6 +97,31 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
         } catch {
             setPolicyAlerts([])
         }
+    }
+
+    const loadDataValidation = async () => {
+        setValidationLoading(true)
+        try {
+            const result = await window.api.complianceGetDataValidation()
+            if (result && Array.isArray(result.rules)) {
+                setValidationRules(result.rules)
+            } else {
+                setValidationRules([])
+            }
+        } catch {
+            setValidationRules([])
+        } finally {
+            setValidationLoading(false)
+        }
+    }
+
+    const toggleRule = (ruleId: string) => {
+        setExpandedRules(prev => {
+            const next = new Set(prev)
+            if (next.has(ruleId)) next.delete(ruleId)
+            else next.add(ruleId)
+            return next
+        })
     }
 
     const handleDecideMatch = async (resultId: string, decision: 'sanctioned' | 'cleared') => {
@@ -253,6 +286,28 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                             </span>
                         )}
                     </button>
+                    <button
+                        id="tab-dataQuality"
+                        role="tab"
+                        aria-selected={activeTab === 'dataQuality'}
+                        aria-controls="panel-dataQuality"
+                        onClick={() => { setActiveTab('dataQuality'); if (validationRules.length === 0) loadDataValidation() }}
+                        style={{
+                            padding: '10px 24px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: activeTab === 'dataQuality' ? 'var(--bg-card)' : 'transparent',
+                            color: activeTab === 'dataQuality' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontWeight: activeTab === 'dataQuality' ? '600' : '400',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}
+                    >
+                        <Database size={16} />
+                        Data Quality
+                    </button>
                 </div>
             </header>
 
@@ -394,6 +449,151 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                             </tbody>
                         </table>
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'dataQuality' && (
+                <div role="tabpanel" id="panel-dataQuality" aria-labelledby="tab-dataQuality">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Database size={20} color="var(--accent-primary)" />
+                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Data Quality</h3>
+                            {validationRules.length > 0 && (() => {
+                                const totalIssues = validationRules.reduce((sum, r) => sum + r.count, 0)
+                                return (
+                                    <span style={{
+                                        padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '700',
+                                        background: totalIssues > 0 ? 'rgba(255, 77, 77, 0.15)' : 'rgba(0, 255, 136, 0.15)',
+                                        color: totalIssues > 0 ? 'var(--danger)' : 'var(--success)'
+                                    }}>
+                                        {totalIssues} issue{totalIssues !== 1 ? 's' : ''}
+                                    </span>
+                                )
+                            })()}
+                        </div>
+                        <button
+                            onClick={loadDataValidation}
+                            disabled={validationLoading}
+                            className="btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
+                        >
+                            <RefreshCw size={14} style={{ animation: validationLoading ? 'spin 1s linear infinite' : 'none' }} />
+                            Refresh
+                        </button>
+                    </div>
+
+                    {validationLoading && validationRules.length === 0 ? (
+                        <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+                            <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite', opacity: 0.3, display: 'block', margin: '0 auto 14px' }} />
+                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Running validation checks...</div>
+                        </div>
+                    ) : (
+                        <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <caption className="sr-only">Data quality validation rules</caption>
+                                <thead>
+                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                        <th scope="col" style={{ padding: '16px', width: '32px' }}></th>
+                                        <th scope="col" style={{ padding: '16px' }}>Rule</th>
+                                        <th scope="col" style={{ padding: '16px' }}>Category</th>
+                                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Violations</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {validationRules.map(rule => {
+                                        const isExpanded = expandedRules.has(rule.id)
+                                        const hasIssues = rule.count > 0
+                                        return (
+                                            <>{/* Fragment wrapper for rule + expanded rows */}
+                                                <tr
+                                                    key={rule.id}
+                                                    onClick={() => hasIssues && toggleRule(rule.id)}
+                                                    style={{
+                                                        borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
+                                                        cursor: hasIssues ? 'pointer' : 'default',
+                                                        borderLeft: `4px solid ${hasIssues ? 'var(--danger)' : 'var(--success)'}`
+                                                    }}
+                                                >
+                                                    <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                                                        {hasIssues ? (
+                                                            <ChevronDownIcon size={16} color="var(--text-secondary)" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                                                        ) : (
+                                                            <CheckCircle size={16} color="var(--success)" />
+                                                        )}
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px' }}>
+                                                        <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>{rule.name}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{rule.description}</div>
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px' }}>
+                                                        <span style={{
+                                                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600',
+                                                            background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', textTransform: 'uppercase'
+                                                        }}>
+                                                            {rule.category}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                                                        <span style={{
+                                                            padding: '4px 12px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: '800',
+                                                            background: hasIssues ? 'rgba(255, 77, 77, 0.15)' : 'rgba(0, 255, 136, 0.15)',
+                                                            color: hasIssues ? 'var(--danger)' : 'var(--success)'
+                                                        }}>
+                                                            {rule.count}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && rule.items.length > 0 && (
+                                                    <tr key={`${rule.id}-items`}>
+                                                        <td colSpan={4} style={{ padding: '0 16px 16px 48px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)', borderBottom: '1px solid var(--table-border)' }}>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '240px', overflowY: 'auto' }}>
+                                                                {rule.items.map((item, idx) => (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            if (item.type === 'vessel' && onNavigateToVessel) onNavigateToVessel(item.id)
+                                                                        }}
+                                                                        style={{
+                                                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                                                            padding: '6px 10px', borderRadius: '6px',
+                                                                            background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'),
+                                                                            cursor: (item.type === 'vessel' && onNavigateToVessel) ? 'pointer' : 'default',
+                                                                            fontSize: '0.82rem'
+                                                                        }}
+                                                                    >
+                                                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />
+                                                                        <span style={{ fontWeight: '500' }}>{item.name}</span>
+                                                                        <span style={{
+                                                                            marginLeft: 'auto', fontSize: '0.68rem', fontWeight: '600',
+                                                                            padding: '1px 6px', borderRadius: '4px',
+                                                                            background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
+                                                                            color: 'var(--text-secondary)', textTransform: 'uppercase'
+                                                                        }}>
+                                                                            {item.type}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </>
+                                        )
+                                    })}
+                                    {validationRules.length === 0 && !validationLoading && (
+                                        <tr>
+                                            <td colSpan={4} style={{ padding: '64px', textAlign: 'center' }}>
+                                                <Database size={48} style={{ opacity: 0.15, marginBottom: '16px' }} />
+                                                <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>No validation data</div>
+                                                <p style={{ color: 'var(--text-secondary)' }}>Click Refresh to run data quality checks.</p>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             )}
 

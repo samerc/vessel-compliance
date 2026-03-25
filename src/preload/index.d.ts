@@ -208,6 +208,22 @@ export interface Api {
   dashboardGetLayout: () => Promise<{ widgets: Array<{ id: string; enabled: boolean; order: number }> } | null>
   dashboardSaveLayout: (layout: { widgets: Array<{ id: string; enabled: boolean; order: number }> }) => Promise<void>
   dashboardSetOnboarded: () => Promise<void>
+  dashboardGetCalendarEvents: (year: number, month: number) => Promise<{
+    policies: Array<{ vesselName: string; vesselId: string; policyTypeName: string; endDate: string }>
+    documents: Array<{ vesselName: string; vesselId: string; documentName: string; expiryDate: string }>
+    surveys: Array<{ vesselName: string; vesselId: string; surveyDate: string; surveyType: string }>
+    warranties: Array<{ vesselName: string; vesselId: string; description: string; deadlineDate: string }>
+  }>
+  complianceGetDataValidation: () => Promise<{
+    rules: Array<{
+      id: string
+      name: string
+      description: string
+      category: string
+      count: number
+      items: Array<{ id: string; name: string; type: string }>
+    }>
+  }>
 
   // Survey Warranties
   surveyWarrantyGetByVessel: (vesselId: string) => Promise<SurveyWarranty[]>

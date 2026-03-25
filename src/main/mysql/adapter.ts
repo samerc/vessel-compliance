@@ -4293,6 +4293,222 @@ export class MySQLAdapter {
         }
     }
 
+    async getCalendarEvents(year: number, month: number): Promise<{
+        policies: any[]
+        documents: any[]
+        surveys: any[]
+        warranties: any[]
+    }> {
+        if (!this.pool) return { policies: [], documents: [], surveys: [], warranties: [] }
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+        const endDate = month === 12
+            ? `${year + 1}-01-01`
+            : `${year}-${String(month + 1).padStart(2, '0')}-01`
+
+        // Policy expirations
+        const [policyRows] = await this.pool.query(`
+            SELECT v.name AS vesselName, v.id AS vesselId, pt.name AS policyTypeName,
+                   vpv.value_date AS endDate
+            FROM vessel_dynamic_policies vdp
+            JOIN vessels v ON v.id = vdp.vessel_id
+            JOIN policy_types pt ON pt.id = vdp.policy_type_id
+            JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
+            JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+            WHERE v.is_active = TRUE
+              AND vdp.status = 'active'
+              AND ptc.field_type = 'date'
+              AND LOWER(ptc.name) LIKE '%end%'
+              AND vpv.value_date >= ? AND vpv.value_date < ?
+        `, [startDate, endDate]) as any
+
+        // Document expirations
+        const [docRows] = await this.pool.query(`
+            SELECT v.name AS vesselName, v.id AS vesselId, dt.name AS documentName,
+                   vd.expiry_date AS expiryDate
+            FROM vessel_documents vd
+            JOIN vessels v ON v.id = vd.vessel_id
+            JOIN document_types dt ON dt.id = vd.document_type_id
+            WHERE v.is_active = TRUE
+              AND vd.expiry_date IS NOT NULL
+              AND vd.expiry_date >= ? AND vd.expiry_date < ?
+        `, [startDate, endDate]) as any
+
+        // Surveys
+        const [surveyRows] = await this.pool.query(`
+            SELECT v.name AS vesselName, v.id AS vesselId, cs.survey_date AS surveyDate,
+                   cs.survey_type AS surveyType
+            FROM condition_surveys cs
+            JOIN vessels v ON v.id = cs.vessel_id
+            WHERE v.is_active = TRUE
+              AND cs.survey_date >= ? AND cs.survey_date < ?
+        `, [startDate, endDate]) as any
+
+        // Warranty deadlines
+        const [warrantyRows] = await this.pool.query(`
+            SELECT v.name AS vesselName, v.id AS vesselId, sw.description,
+                   sw.deadline_date AS deadlineDate
+            FROM survey_warranties sw
+            JOIN vessels v ON v.id = sw.vessel_id
+            WHERE sw.status = 'OPEN'
+              AND sw.deadline_date IS NOT NULL
+              AND sw.deadline_date >= ? AND sw.deadline_date < ?
+        `, [startDate, endDate]) as any
+
+        return {
+            policies: Array.isArray(policyRows) ? policyRows : [],
+            documents: Array.isArray(docRows) ? docRows : [],
+            surveys: Array.isArray(surveyRows) ? surveyRows : [],
+            warranties: Array.isArray(warrantyRows) ? warrantyRows : []
+        }
+    }
+
+    async getDataValidationResults(): Promise<{
+        rules: {
+            id: string
+            name: string
+            description: string
+            category: string
+            count: number
+            items: { id: string; name: string; type: string }[]
+        }[]
+    }> {
+        if (!this.pool) return { rules: [] }
+
+        const rules: any[] = []
+
+        // 1. Vessels without customer
+        const [r1] = await this.pool.query(
+            'SELECT id, name FROM vessels WHERE is_active = TRUE AND customer_id IS NULL'
+        ) as any
+        rules.push({
+            id: 'vessels-no-customer',
+            name: 'Vessels without customer assigned',
+            description: 'Active vessels that have no customer entity linked',
+            category: 'vessels',
+            count: r1.length,
+            items: r1.map((r: any) => ({ id: r.id, name: r.name, type: 'vessel' }))
+        })
+
+        // 2. Vessels without fleet
+        const [r2] = await this.pool.query(
+            'SELECT id, name FROM vessels WHERE is_active = TRUE AND fleet_id IS NULL'
+        ) as any
+        rules.push({
+            id: 'vessels-no-fleet',
+            name: 'Vessels without fleet assigned',
+            description: 'Active vessels not assigned to any fleet',
+            category: 'vessels',
+            count: r2.length,
+            items: r2.map((r: any) => ({ id: r.id, name: r.name, type: 'vessel' }))
+        })
+
+        // 3. Entities without email
+        const [r3] = await this.pool.query(
+            "SELECT id, name FROM entities WHERE email IS NULL OR email = ''"
+        ) as any
+        rules.push({
+            id: 'entities-no-email',
+            name: 'Entities without email',
+            description: 'Entities missing email contact information',
+            category: 'entities',
+            count: r3.length,
+            items: r3.map((r: any) => ({ id: r.id, name: r.name, type: 'entity' }))
+        })
+
+        // 4. Entities without phone
+        const [r4] = await this.pool.query(
+            "SELECT id, name FROM entities WHERE phone IS NULL OR phone = ''"
+        ) as any
+        rules.push({
+            id: 'entities-no-phone',
+            name: 'Entities without phone',
+            description: 'Entities missing phone contact information',
+            category: 'entities',
+            count: r4.length,
+            items: r4.map((r: any) => ({ id: r.id, name: r.name, type: 'entity' }))
+        })
+
+        // 5. Active policies without premium amount
+        const [r5] = await this.pool.query(`
+            SELECT vdp.id, CONCAT(v.name, ' - ', pt.name) AS name
+            FROM vessel_dynamic_policies vdp
+            JOIN vessels v ON v.id = vdp.vessel_id
+            JOIN policy_types pt ON pt.id = vdp.policy_type_id
+            WHERE vdp.status = 'active'
+              AND v.is_active = TRUE
+              AND NOT EXISTS (
+                SELECT 1 FROM vessel_policy_values vpv
+                JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+                WHERE vpv.policy_id = vdp.id
+                  AND LOWER(ptc.name) LIKE '%premium%'
+                  AND vpv.value_text IS NOT NULL AND vpv.value_text != ''
+              )
+        `) as any
+        rules.push({
+            id: 'policies-no-premium',
+            name: 'Active policies without premium amount',
+            description: 'Active policies that have no premium value recorded',
+            category: 'policies',
+            count: r5.length,
+            items: r5.map((r: any) => ({ id: r.id, name: r.name, type: 'policy' }))
+        })
+
+        // 6. Active vessels without any policies
+        const [r6] = await this.pool.query(`
+            SELECT v.id, v.name FROM vessels v
+            WHERE v.is_active = TRUE
+              AND NOT EXISTS (
+                SELECT 1 FROM vessel_dynamic_policies vdp
+                WHERE vdp.vessel_id = v.id AND vdp.status = 'active'
+              )
+        `) as any
+        rules.push({
+            id: 'vessels-no-policies',
+            name: 'Active vessels without any policies',
+            description: 'Active vessels with no active insurance policies',
+            category: 'vessels',
+            count: r6.length,
+            items: r6.map((r: any) => ({ id: r.id, name: r.name, type: 'vessel' }))
+        })
+
+        // 7. Entities with no vessels (orphaned)
+        const [r7] = await this.pool.query(`
+            SELECT e.id, e.name FROM entities e
+            WHERE NOT EXISTS (
+                SELECT 1 FROM vessel_assureds va WHERE va.entity_id = e.id
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM vessels v WHERE v.customer_id = e.id
+            )
+        `) as any
+        rules.push({
+            id: 'entities-orphaned',
+            name: 'Entities with no vessels (orphaned)',
+            description: 'Entities not linked to any vessel as assured or customer',
+            category: 'entities',
+            count: r7.length,
+            items: r7.map((r: any) => ({ id: r.id, name: r.name, type: 'entity' }))
+        })
+
+        // 8. Fleets with 0 vessels
+        const [r8] = await this.pool.query(`
+            SELECT f.id, f.name FROM fleets f
+            WHERE NOT EXISTS (
+                SELECT 1 FROM vessels v WHERE v.fleet_id = f.id
+            )
+        `) as any
+        rules.push({
+            id: 'fleets-empty',
+            name: 'Fleets with 0 vessels',
+            description: 'Fleet groups that contain no vessels',
+            category: 'fleets',
+            count: r8.length,
+            items: r8.map((r: any) => ({ id: r.id, name: r.name, type: 'fleet' }))
+        })
+
+        return { rules }
+    }
+
     // --- Survey Warranties ---
     async getSurveyWarrantiesByVessel(vesselId: string): Promise<any[]> {
         if (!this.pool) return []
