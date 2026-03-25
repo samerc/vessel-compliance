@@ -10746,7 +10746,7 @@ export class MySQLAdapter {
                     LEFT JOIN surveyors s ON cs.surveyor_id = s.id`,
                 columnMap: {
                     vesselName: 'v.name AS vesselName',
-                    surveyorName: 's.name AS surveyorName',
+                    surveyorName: 's.company_name AS surveyorName',
                     surveyType: 'cs.survey_type AS surveyType',
                     surveyDate: 'cs.survey_date AS surveyDate',
                     location: 'cs.location AS location',
@@ -10760,12 +10760,12 @@ export class MySQLAdapter {
                     search: (params, val) => {
                         const s = `%${val}%`
                         params.push(s, s, s)
-                        return '(v.name LIKE ? OR s.name LIKE ? OR cs.location LIKE ?)'
+                        return '(v.name LIKE ? OR s.company_name LIKE ? OR cs.location LIKE ?)'
                     }
                 },
                 groupMap: {
                     vesselName: 'v.name',
-                    surveyorName: 's.name',
+                    surveyorName: 's.company_name',
                     surveyType: 'cs.survey_type',
                     status: 'CASE WHEN EXISTS(SELECT 1 FROM survey_defects sd WHERE sd.survey_id = cs.id AND sd.status = \'OPEN\') THEN \'Open\' ELSE \'Closed\' END'
                 }
