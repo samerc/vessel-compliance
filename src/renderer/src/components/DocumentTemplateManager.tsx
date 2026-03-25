@@ -24,6 +24,7 @@ const CATEGORY_TABS = [
   { id: 'vessel', label: 'Vessel' },
   { id: 'entity', label: 'Entity' },
   { id: 'certificate', label: 'Certificate' },
+  { id: 'email', label: 'Email' },
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -33,6 +34,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   vessel: '#0ea5e9',
   entity: '#f59e0b',
   certificate: '#10b981',
+  email: '#ec4899',
 }
 
 const PLACEHOLDER_ITEMS = TEMPLATE_PLACEHOLDERS.map(p => ({
@@ -202,10 +204,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-            <FileText size={28} /> Document Templates
+            <FileText size={28} /> Templates
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Create rich text templates with {'{{placeholder}}'} fields for auto-filled document generation
+            Create and manage document and email templates with placeholders
           </p>
         </div>
         {canManage && (

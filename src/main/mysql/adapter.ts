@@ -2462,6 +2462,19 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migrate email_templates rows into document_templates (email category)
+            try {
+                const [etRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM email_templates') as any[]
+                if (etRows[0].cnt > 0) {
+                    await this.pool.query(`
+                        INSERT INTO document_templates (id, name, body, category, order_index, created_at, created_by)
+                        SELECT id, name, body, 'email', order_index, created_at, created_by
+                        FROM email_templates
+                        WHERE id NOT IN (SELECT id FROM document_templates)
+                    `)
+                }
+            } catch (e) { /* email_templates table may not exist */ }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error

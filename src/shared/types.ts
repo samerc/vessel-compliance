@@ -1458,6 +1458,7 @@ export const TEMPLATE_CATEGORIES = [
   'vessel',
   'entity',
   'certificate',
+  'email',
 ] as const
 
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
