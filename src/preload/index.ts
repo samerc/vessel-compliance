@@ -749,6 +749,16 @@ const api = {
   bulkSetVesselStatus: (vesselIds: string[], isActive: boolean) => ipcRenderer.invoke('bulk:setVesselStatus', vesselIds, isActive),
   bulkDeleteEntities: (entityIds: string[]) => ipcRenderer.invoke('bulk:deleteEntities', entityIds),
 
+  // Document Templates
+  docTemplateGetAll: (category?: string) => ipcRenderer.invoke('docTemplate:getAll', category),
+  docTemplateGetById: (id: string) => ipcRenderer.invoke('docTemplate:getById', id),
+  docTemplateAdd: (data: any) => ipcRenderer.invoke('docTemplate:add', data),
+  docTemplateUpdate: (id: string, data: any) => ipcRenderer.invoke('docTemplate:update', id, data),
+  docTemplateReplaceFile: (id: string, data: any) => ipcRenderer.invoke('docTemplate:replaceFile', id, data),
+  docTemplateDelete: (id: string) => ipcRenderer.invoke('docTemplate:delete', id),
+  docTemplateReorder: (ids: string[]) => ipcRenderer.invoke('docTemplate:reorder', ids),
+  docTemplateGenerate: (templateId: string, context: { vesselId?: string; policyId?: string; entityId?: string }) => ipcRenderer.invoke('docTemplate:generate', templateId, context),
+
   // Global Search
   globalSearch: (query: string) => ipcRenderer.invoke('global:search', query),
 

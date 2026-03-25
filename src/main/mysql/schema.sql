@@ -844,3 +844,16 @@ CREATE TABLE IF NOT EXISTS notifications (
   INDEX idx_notif_user_read (user_id, is_read),
   INDEX idx_notif_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS document_templates (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT DEFAULT NULL,
+  category VARCHAR(50) NOT NULL DEFAULT 'general',
+  file_name VARCHAR(255) NOT NULL,
+  file_data LONGBLOB NOT NULL,
+  placeholders TEXT DEFAULT NULL,
+  created_by VARCHAR(36) DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

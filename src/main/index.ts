@@ -3317,6 +3317,250 @@ app.whenReady().then(() => {
     return db.bulkDeleteEntities(entityIds)
   })
 
+  // ==================== Document Templates ====================
+  safeHandle('docTemplate:getAll', (event, category?: string) => {
+    requireSession(event)
+    return db.getDocumentTemplates(category)
+  })
+
+  safeHandle('docTemplate:getById', (event, id: string) => {
+    requireSession(event)
+    return db.getDocumentTemplateById(id)
+  })
+
+  safeHandle('docTemplate:add', async (event, data: {
+    name: string
+    description?: string | null
+    category: string
+    fileName: string
+    fileData: number[] // Uint8Array serialized as number array through IPC
+    placeholders?: string[] | null
+  }) => {
+    const user = await requirePermission(event, 'admin:settings')
+    const buf = Buffer.from(data.fileData)
+    return db.addDocumentTemplate({
+      name: data.name,
+      description: data.description,
+      category: data.category,
+      fileName: data.fileName,
+      fileData: buf,
+      placeholders: data.placeholders,
+      createdBy: user.id
+    })
+  })
+
+  safeHandle('docTemplate:update', async (event, id: string, data: {
+    name?: string
+    description?: string | null
+    category?: string
+  }) => {
+    await requirePermission(event, 'admin:settings')
+    return db.updateDocumentTemplate(id, data)
+  })
+
+  safeHandle('docTemplate:replaceFile', async (event, id: string, data: {
+    fileName: string
+    fileData: number[]
+    placeholders: string[] | null
+  }) => {
+    await requirePermission(event, 'admin:settings')
+    const buf = Buffer.from(data.fileData)
+    return db.updateDocumentTemplateFile(id, data.fileName, buf, data.placeholders)
+  })
+
+  safeHandle('docTemplate:delete', async (event, id: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.deleteDocumentTemplate(id)
+  })
+
+  safeHandle('docTemplate:reorder', async (event, ids: string[]) => {
+    await requirePermission(event, 'admin:settings')
+    return db.reorderDocumentTemplates(ids)
+  })
+
+  safeHandle('docTemplate:generate', async (event, templateId: string, context: {
+    vesselId?: string
+    policyId?: string
+    entityId?: string
+  }) => {
+    const user = requireSession(event)
+    const template = await db.getDocumentTemplateById(templateId)
+    if (!template) throw new Error('Template not found')
+
+    // Build replacement map from context
+    const replacements: Record<string, string> = {
+      '{{today}}': new Date().toISOString().split('T')[0],
+      '{{userName}}': user.username
+    }
+
+    // Load company name from report settings
+    try {
+      const settingsJson = await db.getSetting('reportSettings')
+      if (settingsJson) {
+        const settings = JSON.parse(settingsJson)
+        if (settings.companyName) replacements['{{companyName}}'] = settings.companyName
+      }
+    } catch {}
+
+    // Load vessel data if provided
+    if (context.vesselId) {
+      try {
+        const [vesselRows] = await (db as any).pool.query(
+          'SELECT v.*, fs.name AS flagStateName FROM vessels v LEFT JOIN flag_states fs ON v.flag_state_id = fs.id WHERE v.id = ?',
+          [context.vesselId]
+        )
+        const vessel = (vesselRows as any[])[0]
+        if (vessel) {
+          replacements['{{vesselName}}'] = vessel.name || ''
+          replacements['{{imoNumber}}'] = vessel.imo_number || ''
+          replacements['{{vesselType}}'] = vessel.vessel_type || ''
+          replacements['{{flagState}}'] = vessel.flagStateName || ''
+          replacements['{{grossTonnage}}'] = vessel.gross_tonnage ? String(vessel.gross_tonnage) : ''
+          replacements['{{builtYear}}'] = vessel.built_year ? String(vessel.built_year) : ''
+          replacements['{{classification}}'] = vessel.classification_society || ''
+
+          // Load customer entity
+          if (vessel.customer_id) {
+            const [entityRows] = await (db as any).pool.query(
+              'SELECT name, email FROM entities WHERE id = ?',
+              [vessel.customer_id]
+            )
+            const entity = (entityRows as any[])[0]
+            if (entity) {
+              if (vessel.customer_type === 'broker') {
+                replacements['{{brokerName}}'] = entity.name || ''
+              } else {
+                replacements['{{customerName}}'] = entity.name || ''
+                replacements['{{customerEmail}}'] = entity.email || ''
+              }
+            }
+          }
+        }
+      } catch (e) { console.error('Template generate - vessel load error:', e) }
+    }
+
+    // Load entity data if provided
+    if (context.entityId) {
+      try {
+        const [entityRows] = await (db as any).pool.query(
+          'SELECT name, email, phone FROM entities WHERE id = ?',
+          [context.entityId]
+        )
+        const entity = (entityRows as any[])[0]
+        if (entity) {
+          replacements['{{customerName}}'] = entity.name || ''
+          replacements['{{customerEmail}}'] = entity.email || ''
+        }
+      } catch (e) { console.error('Template generate - entity load error:', e) }
+    }
+
+    // Load policy data if provided
+    if (context.policyId) {
+      try {
+        const [policyRows] = await (db as any).pool.query(
+          `SELECT vdp.*, pt.name AS policyTypeName
+           FROM vessel_dynamic_policies vdp
+           LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
+           WHERE vdp.id = ?`,
+          [context.policyId]
+        )
+        const policy = (policyRows as any[])[0]
+        if (policy) {
+          replacements['{{policyNumber}}'] = policy.policy_number || ''
+          replacements['{{policyType}}'] = policy.policyTypeName || ''
+
+          // Load policy values for inception/expiry
+          const [valueRows] = await (db as any).pool.query(
+            `SELECT vpv.value_text, vpv.value_date, ptc.name AS charName
+             FROM vessel_policy_values vpv
+             JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
+             WHERE vpv.dynamic_policy_id = ?`,
+            [context.policyId]
+          )
+          for (const v of (valueRows as any[])) {
+            const nameL = (v.charName || '').toLowerCase()
+            if (nameL.includes('inception') || nameL.includes('start')) {
+              replacements['{{inceptionDate}}'] = v.value_date || v.value_text || ''
+            }
+            if (nameL.includes('end') || nameL.includes('expiry')) {
+              replacements['{{expiryDate}}'] = v.value_date || v.value_text || ''
+            }
+            if (nameL.includes('premium')) {
+              replacements['{{premiumAmount}}'] = v.value_text || ''
+            }
+            if (nameL.includes('currency')) {
+              replacements['{{currency}}'] = v.value_text || ''
+            }
+          }
+        }
+      } catch (e) { console.error('Template generate - policy load error:', e) }
+    }
+
+    // Process the docx using JSZip
+    const JSZip = require('jszip')
+    const zip = await JSZip.loadAsync(template.fileData)
+
+    // Process all XML parts that may contain text (document.xml, headers, footers)
+    const xmlParts = Object.keys(zip.files).filter(
+      (name: string) => name.startsWith('word/') && name.endsWith('.xml')
+    )
+
+    for (const partName of xmlParts) {
+      let xml: string = await zip.file(partName)!.async('string')
+
+      // Handle split runs: Word may split {{placeholder}} across multiple <w:t> elements
+      // Strategy: find <w:r> sequences where concatenated <w:t> text contains {{...}}
+      // First, try simple replacement for non-split placeholders
+      for (const [placeholder, value] of Object.entries(replacements)) {
+        xml = xml.split(placeholder).join(value)
+      }
+
+      // Handle split runs: concatenate <w:t> elements within <w:p> paragraphs,
+      // replace placeholders, then reconstruct
+      xml = xml.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, (paragraph: string) => {
+        // Extract all text from <w:t> elements in this paragraph
+        const textParts: { fullMatch: string; text: string }[] = []
+        const tRegex = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g
+        let tMatch: RegExpExecArray | null
+        while ((tMatch = tRegex.exec(paragraph)) !== null) {
+          textParts.push({ fullMatch: tMatch[0], text: tMatch[1] })
+        }
+        if (textParts.length < 2) return paragraph
+
+        const combined = textParts.map(t => t.text).join('')
+        // Check if the combined text contains any unreplaced placeholder
+        if (!combined.includes('{{')) return paragraph
+
+        // Replace in the combined text
+        let replaced = combined
+        for (const [placeholder, value] of Object.entries(replacements)) {
+          replaced = replaced.split(placeholder).join(value)
+        }
+
+        if (replaced === combined) return paragraph
+
+        // Put the replaced text into the first <w:t> and empty the rest
+        let result = paragraph
+        let first = true
+        for (const part of textParts) {
+          if (first) {
+            const preserveSpace = '<w:t xml:space="preserve">' + replaced + '</w:t>'
+            result = result.replace(part.fullMatch, preserveSpace)
+            first = false
+          } else {
+            result = result.replace(part.fullMatch, '<w:t></w:t>')
+          }
+        }
+        return result
+      })
+
+      zip.file(partName, xml)
+    }
+
+    const outputBuffer = await zip.generateAsync({ type: 'nodebuffer' })
+    return { data: Array.from(outputBuffer as Buffer), fileName: template.fileName }
+  })
+
   // Initialize update service with main window
   const mainWindow = BrowserWindow.getAllWindows()[0]
   if (mainWindow) {

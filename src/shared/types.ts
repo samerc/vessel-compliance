@@ -1410,3 +1410,57 @@ export interface QuotationSurveyWarranty {
   vesselScope?: string[] | null
   alternativeId?: string | null
 }
+
+// ==================== Document Templates ====================
+
+export interface DocumentTemplate {
+  id: string
+  name: string
+  description?: string | null
+  category: string
+  fileName: string
+  placeholders?: string[] | null
+  createdBy?: string | null
+  order: number
+  createdAt?: string
+}
+
+export const TEMPLATE_CATEGORIES = [
+  'general',
+  'policy',
+  'quotation',
+  'vessel',
+  'entity',
+  'certificate',
+] as const
+
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
+
+export const TEMPLATE_PLACEHOLDERS = [
+  // Vessel
+  { key: '{{vesselName}}', label: 'Vessel Name', category: 'Vessel' },
+  { key: '{{imoNumber}}', label: 'IMO Number', category: 'Vessel' },
+  { key: '{{vesselType}}', label: 'Vessel Type', category: 'Vessel' },
+  { key: '{{flagState}}', label: 'Flag State', category: 'Vessel' },
+  { key: '{{grossTonnage}}', label: 'Gross Tonnage', category: 'Vessel' },
+  { key: '{{builtYear}}', label: 'Built Year', category: 'Vessel' },
+  { key: '{{classification}}', label: 'Classification', category: 'Vessel' },
+  // Entity
+  { key: '{{customerName}}', label: 'Customer Name', category: 'Entity' },
+  { key: '{{customerEmail}}', label: 'Customer Email', category: 'Entity' },
+  { key: '{{brokerName}}', label: 'Broker Name', category: 'Entity' },
+  // Policy
+  { key: '{{policyNumber}}', label: 'Policy Number', category: 'Policy' },
+  { key: '{{policyType}}', label: 'Policy Type', category: 'Policy' },
+  { key: '{{inceptionDate}}', label: 'Inception Date', category: 'Policy' },
+  { key: '{{expiryDate}}', label: 'Expiry Date', category: 'Policy' },
+  { key: '{{premiumAmount}}', label: 'Premium Amount', category: 'Policy' },
+  { key: '{{currency}}', label: 'Currency', category: 'Policy' },
+  // Quotation
+  { key: '{{quotationRef}}', label: 'Quotation Reference', category: 'Quotation' },
+  { key: '{{quotationDate}}', label: 'Quotation Date', category: 'Quotation' },
+  // General
+  { key: '{{companyName}}', label: 'Company Name', category: 'General' },
+  { key: '{{today}}', label: "Today's Date", category: 'General' },
+  { key: '{{userName}}', label: 'Current User', category: 'General' },
+] as const

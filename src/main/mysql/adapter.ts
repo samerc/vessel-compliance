@@ -2394,6 +2394,24 @@ export class MySQLAdapter {
                 `)
             } catch (e) { console.error('user_column_prefs migration:', e) }
 
+            // Document templates table
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS document_templates (
+                        id VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT DEFAULT NULL,
+                        category VARCHAR(50) NOT NULL DEFAULT 'general',
+                        file_name VARCHAR(255) NOT NULL,
+                        file_data LONGBLOB NOT NULL,
+                        placeholders TEXT DEFAULT NULL,
+                        created_by VARCHAR(36) DEFAULT NULL,
+                        order_index INT DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                `)
+            } catch (e) { console.error('document_templates migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -10186,6 +10204,119 @@ export class MySQLAdapter {
             entityIds
         )
         return (result as any).affectedRows || 0
+    }
+
+    // --- Document Templates ---
+    async getDocumentTemplates(category?: string): Promise<any[]> {
+        if (!this.pool) return []
+        let query = `SELECT id, name, description, category, file_name AS fileName,
+            placeholders, created_by AS createdBy, order_index AS \`order\`, created_at AS createdAt
+            FROM document_templates`
+        const params: any[] = []
+        if (category) {
+            query += ' WHERE category = ?'
+            params.push(category)
+        }
+        query += ' ORDER BY order_index ASC'
+        const [rows] = await this.pool.query(query, params)
+        return (rows as any[]).map(r => ({
+            ...r,
+            placeholders: r.placeholders ? JSON.parse(r.placeholders) : null
+        }))
+    }
+
+    async getDocumentTemplateById(id: string): Promise<any | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            `SELECT id, name, description, category, file_name AS fileName,
+                file_data AS fileData, placeholders, created_by AS createdBy,
+                order_index AS \`order\`, created_at AS createdAt
+            FROM document_templates WHERE id = ?`,
+            [id]
+        )
+        const arr = rows as any[]
+        if (arr.length === 0) return null
+        const r = arr[0]
+        return {
+            ...r,
+            placeholders: r.placeholders ? JSON.parse(r.placeholders) : null
+        }
+    }
+
+    async addDocumentTemplate(data: {
+        name: string
+        description?: string | null
+        category: string
+        fileName: string
+        fileData: Buffer
+        placeholders?: string[] | null
+        createdBy?: string | null
+    }): Promise<any> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM document_templates') as any[]
+        const nextOrder = maxRow[0]?.nextOrder ?? 0
+        await this.pool.execute(
+            `INSERT INTO document_templates (id, name, description, category, file_name, file_data, placeholders, created_by, order_index)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                data.name,
+                data.description || null,
+                data.category,
+                data.fileName,
+                data.fileData,
+                data.placeholders ? JSON.stringify(data.placeholders) : null,
+                data.createdBy || null,
+                nextOrder
+            ]
+        )
+        return {
+            id,
+            name: data.name,
+            description: data.description || null,
+            category: data.category,
+            fileName: data.fileName,
+            placeholders: data.placeholders || null,
+            createdBy: data.createdBy || null,
+            order: nextOrder
+        }
+    }
+
+    async updateDocumentTemplate(id: string, data: {
+        name?: string
+        description?: string | null
+        category?: string
+    }): Promise<void> {
+        if (!this.pool) return
+        const sets: string[] = []
+        const params: any[] = []
+        if (data.name !== undefined) { sets.push('name = ?'); params.push(data.name) }
+        if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description) }
+        if (data.category !== undefined) { sets.push('category = ?'); params.push(data.category) }
+        if (sets.length === 0) return
+        params.push(id)
+        await this.pool.execute(`UPDATE document_templates SET ${sets.join(', ')} WHERE id = ?`, params)
+    }
+
+    async updateDocumentTemplateFile(id: string, fileName: string, fileData: Buffer, placeholders: string[] | null): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE document_templates SET file_name = ?, file_data = ?, placeholders = ? WHERE id = ?',
+            [fileName, fileData, placeholders ? JSON.stringify(placeholders) : null, id]
+        )
+    }
+
+    async deleteDocumentTemplate(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM document_templates WHERE id = ?', [id])
+    }
+
+    async reorderDocumentTemplates(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE document_templates SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
     }
 }
 

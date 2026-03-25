@@ -333,6 +333,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
     const [auditLog, setAuditLog] = useState<VesselAuditEntry[]>([])
     const [showExportMenu, setShowExportMenu] = useState(false)
+    const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
     const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
     const [showNotesModal, setShowNotesModal] = useState(false)
     const [vesselNotesList, setVesselNotesList] = useState<any[]>([])
@@ -1016,6 +1017,26 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             className="hover-effect"
                                         >
                                             <FileText size={16} /> PDF Report (Pro)
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowExportMenu(false); setShowTemplateGenerate(true) }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px 16px',
+                                                textAlign: 'left',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                borderTop: '1px solid var(--glass-border)',
+                                                color: 'var(--text-primary)',
+                                                cursor: 'pointer',
+                                                fontSize: '0.85rem'
+                                            }}
+                                            className="hover-effect"
+                                        >
+                                            <FileText size={16} /> From Template
                                         </button>
                                     </div>
                                 )}
@@ -1951,6 +1972,18 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     </div>
                 </div>
             )}
+
+            {/* Template Generation Modal */}
+            {showTemplateGenerate && (
+                <VesselTemplateGenerateModal
+                    vesselId={vessel.id}
+                    vesselName={vessel.name}
+                    isLight={isLight}
+                    onClose={() => setShowTemplateGenerate(false)}
+                    showSuccess={showSuccess}
+                    showError={showError}
+                />
+            )}
         </div>
     )
 }
@@ -2535,6 +2568,111 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                     onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
                 />
             )}
+        </div>
+    )
+}
+
+// ==================== Vessel Template Generate Modal ====================
+function VesselTemplateGenerateModal({ vesselId, vesselName, isLight, onClose, showSuccess, showError }: {
+    vesselId: string
+    vesselName: string
+    isLight: boolean
+    onClose: () => void
+    showSuccess: (msg: string) => void
+    showError: (msg: string) => void
+}) {
+    const [templates, setTemplates] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [generating, setGenerating] = useState<string | null>(null)
+
+    useEffect(() => {
+        window.api.docTemplateGetAll().then(result => {
+            if (Array.isArray(result)) setTemplates(result)
+        }).catch(() => {}).finally(() => setLoading(false))
+    }, [])
+
+    const handleGenerate = async (templateId: string) => {
+        try {
+            setGenerating(templateId)
+            const result = await window.api.docTemplateGenerate(templateId, { vesselId })
+            if (result && result.data) {
+                const blob = new Blob([new Uint8Array(result.data)], {
+                    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                const tpl = templates.find(t => t.id === templateId)
+                a.download = (tpl?.fileName || 'document.docx').replace('.docx', `_${vesselName.replace(/\s+/g, '_')}.docx`)
+                a.click()
+                URL.revokeObjectURL(url)
+                showSuccess('Document generated')
+                onClose()
+            }
+        } catch {
+            showError('Failed to generate document')
+        } finally {
+            setGenerating(null)
+        }
+    }
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{
+                background: isLight ? '#ffffff' : '#1a1d28',
+                borderRadius: '12px', padding: '24px', width: '440px', maxWidth: '90vw',
+                border: 'var(--glass-border)', maxHeight: '70vh', display: 'flex', flexDirection: 'column'
+            }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FileText size={18} /> Generate from Template
+                    </h3>
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    Select a template to generate a document pre-filled with data for <strong>{vesselName}</strong>.
+                </p>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                    {loading ? (
+                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>Loading...</div>
+                    ) : templates.length === 0 ? (
+                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
+                            No templates available. Upload templates in Document Templates page.
+                        </div>
+                    ) : templates.map(t => (
+                        <div
+                            key={t.id}
+                            style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '10px 12px', borderRadius: '8px', marginBottom: '4px',
+                                border: '1px solid var(--input-border)',
+                                background: 'var(--input-bg)'
+                            }}
+                        >
+                            <div>
+                                <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{t.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
+                                    <span style={{
+                                        padding: '1px 5px', borderRadius: '3px', fontSize: '0.68rem',
+                                        background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)'
+                                    }}>{t.category}</span>
+                                    {t.placeholders?.length > 0 && <span>{t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}</span>}
+                                </div>
+                            </div>
+                            <button
+                                className="btn-primary"
+                                onClick={() => handleGenerate(t.id)}
+                                disabled={generating !== null}
+                                style={{ padding: '5px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                                {generating === t.id ? 'Generating...' : <><Download size={13} /> Generate</>}
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     )
 }
