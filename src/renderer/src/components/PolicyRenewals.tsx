@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare, Search } from 'lucide-react'
+import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare, Search, DollarSign, TrendingUp, Percent, Filter } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateTime } from '../utils/dateUtils'
@@ -18,12 +18,78 @@ interface RenewalStatusType {
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-type SortField = 'vesselName' | 'imoNumber' | 'customerName' | 'fleetName' | 'policyTypeName' | 'policyNumber' | 'endDate' | 'premium' | 'renewalStatusName' | 'quotationSentDate'
+type SortField = 'vesselName' | 'imoNumber' | 'customerName' | 'fleetName' | 'policyTypeName' | 'policyNumber' | 'endDate' | 'premium' | 'renewalStatusName' | 'quotationSentDate' | 'daysUntil'
 type SortDir = 'asc' | 'desc'
 
 const DEFAULT_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
-// Default column widths: Vessel, IMO, Customer, Fleet, PolicyType, PolicyNo, EndDate, Premium, Status, QuotSent, Actions
-const DEFAULT_COL_WIDTHS = [160, 100, 140, 120, 150, 130, 110, 110, 150, 120, 120]
+
+function daysUntil(dateStr: string): number {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000)
+}
+
+function daysColor(days: number): string {
+    if (days < 0) return 'var(--danger)'
+    if (days <= 30) return '#f59e0b'
+    if (days <= 60) return '#eab308'
+    return '#10b981'
+}
+
+interface PolicyTypeOption {
+    id: string
+    name: string
+}
+
+// ── KPI card ──────────────────────────────────────────────────────────────────
+function KPI({ icon, gradient, label, value, sub }: {
+    icon: React.ReactNode
+    gradient: string
+    label: string
+    value: string | number
+    sub?: string
+}) {
+    return (
+        <div className="glass-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+                width: '48px', height: '48px', borderRadius: '14px',
+                background: gradient,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+            }}>
+                {icon}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                    fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600',
+                    textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px',
+                }}>
+                    {label}
+                </div>
+                <div style={{
+                    fontSize: String(value).length > 12 ? '1rem' : String(value).length > 8 ? '1.25rem' : '1.75rem',
+                    fontWeight: '800',
+                    lineHeight: 1,
+                    letterSpacing: '-0.03em',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    width: '100%',
+                }}>
+                    {value}
+                </div>
+                {sub && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        {sub}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+// Default column widths: Vessel, IMO, Customer, Fleet, PolicyType, PolicyNo, EndDate, Premium, Days, Status, QuotSent, Actions
+const DEFAULT_COL_WIDTHS = [160, 100, 140, 120, 150, 130, 110, 110, 80, 150, 120, 120]
 
 function formatPremium(value: number | null, currency: string | null): string {
     if (value == null) return '-'
@@ -47,6 +113,8 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
     const [groupByFleet, setGroupByFleet] = useState(false)
     const [multiMonthView, setMultiMonthView] = useState(false)
     const [search, setSearch] = useState('')
+    const [policyTypes, setPolicyTypes] = useState<PolicyTypeOption[]>([])
+    const [policyTypeFilter, setPolicyTypeFilter] = useState<string>('all')
 
     // Renewal status management
     const [statusTypes, setStatusTypes] = useState<RenewalStatusType[]>([])
@@ -103,6 +171,15 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
 
     // Keep ref in sync with state (used to read latest value in event handlers)
     useEffect(() => { colWidthsRef.current = colWidths }, [colWidths])
+
+    // Load policy types on mount
+    useEffect(() => {
+        window.api.getPolicyTypes().then((types: any[]) => {
+            if (Array.isArray(types)) {
+                setPolicyTypes(types.map((t: any) => ({ id: t.id, name: t.name })))
+            }
+        }).catch(() => {})
+    }, [])
 
     useEffect(() => {
         loadRenewals()
@@ -277,9 +354,12 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
 
     const sortedRenewals = useMemo(() => {
         let filtered = renewals
+        if (policyTypeFilter !== 'all') {
+            filtered = filtered.filter(r => r.policyTypeId === policyTypeFilter)
+        }
         if (search.trim()) {
             const q = search.toLowerCase()
-            filtered = renewals.filter(r =>
+            filtered = filtered.filter(r =>
                 (r.vesselName || '').toLowerCase().includes(q) ||
                 (r.imoNumber || '').toLowerCase().includes(q) ||
                 (r.customerName || '').toLowerCase().includes(q) ||
@@ -291,16 +371,21 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         }
         const sorted = [...filtered]
         sorted.sort((a, b) => {
+            if (sortField === 'premium') {
+                const diff = (Number(a.premium) || 0) - (Number(b.premium) || 0)
+                return sortDir === 'asc' ? diff : -diff
+            }
+            if (sortField === 'daysUntil') {
+                const diff = daysUntil(a.endDate) - daysUntil(b.endDate)
+                return sortDir === 'asc' ? diff : -diff
+            }
             const aVal = a[sortField] ?? ''
             const bVal = b[sortField] ?? ''
-            if (sortField === 'premium') {
-                return sortDir === 'asc' ? (Number(aVal) - Number(bVal)) : (Number(bVal) - Number(aVal))
-            }
             const cmp = String(aVal).localeCompare(String(bVal))
             return sortDir === 'asc' ? cmp : -cmp
         })
         return sorted
-    }, [renewals, sortField, sortDir, search])
+    }, [renewals, sortField, sortDir, search, policyTypeFilter])
 
     const groupedRenewals = useMemo(() => {
         if (!groupByFleet) return null
@@ -325,6 +410,25 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
         }
         return Array.from(map.values())
     }, [renewals])
+
+    const G = {
+        blue: 'linear-gradient(135deg, #0ea5e9, #2563eb)',
+        green: 'linear-gradient(135deg, #10b981, #059669)',
+        amber: 'linear-gradient(135deg, #f59e0b, #d97706)',
+        teal: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+    }
+
+    const kpis = useMemo(() => {
+        const data = policyTypeFilter !== 'all'
+            ? renewals.filter(r => r.policyTypeId === policyTypeFilter)
+            : renewals
+        const total = data.length
+        const totalPremium = data.reduce((sum: number, r: any) => sum + (Number(r.premium) || 0), 0)
+        const avgPremium = total > 0 ? totalPremium / total : 0
+        const withStatus = data.filter((r: any) => r.renewalStatusName)
+        const renewalRate = total > 0 ? Math.round((withStatus.length / total) * 100) : 0
+        return { total, totalPremium, avgPremium, renewalRate }
+    }, [renewals, policyTypeFilter])
 
     const exportToExcel = async () => {
         // Load notes for all renewals
@@ -352,6 +456,8 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             'Policy Number': r.policyNumber || '',
             'End Date': r.endDate || '',
             'Premium': r.premium != null ? Number(r.premium) : '',
+            'Currency': r.currency || 'USD',
+            'Days Until Expiry': r.endDate ? daysUntil(r.endDate) : '',
             'Renewal Status': r.renewalStatusName || '',
             'Quotation Sent': r.quotationSentDate || '',
             'Notes': notesByKey.get(`${r.id}::${r.policyNumber || ''}`) || ''
@@ -412,7 +518,13 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyTypeName}</td>
             <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>
             <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.endDate || '-'}</td>
-            <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPremium(r.premium, r.currency)}</td>
+            <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatPremium(r.premium, r.currency)}</td>
+            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', fontVariantNumeric: 'tabular-nums', color: r.endDate ? daysColor(daysUntil(r.endDate)) : 'var(--text-secondary)' }}>
+                {r.endDate ? (() => {
+                    const d = daysUntil(r.endDate)
+                    return d < 0 ? `${Math.abs(d)}d overdue` : `${d}d`
+                })() : '-'}
+            </td>
             <td style={{ padding: '12px 16px' }}>
                 <select
                     value={r.renewalStatusId || ''}
@@ -492,6 +604,38 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 <p style={{ color: 'var(--text-secondary)' }}>View policies expiring in a specific month.</p>
             </header>
 
+            {/* ── KPI Row ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+                <KPI
+                    icon={<Calendar size={20} color="#fff" />}
+                    gradient={G.blue}
+                    label="Total Renewals"
+                    value={kpis.total}
+                    sub={multiMonthView ? '3-month period' : `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`}
+                />
+                <KPI
+                    icon={<DollarSign size={20} color="#fff" />}
+                    gradient={G.green}
+                    label="Total Premium"
+                    value={kpis.totalPremium > 0 ? `$${Math.round(kpis.totalPremium).toLocaleString()}` : '--'}
+                    sub="combined value"
+                />
+                <KPI
+                    icon={<TrendingUp size={20} color="#fff" />}
+                    gradient={G.amber}
+                    label="Avg Premium"
+                    value={kpis.avgPremium > 0 ? `$${Math.round(kpis.avgPremium).toLocaleString()}` : '--'}
+                    sub="per policy"
+                />
+                <KPI
+                    icon={<Percent size={20} color="#fff" />}
+                    gradient={G.teal}
+                    label="Renewal Rate"
+                    value={`${kpis.renewalRate}%`}
+                    sub="with status assigned"
+                />
+            </div>
+
             {/* Month Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
                 <div style={{
@@ -512,6 +656,27 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 </div>
 
                 <button onClick={goToCurrentMonth} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Today</button>
+
+                {/* Year selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Year:</label>
+                    <select
+                        value={selectedYear}
+                        onChange={e => setSelectedYear(Number(e.target.value))}
+                        style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid var(--input-border)',
+                            background: 'var(--input-bg)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem',
+                        }}
+                    >
+                        {Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i).map(y => (
+                            <option key={y} value={y}>{y}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <Search size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)', opacity: 0.5, pointerEvents: 'none' }} />
@@ -607,17 +772,50 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                 </div>
             )}
 
-            {/* Summary stats */}
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-                <div style={{ padding: '16px 24px', background: 'var(--bg-card)', borderRadius: '10px', border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Policies</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{renewals.length}</div>
+            {/* Policy Type Filter Chips */}
+            {policyTypes.length > 0 && (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Filter size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                    <button
+                        onClick={() => setPolicyTypeFilter('all')}
+                        style={{
+                            padding: '5px 14px',
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            fontWeight: policyTypeFilter === 'all' ? 600 : 400,
+                            cursor: 'pointer',
+                            border: policyTypeFilter === 'all' ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                            background: policyTypeFilter === 'all' ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
+                            color: policyTypeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            transition: 'all 0.15s',
+                        }}
+                    >
+                        All
+                    </button>
+                    {policyTypes.map(pt => (
+                        <button
+                            key={pt.id}
+                            onClick={() => setPolicyTypeFilter(pt.id)}
+                            style={{
+                                padding: '5px 14px',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: policyTypeFilter === pt.id ? 600 : 400,
+                                cursor: 'pointer',
+                                border: policyTypeFilter === pt.id ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                background: policyTypeFilter === pt.id ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
+                                color: policyTypeFilter === pt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                transition: 'all 0.15s',
+                            }}
+                        >
+                            {pt.name}
+                        </button>
+                    ))}
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
+                        {sortedRenewals.length} of {renewals.length} renewals | {vesselSummary.length} vessels
+                    </span>
                 </div>
-                <div style={{ padding: '16px 24px', background: 'var(--bg-card)', borderRadius: '10px', border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Vessels</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{vesselSummary.length}</div>
-                </div>
-            </div>
+            )}
 
             {/* Results Table */}
             {loading ? (
@@ -671,24 +869,28 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Premium <SortIcon field="premium" /></span>
                                     <ResizeHandle colIdx={7} />
                                 </th>
-                                <th scope="col" style={{ ...thBase, width: colWidths[8], cursor: 'pointer' }} onClick={() => handleSort('renewalStatusName')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Status <SortIcon field="renewalStatusName" /></span>
+                                <th scope="col" style={{ ...thBase, width: colWidths[8], cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('daysUntil')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>Days <SortIcon field="daysUntil" /></span>
                                     <ResizeHandle colIdx={8} />
                                 </th>
-                                <th scope="col" style={{ ...thBase, width: colWidths[9], cursor: 'pointer' }} onClick={() => handleSort('quotationSentDate')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Quot. Sent <SortIcon field="quotationSentDate" /></span>
+                                <th scope="col" style={{ ...thBase, width: colWidths[9], cursor: 'pointer' }} onClick={() => handleSort('renewalStatusName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Status <SortIcon field="renewalStatusName" /></span>
                                     <ResizeHandle colIdx={9} />
                                 </th>
-                                <th scope="col" style={{ ...thBase, width: colWidths[10], cursor: 'default', textAlign: 'center' }}>
-                                    Actions
+                                <th scope="col" style={{ ...thBase, width: colWidths[10], cursor: 'pointer' }} onClick={() => handleSort('quotationSentDate')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Quot. Sent <SortIcon field="quotationSentDate" /></span>
                                     <ResizeHandle colIdx={10} />
+                                </th>
+                                <th scope="col" style={{ ...thBase, width: colWidths[11], cursor: 'default', textAlign: 'center' }}>
+                                    Actions
+                                    <ResizeHandle colIdx={11} />
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
                             {sortedRenewals.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} style={{ padding: '52px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                    <td colSpan={12} style={{ padding: '52px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                         <Calendar size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }} />
                                         {multiMonthView
                                             ? `No policies expiring in the selected 3-month range`
@@ -725,7 +927,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                         return (
                                             <React.Fragment key={lbl}>
                                                 <tr>
-                                                    <td colSpan={11} style={{
+                                                    <td colSpan={12} style={{
                                                         padding: '10px 16px',
                                                         borderBottom: '1px solid var(--table-border)',
                                                         borderTop: '2px solid var(--accent-primary)',
@@ -747,7 +949,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                                 {fleetGroups ? fleetGroups.map(([fleetName, rows]) => (
                                                     <React.Fragment key={fleetName}>
                                                         <tr>
-                                                            <td colSpan={11} style={{
+                                                            <td colSpan={12} style={{
                                                                 padding: '6px 16px 6px 28px',
                                                                 borderBottom: '1px solid var(--table-border)',
                                                                 fontWeight: '700', fontSize: '0.75rem',
@@ -768,7 +970,7 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                                 groupedRenewals.map(([fleetName, rows]) => (
                                     <React.Fragment key={fleetName}>
                                         <tr>
-                                            <td colSpan={11} style={{
+                                            <td colSpan={12} style={{
                                                 padding: '8px 16px',
                                                 borderBottom: '1px solid var(--table-border)',
                                                 borderTop: '2px solid var(--table-border)',
@@ -793,6 +995,28 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                             )}
                         </tbody>
                     </table>
+
+                    {/* Footer summary */}
+                    {sortedRenewals.length > 0 && (
+                        <div style={{
+                            padding: '12px 16px',
+                            borderTop: '1px solid var(--table-border)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            fontSize: '0.8rem',
+                            color: 'var(--text-secondary)',
+                        }}>
+                            <span>
+                                Showing {sortedRenewals.length} of {renewals.length} renewal{renewals.length !== 1 ? 's' : ''}
+                            </span>
+                            <span>
+                                Total Premium: <strong style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                                    ${Math.round(sortedRenewals.reduce((s: number, r: any) => s + (Number(r.premium) || 0), 0)).toLocaleString()}
+                                </strong>
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
 

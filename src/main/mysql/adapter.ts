@@ -8265,7 +8265,7 @@ export class MySQLAdapter {
         const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
         const [rows] = await this.pool.query(
             `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
-                    pt.name as policyTypeName, vdp.policy_number as policyNumber,
+                    pt.name as policyTypeName, pt.id as policyTypeId, vdp.policy_number as policyNumber,
                     vpv.value_date as endDate,
                     e.name as customerName, v.customer_type as customerType,
                     f.name as fleetName,
