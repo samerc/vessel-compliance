@@ -172,13 +172,14 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   const editor = useEditor({
     extensions,
     content: value || '',
+    editable: true,
     immediatelyRender: true,
     onUpdate: ({ editor: e }) => {
       skipUpdate.current = true
       const html = e.getHTML()
       onChange(html === '<p></p>' ? '' : html)
     }
-  })
+  }, [extensions])
 
   useEffect(() => {
     if (!editor) return
