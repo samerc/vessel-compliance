@@ -229,14 +229,17 @@ export class DailyAlertScheduler {
     const todayStr = new Date().toISOString().split('T')[0]
 
     const [rows] = await this.db.pool.query(
-      `SELECT sw.id, sw.description, sw.deadline_date as deadlineDate,
+      `SELECT sw.id, sw.description, sw.inception_date as inceptionDate,
+              sw.deadline_days as deadlineDays,
+              DATE_ADD(sw.inception_date, INTERVAL COALESCE(sw.deadline_days, 0) DAY) as deadlineDate,
               v.name as vesselName
        FROM survey_warranties sw
        JOIN vessels v ON sw.vessel_id = v.id
-       WHERE sw.status = 'open'
-       AND sw.deadline_date IS NOT NULL
-       AND sw.deadline_date > ?
-       AND sw.deadline_date <= ?`,
+       WHERE sw.status IN ('pending', 'survey_done')
+       AND sw.deadline_type = 'days'
+       AND sw.deadline_days IS NOT NULL
+       AND DATE_ADD(sw.inception_date, INTERVAL sw.deadline_days DAY) > ?
+       AND DATE_ADD(sw.inception_date, INTERVAL sw.deadline_days DAY) <= ?`,
       [todayStr, futureDateStr]
     )
 
