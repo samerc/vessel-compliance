@@ -155,6 +155,7 @@ export interface User {
   windowY?: number
   sidebarCollapsed?: boolean
   collapsedGroups?: string // JSON array of collapsed group IDs
+  dashboardOnboarded?: boolean
   createdAt?: string
   lastLoginAt?: string
 }

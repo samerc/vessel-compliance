@@ -1392,6 +1392,30 @@ app.whenReady().then(() => {
   safeHandle('dashboard:getActivity', (event) => { requireSession(event); return db.getDashboardActivity() })
   safeHandle('dashboard:getDataQualityAlerts', (event) => { requireSession(event); return db.getDataQualityAlerts() })
 
+  safeHandle('dashboard:getLayout', async (event) => {
+    const user = requireSession(event)
+    const val = await db.getSetting(`dashboard_layout_${user.id}`)
+    if (!val) return null
+    try { return JSON.parse(val) } catch { return null }
+  })
+
+  safeHandle('dashboard:saveLayout', async (event, layout: any) => {
+    const user = requireSession(event)
+    await db.setSetting(`dashboard_layout_${user.id}`, JSON.stringify(layout))
+  })
+
+  safeHandle('dashboard:setOnboarded', async (event) => {
+    const user = requireSession(event)
+    await db.updateUserDashboardOnboarded(user.id, true)
+    const webContents = event.sender
+    const windowId = BrowserWindow.fromWebContents(webContents)?.id
+    if (windowId) {
+      const sessionId = windowSessions.get(windowId)
+      const session = auth.getSessionData(sessionId)
+      if (session) session.user.dashboardOnboarded = true
+    }
+  })
+
   // Survey Warranties
   safeHandle('survey_warranty:getByVessel', (event, vesselId) => { requireSession(event); return db.getSurveyWarrantiesByVessel(vesselId) })
   safeHandle('survey_warranty:getAll', (event) => { requireSession(event); return db.getAllSurveyWarranties() })

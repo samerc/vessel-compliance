@@ -205,6 +205,9 @@ export interface Api {
     entitiesNoPhone: number
     policiesNoEndDate: number
   }>
+  dashboardGetLayout: () => Promise<{ widgets: Array<{ id: string; enabled: boolean; order: number }> } | null>
+  dashboardSaveLayout: (layout: { widgets: Array<{ id: string; enabled: boolean; order: number }> }) => Promise<void>
+  dashboardSetOnboarded: () => Promise<void>
 
   // Survey Warranties
   surveyWarrantyGetByVessel: (vesselId: string) => Promise<SurveyWarranty[]>

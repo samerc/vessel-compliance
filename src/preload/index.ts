@@ -205,6 +205,9 @@ const api = {
   // Dashboard
   dashboardGetActivity: () => ipcRenderer.invoke('dashboard:getActivity'),
   dashboardGetDataQualityAlerts: () => ipcRenderer.invoke('dashboard:getDataQualityAlerts'),
+  dashboardGetLayout: () => ipcRenderer.invoke('dashboard:getLayout'),
+  dashboardSaveLayout: (layout: any) => ipcRenderer.invoke('dashboard:saveLayout', layout),
+  dashboardSetOnboarded: () => ipcRenderer.invoke('dashboard:setOnboarded'),
 
   // Survey Warranties
   surveyWarrantyGetByVessel: (vesselId) => ipcRenderer.invoke('survey_warranty:getByVessel', vesselId),
