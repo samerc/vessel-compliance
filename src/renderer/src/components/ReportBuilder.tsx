@@ -109,6 +109,9 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'customerName', label: 'Customer', defaultSelected: true },
       { key: 'fleetName', label: 'Fleet' },
       { key: 'brokerName', label: 'Broker' },
+      { key: 'inceptionDate', label: 'Inception Date' },
+      { key: 'expiryDate', label: 'Expiry Date' },
+      { key: 'premium', label: 'Premium', defaultSelected: true },
       { key: 'createdAt', label: 'Created Date' }
     ],
     filters: [
@@ -138,6 +141,8 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
           { value: 'inactive', label: 'Inactive Vessels' }
         ]
       },
+      { key: 'dateFrom', label: 'Inception From', type: 'date' },
+      { key: 'dateTo', label: 'Inception To', type: 'date' },
       { key: 'search', label: 'Search', type: 'text' }
     ],
     groupBy: [
@@ -252,6 +257,150 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'status', label: 'Status' }
     ],
     defaultSort: 'createdAt'
+  },
+  policyDocuments: {
+    label: 'Policy Documents',
+    columns: [
+      { key: 'policyNumber', label: 'Policy Number', defaultSelected: true },
+      { key: 'typeName', label: 'Type', defaultSelected: true },
+      { key: 'vesselName', label: 'Vessel', defaultSelected: true },
+      { key: 'customerName', label: 'Customer', defaultSelected: true },
+      { key: 'inceptionDate', label: 'Inception Date', defaultSelected: true },
+      { key: 'expiryDate', label: 'Expiry Date', defaultSelected: true },
+      { key: 'premiumAmount', label: 'Premium' },
+      { key: 'commissionPercent', label: 'Commission %' },
+      { key: 'bankName', label: 'Bank' },
+      { key: 'status', label: 'Status', defaultSelected: true },
+      { key: 'revisionNumber', label: 'Revision' },
+      { key: 'exchangeRate', label: 'Exchange Rate' },
+      { key: 'createdAt', label: 'Created' },
+      { key: 'exportedAt', label: 'Exported At' },
+      { key: 'daysUntilExpiry', label: 'Days Until Expiry' }
+    ],
+    filters: [
+      { key: 'typeCode', label: 'Type', type: 'select', loadOptions: loadQuotationTypeOptions },
+      {
+        key: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'all', label: 'All' },
+          { value: 'active', label: 'Active' },
+          { value: 'superseded', label: 'Superseded' },
+          { value: 'cancelled', label: 'Cancelled' }
+        ]
+      },
+      { key: 'dateFrom', label: 'Inception From', type: 'date' },
+      { key: 'dateTo', label: 'Inception To', type: 'date' },
+      { key: 'search', label: 'Search', type: 'text' }
+    ],
+    groupBy: [
+      { key: 'typeName', label: 'Type' },
+      { key: 'customerName', label: 'Customer' },
+      { key: 'status', label: 'Status' },
+      { key: 'bankName', label: 'Bank' }
+    ],
+    defaultSort: 'createdAt'
+  },
+  documents: {
+    label: 'Documents',
+    columns: [
+      { key: 'vesselName', label: 'Vessel', defaultSelected: true },
+      { key: 'docTypeName', label: 'Document Type', defaultSelected: true },
+      { key: 'requirement', label: 'Requirement', defaultSelected: true },
+      { key: 'fileStatus', label: 'File Status', defaultSelected: true },
+      { key: 'receivedDate', label: 'Received Date' },
+      { key: 'expiryDate', label: 'Expiry Date' },
+      { key: 'daysUntilExpiry', label: 'Days Until Expiry' }
+    ],
+    filters: [
+      {
+        key: 'status',
+        label: 'File Status',
+        type: 'select',
+        options: [
+          { value: 'all', label: 'All' },
+          { value: 'linked', label: 'Linked' },
+          { value: 'missing', label: 'Missing' },
+          { value: 'expired', label: 'Expired' }
+        ]
+      },
+      {
+        key: 'vesselActive',
+        label: 'Vessel Status',
+        type: 'select',
+        options: [
+          { value: 'all', label: 'All' },
+          { value: 'active', label: 'Active Vessels' },
+          { value: 'inactive', label: 'Inactive Vessels' }
+        ]
+      },
+      { key: 'search', label: 'Search', type: 'text' }
+    ],
+    groupBy: [
+      { key: 'vesselName', label: 'Vessel' },
+      { key: 'docTypeName', label: 'Document Type' },
+      { key: 'fileStatus', label: 'File Status' }
+    ],
+    defaultSort: 'vesselName'
+  },
+  surveys: {
+    label: 'Surveys',
+    columns: [
+      { key: 'vesselName', label: 'Vessel', defaultSelected: true },
+      { key: 'surveyorName', label: 'Surveyor', defaultSelected: true },
+      { key: 'surveyType', label: 'Survey Type', defaultSelected: true },
+      { key: 'surveyDate', label: 'Survey Date', defaultSelected: true },
+      { key: 'location', label: 'Location', defaultSelected: true },
+      { key: 'defectCount', label: 'Defects' },
+      { key: 'openDefects', label: 'Open Defects' },
+      { key: 'status', label: 'Status', defaultSelected: true }
+    ],
+    filters: [
+      { key: 'dateFrom', label: 'Date From', type: 'date' },
+      { key: 'dateTo', label: 'Date To', type: 'date' },
+      { key: 'search', label: 'Search', type: 'text' }
+    ],
+    groupBy: [
+      { key: 'vesselName', label: 'Vessel' },
+      { key: 'surveyorName', label: 'Surveyor' },
+      { key: 'surveyType', label: 'Survey Type' },
+      { key: 'status', label: 'Status' }
+    ],
+    defaultSort: 'surveyDate'
+  },
+  warranties: {
+    label: 'Warranties',
+    columns: [
+      { key: 'vesselName', label: 'Vessel', defaultSelected: true },
+      { key: 'description', label: 'Description', defaultSelected: true },
+      { key: 'deadlineType', label: 'Deadline Type', defaultSelected: true },
+      { key: 'inceptionDate', label: 'Inception Date', defaultSelected: true },
+      { key: 'status', label: 'Status', defaultSelected: true },
+      { key: 'policyTypeName', label: 'Policy Type' },
+      { key: 'createdAt', label: 'Created' }
+    ],
+    filters: [
+      {
+        key: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'all', label: 'All' },
+          { value: 'pending', label: 'Pending' },
+          { value: 'survey_done', label: 'Survey Done' },
+          { value: 'completed', label: 'Completed' },
+          { value: 'waived', label: 'Waived' }
+        ]
+      },
+      { key: 'search', label: 'Search', type: 'text' }
+    ],
+    groupBy: [
+      { key: 'vesselName', label: 'Vessel' },
+      { key: 'status', label: 'Status' },
+      { key: 'policyTypeName', label: 'Policy Type' }
+    ],
+    defaultSort: 'createdAt'
   }
 }
 
@@ -299,18 +448,65 @@ async function loadQuotationTypeOptions(): Promise<{ value: string; label: strin
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+const DATE_FIELDS = new Set([
+  'createdAt', 'quotationDate', 'endDate', 'inceptionDate', 'expiryDate',
+  'receivedDate', 'exportedAt', 'surveyDate', 'deadlineDate'
+])
+
+const NUMBER_FIELDS = new Set([
+  'premiumAmount', 'grossTonnage', 'premium', 'exchangeRate',
+  'defectCount', 'openDefects', 'revisionNumber'
+])
+
 function formatCellValue(value: any, colKey: string): string {
   if (value === null || value === undefined) return ''
   if (colKey === 'isActive') return value ? 'Active' : 'Inactive'
-  if (colKey === 'createdAt' || colKey === 'quotationDate' || colKey === 'endDate') {
+  if (DATE_FIELDS.has(colKey)) {
     const d = new Date(value)
-    if (!isNaN(d.getTime())) return d.toLocaleDateString()
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0')
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const year = d.getFullYear()
+      return `${day}/${month}/${year}`
+    }
   }
-  if (colKey === 'premiumAmount' || colKey === 'grossTonnage') {
+  if (colKey === 'commissionPercent') {
     const n = Number(value)
-    if (!isNaN(n)) return n.toLocaleString()
+    if (!isNaN(n)) return n.toFixed(2) + '%'
+  }
+  if (NUMBER_FIELDS.has(colKey)) {
+    const n = Number(value)
+    if (!isNaN(n)) return n.toLocaleString(undefined, { maximumFractionDigits: 2 })
   }
   return String(value)
+}
+
+// Chart metric definitions per data source
+const CHART_METRICS: Record<string, { value: string; label: string; field?: string }[]> = {
+  vessels: [{ value: 'count', label: 'Count' }],
+  policies: [
+    { value: 'count', label: 'Count' },
+    { value: 'sumPremium', label: 'Sum of Premium', field: 'premium' },
+    { value: 'avgPremium', label: 'Avg Premium', field: 'premium' }
+  ],
+  entities: [{ value: 'count', label: 'Count' }],
+  renewals: [{ value: 'count', label: 'Count' }],
+  quotations: [
+    { value: 'count', label: 'Count' },
+    { value: 'sumPremium', label: 'Sum of Premium', field: 'premiumAmount' },
+    { value: 'avgPremium', label: 'Avg Premium', field: 'premiumAmount' }
+  ],
+  policyDocuments: [
+    { value: 'count', label: 'Count' },
+    { value: 'sumPremium', label: 'Sum of Premium', field: 'premiumAmount' },
+    { value: 'avgPremium', label: 'Avg Premium', field: 'premiumAmount' }
+  ],
+  documents: [{ value: 'count', label: 'Count' }],
+  surveys: [
+    { value: 'count', label: 'Count' },
+    { value: 'sumDefects', label: 'Total Defects', field: 'defectCount' }
+  ],
+  warranties: [{ value: 'count', label: 'Count' }]
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -344,6 +540,10 @@ export default function ReportBuilder() {
   const [dynamicOptions, setDynamicOptions] = useState<
     Record<string, { value: string; label: string }[]>
   >({})
+
+  // Chart view
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table')
+  const [chartMetric, setChartMetric] = useState<'count' | 'sumPremium' | 'avgPremium' | 'sumDefects'>('count')
 
   // Collapsible sections
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
@@ -468,6 +668,35 @@ export default function ReportBuilder() {
     }
     return groups
   }, [results, groupBy])
+
+  // Chart data
+  const chartData = useMemo(() => {
+    if (!groupBy || !results.length) return []
+    const groups: Record<string, any[]> = {}
+    for (const row of results) {
+      const key = String(row[groupBy] ?? '(None)')
+      if (!groups[key]) groups[key] = []
+      groups[key].push(row)
+    }
+
+    const metricDef = (CHART_METRICS[dataSource] || []).find((m) => m.value === chartMetric)
+    const field = metricDef?.field
+
+    const items = Object.entries(groups).map(([label, rows]) => {
+      let value = rows.length
+      if (chartMetric === 'sumPremium' || chartMetric === 'sumDefects') {
+        value = rows.reduce((sum, r) => sum + (Number(r[field!]) || 0), 0)
+      } else if (chartMetric === 'avgPremium') {
+        const total = rows.reduce((sum, r) => sum + (Number(r[field!]) || 0), 0)
+        value = rows.length > 0 ? total / rows.length : 0
+      }
+      return { label, value }
+    })
+
+    items.sort((a, b) => b.value - a.value)
+    const maxVal = Math.max(...items.map((i) => i.value), 1)
+    return items.map((i) => ({ ...i, percent: (i.value / maxVal) * 100 }))
+  }, [results, groupBy, chartMetric, dataSource])
 
   // Save report
   const handleSave = async () => {
@@ -1156,7 +1385,71 @@ export default function ReportBuilder() {
               )}
             </div>
             {hasRun && results.length > 0 && (
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {/* View mode toggle */}
+                <div
+                  style={{
+                    display: 'flex',
+                    borderRadius: '8px',
+                    border: '1px solid var(--input-border)',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <button
+                    onClick={() => setViewMode('table')}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background:
+                        viewMode === 'table' ? 'var(--accent-primary)' : 'transparent',
+                      color: viewMode === 'table' ? '#fff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setViewMode('chart')}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      border: 'none',
+                      borderLeft: '1px solid var(--input-border)',
+                      cursor: 'pointer',
+                      background:
+                        viewMode === 'chart' ? 'var(--accent-primary)' : 'transparent',
+                      color: viewMode === 'chart' ? '#fff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    Chart
+                  </button>
+                </div>
+
+                {/* Chart metric selector */}
+                {viewMode === 'chart' && groupBy && (
+                  <select
+                    value={chartMetric}
+                    onChange={(e) => setChartMetric(e.target.value as any)}
+                    style={{
+                      ...selectStyle,
+                      width: 'auto',
+                      padding: '5px 8px',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    {(CHART_METRICS[dataSource] || [{ value: 'count', label: 'Count' }]).map(
+                      (m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      )
+                    )}
+                  </select>
+                )}
+
                 <button
                   className="btn-secondary"
                   onClick={exportExcel}
@@ -1233,7 +1526,111 @@ export default function ReportBuilder() {
               </div>
             )}
 
-            {hasRun && results.length > 0 && !groupedResults && (
+            {/* Chart View */}
+            {hasRun && results.length > 0 && viewMode === 'chart' && groupBy && (
+              <div style={{ padding: '20px 24px' }}>
+                <h4
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    marginBottom: '16px',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  {sourceDef.groupBy.find((g) => g.key === groupBy)?.label || groupBy} -{' '}
+                  {(CHART_METRICS[dataSource] || []).find((m) => m.value === chartMetric)
+                    ?.label || 'Count'}
+                </h4>
+                {chartData.map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      marginBottom: '8px'
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '200px',
+                        fontSize: '0.85rem',
+                        textAlign: 'right',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        color: 'var(--text-primary)',
+                        flexShrink: 0
+                      }}
+                      title={item.label}
+                    >
+                      {item.label}
+                    </span>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: '24px',
+                        background: 'var(--table-border)',
+                        borderRadius: '4px',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${item.percent}%`,
+                          height: '100%',
+                          background: 'var(--accent-primary)',
+                          borderRadius: '4px',
+                          transition: 'width 0.3s ease'
+                        }}
+                      />
+                    </div>
+                    <span
+                      style={{
+                        width: '80px',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        flexShrink: 0
+                      }}
+                    >
+                      {chartMetric === 'count'
+                        ? item.value
+                        : item.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                ))}
+                {chartData.length === 0 && (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    No data to chart. Select a Group By field to see chart data.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {hasRun && results.length > 0 && viewMode === 'chart' && !groupBy && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '60px 20px',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <Layers size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                <p style={{ fontSize: '0.95rem', fontWeight: '500', marginBottom: '4px' }}>
+                  No grouping selected
+                </p>
+                <p style={{ fontSize: '0.8rem' }}>
+                  Select a Group By field in the sidebar to generate a chart
+                </p>
+              </div>
+            )}
+
+            {/* Table View */}
+            {hasRun && results.length > 0 && viewMode === 'table' && !groupedResults && (
               <ResultsTable
                 columns={sourceDef.columns.filter((c) => selectedColumns.has(c.key))}
                 rows={results}
@@ -1241,7 +1638,7 @@ export default function ReportBuilder() {
               />
             )}
 
-            {hasRun && results.length > 0 && groupedResults && (
+            {hasRun && results.length > 0 && viewMode === 'table' && groupedResults && (
               <div>
                 {Object.entries(groupedResults).map(([group, rows]) => (
                   <div key={group}>
@@ -1469,62 +1866,115 @@ function ResultsTable({
                     : 'rgba(255,255,255,0.015)'
             }}
           >
-            {columns.map((col) => (
-              <td
-                key={col.key}
-                style={{
-                  padding: '7px 12px',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxWidth: '250px'
-                }}
-              >
-                {col.key === 'isActive' ? (
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      fontSize: '0.72rem',
-                      fontWeight: '600',
-                      background: row[col.key] ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
-                      color: row[col.key] ? (isLight ? '#008c46' : '#00ff88') : 'var(--danger)'
-                    }}
-                  >
-                    {row[col.key] ? 'Active' : 'Inactive'}
-                  </span>
-                ) : col.key === 'status' ? (
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      fontSize: '0.72rem',
-                      fontWeight: '600',
-                      background:
-                        row[col.key] === 'active'
-                          ? 'rgba(0,255,136,0.1)'
-                          : row[col.key] === 'draft'
-                            ? 'rgba(255,204,0,0.1)'
-                            : 'rgba(0,210,255,0.1)',
-                      color:
-                        row[col.key] === 'active'
-                          ? isLight
-                            ? '#008c46'
-                            : '#00ff88'
-                          : row[col.key] === 'draft'
-                            ? isLight
-                              ? '#b45309'
-                              : '#ffcc00'
-                            : 'var(--accent-primary)'
-                    }}
-                  >
-                    {row[col.key] || ''}
-                  </span>
-                ) : (
-                  formatCellValue(row[col.key], col.key)
-                )}
-              </td>
-            ))}
+            {columns.map((col) => {
+              const val = row[col.key]
+              // daysUntilExpiry color coding
+              if (col.key === 'daysUntilExpiry' && val !== null && val !== undefined) {
+                const n = Number(val)
+                let bg = 'rgba(0,255,136,0.1)'
+                let fg = isLight ? '#008c46' : '#00ff88'
+                if (n < 0) {
+                  bg = 'rgba(255,77,77,0.1)'; fg = 'var(--danger)'
+                } else if (n < 30) {
+                  bg = 'rgba(255,160,0,0.1)'; fg = isLight ? '#b45309' : '#ffaa00'
+                } else if (n < 60) {
+                  bg = 'rgba(255,204,0,0.1)'; fg = isLight ? '#92700c' : '#ffcc00'
+                }
+                return (
+                  <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: '600', background: bg, color: fg }}>
+                      {n < 0 ? `${Math.abs(n)}d overdue` : `${n}d`}
+                    </span>
+                  </td>
+                )
+              }
+              // fileStatus badge
+              if (col.key === 'fileStatus') {
+                const linked = val === 'Linked'
+                return (
+                  <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                    <span style={{
+                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: '600',
+                      background: linked ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
+                      color: linked ? (isLight ? '#008c46' : '#00ff88') : 'var(--danger)'
+                    }}>
+                      {val || ''}
+                    </span>
+                  </td>
+                )
+              }
+              // requirement badge
+              if (col.key === 'requirement') {
+                const mandatory = val === 'Mandatory'
+                return (
+                  <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                    <span style={{
+                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: '600',
+                      background: mandatory ? 'rgba(255,160,0,0.1)' : 'rgba(0,210,255,0.1)',
+                      color: mandatory ? (isLight ? '#b45309' : '#ffaa00') : 'var(--accent-primary)'
+                    }}>
+                      {val || ''}
+                    </span>
+                  </td>
+                )
+              }
+              return (
+                <td
+                  key={col.key}
+                  style={{
+                    padding: '7px 12px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '250px'
+                  }}
+                >
+                  {col.key === 'isActive' ? (
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem',
+                        fontWeight: '600',
+                        background: val ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
+                        color: val ? (isLight ? '#008c46' : '#00ff88') : 'var(--danger)'
+                      }}
+                    >
+                      {val ? 'Active' : 'Inactive'}
+                    </span>
+                  ) : col.key === 'status' ? (
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem',
+                        fontWeight: '600',
+                        background:
+                          val === 'active' || val === 'Closed' || val === 'completed'
+                            ? 'rgba(0,255,136,0.1)'
+                            : val === 'draft' || val === 'pending' || val === 'Open'
+                              ? 'rgba(255,204,0,0.1)'
+                              : val === 'inactive' || val === 'cancelled' || val === 'superseded'
+                                ? 'rgba(255,77,77,0.1)'
+                                : 'rgba(0,210,255,0.1)',
+                        color:
+                          val === 'active' || val === 'Closed' || val === 'completed'
+                            ? isLight ? '#008c46' : '#00ff88'
+                            : val === 'draft' || val === 'pending' || val === 'Open'
+                              ? isLight ? '#b45309' : '#ffcc00'
+                              : val === 'inactive' || val === 'cancelled' || val === 'superseded'
+                                ? 'var(--danger)'
+                                : 'var(--accent-primary)'
+                      }}
+                    >
+                      {val || ''}
+                    </span>
+                  ) : (
+                    formatCellValue(val, col.key)
+                  )}
+                </td>
+              )
+            })}
           </tr>
         ))}
       </tbody>

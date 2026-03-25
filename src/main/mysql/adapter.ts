@@ -10492,7 +10492,29 @@ export class MySQLAdapter {
                     LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
                     LEFT JOIN fleets f ON v.fleet_id = f.id
                     LEFT JOIN entities cust ON v.customer_id = cust.id
-                    LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id`,
+                    LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id
+                    LEFT JOIN vessel_policy_values vpv_inc ON (
+                        vpv_inc.dynamic_policy_id = vdp.id
+                        AND vpv_inc.characteristic_id IN (
+                            SELECT ptc.id FROM policy_type_characteristics ptc
+                            WHERE ptc.name LIKE '%inception%' AND ptc.field_type = 'date'
+                        )
+                    )
+                    LEFT JOIN vessel_policy_values vpv_exp ON (
+                        vpv_exp.dynamic_policy_id = vdp.id
+                        AND vpv_exp.characteristic_id IN (
+                            SELECT ptc.id FROM policy_type_characteristics ptc
+                            WHERE ptc.name LIKE '%end%' AND ptc.field_type = 'date'
+                        )
+                    )
+                    LEFT JOIN (
+                        SELECT vpv2.dynamic_policy_id,
+                               SUM(CASE WHEN ptc2.name LIKE '%premium%' THEN CAST(vpv2.value_text AS DECIMAL(15,2)) ELSE 0 END) AS policyPremium
+                        FROM vessel_policy_values vpv2
+                        JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
+                        WHERE ptc2.field_type = 'number'
+                        GROUP BY vpv2.dynamic_policy_id
+                    ) vprem ON vprem.dynamic_policy_id = vdp.id`,
                 columnMap: {
                     vesselName: 'v.name AS vesselName',
                     imoNumber: 'v.imo_number AS imoNumber',
@@ -10503,6 +10525,9 @@ export class MySQLAdapter {
                     customerName: 'cust.name AS customerName',
                     fleetName: 'f.name AS fleetName',
                     brokerName: 'broker.name AS brokerName',
+                    inceptionDate: 'vpv_inc.value_date AS inceptionDate',
+                    expiryDate: 'vpv_exp.value_date AS expiryDate',
+                    premium: 'vprem.policyPremium AS premium',
                     createdAt: 'vdp.created_at AS createdAt'
                 },
                 filterMap: {
@@ -10513,6 +10538,8 @@ export class MySQLAdapter {
                         if (val === 'inactive') { params.push(0); return 'v.is_active = ?' }
                         return ''
                     },
+                    dateFrom: (params, val) => { params.push(val); return 'vpv_inc.value_date >= ?' },
+                    dateTo: (params, val) => { params.push(val); return 'vpv_inc.value_date <= ?' },
                     search: (params, val) => {
                         const s = `%${val}%`
                         params.push(s, s, s)
@@ -10632,6 +10659,144 @@ export class MySQLAdapter {
                     type: 'qt.name',
                     status: 'q.status'
                 }
+            },
+            policyDocuments: {
+                baseQuery: `FROM policy_documents pd
+                    LEFT JOIN vessels v ON pd.vessel_id = v.id
+                    LEFT JOIN quotations q ON pd.quotation_id = q.id
+                    LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                    LEFT JOIN entities e ON v.customer_id = e.id
+                    LEFT JOIN banks b ON pd.bank_id = b.id`,
+                columnMap: {
+                    policyNumber: 'pd.policy_number AS policyNumber',
+                    typeName: 'COALESCE(qt.name, \'Unknown\') AS typeName',
+                    vesselName: 'v.name AS vesselName',
+                    customerName: 'e.name AS customerName',
+                    inceptionDate: 'pd.inception_date AS inceptionDate',
+                    expiryDate: 'pd.expiry_date AS expiryDate',
+                    premiumAmount: 'pd.premium_amount AS premiumAmount',
+                    commissionPercent: 'pd.commission_percent AS commissionPercent',
+                    bankName: 'b.name AS bankName',
+                    status: 'pd.status AS status',
+                    revisionNumber: 'pd.revision_number AS revisionNumber',
+                    exchangeRate: 'pd.exchange_rate AS exchangeRate',
+                    createdAt: 'pd.created_at AS createdAt',
+                    exportedAt: 'pd.exported_at AS exportedAt',
+                    daysUntilExpiry: 'DATEDIFF(pd.expiry_date, CURDATE()) AS daysUntilExpiry'
+                },
+                filterMap: {
+                    typeCode: (params, val) => { params.push(val); return 'qt.code = ?' },
+                    status: (params, val) => { params.push(val); return 'pd.status = ?' },
+                    dateFrom: (params, val) => { params.push(val); return 'pd.inception_date >= ?' },
+                    dateTo: (params, val) => { params.push(val); return 'pd.inception_date <= ?' },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s)
+                        return '(pd.policy_number LIKE ? OR v.name LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    typeName: 'COALESCE(qt.name, \'Unknown\')',
+                    customerName: 'e.name',
+                    status: 'pd.status',
+                    bankName: 'b.name'
+                }
+            },
+            documents: {
+                baseQuery: `FROM document_types dt
+                    CROSS JOIN vessels v
+                    LEFT JOIN vessel_documents vd ON vd.vessel_id = v.id AND vd.doc_type_id = dt.id
+                    WHERE dt.is_active = TRUE`,
+                columnMap: {
+                    vesselName: 'v.name AS vesselName',
+                    docTypeName: 'dt.name AS docTypeName',
+                    requirement: 'CASE WHEN dt.is_mandatory = TRUE THEN \'Mandatory\' ELSE \'Optional\' END AS requirement',
+                    fileStatus: 'CASE WHEN vd.file_path IS NOT NULL THEN \'Linked\' ELSE \'Missing\' END AS fileStatus',
+                    receivedDate: 'vd.received_date AS receivedDate',
+                    expiryDate: 'vd.expiry_date AS expiryDate',
+                    daysUntilExpiry: 'DATEDIFF(vd.expiry_date, CURDATE()) AS daysUntilExpiry'
+                },
+                filterMap: {
+                    status: (_params, val) => {
+                        if (val === 'linked') return 'vd.file_path IS NOT NULL'
+                        if (val === 'missing') return 'vd.file_path IS NULL'
+                        if (val === 'expired') return 'vd.expiry_date < CURDATE()'
+                        return ''
+                    },
+                    vesselActive: (params, val) => {
+                        if (val === 'active') { params.push(1); return 'v.is_active = ?' }
+                        if (val === 'inactive') { params.push(0); return 'v.is_active = ?' }
+                        return ''
+                    },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s)
+                        return '(v.name LIKE ? OR dt.name LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    vesselName: 'v.name',
+                    docTypeName: 'dt.name',
+                    fileStatus: 'CASE WHEN vd.file_path IS NOT NULL THEN \'Linked\' ELSE \'Missing\' END'
+                }
+            },
+            surveys: {
+                baseQuery: `FROM condition_surveys cs
+                    JOIN vessels v ON cs.vessel_id = v.id
+                    LEFT JOIN surveyors s ON cs.surveyor_id = s.id`,
+                columnMap: {
+                    vesselName: 'v.name AS vesselName',
+                    surveyorName: 's.name AS surveyorName',
+                    surveyType: 'cs.survey_type AS surveyType',
+                    surveyDate: 'cs.survey_date AS surveyDate',
+                    location: 'cs.location AS location',
+                    defectCount: '(SELECT COUNT(*) FROM survey_defects sd WHERE sd.survey_id = cs.id) AS defectCount',
+                    openDefects: '(SELECT COUNT(*) FROM survey_defects sd WHERE sd.survey_id = cs.id AND sd.status = \'OPEN\') AS openDefects',
+                    status: 'CASE WHEN EXISTS(SELECT 1 FROM survey_defects sd WHERE sd.survey_id = cs.id AND sd.status = \'OPEN\') THEN \'Open\' ELSE \'Closed\' END AS status'
+                },
+                filterMap: {
+                    dateFrom: (params, val) => { params.push(val); return 'cs.survey_date >= ?' },
+                    dateTo: (params, val) => { params.push(val); return 'cs.survey_date <= ?' },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s, s)
+                        return '(v.name LIKE ? OR s.name LIKE ? OR cs.location LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    vesselName: 'v.name',
+                    surveyorName: 's.name',
+                    surveyType: 'cs.survey_type',
+                    status: 'CASE WHEN EXISTS(SELECT 1 FROM survey_defects sd WHERE sd.survey_id = cs.id AND sd.status = \'OPEN\') THEN \'Open\' ELSE \'Closed\' END'
+                }
+            },
+            warranties: {
+                baseQuery: `FROM survey_warranties sw
+                    JOIN vessels v ON sw.vessel_id = v.id
+                    LEFT JOIN vessel_dynamic_policies vdp ON sw.policy_id = vdp.id
+                    LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id`,
+                columnMap: {
+                    vesselName: 'v.name AS vesselName',
+                    description: 'sw.description AS description',
+                    deadlineType: 'sw.deadline_type AS deadlineType',
+                    inceptionDate: 'sw.inception_date AS inceptionDate',
+                    status: 'sw.status AS status',
+                    policyTypeName: 'pt.name AS policyTypeName',
+                    createdAt: 'sw.created_at AS createdAt'
+                },
+                filterMap: {
+                    status: (params, val) => { params.push(val); return 'sw.status = ?' },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s)
+                        return '(v.name LIKE ? OR sw.description LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    vesselName: 'v.name',
+                    status: 'sw.status',
+                    policyTypeName: 'pt.name'
+                }
             }
         }
 
@@ -10658,7 +10823,11 @@ export class MySQLAdapter {
             }
         }
 
-        const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
+        // If baseQuery already contains WHERE, append with AND instead of a new WHERE
+        const hasExistingWhere = def.baseQuery.toUpperCase().includes('WHERE')
+        const whereClause = conditions.length > 0
+            ? (hasExistingWhere ? 'AND ' : 'WHERE ') + conditions.join(' AND ')
+            : ''
 
         // Build ORDER BY
         let orderClause = ''
