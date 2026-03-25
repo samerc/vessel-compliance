@@ -1,4 +1,5 @@
 import { Document, Packer, Paragraph, Footer, TextRun, AlignmentType } from 'docx'
+import { saveAs } from 'file-saver'
 import { parseHtmlToParagraphs } from '../utils/htmlToDocx'
 
 /**
@@ -245,10 +246,6 @@ export async function generateTemplateDocx(
   })
 
   const blob = await Packer.toBlob(document)
-  const url = URL.createObjectURL(blob)
-  const a = window.document.createElement('a')
-  a.href = url
-  a.download = fileName.endsWith('.docx') ? fileName : `${fileName}.docx`
-  a.click()
-  URL.revokeObjectURL(url)
+  const outName = fileName.endsWith('.docx') ? fileName : `${fileName}.docx`
+  saveAs(blob, outName)
 }
