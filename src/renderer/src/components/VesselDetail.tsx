@@ -2594,21 +2594,15 @@ function VesselTemplateGenerateModal({ vesselId, vesselName, isLight, onClose, s
     const handleGenerate = async (templateId: string) => {
         try {
             setGenerating(templateId)
-            const result = await window.api.docTemplateGenerate(templateId, { vesselId })
-            if (result && result.data) {
-                const blob = new Blob([new Uint8Array(result.data)], {
-                    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                const tpl = templates.find(t => t.id === templateId)
-                a.download = (tpl?.fileName || 'document.docx').replace('.docx', `_${vesselName.replace(/\s+/g, '_')}.docx`)
-                a.click()
-                URL.revokeObjectURL(url)
-                showSuccess('Document generated')
-                onClose()
-            }
+            const tpl = templates.find(t => t.id === templateId)
+            if (!tpl?.body) { showError('Template has no body content'); return }
+            const { buildTemplateContext, resolveTemplatePlaceholders, generateTemplateDocx } = await import('../services/DocumentTemplateExportService')
+            const ctx = await buildTemplateContext({ vesselId })
+            const resolvedHtml = resolveTemplatePlaceholders(tpl.body, ctx)
+            const fileName = `${tpl.name.replace(/\s+/g, '_')}_${vesselName.replace(/\s+/g, '_')}`
+            await generateTemplateDocx(resolvedHtml, fileName)
+            showSuccess('Document generated')
+            onClose()
         } catch {
             showError('Failed to generate document')
         } finally {
