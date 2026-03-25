@@ -3317,6 +3317,51 @@ app.whenReady().then(() => {
     return db.bulkDeleteEntities(entityIds)
   })
 
+  // ==================== Report Builder ====================
+  safeHandle('reports:getSaved', async (event) => {
+    const user = requireSession(event)
+    return db.getSavedReports(user.id)
+  })
+
+  safeHandle('reports:save', async (event, data: {
+    id?: string
+    name: string
+    description?: string | null
+    dataSource: string
+    config: any
+    isShared?: boolean
+  }) => {
+    const user = requireSession(event)
+    if (data.id) {
+      await db.updateSavedReport(data.id, {
+        name: data.name,
+        description: data.description,
+        config: data.config,
+        isShared: data.isShared
+      })
+      return { id: data.id }
+    } else {
+      return db.addSavedReport({
+        name: data.name,
+        description: data.description,
+        dataSource: data.dataSource,
+        config: data.config,
+        createdBy: user.id,
+        isShared: data.isShared
+      })
+    }
+  })
+
+  safeHandle('reports:delete', async (event, id: string) => {
+    requireSession(event)
+    return db.deleteSavedReport(id)
+  })
+
+  safeHandle('reports:run', async (event, dataSource: string, config: any) => {
+    requireSession(event)
+    return db.runReport(dataSource, config)
+  })
+
   // ==================== Document Templates ====================
   safeHandle('docTemplate:getAll', (event, category?: string) => {
     requireSession(event)

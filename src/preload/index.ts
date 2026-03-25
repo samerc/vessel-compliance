@@ -749,6 +749,12 @@ const api = {
   bulkSetVesselStatus: (vesselIds: string[], isActive: boolean) => ipcRenderer.invoke('bulk:setVesselStatus', vesselIds, isActive),
   bulkDeleteEntities: (entityIds: string[]) => ipcRenderer.invoke('bulk:deleteEntities', entityIds),
 
+  // Report Builder
+  reportBuilderGetSaved: () => ipcRenderer.invoke('reports:getSaved'),
+  reportBuilderSave: (data: any) => ipcRenderer.invoke('reports:save', data),
+  reportBuilderDelete: (id: string) => ipcRenderer.invoke('reports:delete', id),
+  reportBuilderRun: (dataSource: string, config: any) => ipcRenderer.invoke('reports:run', dataSource, config),
+
   // Document Templates
   docTemplateGetAll: (category?: string) => ipcRenderer.invoke('docTemplate:getAll', category),
   docTemplateGetById: (id: string) => ipcRenderer.invoke('docTemplate:getById', id),

@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText, SavedReport, ReportConfig } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -2411,6 +2411,22 @@ export class MySQLAdapter {
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 `)
             } catch (e) { console.error('document_templates migration:', e) }
+
+            // Saved reports table
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS saved_reports (
+                        id VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT DEFAULT NULL,
+                        data_source VARCHAR(50) NOT NULL,
+                        config TEXT NOT NULL,
+                        created_by VARCHAR(36) DEFAULT NULL,
+                        is_shared BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                `)
+            } catch (e) { console.error('saved_reports migration:', e) }
 
         } catch (error) {
             console.error('Schema initialization failed:', error)
@@ -10317,6 +10333,316 @@ export class MySQLAdapter {
         for (let i = 0; i < ids.length; i++) {
             await this.pool.execute('UPDATE document_templates SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
+    }
+
+    // ==================== Saved Reports ====================
+
+    async getSavedReports(userId: string): Promise<SavedReport[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, name, description, data_source AS dataSource, config,
+                    created_by AS createdBy, is_shared AS isShared, created_at AS createdAt
+             FROM saved_reports
+             WHERE created_by = ? OR is_shared = TRUE
+             ORDER BY created_at DESC`,
+            [userId]
+        )
+        return (rows as any[]).map(r => ({
+            ...r,
+            isShared: Boolean(r.isShared),
+            config: typeof r.config === 'string' ? JSON.parse(r.config) : r.config
+        }))
+    }
+
+    async addSavedReport(data: {
+        name: string
+        description?: string | null
+        dataSource: string
+        config: ReportConfig
+        createdBy?: string | null
+        isShared?: boolean
+    }): Promise<SavedReport> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO saved_reports (id, name, description, data_source, config, created_by, is_shared)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.name, data.description || null, data.dataSource,
+             JSON.stringify(data.config), data.createdBy || null, data.isShared ? 1 : 0]
+        )
+        return {
+            id,
+            name: data.name,
+            description: data.description || null,
+            dataSource: data.dataSource,
+            config: data.config,
+            createdBy: data.createdBy || null,
+            isShared: data.isShared || false
+        }
+    }
+
+    async updateSavedReport(id: string, data: {
+        name?: string
+        description?: string | null
+        config?: ReportConfig
+        isShared?: boolean
+    }): Promise<void> {
+        if (!this.pool) return
+        const sets: string[] = []
+        const params: any[] = []
+        if (data.name !== undefined) { sets.push('name = ?'); params.push(data.name) }
+        if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description) }
+        if (data.config !== undefined) { sets.push('config = ?'); params.push(JSON.stringify(data.config)) }
+        if (data.isShared !== undefined) { sets.push('is_shared = ?'); params.push(data.isShared ? 1 : 0) }
+        if (sets.length === 0) return
+        params.push(id)
+        await this.pool.execute(`UPDATE saved_reports SET ${sets.join(', ')} WHERE id = ?`, params)
+    }
+
+    async deleteSavedReport(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM saved_reports WHERE id = ?', [id])
+    }
+
+    async runReport(dataSource: string, config: ReportConfig): Promise<any[]> {
+        if (!this.pool) return []
+
+        // Define allowed columns per data source to prevent SQL injection
+        const DATA_SOURCE_DEFS: Record<string, {
+            baseQuery: string
+            columnMap: Record<string, string>
+            filterMap: Record<string, (params: any[], val: any) => string>
+            groupMap?: Record<string, string>
+        }> = {
+            vessels: {
+                baseQuery: `FROM vessels v
+                    LEFT JOIN fleets f ON v.fleet_id = f.id
+                    LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
+                    LEFT JOIN entities cust ON v.customer_id = cust.id`,
+                columnMap: {
+                    name: 'v.name AS name',
+                    imoNumber: 'v.imo_number AS imoNumber',
+                    vesselType: 'v.vessel_type AS vesselType',
+                    flagState: 'fs.name AS flagState',
+                    builtYear: 'v.built_year AS builtYear',
+                    grossTonnage: 'v.gross_tonnage AS grossTonnage',
+                    classification: 'v.classification_society AS classification',
+                    customer: 'cust.name AS customer',
+                    fleet: 'f.name AS fleet',
+                    isActive: 'v.is_active AS isActive',
+                    createdAt: 'v.created_at AS createdAt',
+                    callSign: 'v.call_sign AS callSign',
+                    customerType: 'v.customer_type AS customerType'
+                },
+                filterMap: {
+                    status: (params, val) => {
+                        if (val === 'active') { params.push(1); return 'v.is_active = ?' }
+                        if (val === 'inactive') { params.push(0); return 'v.is_active = ?' }
+                        return ''
+                    },
+                    fleetId: (params, val) => { params.push(val); return 'v.fleet_id = ?' },
+                    flagStateId: (params, val) => { params.push(val); return 'v.flag_state_id = ?' },
+                    customerId: (params, val) => { params.push(val); return 'v.customer_id = ?' },
+                    vesselType: (params, val) => { params.push(val); return 'v.vessel_type = ?' },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s)
+                        return '(v.name LIKE ? OR v.imo_number LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    customer: 'cust.name',
+                    fleet: 'f.name',
+                    vesselType: 'v.vessel_type',
+                    flagState: 'fs.name'
+                }
+            },
+            policies: {
+                baseQuery: `FROM vessel_dynamic_policies vdp
+                    LEFT JOIN vessels v ON vdp.vessel_id = v.id
+                    LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
+                    LEFT JOIN fleets f ON v.fleet_id = f.id
+                    LEFT JOIN entities cust ON v.customer_id = cust.id
+                    LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id`,
+                columnMap: {
+                    vesselName: 'v.name AS vesselName',
+                    imoNumber: 'v.imo_number AS imoNumber',
+                    policyType: 'pt.name AS policyType',
+                    policyNumber: 'vdp.policy_number AS policyNumber',
+                    status: 'vdp.status AS status',
+                    currency: 'vdp.currency AS currency',
+                    customerName: 'cust.name AS customerName',
+                    fleetName: 'f.name AS fleetName',
+                    brokerName: 'broker.name AS brokerName',
+                    createdAt: 'vdp.created_at AS createdAt'
+                },
+                filterMap: {
+                    policyTypeId: (params, val) => { params.push(val); return 'vdp.policy_type_id = ?' },
+                    status: (params, val) => { params.push(val); return 'vdp.status = ?' },
+                    vesselActive: (params, val) => {
+                        if (val === 'active') { params.push(1); return 'v.is_active = ?' }
+                        if (val === 'inactive') { params.push(0); return 'v.is_active = ?' }
+                        return ''
+                    },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s, s)
+                        return '(v.name LIKE ? OR vdp.policy_number LIKE ? OR pt.name LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    policyType: 'pt.name',
+                    customer: 'cust.name',
+                    fleet: 'f.name',
+                    status: 'vdp.status'
+                }
+            },
+            entities: {
+                baseQuery: `FROM entities e
+                    LEFT JOIN (
+                        SELECT entity_id, COUNT(*) AS vesselCount
+                        FROM vessel_assureds GROUP BY entity_id
+                    ) vc ON e.id = vc.entity_id`,
+                columnMap: {
+                    name: 'e.name AS name',
+                    type: 'e.type AS type',
+                    email: 'e.email AS email',
+                    phone: 'e.phone AS phone',
+                    identifier: 'e.identifier AS identifier',
+                    vesselCount: 'COALESCE(vc.vesselCount, 0) AS vesselCount',
+                    createdAt: 'e.created_at AS createdAt'
+                },
+                filterMap: {
+                    type: (params, val) => { params.push(val); return 'e.type = ?' },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s, s)
+                        return '(e.name LIKE ? OR e.email LIKE ? OR e.identifier LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    type: 'e.type'
+                }
+            },
+            renewals: {
+                baseQuery: `FROM vessel_dynamic_policies vdp
+                    LEFT JOIN vessels v ON vdp.vessel_id = v.id
+                    LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
+                    LEFT JOIN fleets f ON v.fleet_id = f.id
+                    LEFT JOIN entities cust ON v.customer_id = cust.id
+                    LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
+                    LEFT JOIN vessel_policy_values vpv_end ON (
+                        vpv_end.dynamic_policy_id = vdp.id
+                        AND vpv_end.characteristic_id IN (
+                            SELECT ptc.id FROM policy_type_characteristics ptc
+                            WHERE ptc.name LIKE '%end%' AND ptc.field_type = 'date'
+                        )
+                    )`,
+                columnMap: {
+                    vesselName: 'v.name AS vesselName',
+                    imoNumber: 'v.imo_number AS imoNumber',
+                    policyType: 'pt.name AS policyType',
+                    policyNumber: 'vdp.policy_number AS policyNumber',
+                    endDate: 'vpv_end.value_date AS endDate',
+                    customerName: 'cust.name AS customerName',
+                    fleetName: 'f.name AS fleetName',
+                    renewalStatus: 'rst.name AS renewalStatus',
+                    daysUntilExpiry: 'DATEDIFF(vpv_end.value_date, CURDATE()) AS daysUntilExpiry'
+                },
+                filterMap: {
+                    policyTypeId: (params, val) => { params.push(val); return 'vdp.policy_type_id = ?' },
+                    dateFrom: (params, val) => { params.push(val); return 'vpv_end.value_date >= ?' },
+                    dateTo: (params, val) => { params.push(val); return 'vpv_end.value_date <= ?' },
+                    status: (params, val) => { params.push(val); return 'vdp.status = ?' },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s)
+                        return '(v.name LIKE ? OR vdp.policy_number LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    policyType: 'pt.name',
+                    customer: 'cust.name',
+                    fleet: 'f.name',
+                    renewalStatus: 'rst.name'
+                }
+            },
+            quotations: {
+                baseQuery: `FROM quotations q
+                    LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                    LEFT JOIN (
+                        SELECT qv.quotation_id,
+                               GROUP_CONCAT(COALESCE(v2.name, qv.name) SEPARATOR ', ') AS vesselNames
+                        FROM quotation_vessels qv
+                        LEFT JOIN vessels v2 ON qv.vessel_id = v2.id
+                        GROUP BY qv.quotation_id
+                    ) qvn ON q.id = qvn.quotation_id`,
+                columnMap: {
+                    referenceNumber: 'q.reference_number AS referenceNumber',
+                    typeName: 'qt.name AS typeName',
+                    status: 'q.status AS status',
+                    vesselNames: 'qvn.vesselNames AS vesselNames',
+                    premiumAmount: 'q.premium_amount AS premiumAmount',
+                    premiumCurrency: 'q.premium_currency AS premiumCurrency',
+                    quotationDate: 'q.quotation_date AS quotationDate',
+                    createdAt: 'q.created_at AS createdAt',
+                    createdBy: 'q.created_by AS createdBy'
+                },
+                filterMap: {
+                    typeId: (params, val) => { params.push(val); return 'q.quotation_type_id = ?' },
+                    status: (params, val) => { params.push(val); return 'q.status = ?' },
+                    dateFrom: (params, val) => { params.push(val); return 'q.quotation_date >= ?' },
+                    dateTo: (params, val) => { params.push(val); return 'q.quotation_date <= ?' },
+                    search: (params, val) => {
+                        const s = `%${val}%`
+                        params.push(s, s)
+                        return '(q.reference_number LIKE ? OR qvn.vesselNames LIKE ?)'
+                    }
+                },
+                groupMap: {
+                    type: 'qt.name',
+                    status: 'q.status'
+                }
+            }
+        }
+
+        const def = DATA_SOURCE_DEFS[dataSource]
+        if (!def) throw new Error(`Unknown data source: ${dataSource}`)
+
+        // Build SELECT columns — only allowed ones
+        const requestedCols = (config.columns || []).filter(c => def.columnMap[c])
+        if (requestedCols.length === 0) throw new Error('No valid columns selected')
+
+        const selectCols = requestedCols.map(c => def.columnMap[c]).join(', ')
+
+        // Build WHERE
+        const conditions: string[] = []
+        const params: any[] = []
+        if (config.filters) {
+            for (const [key, val] of Object.entries(config.filters)) {
+                if (val === undefined || val === null || val === '' || val === 'all') continue
+                const filterFn = def.filterMap[key]
+                if (filterFn) {
+                    const cond = filterFn(params, val)
+                    if (cond) conditions.push(cond)
+                }
+            }
+        }
+
+        const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
+
+        // Build ORDER BY
+        let orderClause = ''
+        if (config.sortBy && def.columnMap[config.sortBy]) {
+            // Extract the actual column expression (before AS alias)
+            const colExpr = def.columnMap[config.sortBy].split(' AS ')[0]
+            const dir = config.sortDir === 'desc' ? 'DESC' : 'ASC'
+            orderClause = `ORDER BY ${colExpr} ${dir}`
+        }
+
+        const query = `SELECT ${selectCols} ${def.baseQuery} ${whereClause} ${orderClause} LIMIT 5000`
+        const [rows] = await this.pool.query(query, params)
+        return rows as any[]
     }
 }
 

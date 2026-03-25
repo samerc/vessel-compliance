@@ -1411,6 +1411,27 @@ export interface QuotationSurveyWarranty {
   alternativeId?: string | null
 }
 
+// ==================== Report Builder ====================
+
+export interface SavedReport {
+  id: string
+  name: string
+  description?: string | null
+  dataSource: string
+  config: ReportConfig
+  createdBy?: string | null
+  isShared: boolean
+  createdAt?: string
+}
+
+export interface ReportConfig {
+  columns: string[]
+  filters: Record<string, any>
+  groupBy?: string | null
+  sortBy?: string | null
+  sortDir?: 'asc' | 'desc'
+}
+
 // ==================== Document Templates ====================
 
 export interface DocumentTemplate {
