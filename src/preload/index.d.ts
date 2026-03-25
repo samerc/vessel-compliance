@@ -732,6 +732,10 @@ export interface Api {
   notifGroupGetSubscriptions: (groupId: string) => Promise<string[]>
   notifGroupSetSubscriptions: (groupId: string, eventTypes: string[]) => Promise<void>
 
+  // Daily Alerts
+  dailyAlertsRunNow: () => Promise<{ success: boolean }>
+  dailyAlertsGetLastRun: () => Promise<string | null>
+
   // Notifications
   notificationsGet: (opts?: { unreadOnly?: boolean; limit?: number; offset?: number }) => Promise<{ data: Notification[]; unreadCount: number }>
   notificationsGetUnreadCount: () => Promise<number>

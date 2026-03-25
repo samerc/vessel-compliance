@@ -134,6 +134,9 @@ class ComplianceScheduler {
                                     score: r.score
                                 })))
                             })
+
+                            // Notify groups about the match
+                            db.notifyGroupsForEvent('compliance_match', `Sanctions match found: ${entity.name}`, `Score: ${Math.round(bestScore * 100)}%`, 'entity', entity.id).catch(() => {})
                         } else {
                             // No high-score matches - update as cleared
                             await db.updateEntity(entity.id, {
@@ -198,6 +201,9 @@ class ComplianceScheduler {
                                     score: r.score
                                 })))
                             })
+
+                            // Notify groups about the match
+                            db.notifyGroupsForEvent('compliance_match', `Sanctions match found: ${vessel.name}`, `Score: ${Math.round(bestScore * 100)}%`, 'vessel', vessel.id).catch(() => {})
                         } else {
                             // No high-score matches - update as cleared
                             await db.updateVessel(vessel.id, {

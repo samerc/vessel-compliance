@@ -722,6 +722,10 @@ const api = {
   notifGroupGetSubscriptions: (groupId: string) => ipcRenderer.invoke('notifGroup:getSubscriptions', groupId),
   notifGroupSetSubscriptions: (groupId: string, eventTypes: string[]) => ipcRenderer.invoke('notifGroup:setSubscriptions', groupId, eventTypes),
 
+  // Daily Alerts
+  dailyAlertsRunNow: () => ipcRenderer.invoke('dailyAlerts:runNow'),
+  dailyAlertsGetLastRun: () => ipcRenderer.invoke('dailyAlerts:getLastRun'),
+
   // Notifications
   notificationsGet: (opts?: any) => ipcRenderer.invoke('notifications:get', opts),
   notificationsGetUnreadCount: () => ipcRenderer.invoke('notifications:getUnreadCount'),

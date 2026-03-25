@@ -141,6 +141,16 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [editNotifGroupName, setEditNotifGroupName] = useState('')
     const [editNotifGroupDesc, setEditNotifGroupDesc] = useState('')
 
+    // Daily Alerts state
+    const [dailyAlertsEnabled, setDailyAlertsEnabled] = useState(false)
+    const [dailyAlertsTime, setDailyAlertsTime] = useState('08:00')
+    const [dailyAlertsDocDays, setDailyAlertsDocDays] = useState(30)
+    const [dailyAlertsPolicyDays, setDailyAlertsPolicyDays] = useState(60)
+    const [dailyAlertsBlueCardDays, setDailyAlertsBlueCardDays] = useState(30)
+    const [dailyAlertsWarrantyDays, setDailyAlertsWarrantyDays] = useState(14)
+    const [dailyAlertsLastRun, setDailyAlertsLastRun] = useState<string | null>(null)
+    const [dailyAlertsRunning, setDailyAlertsRunning] = useState(false)
+
     useEffect(() => {
         loadData()
         loadFileTypeSettings()
@@ -153,6 +163,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         loadLogRetention()
         loadBanks()
         loadNotifGroups()
+        loadDailyAlerts()
         window.api.getUserSectionAccess().then(setUserSectionAccess).catch(() => {})
     }, [])
 
@@ -259,6 +270,44 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         try {
             await window.api.notifGroupReorder(newList.map(g => g.id))
         } catch (err: any) { showError(err?.message || 'Failed to reorder') }
+    }
+
+    // ── Daily Alerts ──────────────────────────────────────────────────────────
+    const loadDailyAlerts = async () => {
+        try {
+            const [enabled, time, docDays, policyDays, blueCardDays, warrantyDays, lastRun] = await Promise.all([
+                window.api.getSetting('daily_alerts_enabled'),
+                window.api.getSetting('daily_alerts_time'),
+                window.api.getSetting('daily_alerts_doc_expiry_days'),
+                window.api.getSetting('daily_alerts_policy_expiry_days'),
+                window.api.getSetting('daily_alerts_blue_card_days'),
+                window.api.getSetting('daily_alerts_warranty_days'),
+                window.api.dailyAlertsGetLastRun(),
+            ])
+            setDailyAlertsEnabled(enabled === 'true')
+            if (time) setDailyAlertsTime(time)
+            if (docDays) setDailyAlertsDocDays(parseInt(docDays, 10))
+            if (policyDays) setDailyAlertsPolicyDays(parseInt(policyDays, 10))
+            if (blueCardDays) setDailyAlertsBlueCardDays(parseInt(blueCardDays, 10))
+            if (warrantyDays) setDailyAlertsWarrantyDays(parseInt(warrantyDays, 10))
+            setDailyAlertsLastRun(lastRun)
+        } catch { /* ignore */ }
+    }
+
+    const saveDailyAlertSetting = async (key: string, value: string) => {
+        try {
+            await window.api.setSetting(key, value)
+        } catch (err: any) { showError(err?.message || 'Failed to save setting') }
+    }
+
+    const handleDailyAlertsRunNow = async () => {
+        setDailyAlertsRunning(true)
+        try {
+            await window.api.dailyAlertsRunNow()
+            showSuccess('Daily alert check completed')
+            await loadDailyAlerts()
+        } catch (err: any) { showError(err?.message || 'Failed to run daily alerts') }
+        finally { setDailyAlertsRunning(false) }
     }
 
     const loadLastBackupDate = async () => {
@@ -1187,6 +1236,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             { id: 'policySettings', label: 'Policy Settings', icon: <Clock size={16} />, adminOnly: true },
             { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
             { id: 'notifGroups', label: 'Notification Groups', icon: <Bell size={16} />, adminOnly: true },
+            { id: 'dailyAlerts', label: 'Daily Alerts', icon: <Clock size={16} />, adminOnly: true },
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
             { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
@@ -3022,6 +3072,134 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                     </div>
                                 )}
                             </div>
+                        )}
+                    </div>
+                </section>
+            )}
+
+            {/* Daily Alerts - admin only */}
+            {effectiveSection === 'dailyAlerts' && isAdmin && (
+                <section className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+                    <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Clock size={20} color="var(--accent-primary)" /> Daily Alerts
+                    </h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                        Automatically check for expiring documents, policies, blue cards, and warranty deadlines daily and notify subscribed groups.
+                    </p>
+
+                    {/* Enable / Disable */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={dailyAlertsEnabled}
+                                onChange={async (e) => {
+                                    const val = e.target.checked
+                                    setDailyAlertsEnabled(val)
+                                    await saveDailyAlertSetting('daily_alerts_enabled', String(val))
+                                    showSuccess(val ? 'Daily alerts enabled' : 'Daily alerts disabled')
+                                }}
+                                style={{ accentColor: 'var(--accent-primary)', width: '16px', height: '16px' }}
+                            />
+                            <span style={{ fontWeight: 600 }}>Enable daily alerts</span>
+                        </label>
+                    </div>
+
+                    {/* Time picker */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Run Time</label>
+                            <input
+                                type="time"
+                                value={dailyAlertsTime}
+                                onChange={async (e) => {
+                                    setDailyAlertsTime(e.target.value)
+                                    await saveDailyAlertSetting('daily_alerts_time', e.target.value)
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Threshold inputs */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Document expiry (days)</label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={dailyAlertsDocDays}
+                                onChange={async (e) => {
+                                    const v = parseInt(e.target.value, 10) || 30
+                                    setDailyAlertsDocDays(v)
+                                    await saveDailyAlertSetting('daily_alerts_doc_expiry_days', String(v))
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Policy expiry (days)</label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={dailyAlertsPolicyDays}
+                                onChange={async (e) => {
+                                    const v = parseInt(e.target.value, 10) || 60
+                                    setDailyAlertsPolicyDays(v)
+                                    await saveDailyAlertSetting('daily_alerts_policy_expiry_days', String(v))
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Blue card expiry (days)</label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={dailyAlertsBlueCardDays}
+                                onChange={async (e) => {
+                                    const v = parseInt(e.target.value, 10) || 30
+                                    setDailyAlertsBlueCardDays(v)
+                                    await saveDailyAlertSetting('daily_alerts_blue_card_days', String(v))
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Warranty deadline (days)</label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={dailyAlertsWarrantyDays}
+                                onChange={async (e) => {
+                                    const v = parseInt(e.target.value, 10) || 14
+                                    setDailyAlertsWarrantyDays(v)
+                                    await saveDailyAlertSetting('daily_alerts_warranty_days', String(v))
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Run Now + Last Run */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <button
+                            className="btn-primary"
+                            onClick={handleDailyAlertsRunNow}
+                            disabled={dailyAlertsRunning}
+                            style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            {dailyAlertsRunning ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+                            {dailyAlertsRunning ? 'Running...' : 'Run Now'}
+                        </button>
+                        {dailyAlertsLastRun && (
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                Last run: {dailyAlertsLastRun}
+                            </span>
                         )}
                     </div>
                 </section>

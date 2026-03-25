@@ -7,6 +7,7 @@ import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
 import { auth } from './auth'
 import { complianceScheduler } from './services/ComplianceScheduler'
+import { DailyAlertScheduler } from './services/DailyAlertScheduler'
 import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
 import Store from 'electron-store'
@@ -1002,6 +1003,12 @@ app.whenReady().then(() => {
       entityName: vesselName,
       details: changeSummary || `Updated ${vesselName}`
     }).catch(() => {})
+    // Notify on vessel active status change
+    if (updates.isActive !== undefined || updates.is_active !== undefined) {
+      const isNowActive = updates.isActive ?? updates.is_active
+      const action = isNowActive ? 'activated' : 'deactivated'
+      db.notifyGroupsForEvent('vessel_status_change', `Vessel ${vesselName} ${action}`, undefined, 'vessel', id, user.id).catch(() => {})
+    }
     return result
   })
   safeHandle('db:getVesselNameHistory', (event, vesselId) => { requireSession(event); return db.getVesselNameHistory(vesselId) })
@@ -1070,6 +1077,7 @@ app.whenReady().then(() => {
       entityName: entity.name,
       details: `Created entity ${entity.name}`
     }).catch(() => {})
+    db.notifyGroupsForEvent('entity_change', `New entity: ${entity.name}`, 'Entity created', 'entity', result?.id || entity.id, user.id).catch(() => {})
     return result
   })
   safeHandle('db:updateEntity', async (event, id, updates) => {
@@ -1099,6 +1107,7 @@ app.whenReady().then(() => {
     const user = await requirePermission(event, 'entities:delete')
     const [eDelRows] = await (db as any).pool.query('SELECT name FROM entities WHERE id = ?', [id])
     const entityName = (eDelRows as any[])[0]?.name || id
+    db.notifyGroupsForEvent('entity_change', `Entity deleted: ${entityName}`, undefined, 'entity', id, user.id).catch(() => {})
     const result = await db.deleteEntity(id)
     db.logActivity({
       userId: user.id,
@@ -2470,6 +2479,13 @@ app.whenReady().then(() => {
       module: 'Policies',
       details: `Created renewal quotation from policy ${policyId}`
     })
+    // Resolve policy number for notification
+    let policyNumber = policyId
+    try {
+      const [pnRows] = await (db as any).pool.query('SELECT policy_number FROM policy_documents WHERE id = ?', [policyId]) as any[]
+      if (pnRows.length > 0 && pnRows[0].policy_number) policyNumber = pnRows[0].policy_number
+    } catch { /* use policyId */ }
+    db.notifyGroupsForEvent('policy_renewed', `Policy ${policyNumber} renewed`, 'A renewal quotation has been created', 'policy', policyId, user.id).catch(() => {})
     return { quotationId }
   })
 
@@ -3199,6 +3215,21 @@ app.whenReady().then(() => {
 
   // Start the compliance scheduler after window is created
   complianceScheduler.start()
+
+  // Start the daily alert scheduler
+  const dailyAlertScheduler = new DailyAlertScheduler(db)
+  dailyAlertScheduler.start()
+
+  safeHandle('dailyAlerts:runNow', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    await dailyAlertScheduler.run()
+    return { success: true }
+  })
+
+  safeHandle('dailyAlerts:getLastRun', async (event) => {
+    requireSession(event)
+    return db.getSetting('daily_alerts_last_run')
+  })
 
   // Initialize update service with main window
   const mainWindow = BrowserWindow.getAllWindows()[0]
