@@ -808,6 +808,28 @@ CREATE TABLE IF NOT EXISTS flag_state_ports (
   INDEX idx_fsp_flag (flag_state_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS notification_groups (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notification_group_members (
+  group_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  PRIMARY KEY (group_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notification_group_subscriptions (
+  id VARCHAR(36) PRIMARY KEY,
+  group_id VARCHAR(36) NOT NULL,
+  event_type VARCHAR(100) NOT NULL,
+  INDEX idx_ngs_group (group_id),
+  INDEX idx_ngs_event (event_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS notifications (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36) NOT NULL,

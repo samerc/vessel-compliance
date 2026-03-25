@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -128,6 +128,19 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [editBankName, setEditBankName] = useState('')
     const [editBankDetails, setEditBankDetails] = useState('')
 
+    // Notification Groups state
+    const [notifGroups, setNotifGroups] = useState<NotificationGroup[]>([])
+    const [newNotifGroupName, setNewNotifGroupName] = useState('')
+    const [newNotifGroupDesc, setNewNotifGroupDesc] = useState('')
+    const [selectedNotifGroupId, setSelectedNotifGroupId] = useState<string | null>(null)
+    const [notifGroupMembers, setNotifGroupMembers] = useState<string[]>([])
+    const [notifGroupSubs, setNotifGroupSubs] = useState<string[]>([])
+    const [allUsers, setAllUsers] = useState<{ id: string; username: string }[]>([])
+    const [notifGroupTab, setNotifGroupTab] = useState<'members' | 'subscriptions'>('members')
+    const [editingNotifGroupId, setEditingNotifGroupId] = useState<string | null>(null)
+    const [editNotifGroupName, setEditNotifGroupName] = useState('')
+    const [editNotifGroupDesc, setEditNotifGroupDesc] = useState('')
+
     useEffect(() => {
         loadData()
         loadFileTypeSettings()
@@ -139,6 +152,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         loadLastBackupDate()
         loadLogRetention()
         loadBanks()
+        loadNotifGroups()
         window.api.getUserSectionAccess().then(setUserSectionAccess).catch(() => {})
     }, [])
 
@@ -157,6 +171,94 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             const data = await window.api.rbacGetGroups()
             if (Array.isArray(data)) setUserGroups(data)
         } catch { /* ignore */ }
+    }
+
+    // ── Notification Groups ────────────────────────────────────────────────────
+    const loadNotifGroups = async () => {
+        try {
+            const data = await window.api.notifGroupGetAll()
+            if (Array.isArray(data)) setNotifGroups(data)
+            const users = await window.api.getUsers()
+            if (Array.isArray(users)) setAllUsers(users.map((u: any) => ({ id: u.id, username: u.username })))
+        } catch { /* ignore */ }
+    }
+
+    const handleAddNotifGroup = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newNotifGroupName.trim()) return
+        try {
+            await window.api.notifGroupAdd(newNotifGroupName.trim(), newNotifGroupDesc.trim() || undefined)
+            setNewNotifGroupName('')
+            setNewNotifGroupDesc('')
+            await loadNotifGroups()
+            showSuccess('Notification group created')
+        } catch (err: any) { showError(err?.message || 'Failed to create group') }
+    }
+
+    const handleDeleteNotifGroup = async (id: string) => {
+        if (!confirm('Delete this notification group?')) return
+        try {
+            await window.api.notifGroupDelete(id)
+            if (selectedNotifGroupId === id) setSelectedNotifGroupId(null)
+            await loadNotifGroups()
+            showSuccess('Group deleted')
+        } catch (err: any) { showError(err?.message || 'Failed to delete group') }
+    }
+
+    const handleSelectNotifGroup = async (groupId: string) => {
+        setSelectedNotifGroupId(groupId)
+        setNotifGroupTab('members')
+        try {
+            const members = await window.api.notifGroupGetMembers(groupId)
+            setNotifGroupMembers(Array.isArray(members) ? members.map((m: any) => m.id) : [])
+            const subs = await window.api.notifGroupGetSubscriptions(groupId)
+            setNotifGroupSubs(Array.isArray(subs) ? subs : [])
+        } catch { /* ignore */ }
+    }
+
+    const handleToggleNotifMember = async (userId: string) => {
+        if (!selectedNotifGroupId) return
+        const next = notifGroupMembers.includes(userId)
+            ? notifGroupMembers.filter(id => id !== userId)
+            : [...notifGroupMembers, userId]
+        setNotifGroupMembers(next)
+        try {
+            await window.api.notifGroupSetMembers(selectedNotifGroupId, next)
+            await loadNotifGroups()
+        } catch (err: any) { showError(err?.message || 'Failed to update members') }
+    }
+
+    const handleToggleNotifSub = async (eventType: string) => {
+        if (!selectedNotifGroupId) return
+        const next = notifGroupSubs.includes(eventType)
+            ? notifGroupSubs.filter(et => et !== eventType)
+            : [...notifGroupSubs, eventType]
+        setNotifGroupSubs(next)
+        try {
+            await window.api.notifGroupSetSubscriptions(selectedNotifGroupId, next)
+            await loadNotifGroups()
+        } catch (err: any) { showError(err?.message || 'Failed to update subscriptions') }
+    }
+
+    const handleUpdateNotifGroup = async (id: string) => {
+        if (!editNotifGroupName.trim()) return
+        try {
+            await window.api.notifGroupUpdate(id, editNotifGroupName.trim(), editNotifGroupDesc.trim() || undefined)
+            setEditingNotifGroupId(null)
+            await loadNotifGroups()
+            showSuccess('Group updated')
+        } catch (err: any) { showError(err?.message || 'Failed to update group') }
+    }
+
+    const handleReorderNotifGroup = async (index: number, direction: -1 | 1) => {
+        const newList = [...notifGroups]
+        const target = index + direction
+        if (target < 0 || target >= newList.length) return
+        ;[newList[index], newList[target]] = [newList[target], newList[index]]
+        setNotifGroups(newList)
+        try {
+            await window.api.notifGroupReorder(newList.map(g => g.id))
+        } catch (err: any) { showError(err?.message || 'Failed to reorder') }
     }
 
     const loadLastBackupDate = async () => {
@@ -1084,6 +1186,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             { id: 'banks', label: 'Banks', icon: <Landmark size={16} />, adminOnly: true },
             { id: 'policySettings', label: 'Policy Settings', icon: <Clock size={16} />, adminOnly: true },
             { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
+            { id: 'notifGroups', label: 'Notification Groups', icon: <Bell size={16} />, adminOnly: true },
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
             { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
@@ -2756,6 +2859,168 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         {userGroups.length === 0 && (
                             <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                                 No groups defined yet. Create one above.
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
+
+            {/* Notification Groups - admin only */}
+            {effectiveSection === 'notifGroups' && isAdmin && (
+                <section className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+                    <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Bell size={20} color="var(--accent-primary)" /> Notification Groups
+                    </h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                        Route notifications to specific users by creating groups and subscribing them to event types.
+                    </p>
+
+                    {/* Add Group Form */}
+                    <form onSubmit={handleAddNotifGroup} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
+                        <div style={{ flex: '1 1 200px' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Group Name</label>
+                            <input
+                                type="text"
+                                value={newNotifGroupName}
+                                onChange={e => setNewNotifGroupName(e.target.value)}
+                                placeholder="e.g. Compliance Team"
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div style={{ flex: '2 1 300px' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Description</label>
+                            <input
+                                type="text"
+                                value={newNotifGroupDesc}
+                                onChange={e => setNewNotifGroupDesc(e.target.value)}
+                                placeholder="Optional description"
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <button type="submit" className="btn-primary" disabled={!newNotifGroupName.trim()} style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Plus size={14} /> Add Group
+                        </button>
+                    </form>
+
+                    <div style={{ display: 'flex', gap: '20px', minHeight: '300px' }}>
+                        {/* Groups list */}
+                        <div style={{ flex: '0 0 320px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {notifGroups.map((g, idx) => (
+                                <div
+                                    key={g.id}
+                                    onClick={() => handleSelectNotifGroup(g.id)}
+                                    style={{
+                                        padding: '12px 14px', borderRadius: '8px', cursor: 'pointer',
+                                        border: selectedNotifGroupId === g.id ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)',
+                                        background: selectedNotifGroupId === g.id ? 'rgba(0,210,255,0.06)' : 'transparent',
+                                    }}
+                                >
+                                    {editingNotifGroupId === g.id ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                                            <input value={editNotifGroupName} onChange={e => setEditNotifGroupName(e.target.value)} style={{ fontSize: '0.85rem' }} autoFocus />
+                                            <input value={editNotifGroupDesc} onChange={e => setEditNotifGroupDesc(e.target.value)} placeholder="Description" style={{ fontSize: '0.8rem' }} />
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => handleUpdateNotifGroup(g.id)}>Save</button>
+                                                <button className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => setEditingNotifGroupId(null)}>Cancel</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <button onClick={e => { e.stopPropagation(); handleReorderNotifGroup(idx, -1) }} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
+                                                <button onClick={e => { e.stopPropagation(); handleReorderNotifGroup(idx, 1) }} disabled={idx === notifGroups.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === notifGroups.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{g.name}</div>
+                                                {g.description && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{g.description}</div>}
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '12px' }}>
+                                                    <span>{g.memberCount ?? 0} member{(g.memberCount ?? 0) !== 1 ? 's' : ''}</span>
+                                                    <span>{g.subscriptionCount ?? 0} subscription{(g.subscriptionCount ?? 0) !== 1 ? 's' : ''}</span>
+                                                </div>
+                                            </div>
+                                            <button onClick={e => { e.stopPropagation(); setEditingNotifGroupId(g.id); setEditNotifGroupName(g.name); setEditNotifGroupDesc(g.description || '') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><Edit3 size={14} /></button>
+                                            <button onClick={e => { e.stopPropagation(); handleDeleteNotifGroup(g.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {notifGroups.length === 0 && (
+                                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                    No notification groups yet.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Detail panel */}
+                        {selectedNotifGroupId && (
+                            <div style={{ flex: 1, border: '1px solid var(--table-border)', borderRadius: '10px', padding: '16px', maxHeight: 'calc(100vh - 400px)', overflowY: 'auto' }}>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                                    <button
+                                        className={notifGroupTab === 'members' ? 'btn-primary' : 'btn-secondary'}
+                                        style={{ padding: '6px 16px', fontSize: '0.82rem' }}
+                                        onClick={() => setNotifGroupTab('members')}
+                                    >
+                                        <Users size={14} style={{ marginRight: '6px' }} /> Members
+                                    </button>
+                                    <button
+                                        className={notifGroupTab === 'subscriptions' ? 'btn-primary' : 'btn-secondary'}
+                                        style={{ padding: '6px 16px', fontSize: '0.82rem' }}
+                                        onClick={() => setNotifGroupTab('subscriptions')}
+                                    >
+                                        <Bell size={14} style={{ marginRight: '6px' }} /> Subscriptions
+                                    </button>
+                                </div>
+
+                                {notifGroupTab === 'members' && (
+                                    <div>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                                            Check users to include them in this notification group.
+                                        </p>
+                                        {allUsers.map(u => (
+                                            <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0', cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={notifGroupMembers.includes(u.id)}
+                                                    onChange={() => handleToggleNotifMember(u.id)}
+                                                    style={{ accentColor: 'var(--accent-primary)', width: '14px', height: '14px' }}
+                                                />
+                                                <span style={{ fontSize: '0.9rem' }}>{u.username}</span>
+                                            </label>
+                                        ))}
+                                        {allUsers.length === 0 && (
+                                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No users found.</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {notifGroupTab === 'subscriptions' && (
+                                    <div>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                                            Select which events this group should be notified about.
+                                        </p>
+                                        {(() => {
+                                            const categories = [...new Set(NOTIFICATION_EVENT_TYPES.map(e => e.category))]
+                                            return categories.map(cat => (
+                                                <div key={cat} style={{ marginBottom: '16px' }}>
+                                                    <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                                        {cat}
+                                                    </div>
+                                                    {NOTIFICATION_EVENT_TYPES.filter(e => e.category === cat).map(evt => (
+                                                        <label key={evt.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 0', cursor: 'pointer' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={notifGroupSubs.includes(evt.key)}
+                                                                onChange={() => handleToggleNotifSub(evt.key)}
+                                                                style={{ accentColor: 'var(--accent-primary)', width: '14px', height: '14px' }}
+                                                            />
+                                                            <span style={{ fontSize: '0.88rem' }}>{evt.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            ))
+                                        })()}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

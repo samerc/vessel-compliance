@@ -711,6 +711,17 @@ const api = {
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
   policyRenew: (policyId: string) => ipcRenderer.invoke('policy:renew', policyId),
 
+  // Notification Groups
+  notifGroupGetAll: () => ipcRenderer.invoke('notifGroup:getAll'),
+  notifGroupAdd: (name: string, description?: string) => ipcRenderer.invoke('notifGroup:add', name, description),
+  notifGroupUpdate: (id: string, name: string, description?: string) => ipcRenderer.invoke('notifGroup:update', id, name, description),
+  notifGroupDelete: (id: string) => ipcRenderer.invoke('notifGroup:delete', id),
+  notifGroupReorder: (ids: string[]) => ipcRenderer.invoke('notifGroup:reorder', ids),
+  notifGroupGetMembers: (groupId: string) => ipcRenderer.invoke('notifGroup:getMembers', groupId),
+  notifGroupSetMembers: (groupId: string, userIds: string[]) => ipcRenderer.invoke('notifGroup:setMembers', groupId, userIds),
+  notifGroupGetSubscriptions: (groupId: string) => ipcRenderer.invoke('notifGroup:getSubscriptions', groupId),
+  notifGroupSetSubscriptions: (groupId: string, eventTypes: string[]) => ipcRenderer.invoke('notifGroup:setSubscriptions', groupId, eventTypes),
+
   // Notifications
   notificationsGet: (opts?: any) => ipcRenderer.invoke('notifications:get', opts),
   notificationsGetUnreadCount: () => ipcRenderer.invoke('notifications:getUnreadCount'),

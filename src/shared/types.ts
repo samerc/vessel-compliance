@@ -1129,6 +1129,32 @@ export interface Notification {
   createdAt: string
 }
 
+export interface NotificationGroup {
+  id: string
+  name: string
+  description?: string | null
+  order: number
+  memberCount?: number
+  subscriptionCount?: number
+}
+
+export const NOTIFICATION_EVENT_TYPES = [
+  { key: 'survey_warranty_deadline', label: 'Survey Warranty Deadlines', category: 'Surveys' },
+  { key: 'document_expiring', label: 'Document Expiry Warnings', category: 'Compliance' },
+  { key: 'document_missing', label: 'Missing Documents', category: 'Compliance' },
+  { key: 'compliance_match', label: 'Sanctions Screening Matches', category: 'Compliance' },
+  { key: 'quotation_workflow', label: 'Quotation Workflow Changes', category: 'Quotations' },
+  { key: 'quotation_approval_needed', label: 'Quotation Approval Requests', category: 'Quotations' },
+  { key: 'policy_created', label: 'Policy Conversions', category: 'Policies' },
+  { key: 'policy_renewed', label: 'Policy Renewals', category: 'Policies' },
+  { key: 'policy_expiring', label: 'Policy Expiry Warnings', category: 'Policies' },
+  { key: 'blue_card_expiring', label: 'Blue Card Expiry', category: 'Policies' },
+  { key: 'vessel_status_change', label: 'Vessel Status Changes', category: 'Vessels' },
+  { key: 'entity_change', label: 'Entity Changes', category: 'Entities' },
+] as const
+
+export type NotificationEventType = typeof NOTIFICATION_EVENT_TYPES[number]['key']
+
 export interface PISectionTexts {
   docHeader?: string
   docHeaderSpacing?: number

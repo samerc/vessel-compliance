@@ -2442,11 +2442,14 @@ app.whenReady().then(() => {
     const result = await db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
     // Notify quotation creator about conversion
     try {
-      const [qRows] = await (db as any).pool.query('SELECT created_by, reference FROM quotations WHERE id = ?', [quotationId])
+      const [qRows] = await (db as any).pool.query('SELECT created_by, reference_number FROM quotations WHERE id = ?', [quotationId])
       const q = (qRows as any[])[0]
+      const refLabel = q?.reference_number || ''
       if (q?.created_by && q.created_by !== session.id) {
-        await db.notifyUser(q.created_by, 'policy_created', `Your quotation ${q.reference || ''} has been converted to a policy`, undefined, 'quotation', quotationId)
+        await db.notifyUser(q.created_by, 'policy_created', `Your quotation ${refLabel} has been converted to a policy`, undefined, 'quotation', quotationId)
       }
+      // Also notify groups subscribed to policy_created
+      db.notifyGroupsForEvent('policy_created', `Quotation ${refLabel} converted to policy`, undefined, 'quotation', quotationId, session.id).catch(() => {})
     } catch (err) { console.error('Policy conversion notification error:', err) }
     return result
   })
@@ -3066,6 +3069,14 @@ app.whenReady().then(() => {
         quotationId,
         user.id
       ).catch(() => {})
+      // Also notify groups subscribed to quotation_workflow
+      db.notifyGroupsForEvent('quotation_workflow', `Quotation moved to ${toStepName}`, comment || undefined, 'quotation', quotationId, user.id).catch(() => {})
+      // If the target step requires approval permission, also fire approval event
+      const transitionsToStep = transitions.filter(t => t.toStepId === toStepId)
+      const needsApproval = transitionsToStep.some(t => t.permissionKey === 'quotations:approve')
+      if (needsApproval) {
+        db.notifyGroupsForEvent('quotation_approval_needed', `Quotation requires approval (${toStepName})`, comment || undefined, 'quotation', quotationId, user.id).catch(() => {})
+      }
     } catch (err) { console.error('Workflow notification error:', err) }
     return { success: true }
   })
@@ -3133,6 +3144,52 @@ app.whenReady().then(() => {
     requireSession(event)
     const users = await db.getUsers()
     return users.map((u: any) => ({ id: u.id, username: u.username }))
+  })
+
+  // ==================== Notification Groups ====================
+  safeHandle('notifGroup:getAll', async (event) => {
+    requireSession(event)
+    return db.getNotificationGroups()
+  })
+
+  safeHandle('notifGroup:add', async (event, name: string, description?: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.addNotificationGroup(name, description)
+  })
+
+  safeHandle('notifGroup:update', async (event, id: string, name: string, description?: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.updateNotificationGroup(id, name, description)
+  })
+
+  safeHandle('notifGroup:delete', async (event, id: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.deleteNotificationGroup(id)
+  })
+
+  safeHandle('notifGroup:reorder', async (event, ids: string[]) => {
+    await requirePermission(event, 'admin:settings')
+    return db.reorderNotificationGroups(ids)
+  })
+
+  safeHandle('notifGroup:getMembers', async (event, groupId: string) => {
+    requireSession(event)
+    return db.getNotificationGroupMembers(groupId)
+  })
+
+  safeHandle('notifGroup:setMembers', async (event, groupId: string, userIds: string[]) => {
+    await requirePermission(event, 'admin:settings')
+    return db.setNotificationGroupMembers(groupId, userIds)
+  })
+
+  safeHandle('notifGroup:getSubscriptions', async (event, groupId: string) => {
+    requireSession(event)
+    return db.getNotificationGroupSubscriptions(groupId)
+  })
+
+  safeHandle('notifGroup:setSubscriptions', async (event, groupId: string, eventTypes: string[]) => {
+    await requirePermission(event, 'admin:settings')
+    return db.setNotificationGroupSubscriptions(groupId, eventTypes)
   })
 
   // Cleanup old read notifications on startup

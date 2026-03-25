@@ -2323,6 +2323,37 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('pi_warranty_set_items order_index migration:', e) }
 
+            // Migration: Create notification_groups tables if they don't exist
+            try {
+                const [ngTables] = await this.pool.query("SHOW TABLES LIKE 'notification_groups'") as any[]
+                if (ngTables.length === 0) {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS notification_groups (
+                        id VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT DEFAULT NULL,
+                        order_index INT DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS notification_group_members (
+                        group_id VARCHAR(36) NOT NULL,
+                        user_id VARCHAR(36) NOT NULL,
+                        PRIMARY KEY (group_id, user_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS notification_group_subscriptions (
+                        id VARCHAR(36) PRIMARY KEY,
+                        group_id VARCHAR(36) NOT NULL,
+                        event_type VARCHAR(100) NOT NULL,
+                        INDEX idx_ngs_group (group_id),
+                        INDEX idx_ngs_event (event_type)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                }
+            } catch (e) { console.error('notification_groups migration:', e) }
+
+            // Seed default notification groups
+            try {
+                await this.seedDefaultNotificationGroups()
+            } catch (e) { console.error('seedDefaultNotificationGroups:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -9718,6 +9749,160 @@ export class MySQLAdapter {
         const placeholders = usernames.map(() => '?').join(', ')
         const [rows] = await this.pool.query(`SELECT id, username FROM users WHERE username IN (${placeholders})`, usernames)
         return rows as { id: string; username: string }[]
+    }
+
+    // ==================== Notification Groups ====================
+
+    async getNotificationGroups(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT ng.id, ng.name, ng.description, ng.order_index AS \`order\`,
+                    (SELECT COUNT(*) FROM notification_group_members ngm WHERE ngm.group_id = ng.id) AS memberCount,
+                    (SELECT COUNT(*) FROM notification_group_subscriptions ngs WHERE ngs.group_id = ng.id) AS subscriptionCount
+             FROM notification_groups ng ORDER BY ng.order_index ASC`
+        )
+        return (rows as any[]).map(r => ({ ...r, memberCount: Number(r.memberCount), subscriptionCount: Number(r.subscriptionCount) }))
+    }
+
+    async addNotificationGroup(name: string, description?: string): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM notification_groups') as any[]
+        const order = maxRow[0]?.nextOrder ?? 0
+        await this.pool.execute(
+            'INSERT INTO notification_groups (id, name, description, order_index) VALUES (?, ?, ?, ?)',
+            [id, name, description || null, order]
+        )
+        return { id, name, description: description || null, order, memberCount: 0, subscriptionCount: 0 }
+    }
+
+    async updateNotificationGroup(id: string, name: string, description?: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE notification_groups SET name = ?, description = ? WHERE id = ?',
+            [name, description || null, id]
+        )
+    }
+
+    async deleteNotificationGroup(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM notification_group_members WHERE group_id = ?', [id])
+        await this.pool.execute('DELETE FROM notification_group_subscriptions WHERE group_id = ?', [id])
+        await this.pool.execute('DELETE FROM notification_groups WHERE id = ?', [id])
+    }
+
+    async reorderNotificationGroups(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE notification_groups SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
+    async getNotificationGroupMembers(groupId: string): Promise<{ id: string; username: string }[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT u.id, u.username FROM notification_group_members ngm
+             JOIN users u ON u.id = ngm.user_id
+             WHERE ngm.group_id = ?
+             ORDER BY u.username ASC`,
+            [groupId]
+        )
+        return rows as { id: string; username: string }[]
+    }
+
+    async setNotificationGroupMembers(groupId: string, userIds: string[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM notification_group_members WHERE group_id = ?', [groupId])
+        for (const userId of userIds) {
+            await this.pool.execute(
+                'INSERT INTO notification_group_members (group_id, user_id) VALUES (?, ?)',
+                [groupId, userId]
+            )
+        }
+    }
+
+    async getNotificationGroupSubscriptions(groupId: string): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT event_type FROM notification_group_subscriptions WHERE group_id = ?',
+            [groupId]
+        )
+        return (rows as any[]).map(r => r.event_type)
+    }
+
+    async setNotificationGroupSubscriptions(groupId: string, eventTypes: string[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM notification_group_subscriptions WHERE group_id = ?', [groupId])
+        for (const eventType of eventTypes) {
+            await this.pool.execute(
+                'INSERT INTO notification_group_subscriptions (id, group_id, event_type) VALUES (?, ?, ?)',
+                [uuidv4(), groupId, eventType]
+            )
+        }
+    }
+
+    async getGroupsSubscribedToEvent(eventType: string): Promise<{ groupId: string; groupName: string; userIds: string[] }[]> {
+        if (!this.pool) return []
+        const [groupRows] = await this.pool.query(
+            `SELECT ng.id AS groupId, ng.name AS groupName
+             FROM notification_group_subscriptions ngs
+             JOIN notification_groups ng ON ng.id = ngs.group_id
+             WHERE ngs.event_type = ?`,
+            [eventType]
+        )
+        const groups = groupRows as { groupId: string; groupName: string }[]
+        for (const g of groups) {
+            const [memberRows] = await this.pool.query(
+                'SELECT user_id FROM notification_group_members WHERE group_id = ?',
+                [g.groupId]
+            )
+            ;(g as any).userIds = (memberRows as any[]).map(r => r.user_id)
+        }
+        return groups as any[]
+    }
+
+    async notifyGroupsForEvent(eventType: string, title: string, message?: string, linkType?: string, linkId?: string, excludeUserId?: string): Promise<void> {
+        if (!this.pool) return
+        const groups = await this.getGroupsSubscribedToEvent(eventType)
+        // Deduplicate user IDs across all groups
+        const userIdSet = new Set<string>()
+        for (const g of groups) {
+            for (const uid of g.userIds) {
+                if (excludeUserId && uid === excludeUserId) continue
+                userIdSet.add(uid)
+            }
+        }
+        for (const userId of userIdSet) {
+            await this.createNotification({ userId, type: eventType, title, message, linkType, linkId })
+        }
+    }
+
+    async seedDefaultNotificationGroups(): Promise<void> {
+        if (!this.pool) return
+        const [existing] = await this.pool.query('SELECT COUNT(*) AS cnt FROM notification_groups') as any[]
+        if (existing[0]?.cnt > 0) return
+
+        const complianceId = uuidv4()
+        const underwritingId = uuidv4()
+        const operationsId = uuidv4()
+
+        await this.pool.execute('INSERT INTO notification_groups (id, name, description, order_index) VALUES (?, ?, ?, ?)', [complianceId, 'Compliance', 'Document and sanctions compliance notifications', 0])
+        await this.pool.execute('INSERT INTO notification_groups (id, name, description, order_index) VALUES (?, ?, ?, ?)', [underwritingId, 'Underwriting', 'Quotation and policy workflow notifications', 1])
+        await this.pool.execute('INSERT INTO notification_groups (id, name, description, order_index) VALUES (?, ?, ?, ?)', [operationsId, 'Operations', 'Vessel and survey operational notifications', 2])
+
+        const complianceSubs = ['document_expiring', 'document_missing', 'compliance_match']
+        const underwritingSubs = ['quotation_workflow', 'quotation_approval_needed', 'policy_created', 'policy_renewed']
+        const operationsSubs = ['survey_warranty_deadline', 'vessel_status_change']
+
+        for (const et of complianceSubs) {
+            await this.pool.execute('INSERT INTO notification_group_subscriptions (id, group_id, event_type) VALUES (?, ?, ?)', [uuidv4(), complianceId, et])
+        }
+        for (const et of underwritingSubs) {
+            await this.pool.execute('INSERT INTO notification_group_subscriptions (id, group_id, event_type) VALUES (?, ?, ?)', [uuidv4(), underwritingId, et])
+        }
+        for (const et of operationsSubs) {
+            await this.pool.execute('INSERT INTO notification_group_subscriptions (id, group_id, event_type) VALUES (?, ?, ?)', [uuidv4(), operationsId, et])
+        }
     }
 }
 
