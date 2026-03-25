@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List } from 'lucide-react'
+import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2 } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -17,6 +17,8 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
 import ChangelogModal from './components/ChangelogModal'
 import WhatsNewModal from './components/WhatsNewModal'
+import GlobalSearch from './components/GlobalSearch'
+import type { RecentItem } from '../../shared/types'
 
 // Heavy components — lazy loaded to reduce initial bundle size
 const SanctionsSearch = lazy(() => import('./components/SanctionsSearch'))
@@ -63,8 +65,39 @@ function App(): React.JSX.Element {
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set<string>())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set<string>(['recent']))
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Ctrl+K global search shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  const handleSearchNavigate = useCallback((type: string, id: string, _extra?: any) => {
+    if (type === 'vessel') {
+      setNavigateToVesselId(id)
+      setNavigateToVesselSection(undefined)
+      setNavigateBackTab(undefined)
+      setActiveTab('vessels')
+    } else if (type === 'entity') {
+      setActiveTab('directory')
+    } else if (type === 'quotation') {
+      setInitialQuotationId(id)
+      setActiveTab('quotations')
+    } else if (type === 'policy') {
+      setSelectedPolicyId(id)
+      setActiveTab('policy-detail')
+    }
+  }, [])
 
   // Restore sidebar state from DB when user session loads
   useEffect(() => {
@@ -134,6 +167,25 @@ function App(): React.JSX.Element {
     const interval = setInterval(fetchCount, 30000)
     return () => clearInterval(interval)
   }, [isAuthenticated])
+
+  // Load recent items
+  const loadRecentItems = useCallback(() => {
+    if (!isAuthenticated) { setRecentItems([]); return }
+    window.api.recentItemsGet().then(items => {
+      if (Array.isArray(items)) setRecentItems(items)
+    }).catch(() => {})
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    loadRecentItems()
+  }, [loadRecentItems])
+
+  // Listen for recent-item-added custom event from child components
+  useEffect(() => {
+    const handler = () => loadRecentItems()
+    window.addEventListener('recent-item-added', handler)
+    return () => window.removeEventListener('recent-item-added', handler)
+  }, [loadRecentItems])
 
   useEffect(() => {
     const preventDefault = (e: DragEvent) => {
@@ -219,8 +271,27 @@ function App(): React.JSX.Element {
               </>}
             </div>
 
-            {/* Notification Bell */}
-            <div style={{ display: 'flex', justifyContent: sc ? 'center' : 'flex-end', marginTop: '6px' }}>
+            {/* Search + Notification Bell */}
+            <div style={{ display: 'flex', justifyContent: sc ? 'center' : 'flex-end', marginTop: '6px', gap: '2px' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSearchOpen(true) }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+                className="hover-effect"
+                title="Search (Ctrl+K)"
+              >
+                <Search size={16} />
+                {!sc && <span style={{ fontSize: '0.78rem' }}>Search</span>}
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setActiveTab('notifications') }}
                 style={{
@@ -314,6 +385,74 @@ function App(): React.JSX.Element {
           {/* Navigation */}
           <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflowY: 'auto' }}>
             {navItem('dashboard', <LayoutDashboard size={18} />, 'Dashboard')}
+
+            {recentItems.length > 0 && (
+              <NavGroup id="recent" label="Recent" icon={<RefreshCw size={14} />}
+                groupCollapsed={collapsedGroups.has('recent')} onToggle={toggleGroup} sidebarCollapsed={sc}
+              >
+                {recentItems.slice(0, 8).map(item => {
+                  const iconMap: Record<string, React.ReactNode> = {
+                    vessel: <Anchor size={14} />,
+                    entity: <Building2 size={14} />,
+                    quotation: <FileText size={14} />,
+                    policy: <FileCheck size={14} />,
+                  }
+                  const icon = iconMap[item.itemType] || <FileText size={14} />
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        if (item.itemType === 'vessel') {
+                          setNavigateToVesselId(item.itemId)
+                          setNavigateToVesselSection(undefined)
+                          setNavigateBackTab(undefined)
+                          setActiveTab('vessels')
+                        } else if (item.itemType === 'entity') {
+                          setActiveTab('directory')
+                        } else if (item.itemType === 'quotation') {
+                          setInitialQuotationId(item.itemId)
+                          setActiveTab('quotations')
+                        } else if (item.itemType === 'policy') {
+                          setSelectedPolicyId(item.itemId)
+                          setActiveTab('policy-detail')
+                        }
+                      }}
+                      title={item.itemSublabel ? `${item.itemLabel} — ${item.itemSublabel}` : item.itemLabel}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: sc ? '0' : '8px',
+                        width: '100%',
+                        padding: sc ? '5px 0' : '4px 10px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.82rem',
+                        textAlign: 'left',
+                        overflow: 'hidden',
+                        justifyContent: sc ? 'center' : 'flex-start',
+                        transition: 'background 0.15s',
+                      }}
+                      className="hover-effect"
+                    >
+                      <span style={{ flexShrink: 0, opacity: 0.7 }}>{icon}</span>
+                      {!sc && (
+                        <span style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: 1,
+                        }}>
+                          {item.itemLabel}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </NavGroup>
+            )}
 
             <NavGroup id="fleet" label="Fleet" icon={<Ship size={14} />}
               groupCollapsed={collapsedGroups.has('fleet')} onToggle={toggleGroup} sidebarCollapsed={sc}
@@ -492,6 +631,7 @@ function App(): React.JSX.Element {
           </Suspense>}
         </main>
         <UpdateNotification />
+        <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={handleSearchNavigate} />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
         {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
         {showWhatsNew && (

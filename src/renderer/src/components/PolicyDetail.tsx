@@ -306,6 +306,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     loadData()
   }, [loadData])
 
+  // Track recent item view when policy loads
+  useEffect(() => {
+    if (!policy) return
+    window.api.recentItemsAdd('policy', policyId, policy.policyNumber || 'Policy', policy.vesselName || undefined).then(() => {
+      window.dispatchEvent(new Event('recent-item-added'))
+    }).catch(() => {})
+  }, [policy?.id])
+
   // Load supplementary data for blue card management + editing
   useEffect(() => {
     const loadSupplementary = async (): Promise<void> => {

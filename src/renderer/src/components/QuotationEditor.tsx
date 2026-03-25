@@ -172,6 +172,15 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         loadMasterData()
     }, [])
 
+    // Track recent item view
+    useEffect(() => {
+        const label = quotation.referenceNumber || 'Quotation'
+        const sublabel = (quotation as any).quotationTypeName || undefined
+        window.api.recentItemsAdd('quotation', quotation.id, label, sublabel).then(() => {
+            window.dispatchEvent(new Event('recent-item-added'))
+        }).catch(() => {})
+    }, [quotation.id])
+
     const loadMasterData = async () => {
         const [fullQ, , v, gt, sv] = await Promise.all([
             window.api.getQuotation(quotation.id),

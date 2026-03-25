@@ -3174,6 +3174,17 @@ app.whenReady().then(() => {
     return users.map((u: any) => ({ id: u.id, username: u.username }))
   })
 
+  // ==================== Recent Items ====================
+  safeHandle('recent:get', async (event) => {
+    const user = requireSession(event)
+    return db.getRecentItems(user.id)
+  })
+
+  safeHandle('recent:add', async (event, itemType: string, itemId: string, itemLabel: string, itemSublabel?: string) => {
+    const user = requireSession(event)
+    return db.addRecentItem(user.id, itemType, itemId, itemLabel, itemSublabel)
+  })
+
   // ==================== Notification Groups ====================
   safeHandle('notifGroup:getAll', async (event) => {
     requireSession(event)
@@ -3241,6 +3252,12 @@ app.whenReady().then(() => {
   safeHandle('dailyAlerts:getLastRun', async (event) => {
     requireSession(event)
     return db.getSetting('daily_alerts_last_run')
+  })
+
+  // Global Search
+  safeHandle('global:search', async (event, query: string) => {
+    requireSession(event)
+    return db.globalSearch(query)
   })
 
   // Initialize update service with main window

@@ -2354,6 +2354,21 @@ export class MySQLAdapter {
                 await this.seedDefaultNotificationGroups()
             } catch (e) { console.error('seedDefaultNotificationGroups:', e) }
 
+            // Recent Items table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS user_recent_items (
+                    id VARCHAR(36) PRIMARY KEY,
+                    user_id VARCHAR(36) NOT NULL,
+                    item_type VARCHAR(50) NOT NULL,
+                    item_id VARCHAR(36) NOT NULL,
+                    item_label VARCHAR(255) NOT NULL,
+                    item_sublabel VARCHAR(255) DEFAULT NULL,
+                    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_uri_user (user_id),
+                    UNIQUE KEY uk_uri_user_item (user_id, item_type, item_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch (e) { console.error('user_recent_items migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -9877,6 +9892,68 @@ export class MySQLAdapter {
         }
     }
 
+    async globalSearch(query: string, limit: number = 20): Promise<{
+        vessels: any[]
+        entities: any[]
+        quotations: any[]
+        policies: any[]
+    }> {
+        if (!this.pool) return { vessels: [], entities: [], quotations: [], policies: [] }
+        const like = `%${query}%`
+        const perCategory = Math.min(Math.floor(limit / 4), 5) || 5
+
+        const [vessels, entities, quotations, policies] = await Promise.all([
+            this.pool.query(
+                `SELECT id, name, imo_number AS imoNumber, is_active AS isActive
+                 FROM vessels
+                 WHERE name LIKE ? OR imo_number LIKE ?
+                 ORDER BY is_active DESC, name ASC
+                 LIMIT ?`,
+                [like, like, perCategory]
+            ).then(([rows]) => rows as any[]),
+
+            this.pool.query(
+                `SELECT id, name, type
+                 FROM entities
+                 WHERE name LIKE ?
+                 ORDER BY name ASC
+                 LIMIT ?`,
+                [like, perCategory]
+            ).then(([rows]) => rows as any[]),
+
+            this.pool.query(
+                `SELECT q.id, q.reference_number AS referenceNumber,
+                        q.quotation_date AS quotationDate,
+                        qt.name AS quotationTypeName, qt.code AS quotationTypeCode
+                 FROM quotations q
+                 LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                 WHERE q.revision_number = (
+                     SELECT MAX(q2.revision_number) FROM quotations q2
+                     WHERE q2.revision_group_id = q.revision_group_id
+                 )
+                 AND q.reference_number LIKE ?
+                 ORDER BY q.quotation_date DESC
+                 LIMIT ?`,
+                [like, perCategory]
+            ).then(([rows]) => rows as any[]),
+
+            this.pool.query(
+                `SELECT vdp.id, vdp.policy_number AS policyNumber,
+                        vdp.vessel_id AS vesselId, v.name AS vesselName,
+                        pt.name AS policyTypeName, vdp.status
+                 FROM vessel_dynamic_policies vdp
+                 LEFT JOIN vessels v ON vdp.vessel_id = v.id
+                 LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
+                 WHERE vdp.policy_number LIKE ? OR v.name LIKE ?
+                 ORDER BY vdp.status ASC, v.name ASC
+                 LIMIT ?`,
+                [like, like, perCategory]
+            ).then(([rows]) => rows as any[])
+        ])
+
+        return { vessels, entities, quotations, policies }
+    }
+
     async seedDefaultNotificationGroups(): Promise<void> {
         if (!this.pool) return
         const [existing] = await this.pool.query('SELECT COUNT(*) AS cnt FROM notification_groups') as any[]
@@ -9903,6 +9980,43 @@ export class MySQLAdapter {
         for (const et of operationsSubs) {
             await this.pool.execute('INSERT INTO notification_group_subscriptions (id, group_id, event_type) VALUES (?, ?, ?)', [uuidv4(), operationsId, et])
         }
+    }
+
+    // --- Recent Items ---
+    async getRecentItems(userId: string, limit = 8): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, user_id AS userId, item_type AS itemType, item_id AS itemId,
+                    item_label AS itemLabel, item_sublabel AS itemSublabel,
+                    viewed_at AS viewedAt
+             FROM user_recent_items
+             WHERE user_id = ?
+             ORDER BY viewed_at DESC
+             LIMIT ?`,
+            [userId, limit]
+        )
+        return rows as any[]
+    }
+
+    async addRecentItem(userId: string, itemType: string, itemId: string, itemLabel: string, itemSublabel?: string): Promise<void> {
+        if (!this.pool) return
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO user_recent_items (id, user_id, item_type, item_id, item_label, item_sublabel, viewed_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE viewed_at = NOW(), item_label = VALUES(item_label), item_sublabel = VALUES(item_sublabel)`,
+            [id, userId, itemType, itemId, itemLabel, itemSublabel || null]
+        )
+        // Keep max 20 items per user — delete oldest beyond 20
+        await this.pool.execute(
+            `DELETE FROM user_recent_items
+             WHERE user_id = ? AND id NOT IN (
+                 SELECT id FROM (
+                     SELECT id FROM user_recent_items WHERE user_id = ? ORDER BY viewed_at DESC LIMIT 20
+                 ) AS keep
+             )`,
+            [userId, userId]
+        )
     }
 }
 

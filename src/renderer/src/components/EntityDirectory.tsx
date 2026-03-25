@@ -596,6 +596,10 @@ export default function EntityDirectory() {
       })
       setShowAddAddress(false)
       setEditingAddress(null)
+      // Track recent item view
+      window.api.recentItemsAdd('entity', selectedEntity.id, selectedEntity.name, selectedEntity.type).then(() => {
+        window.dispatchEvent(new Event('recent-item-added'))
+      }).catch(() => {})
     } else {
       setEntityAddresses([])
     }

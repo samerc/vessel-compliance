@@ -51,6 +51,13 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         loadData()
     }, [vessel])
 
+    // Track recent item view
+    useEffect(() => {
+        window.api.recentItemsAdd('vessel', vessel.id, vessel.name, vessel.imoNumber ? 'IMO: ' + vessel.imoNumber : undefined).then(() => {
+            window.dispatchEvent(new Event('recent-item-added'))
+        }).catch(() => {})
+    }, [vessel.id])
+
 
     const loadData = async () => {
         const types = await window.api.getDocumentTypes()

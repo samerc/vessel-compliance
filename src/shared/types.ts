@@ -1129,6 +1129,16 @@ export interface Notification {
   createdAt: string
 }
 
+export interface RecentItem {
+  id: string
+  userId: string
+  itemType: string
+  itemId: string
+  itemLabel: string
+  itemSublabel?: string | null
+  viewedAt: string
+}
+
 export interface NotificationGroup {
   id: string
   name: string

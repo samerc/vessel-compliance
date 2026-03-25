@@ -733,6 +733,13 @@ const api = {
   notificationsMarkAllRead: () => ipcRenderer.invoke('notifications:markAllRead'),
   notificationsDelete: (id: string) => ipcRenderer.invoke('notifications:delete', id),
   notificationsGetUsernames: () => ipcRenderer.invoke('notifications:getUsernames'),
+
+  // Global Search
+  globalSearch: (query: string) => ipcRenderer.invoke('global:search', query),
+
+  // Recent Items
+  recentItemsGet: () => ipcRenderer.invoke('recent:get'),
+  recentItemsAdd: (itemType: string, itemId: string, itemLabel: string, itemSublabel?: string) => ipcRenderer.invoke('recent:add', itemType, itemId, itemLabel, itemSublabel),
 }
 
 // Expose curated API to renderer via context bridge
