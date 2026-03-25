@@ -10,6 +10,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateShort } from '../utils/dateUtils'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -26,6 +27,16 @@ export default function SurveyorDirectory() {
   const { showError, showSuccess } = useToast()
   const { hasPermission } = useAuth()
   const canManage = hasPermission('surveys:manage')
+
+  // Column preferences
+  const SURVEYOR_COLUMNS: ColumnDef[] = [
+    { id: 'company', label: 'Company', defaultVisible: true },
+    { id: 'country', label: 'Country', defaultVisible: true },
+    { id: 'contact', label: 'Contact Person', defaultVisible: true },
+    { id: 'surveys', label: 'Surveys', defaultVisible: true },
+  ]
+  const { visibleColumns: survVisibleCols, setVisibleColumns: setSurvVisibleCols } = useColumnPrefs('surveyors', SURVEYOR_COLUMNS)
+  const survVisibleSet = new Set(survVisibleCols)
 
   // ── Surveyors (paginated) ────────────────────────────────────────────────────
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
@@ -311,19 +322,27 @@ export default function SurveyorDirectory() {
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)', position: 'sticky', top: 0, zIndex: 1 }}>
-                  {['Company', 'Country', 'Contact Person', 'Surveys'].map(col => (
-                    <th key={col} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{col}</th>
+                  {[
+                    { id: 'company', label: 'Company' },
+                    { id: 'country', label: 'Country' },
+                    { id: 'contact', label: 'Contact Person' },
+                    { id: 'surveys', label: 'Surveys' },
+                  ].filter(col => survVisibleSet.has(col.id)).map(col => (
+                    <th key={col.id} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{col.label}</th>
                   ))}
+                  <th style={{ padding: '10px 16px', textAlign: 'right', width: '40px' }}>
+                    <ColumnSelector pageKey="surveyors" allColumns={SURVEYOR_COLUMNS} visibleColumns={survVisibleCols} onChange={setSurvVisibleCols} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading && surveyors.length === 0 ? (
-                  <tr><td colSpan={4} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <tr><td colSpan={survVisibleCols.length + 1} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <Loader2 size={22} className="spinner" style={{ display: 'block', margin: '0 auto 10px' }} />
                     Loading surveyors...
                   </td></tr>
                 ) : surveyors.length === 0 ? (
-                  <tr><td colSpan={4} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <tr><td colSpan={survVisibleCols.length + 1} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <Anchor size={30} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }} />
                     No surveyors found
                   </td></tr>
@@ -344,6 +363,7 @@ export default function SurveyorDirectory() {
                       }}
                     >
                       {/* Company */}
+                      {survVisibleSet.has('company') && (
                       <td style={{ padding: '12px 16px', overflow: 'hidden' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -357,14 +377,18 @@ export default function SurveyorDirectory() {
                           </div>
                         </div>
                       </td>
+                      )}
                       {/* Country */}
+                      {survVisibleSet.has('country') && (
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.83rem', color: 'var(--text-secondary)' }}>
                           <Globe size={12} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
                           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{surveyor.country}</span>
                         </div>
                       </td>
+                      )}
                       {/* Contact Person */}
+                      {survVisibleSet.has('contact') && (
                       <td style={{ padding: '12px 16px' }}>
                         {surveyor.contactPerson ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.83rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -375,7 +399,9 @@ export default function SurveyorDirectory() {
                           <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', opacity: 0.5 }}>—</span>
                         )}
                       </td>
+                      )}
                       {/* Surveys */}
+                      {survVisibleSet.has('surveys') && (
                       <td style={{ padding: '12px 16px' }}>
                         {count > 0 ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)', background: accentBg, padding: '2px 8px', borderRadius: '10px' }}>
@@ -385,6 +411,8 @@ export default function SurveyorDirectory() {
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', opacity: 0.5 }}>—</span>
                         )}
                       </td>
+                      )}
+                      <td />{/* spacer for column selector header */}
                     </tr>
                   )
                 })}

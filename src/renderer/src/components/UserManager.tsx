@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 export default function UserManager() {
     const { resetPassword, user: currentUser, hasPermission } = useAuth()
@@ -20,6 +21,18 @@ export default function UserManager() {
     const [userGroupMap, setUserGroupMap] = useState<Record<string, string[]>>({})
     const [userPermCounts, setUserPermCounts] = useState<Record<string, number>>({})
     const [groupNameMap, setGroupNameMap] = useState<Record<string, string>>({})
+
+    // Column preferences
+    const USER_COLUMNS: ColumnDef[] = [
+        { id: 'user', label: 'User', defaultVisible: true },
+        { id: 'groups', label: 'Groups', defaultVisible: true },
+        { id: 'permissions', label: 'Permissions', defaultVisible: true },
+        { id: 'version', label: 'Version', defaultVisible: true },
+        { id: 'lastLogin', label: 'Last Login', defaultVisible: true },
+        { id: 'actions', label: 'Actions', defaultVisible: true },
+    ]
+    const { visibleColumns: userVisibleCols, setVisibleColumns: setUserVisibleCols } = useColumnPrefs('users', USER_COLUMNS)
+    const userVisibleSet = new Set(userVisibleCols)
 
     // Confirmation modal state
     const [confirmation, setConfirmation] = useState<{
@@ -445,12 +458,23 @@ export default function UserManager() {
                         <caption className="sr-only">User accounts</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>User</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Groups</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Permissions</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Version</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Last Login</th>
-                                <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'right' }}>Actions</th>
+                                {userVisibleSet.has('user') && <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>User</th>}
+                                {userVisibleSet.has('groups') && <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Groups</th>}
+                                {userVisibleSet.has('permissions') && <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Permissions</th>}
+                                {userVisibleSet.has('version') && <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Version</th>}
+                                {userVisibleSet.has('lastLogin') && <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Last Login</th>}
+                                {userVisibleSet.has('actions') ? (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                                            Actions
+                                            <ColumnSelector pageKey="users" allColumns={USER_COLUMNS} visibleColumns={userVisibleCols} onChange={setUserVisibleCols} />
+                                        </div>
+                                    </th>
+                                ) : (
+                                    <th scope="col" style={{ padding: '14px 16px', textAlign: 'right' }}>
+                                        <ColumnSelector pageKey="users" allColumns={USER_COLUMNS} visibleColumns={userVisibleCols} onChange={setUserVisibleCols} />
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
@@ -462,6 +486,7 @@ export default function UserManager() {
 
                                 return (
                                     <tr key={user.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                        {userVisibleSet.has('user') && (
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <div style={{
@@ -488,6 +513,8 @@ export default function UserManager() {
                                                 </div>
                                             </div>
                                         </td>
+                                        )}
+                                        {userVisibleSet.has('groups') && (
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                                 {groupIds.length === 0 ? (
@@ -505,6 +532,8 @@ export default function UserManager() {
                                                 )}
                                             </div>
                                         </td>
+                                        )}
+                                        {userVisibleSet.has('permissions') && (
                                         <td style={{ padding: '12px 16px' }}>
                                             <span style={{
                                                 padding: '2px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '600',
@@ -515,6 +544,8 @@ export default function UserManager() {
                                                 {permCount}
                                             </span>
                                         </td>
+                                        )}
+                                        {userVisibleSet.has('version') && (
                                         <td style={{ padding: '12px 16px' }}>
                                             <span style={{
                                                 padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '600',
@@ -523,9 +554,13 @@ export default function UserManager() {
                                                 {user.lastAppVersion || '—'}
                                             </span>
                                         </td>
+                                        )}
+                                        {userVisibleSet.has('lastLogin') && (
                                         <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
                                             {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : <span style={{ opacity: 0.5 }}>Never</span>}
                                         </td>
+                                        )}
+                                        {userVisibleSet.has('actions') && (
                                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
                                                 {canManageUsers && (
@@ -571,6 +606,7 @@ export default function UserManager() {
                                                 )}
                                             </div>
                                         </td>
+                                        )}
                                     </tr>
                                 )
                             })}

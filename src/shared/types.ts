@@ -830,6 +830,7 @@ export interface QuotationHullAlternative {
   label?: string
   premiumAmount?: number
   order: number
+  vesselScopeId?: string | null
 }
 
 export interface QuotationPIAlternative {

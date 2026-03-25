@@ -278,8 +278,8 @@ export interface Api {
   updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => Promise<void>
   // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => Promise<QuotationHullAlternative[]>
-  hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string) => Promise<QuotationHullAlternative>
-  hullUpdateQuotationAlternative: (id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null }) => Promise<void>
+  hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string, vesselScopeId?: string | null) => Promise<QuotationHullAlternative>
+  hullUpdateQuotationAlternative: (id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null; vesselScopeId?: string | null }) => Promise<void>
   hullDeleteQuotationAlternative: (id: string) => Promise<void>
   hullReorderQuotationAlternatives: (ids: string[]) => Promise<void>
   hullGetQuotationHullConditions: (qId: string) => Promise<QuotationHullCondition[]>

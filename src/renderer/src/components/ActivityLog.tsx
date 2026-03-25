@@ -4,6 +4,7 @@ import { ActivityLogEntry, ActivityLogFilters } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
   CREATE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
@@ -65,6 +66,18 @@ export default function ActivityLog() {
       </div>
     )
   }
+
+  // Column preferences
+  const ACTIVITY_COLUMNS: ColumnDef[] = [
+    { id: 'date', label: 'Date / Time', defaultVisible: true },
+    { id: 'user', label: 'User', defaultVisible: true },
+    { id: 'module', label: 'Module', defaultVisible: true },
+    { id: 'action', label: 'Action', defaultVisible: true },
+    { id: 'entity', label: 'Entity', defaultVisible: true },
+    { id: 'details', label: 'Details', defaultVisible: true },
+  ]
+  const { visibleColumns: actVisibleCols, setVisibleColumns: setActVisibleCols } = useColumnPrefs('activity-log', ACTIVITY_COLUMNS)
+  const actVisibleSet = new Set(actVisibleCols)
 
   const [entries, setEntries] = useState<ActivityLogEntry[]>([])
   const [total, setTotal] = useState(0)
@@ -287,15 +300,15 @@ export default function ActivityLog() {
               borderBottom: `2px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
             }}>
               {[
-                { label: 'Date / Time', width: '155px' },
-                { label: 'User', width: '110px' },
-                { label: 'Module', width: '110px' },
-                { label: 'Action', width: '120px' },
-                { label: 'Entity', width: 'auto' },
-                { label: 'Details', width: '35%' },
-              ].map((h) => (
+                { id: 'date', label: 'Date / Time', width: '155px' },
+                { id: 'user', label: 'User', width: '110px' },
+                { id: 'module', label: 'Module', width: '110px' },
+                { id: 'action', label: 'Action', width: '120px' },
+                { id: 'entity', label: 'Entity', width: 'auto' },
+                { id: 'details', label: 'Details', width: '35%' },
+              ].filter(h => actVisibleSet.has(h.id)).map((h) => (
                 <th
-                  key={h.label}
+                  key={h.id}
                   style={{
                     padding: '11px 16px', textAlign: 'left', fontSize: '0.7rem',
                     fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px',
@@ -306,18 +319,21 @@ export default function ActivityLog() {
                   {h.label}
                 </th>
               ))}
+              <th style={{ padding: '11px 8px', textAlign: 'right', width: '40px' }}>
+                <ColumnSelector pageKey="activity-log" allColumns={ACTIVITY_COLUMNS} visibleColumns={actVisibleCols} onChange={setActVisibleCols} />
+              </th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <td colSpan={actVisibleCols.length + 1} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                   Loading...
                 </td>
               </tr>
             ) : entries.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '64px 20px', textAlign: 'center' }}>
+                <td colSpan={actVisibleCols.length + 1} style={{ padding: '64px 20px', textAlign: 'center' }}>
                   <ScrollText size={36} style={{ color: 'var(--text-secondary)', opacity: 0.2, marginBottom: '12px' }} />
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 500 }}>
                     No activity entries found
@@ -342,12 +358,17 @@ export default function ActivityLog() {
                     transition: 'background 0.15s',
                   }}
                 >
+                  {actVisibleSet.has('date') && (
                   <td style={{ padding: '10px 16px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: isLight ? '#64748b' : 'var(--text-secondary)', fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
                     {formatDateTime(entry.createdAt)}
                   </td>
+                  )}
+                  {actVisibleSet.has('user') && (
                   <td style={{ padding: '10px 16px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {entry.username}
                   </td>
+                  )}
+                  {actVisibleSet.has('module') && (
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{
                       display: 'inline-block', padding: '3px 10px', borderRadius: '6px',
@@ -359,6 +380,8 @@ export default function ActivityLog() {
                       {entry.module}
                     </span>
                   </td>
+                  )}
+                  {actVisibleSet.has('action') && (
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{
                       display: 'inline-block', padding: '3px 10px', borderRadius: '6px',
@@ -369,6 +392,8 @@ export default function ActivityLog() {
                       {entry.action.replace(/_/g, ' ')}
                     </span>
                   </td>
+                  )}
+                  {actVisibleSet.has('entity') && (
                   <td style={{ padding: '10px 16px', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
                     {entry.entityName ? (
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{entry.entityName}</span>
@@ -378,6 +403,8 @@ export default function ActivityLog() {
                       <span style={{ color: 'var(--text-secondary)', opacity: 0.35 }}>&mdash;</span>
                     )}
                   </td>
+                  )}
+                  {actVisibleSet.has('details') && (
                   <td style={{
                     padding: '10px 16px', fontSize: '0.8rem', color: isLight ? '#64748b' : 'var(--text-secondary)',
                     maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -386,6 +413,8 @@ export default function ActivityLog() {
                   >
                     {entry.details || ''}
                   </td>
+                  )}
+                  <td />{/* spacer for column selector header */}
                 </tr>
               )
             })}

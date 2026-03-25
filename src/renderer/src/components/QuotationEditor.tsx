@@ -3924,17 +3924,21 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                             })}
                         </div>
                     ) :
-                    /* Hull with multiple alternatives: per-alternative premium */
-                    quotation.quotationTypeCode === 'H' && hullAlternatives.length > 1 ? (
+                    /* Hull with multiple alternatives or per-vessel mode: per-alternative/vessel premium */
+                    quotation.quotationTypeCode === 'H' && (hullAlternatives.length > 1 || hullAlternatives.some(a => a.vesselScopeId)) ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
                             {hullAlternatives.map((alt, idx) => {
                                 const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                                const vessel = alt.vesselScopeId ? qVessels.find(v => v.id === alt.vesselScopeId) : null
                                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
                                 const accentColor = altColors[idx % altColors.length]
+                                const label = vessel
+                                    ? `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
+                                    : `Alt ${idx + 1}${clause ? ` (${clause.code})` : ''}`
                                 return (
                                     <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
                                         <label style={{ fontSize: '0.82rem', fontWeight: 600, color: accentColor, minWidth: '140px', whiteSpace: 'nowrap' }}>
-                                            Alt {idx + 1}{clause ? ` (${clause.code})` : ''}
+                                            {label}
                                         </label>
                                         <input type="number" value={alt.premiumAmount || ''} onChange={e => setHullAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updateAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
@@ -4041,7 +4045,7 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                     return an - ud
                 }
                 const discountLabel = (quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : '') + (quotation.ncbEnabled && quotation.upccEnabled ? ' + ' : '') + (quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '')
-                const hullMultiAlt = quotation.quotationTypeCode === 'H' && hullAlternatives.length > 1
+                const hullMultiAlt = quotation.quotationTypeCode === 'H' && (hullAlternatives.length > 1 || hullAlternatives.some(a => a.vesselScopeId))
                 const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
                 const anyMultiAlt = hullMultiAlt || piMultiAlt
                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
@@ -4066,10 +4070,14 @@ function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotat
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {hullAlternatives.map((alt, idx) => {
                                     const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                                    const vessel = alt.vesselScopeId ? qVessels.find(v => v.id === alt.vesselScopeId) : null
+                                    const altLabel = vessel
+                                        ? `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
+                                        : `Alt ${idx + 1}${clause ? ` (${clause.code})` : ''}`
                                     return (
                                         <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: altColors[idx % altColors.length], minWidth: '140px' }}>
-                                                Alt {idx + 1}{clause ? ` (${clause.code})` : ''}
+                                                {altLabel}
                                             </span>
                                             <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(computePayable(alt.premiumAmount || 0))}</span>
                                         </div>
@@ -6086,6 +6094,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     const [qConditions, setQConditions] = useState<QuotationHullCondition[]>([])
     const [qAdditional, setQAdditional] = useState<QuotationHullAdditionalCondition[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [selectedVesselTab, setSelectedVesselTab] = useState<string | null>(null) // null = 'All', string = vessel.id
     const condDefaultsApplied = useRef(false)
     const addDefaultsApplied = useRef(false)
 
@@ -6116,6 +6125,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
 
         // If no alternatives exist yet, create one from the quotation's hullClauseId or first H&M clause
         const hmClauses = safeClauses.filter(c => c.conditionSection !== 'iv')
+        const safeVessels = Array.isArray(qv) ? qv : []
         if (safeAlts.length === 0 && hmClauses.length > 0) {
             const defaultClauseId = quotation.hullClauseId && safeClauses.some(c => c.id === quotation.hullClauseId)
                 ? quotation.hullClauseId
@@ -6131,10 +6141,15 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         } else {
             setAlternatives(safeAlts)
             // Sync hullClauseId from first alternative
-            if (safeAlts.length === 1 && safeAlts[0].hullClauseId !== quotation.hullClauseId) {
-                try { updateField('hullClauseId', safeAlts[0].hullClauseId) } catch {}
+            const nonVesselAlts = safeAlts.filter(a => !a.vesselScopeId)
+            if (nonVesselAlts.length === 1 && nonVesselAlts[0].hullClauseId !== quotation.hullClauseId) {
+                try { updateField('hullClauseId', nonVesselAlts[0].hullClauseId) } catch {}
             } else if (safeAlts.length > 1 && quotation.hullClauseId) {
                 try { updateField('hullClauseId', null) } catch {}
+            }
+            // Auto-select first vessel tab if per-vessel mode is active
+            if (safeAlts.some(a => a.vesselScopeId) && safeVessels.length >= 2) {
+                setSelectedVesselTab(prev => prev !== null ? prev : safeVessels[0].id)
             }
         }
 
@@ -6190,20 +6205,84 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         }
     }
 
-    // Alternative management
-    const addAlternative = async () => {
+    // Per-vessel mode detection
+    const isPerVesselMode = alternatives.some(a => a.vesselScopeId)
+    const multiVessel = qVessels.length >= 2
+
+    // Enable per-vessel mode: create one alternative per vessel from the existing single alt's clause
+    const enablePerVesselMode = async () => {
+        if (!multiVessel) return
         const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
         if (hmClauses.length === 0) return
-        // Pick first clause not already used by an alternative
-        const usedIds = new Set(alternatives.map(a => a.hullClauseId))
+        // Use existing alt's clause as default, or quotation's hullClauseId
+        const baseClauseId = alternatives[0]?.hullClauseId || quotation.hullClauseId || hmClauses[0].id
+        try {
+            // Delete existing non-vessel-scoped alternatives
+            for (const alt of alternatives.filter(a => !a.vesselScopeId)) {
+                await window.api.hullDeleteQuotationAlternative(alt.id)
+            }
+            // Create one alternative per vessel
+            const newAlts: QuotationHullAlternative[] = []
+            for (const v of qVessels) {
+                const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, baseClauseId, undefined, v.id)
+                if (newAlt && !(newAlt as any).error) newAlts.push(newAlt)
+            }
+            // Keep any existing vessel-scoped alternatives that still match
+            const existingVesselAlts = alternatives.filter(a => a.vesselScopeId)
+            setAlternatives([...existingVesselAlts, ...newAlts])
+            setSelectedVesselTab(qVessels[0].id)
+            try { updateField('hullClauseId', null) } catch {}
+            // Refresh conditions
+            const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
+            setQConditions(Array.isArray(fresh) ? fresh : [])
+            const freshAdd = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+            setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to enable per-vessel mode')
+        }
+    }
+
+    // Disable per-vessel mode: merge all vessel-scoped alts into one shared alt
+    const disablePerVesselMode = async () => {
+        const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
+        if (hmClauses.length === 0) return
+        const baseClauseId = alternatives[0]?.hullClauseId || quotation.hullClauseId || hmClauses[0].id
+        try {
+            for (const alt of alternatives) {
+                await window.api.hullDeleteQuotationAlternative(alt.id)
+            }
+            const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, baseClauseId)
+            if (newAlt && !(newAlt as any).error) {
+                setAlternatives([newAlt])
+                try { updateField('hullClauseId', baseClauseId) } catch {}
+            }
+            setSelectedVesselTab(null)
+            const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
+            setQConditions(Array.isArray(fresh) ? fresh : [])
+            const freshAdd = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+            setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
+        } catch (err: any) {
+            showError(err.message || 'Failed to disable per-vessel mode')
+        }
+    }
+
+    // Alternative management
+    const addAlternative = async (vesselScopeId?: string | null) => {
+        const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
+        if (hmClauses.length === 0) return
+        // Pick first clause not already used by an alternative in the same scope
+        const scopeAlts = vesselScopeId
+            ? alternatives.filter(a => a.vesselScopeId === vesselScopeId)
+            : alternatives.filter(a => !a.vesselScopeId)
+        const usedIds = new Set(scopeAlts.map(a => a.hullClauseId))
         const available = hmClauses.find(c => !usedIds.has(c.id)) || hmClauses[0]
         try {
-            const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, available.id)
+            const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, available.id, undefined, vesselScopeId)
             if (newAlt && !(newAlt as any).error) {
                 const updated = [...alternatives, newAlt]
                 setAlternatives(updated)
                 // Clear hullClauseId when we have multiple alternatives
-                if (updated.length > 1) {
+                if (updated.filter(a => !a.vesselScopeId).length > 1) {
                     try { updateField('hullClauseId', null) } catch {}
                 }
             }
@@ -6213,7 +6292,14 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     }
 
     const removeAlternative = async (altId: string) => {
-        if (alternatives.length <= 1) return
+        const alt = alternatives.find(a => a.id === altId)
+        // In per-vessel mode, each vessel must keep at least one alternative
+        if (alt?.vesselScopeId) {
+            const vesselAlts = alternatives.filter(a => a.vesselScopeId === alt.vesselScopeId)
+            if (vesselAlts.length <= 1) return
+        } else if (alternatives.filter(a => !a.vesselScopeId).length <= 1 && !isPerVesselMode) {
+            return
+        }
         try {
             await window.api.hullDeleteQuotationAlternative(altId)
             const updated = alternatives.filter(a => a.id !== altId)
@@ -6223,9 +6309,10 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
             setQConditions(Array.isArray(fresh) ? fresh : [])
             const freshAdd = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
             setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
-            // If back to single alternative, sync hullClauseId
-            if (updated.length === 1) {
-                try { updateField('hullClauseId', updated[0].hullClauseId) } catch {}
+            // If back to single non-vessel alternative, sync hullClauseId
+            const nonVesselAlts = updated.filter(a => !a.vesselScopeId)
+            if (nonVesselAlts.length === 1 && !isPerVesselMode) {
+                try { updateField('hullClauseId', nonVesselAlts[0].hullClauseId) } catch {}
             }
         } catch (err: any) {
             showError(err.message || 'Failed to remove alternative')
@@ -6418,7 +6505,13 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
     const ivClauses = hullClauses.filter(c => c.conditionSection === 'iv')
     const selectedIvClause = hullClauses.find(c => c.id === selectedIvClauseId)
-    const multiAlt = alternatives.length > 1
+
+    // In per-vessel mode, filter alternatives by the selected vessel tab
+    // In standard mode, show all non-vessel-scoped alternatives
+    const visibleAlternatives = isPerVesselMode && selectedVesselTab
+        ? alternatives.filter(a => a.vesselScopeId === selectedVesselTab)
+        : alternatives.filter(a => !a.vesselScopeId)
+    const multiAlt = visibleAlternatives.length > 1
 
     // Build condition items with amount inputs
     const buildCondItems = (conds: HullClauseCondition[]) => conds.map(c => ({
@@ -6482,102 +6575,164 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         }
     }
 
+    // Render a set of alternatives (used both in standard and per-vessel mode)
+    const renderAlternatives = (alts: QuotationHullAlternative[], vesselScopeId?: string | null) => {
+        const isMulti = alts.length > 1
+        return (
+            <>
+                {alts.map((alt, idx) => {
+                    const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                    const clauseConditions = allConditions.filter(c => c.hullClauseId === alt.hullClauseId)
+                    const altLabel = isMulti ? `Alternative ${idx + 1}` : (quotation.ivEnabled ? 'Section A — Hull and Machinery' : 'Hull Clause')
+                    const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+                    const accentColor = isMulti ? altColors[idx % altColors.length] : 'transparent'
+
+                    return (
+                        <div key={alt.id} style={{
+                            marginBottom: isMulti ? '16px' : '0',
+                            borderLeft: isMulti ? `3px solid ${accentColor}` : 'none',
+                            paddingLeft: isMulti ? '16px' : '0',
+                            borderRadius: isMulti ? '2px' : '0'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <div style={{
+                                    fontSize: isMulti ? '0.88rem' : '0.78rem',
+                                    color: isMulti ? accentColor : 'var(--text-secondary)',
+                                    fontWeight: 600
+                                }}>{altLabel}</div>
+                                {isMulti && clause && (
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                        {clause.code || clause.name}
+                                    </span>
+                                )}
+                                <div style={{ flex: 1 }} />
+                                {isMulti && (
+                                    <button
+                                        onClick={() => removeAlternative(alt.id)}
+                                        style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                        title="Remove alternative"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
+                            </div>
+                            <HullClauseDropdown
+                                clauses={quotation.ivEnabled ? hmClauses : hullClauses}
+                                selectedId={alt.hullClauseId}
+                                onChange={(clauseId) => changeAlternativeClause(alt.id, clauseId)}
+                                description={clause?.description}
+                            />
+
+                            {alt.hullClauseId && (
+                                <HullConditionPicker
+                                    label={isMulti ? `Alternative ${idx + 1} Conditions` : (quotation.ivEnabled ? 'Section A Conditions' : 'Clause Conditions')}
+                                    items={buildCondItems(clauseConditions)}
+                                    selectedIds={getAltSelectedIds(alt.id)}
+                                    onToggle={(condId) => toggleCondition(condId, alt.id)}
+                                    overrides={getAltOverrides(alt.id)}
+                                    onOverrideChange={updateConditionOverride}
+                                    onOverrideBlur={saveConditionOverrides}
+                                    scopes={getAltScopes(alt.id)}
+                                    onScopeChange={updateConditionScope}
+                                    vessels={qVessels}
+                                    emptyText="No conditions defined for this clause. Add them in Quotation Settings → Hull Clauses."
+                                    amounts={getAltAmounts(alt.id)}
+                                    onAmountChange={updateConditionAmount}
+                                    onAmountBlur={saveConditionOverrides}
+                                    allConditions={allConditions}
+                                />
+                            )}
+                        </div>
+                    )
+                })}
+
+                {/* Add Alternative button */}
+                <button
+                    onClick={() => addAlternative(vesselScopeId)}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        background: 'none', border: '1px dashed var(--input-border)',
+                        borderRadius: '6px', padding: '6px 12px', cursor: 'pointer',
+                        color: 'var(--accent)', fontSize: '0.8rem', marginBottom: '16px'
+                    }}
+                >
+                    <Plus size={14} /> Add Alternative
+                </button>
+            </>
+        )
+    }
+
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Hull Conditions</h3>
-                <button
-                    onClick={handleSyncFromSettings}
-                    className="btn-secondary"
-                    style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    title="Add new default items from settings without replacing existing selections"
-                >
-                    <RefreshCw size={12} /> Sync from Settings
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {multiVessel && (
+                        <button
+                            onClick={isPerVesselMode ? disablePerVesselMode : enablePerVesselMode}
+                            className="btn-secondary"
+                            style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title={isPerVesselMode ? 'Switch to shared hull clause for all vessels' : 'Assign different hull clauses per vessel'}
+                        >
+                            <Ship size={12} /> {isPerVesselMode ? 'Shared Clause' : 'Per-Vessel Clauses'}
+                        </button>
+                    )}
+                    <button
+                        onClick={handleSyncFromSettings}
+                        className="btn-secondary"
+                        style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        title="Add new default items from settings without replacing existing selections"
+                    >
+                        <RefreshCw size={12} /> Sync from Settings
+                    </button>
+                </div>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
-                Select hull clause{multiAlt ? ' alternatives' : ''}, configure clause conditions, and additional conditions.
+                {isPerVesselMode
+                    ? 'Each vessel has its own hull clause and conditions. Select a vessel tab to configure.'
+                    : `Select hull clause${multiAlt ? ' alternatives' : ''}, configure clause conditions, and additional conditions.`}
             </p>
 
-            {/* Alternatives */}
-            {alternatives.map((alt, idx) => {
-                const clause = hullClauses.find(c => c.id === alt.hullClauseId)
-                const clauseConditions = allConditions.filter(c => c.hullClauseId === alt.hullClauseId)
-                const altLabel = multiAlt ? `Alternative ${idx + 1}` : (quotation.ivEnabled ? 'Section A — Hull and Machinery' : 'Hull Clause')
-                const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
-                const accentColor = multiAlt ? altColors[idx % altColors.length] : 'transparent'
+            {/* Per-vessel tabs */}
+            {isPerVesselMode && multiVessel && (
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    {qVessels.map(v => {
+                        const isActive = selectedVesselTab === v.id
+                        const vesselAlts = alternatives.filter(a => a.vesselScopeId === v.id)
+                        const vesselClause = vesselAlts[0] ? hullClauses.find(c => c.id === vesselAlts[0].hullClauseId) : null
+                        return (
+                            <button
+                                key={v.id}
+                                onClick={() => setSelectedVesselTab(v.id)}
+                                style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '6px',
+                                    border: isActive ? '2px solid var(--accent)' : '1px solid var(--input-border)',
+                                    background: isActive ? 'rgba(0,170,200,0.1)' : 'transparent',
+                                    color: isActive ? 'var(--accent)' : 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: isActive ? 600 : 400,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'flex-start',
+                                    gap: '2px'
+                                }}
+                            >
+                                <span>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                                {vesselClause && (
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                        {vesselClause.code || vesselClause.name}
+                                    </span>
+                                )}
+                            </button>
+                        )
+                    })}
+                </div>
+            )}
 
-                return (
-                    <div key={alt.id} style={{
-                        marginBottom: multiAlt ? '16px' : '0',
-                        borderLeft: multiAlt ? `3px solid ${accentColor}` : 'none',
-                        paddingLeft: multiAlt ? '16px' : '0',
-                        borderRadius: multiAlt ? '2px' : '0'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                            <div style={{
-                                fontSize: multiAlt ? '0.88rem' : '0.78rem',
-                                color: multiAlt ? accentColor : 'var(--text-secondary)',
-                                fontWeight: 600
-                            }}>{altLabel}</div>
-                            {multiAlt && clause && (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                                    {clause.code || clause.name}
-                                </span>
-                            )}
-                            <div style={{ flex: 1 }} />
-                            {multiAlt && (
-                                <button
-                                    onClick={() => removeAlternative(alt.id)}
-                                    style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                                    title="Remove alternative"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
-                            )}
-                        </div>
-                        <HullClauseDropdown
-                            clauses={quotation.ivEnabled ? hmClauses : hullClauses}
-                            selectedId={alt.hullClauseId}
-                            onChange={(clauseId) => changeAlternativeClause(alt.id, clauseId)}
-                            description={clause?.description}
-                        />
-
-                        {alt.hullClauseId && (
-                            <HullConditionPicker
-                                label={multiAlt ? `Alternative ${idx + 1} Conditions` : (quotation.ivEnabled ? 'Section A Conditions' : 'Clause Conditions')}
-                                items={buildCondItems(clauseConditions)}
-                                selectedIds={getAltSelectedIds(alt.id)}
-                                onToggle={(condId) => toggleCondition(condId, alt.id)}
-                                overrides={getAltOverrides(alt.id)}
-                                onOverrideChange={updateConditionOverride}
-                                onOverrideBlur={saveConditionOverrides}
-                                scopes={getAltScopes(alt.id)}
-                                onScopeChange={updateConditionScope}
-                                vessels={qVessels}
-                                emptyText="No conditions defined for this clause. Add them in Quotation Settings → Hull Clauses."
-                                amounts={getAltAmounts(alt.id)}
-                                onAmountChange={updateConditionAmount}
-                                onAmountBlur={saveConditionOverrides}
-                                allConditions={allConditions}
-                            />
-                        )}
-                    </div>
-                )
-            })}
-
-            {/* Add Alternative button */}
-            <button
-                onClick={addAlternative}
-                style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    background: 'none', border: '1px dashed var(--input-border)',
-                    borderRadius: '6px', padding: '6px 12px', cursor: 'pointer',
-                    color: 'var(--accent)', fontSize: '0.8rem', marginBottom: '16px'
-                }}
-            >
-                <Plus size={14} /> Add Alternative
-            </button>
+            {/* Alternatives (filtered by vessel tab in per-vessel mode) */}
+            {renderAlternatives(visibleAlternatives, isPerVesselMode ? selectedVesselTab : undefined)}
 
             {/* IV Clause Selector (only when IV enabled) */}
             {quotation.ivEnabled && ivClauses.length > 0 && (

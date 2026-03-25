@@ -654,3 +654,95 @@ header h1::after {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* ── Utility: hide element when printing ── */
+.no-print {
+  /* visible on screen; hidden via @media print below */
+}
+
+/* ── Print-friendly styles ── */
+@media print {
+  /* Hide non-printable elements */
+  .sidebar,
+  .no-print,
+  button,
+  .btn-primary,
+  .btn-secondary,
+  nav,
+  .toast-container,
+  [role='navigation'] {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for paper */
+  body,
+  .glass-card,
+  .main-content {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Full width content */
+  .main-content,
+  [class*='content'] {
+    margin: 0 !important;
+    padding: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Table styling for print */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  table th,
+  table td {
+    border: 1px solid #ddd !important;
+    padding: 6px 8px !important;
+    background: white !important;
+    color: black !important;
+    font-size: 10pt !important;
+  }
+
+  table th {
+    background: #f0f0f0 !important;
+    font-weight: bold !important;
+  }
+
+  /* Page breaks */
+  .glass-card {
+    page-break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3 {
+    page-break-after: avoid;
+    color: black !important;
+  }
+
+  /* Remove fancy effects */
+  * {
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Links — show URL */
+  a[href]::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.8em;
+    color: #666;
+  }
+
+  /* Specific pages */
+  .vessel-detail-header {
+    border-bottom: 2px solid black;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+}

@@ -7,6 +7,7 @@ import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 interface FleetDetailProps {
     fleet: Fleet
@@ -25,6 +26,15 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const isLight = theme === 'light'
     const { hasPermission } = useAuth()
     const canManageFleets = hasPermission('fleets:manage')
+
+    // Column preferences for fleet detail vessel table
+    const FLEET_DETAIL_COLUMNS: ColumnDef[] = [
+        { id: 'name', label: 'Vessel Name', defaultVisible: true },
+        { id: 'imo', label: 'IMO Number', defaultVisible: true },
+        { id: 'actions', label: 'Actions', defaultVisible: true },
+    ]
+    const { visibleColumns: fdVisibleCols, setVisibleColumns: setFdVisibleCols } = useColumnPrefs('fleet-detail', FLEET_DETAIL_COLUMNS)
+    const fdVisibleSet = new Set(fdVisibleCols)
 
     // Individual PDF export state
     const [exportingIndividual, setExportingIndividual] = useState(false)
@@ -160,14 +170,26 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         <caption className="sr-only">{title}</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                <th scope="col" style={{ padding: '16px' }}>Vessel Name</th>
-                                <th scope="col" style={{ padding: '16px' }}>IMO Number</th>
-                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                                {fdVisibleSet.has('name') && <th scope="col" style={{ padding: '16px' }}>Vessel Name</th>}
+                                {fdVisibleSet.has('imo') && <th scope="col" style={{ padding: '16px' }}>IMO Number</th>}
+                                {fdVisibleSet.has('actions') ? (
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                                            Actions
+                                            <ColumnSelector pageKey="fleet-detail" allColumns={FLEET_DETAIL_COLUMNS} visibleColumns={fdVisibleCols} onChange={setFdVisibleCols} />
+                                        </div>
+                                    </th>
+                                ) : (
+                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                                        <ColumnSelector pageKey="fleet-detail" allColumns={FLEET_DETAIL_COLUMNS} visibleColumns={fdVisibleCols} onChange={setFdVisibleCols} />
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
                             {vesselList.map(v => (
                                 <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+                                    {fdVisibleSet.has('name') && (
                                     <td style={{ padding: '16px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             <div style={{ background: 'var(--bg-card)', padding: '8px', borderRadius: '8px' }}>
@@ -193,11 +215,15 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {fdVisibleSet.has('imo') && (
                                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <Hash size={14} /> {v.imoNumber}
                                         </div>
                                     </td>
+                                    )}
+                                    {fdVisibleSet.has('actions') && (
                                     <td style={{ padding: '16px', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                             <button
@@ -219,6 +245,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                             )}
                                         </div>
                                     </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>

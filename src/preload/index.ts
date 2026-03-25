@@ -290,7 +290,7 @@ const api = {
   updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => ipcRenderer.invoke('quotation:updateItemAlternativeId', table, id, alternativeId),
   // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('hull:getQuotationAlternatives', qId),
-  hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label),
+  hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string, vesselScopeId?: string | null) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label, vesselScopeId),
   hullUpdateQuotationAlternative: (id: string, updates: any) => ipcRenderer.invoke('hull:updateQuotationAlternative', id, updates),
   hullDeleteQuotationAlternative: (id: string) => ipcRenderer.invoke('hull:deleteQuotationAlternative', id),
   hullReorderQuotationAlternatives: (ids: string[]) => ipcRenderer.invoke('hull:reorderQuotationAlternatives', ids),

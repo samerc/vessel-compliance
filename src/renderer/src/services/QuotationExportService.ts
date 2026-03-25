@@ -773,7 +773,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     if (hc.length > 0 || ha.length > 0) {
       const ivClauseId = data.quotation.ivClauseId
       const selectedIvClause = ivClauseId ? data.hullClauses.find(c => c.id === ivClauseId) : null
-      const multiAlt = alts.length > 1
+      const isPerVesselExport = alts.some(a => a.vesselScopeId)
+      const multiAlt = alts.length > 1 || isPerVesselExport
 
       const getCondClauseId = (qc: typeof hc[0]) => {
         const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
@@ -873,15 +874,22 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           const alt = alts[i]
           const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
           const altConds = getAltCondsResolved(alt)
-          hcBlocks.push({ title: `Alternative ${i + 1}`, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
+          // Use vessel name as title in per-vessel mode, otherwise "Alternative N"
+          let altTitle = `Alternative ${i + 1}`
+          if (isPerVesselExport && alt.vesselScopeId) {
+            const vessel = data.quotationVessels.find(v => v.id === alt.vesselScopeId)
+            if (vessel) altTitle = `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}`
+          }
+          hcBlocks.push({ title: altTitle, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
         }
         const allAltsAddl = renderAddlForSection(b => b.type === 'allAlts')
-        if (allAltsAddl) hcBlocks.push({ title: 'Applicable to all alternatives', underline: true, addl: allAltsAddl })
+        const allLabel = isPerVesselExport ? 'Applicable to all vessels' : 'Applicable to all alternatives'
+        if (allAltsAddl) hcBlocks.push({ title: allLabel, underline: true, addl: allAltsAddl })
         if (hasIvSection) {
           hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         }
         const bothAddl = renderAddlForSection(b => b.type === 'both')
-        if (bothAddl) hcBlocks.push({ title: hasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives', underline: true, addl: bothAddl })
+        if (bothAddl) hcBlocks.push({ title: hasIvSection ? 'Applicable to all sections' : allLabel, underline: true, addl: bothAddl })
       } else if (hasIvSection) {
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
@@ -1269,7 +1277,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     // Build premium line items
     type PDFPremLine = { label: string; tech: number }
     const pdfPremLines: PDFPremLine[] = []
-    const hullMultiAlt = data.hullAlternatives.length > 1
+    const hullMultiAlt = data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId)
+    const hullPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
     const piMultiAltPrem = data.piAlternatives.length > 1
 
     if (hasVesselPremiums) {
@@ -1286,7 +1295,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
           const alt = data.hullAlternatives[ai]
           const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-          pdfPremLines.push({ label: `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`, tech: alt.premiumAmount || 0 })
+          let premLabel = `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`
+          if (hullPerVessel && alt.vesselScopeId) {
+            const vessel = data.quotationVessels.find(v => v.id === alt.vesselScopeId)
+            if (vessel) premLabel = `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
+          }
+          pdfPremLines.push({ label: premLabel, tech: alt.premiumAmount || 0 })
         }
         if (q.ivEnabled && q.ivPremiumAmount != null) pdfPremLines.push({ label: 'IV', tech: q.ivPremiumAmount })
       } else if (q.ivEnabled) {
@@ -1985,7 +1999,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const noBordersObj = () => ({ top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } })
       const dIvClauseId = data.quotation.ivClauseId
       const dSelectedIvClause = dIvClauseId ? data.hullClauses.find(c => c.id === dIvClauseId) : null
-      const dMultiAlt = dAlts.length > 1
+      const dIsPerVessel = dAlts.some(a => a.vesselScopeId)
+      const dMultiAlt = dAlts.length > 1 || dIsPerVessel
 
       // Resolve amount: check the condition itself, then any sibling with the same conditionId
       const dResolveAmount = (qc: typeof hc[0]): number | null | undefined => {
@@ -2095,12 +2110,17 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
 
       if (dMultiAlt) {
-        // Multiple alternatives
+        // Multiple alternatives or per-vessel
         for (let i = 0; i < dAlts.length; i++) {
           const alt = dAlts[i]
           const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
           const altConds = dGetAltCondsResolved(alt)
-          hcContent.push(bup(`Alternative ${i + 1}`))
+          let dAltTitle = `Alternative ${i + 1}`
+          if (dIsPerVessel && alt.vesselScopeId) {
+            const vessel = data.quotationVessels.find(v => v.id === alt.vesselScopeId)
+            if (vessel) dAltTitle = `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}`
+          }
+          hcContent.push(bup(dAltTitle))
           hcContent.push(emptyP())
           if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
           if (altConds.length > 0) hcContent.push(makeCondTable(altConds))
@@ -2109,10 +2129,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           hcContent.push(emptyP())
         }
 
-        // Applicable to all alternatives
+        // Applicable to all alternatives/vessels
+        const dAllLabel = dIsPerVessel ? 'Applicable to all vessels' : 'Applicable to all alternatives'
         const allAltsAddl = dRenderAddlForSection(b => b.type === 'allAlts')
         if (allAltsAddl.length > 0) {
-          hcContent.push(bup('Applicable to all alternatives'))
+          hcContent.push(bup(dAllLabel))
           hcContent.push(emptyP())
           hcContent.push(...allAltsAddl)
           hcContent.push(emptyP())
@@ -2138,7 +2159,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Applicable to all sections
         const dBothAddl = dRenderAddlForSection(b => b.type === 'both')
         if (dBothAddl.length > 0) {
-          hcContent.push(bup(dHasIvSection ? 'Applicable to all sections' : 'Applicable to all alternatives'))
+          hcContent.push(bup(dHasIvSection ? 'Applicable to all sections' : dAllLabel))
           hcContent.push(emptyP())
           hcContent.push(...dBothAddl)
         }
@@ -2714,8 +2735,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       premContent.push(new Table({ rows: premTableRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: premColW, layout: TableLayoutType.FIXED }))
       premContent.push(np('per annum'))
       premContent.push(emptyP())
-    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.piAlternatives.length > 1) {
-      const wMultiAlt = data.hullAlternatives.length > 1
+    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId) || data.piAlternatives.length > 1) {
+      const wMultiAlt = data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId)
+      const wPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
       const wPiMultiAlt = data.piAlternatives.length > 1
       const premLabelW = Math.round(BODY_W * 0.35)
       const premAmtW = BODY_W - premLabelW
@@ -2726,7 +2748,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       })
       const premRow = (label: string, amount: string, boldLabel = false) => new TableRow({
         children: [
-          premCell(label, boldLabel || label.startsWith('Alternative'), undefined, premLabelW),
+          premCell(label, boldLabel || label.startsWith('Alternative') || label.startsWith('M/V'), undefined, premLabelW),
           premCell(amount, true, undefined, premAmtW)
         ]
       })
@@ -2749,7 +2771,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
           const alt = data.hullAlternatives[ai]
           const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-          lines.push({ label: `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`, tech: alt.premiumAmount || 0 })
+          let wAltLabel = `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`
+          if (wPerVessel && alt.vesselScopeId) {
+            const vessel = data.quotationVessels.find(v => v.id === alt.vesselScopeId)
+            if (vessel) wAltLabel = `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
+          }
+          lines.push({ label: wAltLabel, tech: alt.premiumAmount || 0 })
         }
         if (wq.ivEnabled && wq.ivPremiumAmount != null) lines.push({ label: 'IV', tech: wq.ivPremiumAmount })
       } else if (wq.ivEnabled) {

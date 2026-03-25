@@ -27,6 +27,7 @@ import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 interface CustomerGroup {
   entity: Entity
@@ -66,6 +67,15 @@ export default function FleetManager() {
   const [fleetSearch, setFleetSearch] = useState('')
   const [fleetSortKey, setFleetSortKey] = useState<'name' | 'vessels'>('name')
   const [fleetSortDir, setFleetSortDir] = useState<'asc' | 'desc'>('asc')
+
+  // Column preferences for fleet table
+  const FLEET_COLUMNS: ColumnDef[] = [
+    { id: 'name', label: 'Fleet', defaultVisible: true },
+    { id: 'vessels', label: 'Vessels', defaultVisible: true },
+    { id: 'actions', label: 'Actions', defaultVisible: true },
+  ]
+  const { visibleColumns: fleetVisibleCols, setVisibleColumns: setFleetVisibleCols } = useColumnPrefs('fleets', FLEET_COLUMNS)
+  const fleetVisibleSet = new Set(fleetVisibleCols)
   const [customerSearch, setCustomerSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'broker' | 'direct'>('all')
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
@@ -700,6 +710,7 @@ export default function FleetManager() {
                     }}
                   >
                     {/* Sortable: FLEET */}
+                    {fleetVisibleSet.has('name') && (
                     <th
                       scope="col"
                       onClick={() => toggleFleetSort('name')}
@@ -724,7 +735,9 @@ export default function FleetManager() {
                         )}
                       </span>
                     </th>
+                    )}
                     {/* Sortable: VESSELS */}
+                    {fleetVisibleSet.has('vessels') && (
                     <th
                       scope="col"
                       onClick={() => toggleFleetSort('vessels')}
@@ -750,7 +763,9 @@ export default function FleetManager() {
                         )}
                       </span>
                     </th>
+                    )}
                     {/* Non-sortable: ACTIONS */}
+                    {fleetVisibleSet.has('actions') ? (
                     <th
                       scope="col"
                       style={{
@@ -763,8 +778,16 @@ export default function FleetManager() {
                         width: 130,
                       }}
                     >
-                      ACTIONS
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                        ACTIONS
+                        <ColumnSelector pageKey="fleets" allColumns={FLEET_COLUMNS} visibleColumns={fleetVisibleCols} onChange={setFleetVisibleCols} />
+                      </div>
                     </th>
+                    ) : (
+                    <th scope="col" style={{ padding: '11px 16px', textAlign: 'right' }}>
+                      <ColumnSelector pageKey="fleets" allColumns={FLEET_COLUMNS} visibleColumns={fleetVisibleCols} onChange={setFleetVisibleCols} />
+                    </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -804,6 +827,7 @@ export default function FleetManager() {
                           }}
                           className="hover-effect"
                         >
+                          {fleetVisibleSet.has('name') && (
                           <td style={{ padding: '13px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div
@@ -835,6 +859,8 @@ export default function FleetManager() {
                               </div>
                             </div>
                           </td>
+                          )}
+                          {fleetVisibleSet.has('vessels') && (
                           <td style={{ padding: '13px 16px' }}>
                             {count === 0 ? (
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
@@ -860,6 +886,8 @@ export default function FleetManager() {
                               </span>
                             )}
                           </td>
+                          )}
+                          {fleetVisibleSet.has('actions') && (
                           <td
                             style={{ padding: '13px 16px', textAlign: 'right' }}
                             onClick={e => e.stopPropagation()}
@@ -901,6 +929,7 @@ export default function FleetManager() {
                               )}
                             </div>
                           </td>
+                          )}
                         </tr>
                       )
                     })

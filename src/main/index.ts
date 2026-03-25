@@ -1068,7 +1068,18 @@ app.whenReady().then(() => {
       details: `Uploaded ${docTypeName} for vessel ${vDocName}`
     }).catch(() => {})
   })
-  safeHandle('db:updateVesselDocumentExpiry', async (event, vesselId, docTypeId, expiryDate) => { await requirePermission(event, 'documents:upload'); return db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate) })
+  safeHandle('db:updateVesselDocumentExpiry', async (event, vesselId, docTypeId, expiryDate) => {
+    const user = await requirePermission(event, 'documents:upload')
+    const result = await db.updateVesselDocumentExpiry(vesselId, docTypeId, expiryDate)
+    try {
+      const [vRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [vesselId])
+      const vesselName = (vRows as any[])[0]?.name || vesselId
+      const [dtRows] = await (db as any).pool.query('SELECT name FROM document_types WHERE id = ? UNION SELECT name FROM vessel_custom_doc_types WHERE id = ?', [docTypeId, docTypeId])
+      const docTypeName = (dtRows as any[])[0]?.name || 'document'
+      db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Documents', entityType: 'vessel_document', entityId: vesselId, entityName: vesselName, details: `${docTypeName} expiry ${expiryDate ? 'set to ' + expiryDate : 'cleared'} for ${vesselName}` }).catch(() => {})
+    } catch { /* do not block */ }
+    return result
+  })
   safeHandle('db:updateVesselDocumentReceivedDate', async (event, vesselId, docTypeId, receivedDate) => { await requirePermission(event, 'documents:upload'); return db.updateVesselDocumentReceivedDate(vesselId, docTypeId, receivedDate) })
   safeHandle('db:duplicateVesselDocument', async (event, docId, uploadedBy) => { await requirePermission(event, 'documents:upload'); return db.duplicateVesselDocument(docId, uploadedBy) })
   safeHandle('db:deleteVesselDocumentById', async (event, docId) => { await requirePermission(event, 'documents:delete'); return db.deleteVesselDocumentById(docId) })
@@ -1094,16 +1105,23 @@ app.whenReady().then(() => {
   })
   safeHandle('db:updateEntity', async (event, id, updates) => {
     const user = await requirePermission(event, 'entities:edit')
-    const [eRows] = await (db as any).pool.query('SELECT name FROM entities WHERE id = ?', [id])
-    const entityName = updates.name || (eRows as any[])[0]?.name || id
+    const [eRows] = await (db as any).pool.query('SELECT name, email, phone, type FROM entities WHERE id = ?', [id])
+    const old = (eRows as any[])[0] || {}
+    const entityName = updates.name || old.name || id
     const docFields = ['passportFilePath', 'certificateOfIncorporationPath', 'articlesOfAssociationPath', 'kycFilePath']
     const hasDocChange = docFields.some(f => updates[f] !== undefined)
     await db.updateEntity(id, updates)
     if (hasDocChange) {
       await db.autoSnoozeVesselsForEntity(id)
     }
-    const fields = Object.keys(updates).filter(k => updates[k] !== undefined && !docFields.includes(k))
-    const summary = fields.length > 0 ? fields.map(k => k === 'name' ? `Name → ${updates[k]}` : `${k} changed`).join(', ') : hasDocChange ? 'Documents updated' : `Updated ${entityName}`
+    const changes: string[] = []
+    if (updates.name && updates.name !== old.name) changes.push(`name: ${old.name} → ${updates.name}`)
+    if (updates.email !== undefined && updates.email !== old.email) changes.push('email changed')
+    if (updates.phone !== undefined && updates.phone !== old.phone) changes.push('phone changed')
+    if (updates.type && updates.type !== old.type) changes.push(`type: ${old.type} → ${updates.type}`)
+    const nonDocFields = Object.keys(updates).filter(k => updates[k] !== undefined && !docFields.includes(k) && !['name', 'email', 'phone', 'type'].includes(k))
+    if (nonDocFields.length > 0) changes.push(...nonDocFields.map(k => `${k} changed`))
+    const summary = changes.length > 0 ? changes.join(', ') : hasDocChange ? 'Documents updated' : `Updated ${entityName}`
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -1172,8 +1190,34 @@ app.whenReady().then(() => {
   safeHandle('db:queryDAB', (event, criteria) => { requireSession(event); return db.queryDAB(criteria) })
 
   safeHandle('db:getVesselAssureds', (event, vesselId) => { requireSession(event); return db.getVesselAssureds(vesselId) })
-  safeHandle('db:addVesselAssured', async (event, assured) => { await requirePermission(event, 'assureds:manage'); return db.addVesselAssured(assured) })
-  safeHandle('db:deleteVesselAssured', async (event, id) => { await requirePermission(event, 'assureds:manage'); return db.deleteVesselAssured(id) })
+  safeHandle('db:addVesselAssured', async (event, assured) => {
+    const user = await requirePermission(event, 'assureds:manage')
+    const result = await db.addVesselAssured(assured)
+    try {
+      const [vRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [assured.vesselId])
+      const vesselName = (vRows as any[])[0]?.name || assured.vesselId
+      const [entRows] = await (db as any).pool.query('SELECT name FROM entities WHERE id = ?', [assured.entityId])
+      const entityName = (entRows as any[])[0]?.name || assured.entityId
+      db.logActivity({ userId: user.id, username: user.username, action: 'CREATE', module: 'Assureds', entityType: 'vessel_assured', entityId: assured.vesselId, entityName: vesselName, details: `Added ${entityName} as ${assured.role || 'assured'} on ${vesselName}` }).catch(() => {})
+    } catch { /* do not block */ }
+    return result
+  })
+  safeHandle('db:deleteVesselAssured', async (event, id) => {
+    const user = await requirePermission(event, 'assureds:manage')
+    let vesselName = ''
+    let entityName = ''
+    let role = ''
+    try {
+      const [rows] = await (db as any).pool.query('SELECT va.vessel_id, va.role, e.name AS entity_name, v.name AS vessel_name FROM vessel_assureds va LEFT JOIN entities e ON e.id = va.entity_id LEFT JOIN vessels v ON v.id = va.vessel_id WHERE va.id = ?', [id])
+      const row = (rows as any[])[0]
+      vesselName = row?.vessel_name || ''
+      entityName = row?.entity_name || ''
+      role = row?.role || ''
+    } catch { /* do not block */ }
+    const result = await db.deleteVesselAssured(id)
+    db.logActivity({ userId: user.id, username: user.username, action: 'DELETE', module: 'Assureds', entityType: 'vessel_assured', entityName: vesselName, details: `Removed ${entityName}${role ? ' (' + role + ')' : ''} from ${vesselName}` }).catch(() => {})
+    return result
+  })
   safeHandle('db:updateVesselAssuredRole', async (event, id, role) => { await requirePermission(event, 'assureds:manage'); return db.updateVesselAssuredRole(id, role) })
 
   safeHandle('db:getEntityUBOs', (event, assuredEntityId) => { requireSession(event); return db.getEntityUBOs(assuredEntityId) })
@@ -1825,11 +1869,12 @@ app.whenReady().then(() => {
   })
 
   safeHandle('compliance:setScheduleSettings', async (event, settings) => {
-    await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'admin:settings')
     const nextRunAt = complianceScheduler.calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
     settings.nextRunAt = nextRunAt
     await db.setComplianceScheduleSettings(settings)
     complianceScheduler.start()
+    db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Settings', entityType: 'compliance_schedule', entityName: 'Compliance Schedule', details: `Updated compliance schedule: ${settings.enabled ? 'enabled' : 'disabled'}, threshold ${settings.matchThreshold}%` }).catch(() => {})
     return { success: true }
   })
 
@@ -1944,7 +1989,7 @@ app.whenReady().then(() => {
 
   // Hull Alternatives
   safeHandle('hull:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationHullAlternatives(qId) })
-  safeHandle('hull:addQuotationAlternative', async (event, qId, hullClauseId, label) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationHullAlternative(qId, hullClauseId, label) })
+  safeHandle('hull:addQuotationAlternative', async (event, qId, hullClauseId, label, vesselScopeId) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationHullAlternative(qId, hullClauseId, label, vesselScopeId) })
   safeHandle('hull:updateQuotationAlternative', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationHullAlternative(id, updates) })
   safeHandle('hull:deleteQuotationAlternative', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationHullAlternative(id) })
   safeHandle('hull:reorderQuotationAlternatives', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationHullAlternatives(ids) })
@@ -2479,9 +2524,19 @@ app.whenReady().then(() => {
   safeHandle('policy:getAddresses', (event, policyId) => { requireSession(event); return db.getPolicyAddresses(policyId) })
   safeHandle('policy:getBlueCards', (event, policyId) => { requireSession(event); return db.getPolicyBlueCards(policyId) })
   safeHandle('policy:getRevisions', (event, policyNumber) => { requireSession(event); return db.getPolicyRevisions(policyNumber) })
-  safeHandle('policy:addBlueCard', (event, data) => { requireSession(event); return db.addPolicyBlueCard(data) })
+  safeHandle('policy:addBlueCard', async (event, data) => {
+    const user = requireSession(event)
+    const result = await db.addPolicyBlueCard(data)
+    db.logActivity({ userId: user.id, username: user.username, action: 'CREATE', module: 'Policies', entityType: 'blue_card', entityId: data.policyDocumentId, entityName: data.cardType || 'Blue Card', details: `Added ${data.cardType || 'blue card'}${data.policyNumber ? ' for policy ' + data.policyNumber : ''}` }).catch(() => {})
+    return result
+  })
   safeHandle('policy:updateBlueCard', (event, id, data) => { requireSession(event); return db.updatePolicyBlueCard(id, data) })
-  safeHandle('policy:supersedeBlueCard', (event, id) => { requireSession(event); return db.supersedePolicyBlueCard(id) })
+  safeHandle('policy:supersedeBlueCard', async (event, id) => {
+    const user = requireSession(event)
+    const result = await db.supersedePolicyBlueCard(id)
+    db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Policies', entityType: 'blue_card', entityId: id, entityName: 'Blue Card', details: 'Superseded blue card' }).catch(() => {})
+    return result
+  })
   safeHandle('policy:convertFromQuotation', async (event, quotationId, options) => {
     const session = requireSession(event)
     const result = await db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
@@ -2499,7 +2554,16 @@ app.whenReady().then(() => {
     return result
   })
 
-  safeHandle('policy:update', async (event, id, fields) => { await requirePermission(event, 'policies:manage'); return db.updatePolicyDocument(id, fields) })
+  safeHandle('policy:update', async (event, id, fields) => {
+    const user = await requirePermission(event, 'policies:manage')
+    const result = await db.updatePolicyDocument(id, fields)
+    try {
+      const changedKeys = Object.keys(fields).filter(k => fields[k] !== undefined)
+      const policyLabel = fields.policyNumber || id
+      db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Policies', entityType: 'policy_document', entityId: id, entityName: String(policyLabel), details: `Updated policy fields: ${changedKeys.join(', ')}` }).catch(() => {})
+    } catch { /* do not block */ }
+    return result
+  })
   safeHandle('policy:setInstalments', async (event, policyId, instalments) => { await requirePermission(event, 'policies:manage'); return db.setPolicyInstalments(policyId, instalments) })
   safeHandle('policy:setAddresses', async (event, policyId, addresses) => { await requirePermission(event, 'policies:manage'); return db.setPolicyAddresses(policyId, addresses) })
   safeHandle('policy:createRevision', async (event, policyId) => { const session = requireSession(event); await requirePermission(event, 'policies:manage'); return db.createPolicyRevision(policyId, session.id) })
@@ -2844,8 +2908,9 @@ app.whenReady().then(() => {
     return raw ? { ...REPORT_SETTINGS_DEFAULTS, ...JSON.parse(raw) } : REPORT_SETTINGS_DEFAULTS
   })
   safeHandle('reportSettings:set', async (event, settings) => {
-    await requirePermission(event, 'admin:settings')
+    const user = await requirePermission(event, 'admin:settings')
     await db.setSetting(REPORT_SETTINGS_KEY, JSON.stringify(settings))
+    db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Settings', entityType: 'report_settings', entityName: 'Report Settings', details: `Updated report settings${settings.companyName ? ': company "' + settings.companyName + '"' : ''}` }).catch(() => {})
   })
 
   // Generic settings get/set
@@ -3316,8 +3381,13 @@ app.whenReady().then(() => {
 
   // ==================== Bulk Operations ====================
   safeHandle('bulk:assignFleet', async (event, vesselIds: string[], fleetId: string) => {
-    await requirePermission(event, 'vessels:edit')
+    const user = await requirePermission(event, 'vessels:edit')
     await db.bulkAssignFleet(vesselIds, fleetId)
+    try {
+      const [fRows] = await (db as any).pool.query('SELECT name FROM fleets WHERE id = ?', [fleetId])
+      const fleetName = (fRows as any[])[0]?.name || fleetId
+      db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Fleets', entityType: 'fleet', entityId: fleetId, entityName: fleetName, details: `Bulk assigned ${vesselIds.length} vessel(s) to fleet ${fleetName}` }).catch(() => {})
+    } catch { /* do not block */ }
   })
 
   safeHandle('bulk:setVesselStatus', async (event, vesselIds: string[], isActive: boolean) => {
