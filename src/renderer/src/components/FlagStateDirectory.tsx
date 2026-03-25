@@ -44,6 +44,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   const [showModal, setShowModal] = useState(false)
   const [modalEditId, setModalEditId] = useState<string | null>(null)
   const [formName, setFormName] = useState('')
+  const [formDisplayName, setFormDisplayName] = useState('')
   const [formIso3, setFormIso3] = useState('')
   const [formEmail, setFormEmail] = useState('')
   const [formRatifiedBunker, setFormRatifiedBunker] = useState(false)
@@ -129,6 +130,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   // Modal helpers
   const resetForm = () => {
     setFormName('')
+    setFormDisplayName('')
     setFormIso3('')
     setFormEmail('')
     setFormRatifiedBunker(false)
@@ -146,6 +148,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   const openEditModal = (fs: FlagState) => {
     setModalEditId(fs.id)
     setFormName(fs.name)
+    setFormDisplayName(fs.displayName || '')
     setFormIso3(fs.iso3Code)
     setFormEmail(fs.email || '')
     setFormRatifiedBunker(Boolean(fs.ratifiedBunker))
@@ -169,6 +172,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     try {
       const payload = {
         name: formName.trim(),
+        displayName: formDisplayName.trim() || null,
         iso3Code: formIso3.toUpperCase(),
         email: formEmail.trim() || undefined,
         ratifiedBunker: formRatifiedBunker,
@@ -455,7 +459,8 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                   })()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.2, marginBottom: '4px', wordBreak: 'break-word' }}>{selectedFlag.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.2, marginBottom: '2px', wordBreak: 'break-word' }}>{selectedFlag.name}</div>
+                  {selectedFlag.displayName && <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>{selectedFlag.displayName}</div>}
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontFamily: 'monospace', fontWeight: 600 }}>{selectedFlag.iso3Code}</div>
                 </div>
                 <button onClick={() => { setSelectedFlag(null); setPanelPorts([]) }} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
@@ -716,6 +721,21 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                     style={{ width: '100%', textTransform: 'uppercase', fontFamily: 'monospace' }}
                     maxLength={3}
                   />
+                </div>
+              </div>
+
+              {/* Display Name */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Display Name (for documents)</label>
+                <input
+                  type="text"
+                  value={formDisplayName}
+                  onChange={e => setFormDisplayName(e.target.value)}
+                  placeholder="e.g. Republic of Panama, Union of Comoros"
+                  style={{ width: '100%' }}
+                />
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Official name used in policies and blue cards. If empty, the short name above will be used.
                 </div>
               </div>
 

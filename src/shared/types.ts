@@ -112,6 +112,7 @@ export interface VesselNameHistory {
 export interface FlagState {
   id: string
   name: string
+  displayName?: string | null
   iso3Code: string
   address?: string
   email?: string

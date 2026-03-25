@@ -2237,6 +2237,9 @@ export class MySQLAdapter {
             if (!fsColNames.includes('authority_address')) {
                 await this.pool.query('ALTER TABLE flag_states ADD COLUMN authority_address TEXT DEFAULT NULL')
             }
+            if (!fsColNames.includes('display_name')) {
+                await this.pool.query('ALTER TABLE flag_states ADD COLUMN display_name VARCHAR(255) DEFAULT NULL')
+            }
 
             // Ensure flag_state_ports table exists
             await this.pool.query(`CREATE TABLE IF NOT EXISTS flag_state_ports (
@@ -2793,7 +2796,7 @@ export class MySQLAdapter {
     async getFlagStates(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`
-            SELECT fs.id, fs.name, fs.iso3_code as iso3Code, fs.address, fs.email,
+            SELECT fs.id, fs.name, fs.display_name as displayName, fs.iso3_code as iso3Code, fs.address, fs.email,
                    fs.ratified_bunker as ratifiedBunker,
                    fs.ratified_wreck as ratifiedWreck,
                    fs.authority_name as authorityName,
@@ -2813,21 +2816,22 @@ export class MySQLAdapter {
         }))
     }
 
-    async addFlagState(flagState: { name: string; iso3Code: string; address?: string; email?: string; ratifiedBunker?: boolean; ratifiedWreck?: boolean; authorityName?: string; authorityAddress?: string }): Promise<any> {
+    async addFlagState(flagState: { name: string; displayName?: string; iso3Code: string; address?: string; email?: string; ratifiedBunker?: boolean; ratifiedWreck?: boolean; authorityName?: string; authorityAddress?: string }): Promise<any> {
         if (!this.pool) throw new Error('No database connection')
         const id = require('crypto').randomUUID()
         await this.pool.execute(
-            'INSERT INTO flag_states (id, name, iso3_code, address, email, ratified_bunker, ratified_wreck, authority_name, authority_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, flagState.name, flagState.iso3Code.toUpperCase(), flagState.address || null, flagState.email || null, flagState.ratifiedBunker ? 1 : 0, flagState.ratifiedWreck ? 1 : 0, flagState.authorityName || null, flagState.authorityAddress || null]
+            'INSERT INTO flag_states (id, name, display_name, iso3_code, address, email, ratified_bunker, ratified_wreck, authority_name, authority_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, flagState.name, flagState.displayName || null, flagState.iso3Code.toUpperCase(), flagState.address || null, flagState.email || null, flagState.ratifiedBunker ? 1 : 0, flagState.ratifiedWreck ? 1 : 0, flagState.authorityName || null, flagState.authorityAddress || null]
         )
         return { id, ...flagState, iso3Code: flagState.iso3Code.toUpperCase(), ratifiedBunker: Boolean(flagState.ratifiedBunker), ratifiedWreck: Boolean(flagState.ratifiedWreck), vesselCount: 0 }
     }
 
-    async updateFlagState(id: string, updates: { name?: string; iso3Code?: string; address?: string; email?: string; ratifiedBunker?: boolean; ratifiedWreck?: boolean; authorityName?: string | null; authorityAddress?: string | null }): Promise<void> {
+    async updateFlagState(id: string, updates: { name?: string; displayName?: string | null; iso3Code?: string; address?: string; email?: string; ratifiedBunker?: boolean; ratifiedWreck?: boolean; authorityName?: string | null; authorityAddress?: string | null }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.displayName !== undefined) { fields.push('display_name = ?'); values.push(updates.displayName || null) }
         if (updates.iso3Code !== undefined) { fields.push('iso3_code = ?'); values.push(updates.iso3Code.toUpperCase()) }
         if (updates.address !== undefined) { fields.push('address = ?'); values.push(updates.address || null) }
         if (updates.email !== undefined) { fields.push('email = ?'); values.push(updates.email || null) }
