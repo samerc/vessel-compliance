@@ -1251,7 +1251,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
             { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
-            { id: 'dbHealth', label: 'Database Health', icon: <Database size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
         ] : []),
     ]
@@ -2429,11 +2428,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             )}
 
             {/* 6. Database Configuration */}
-            {effectiveSection === 'dbHealth' && (
+            {effectiveSection === 'dbConfig' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Database size={20} color="var(--accent-primary)" /> Database Health
+                        <Database size={20} color="var(--accent-primary)" /> Database
                     </h3>
                     <button
                         className="btn-primary"
@@ -2449,13 +2448,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
                     >
                         {loadingDbHealth ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-                        {dbHealth ? 'Refresh' : 'Check Health'}
+                        {dbHealth ? 'Refresh Health' : 'Check Health'}
                     </button>
                 </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
-                    View database connection status, version, size, and table statistics.
-                </p>
 
+                {/* Health section */}
                 {dbHealth && (
                     <>
                         {/* KPI cards */}
@@ -2529,14 +2526,14 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         Click &quot;Check Health&quot; to view database statistics.
                     </div>
                 )}
-            </section>
-            )}
 
-            {effectiveSection === 'dbConfig' && (
-            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Database size={20} color="var(--accent-primary)" /> Database Configuration
-                </h3>
+                {/* Divider */}
+                <div style={{ borderTop: '1px solid var(--glass-border)', margin: '24px 0' }} />
+
+                {/* Connection configuration */}
+                <h4 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem' }}>
+                    Connection Configuration
+                </h4>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
                     View and manage the MySQL database connection settings.
                 </p>

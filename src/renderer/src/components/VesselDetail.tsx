@@ -2776,12 +2776,39 @@ interface TimelineEvent {
     color: string
 }
 
+interface MergedEvent {
+    date: string
+    type: string
+    title: string
+    count: number
+    items: TimelineEvent[]
+    icon: string
+    color: string
+}
+
 const TIMELINE_PAGE_SIZE = 50
+
+const TIMELINE_TYPE_META: Record<string, { label: string; color: string }> = {
+    audit: { label: 'Changes', color: '#6495ed' },
+    document: { label: 'Documents', color: '#00aac8' },
+    policy: { label: 'Policies', color: '#9370db' },
+    survey: { label: 'Surveys', color: '#22c55e' },
+    warranty: { label: 'Warranties', color: '#f59e0b' },
+    sanctions: { label: 'Sanctions', color: '#ef4444' }
+}
 
 function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: boolean }) {
     const [events, setEvents] = useState<TimelineEvent[]>([])
     const [loading, setLoading] = useState(true)
     const [visibleCount, setVisibleCount] = useState(TIMELINE_PAGE_SIZE)
+    const [typeFilter, setTypeFilter] = useState<string>('all')
+    const [dateFrom, setDateFrom] = useState<string>(() => {
+        const d = new Date()
+        d.setFullYear(d.getFullYear() - 1)
+        return d.toISOString().split('T')[0]
+    })
+    const [dateTo, setDateTo] = useState<string>(() => new Date().toISOString().split('T')[0])
+    const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
     useEffect(() => {
         let cancelled = false
@@ -2914,18 +2941,78 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
         return () => { cancelled = true }
     }, [vesselId])
 
-    const visibleEvents = events.slice(0, visibleCount)
+    // Compute type counts for filter chips
+    const typeCounts: Record<string, number> = {}
+    for (const ev of events) {
+        typeCounts[ev.type] = (typeCounts[ev.type] || 0) + 1
+    }
 
-    // Group by year
-    const yearGroups: { year: string; items: TimelineEvent[] }[] = []
-    let currentYear = ''
-    for (const ev of visibleEvents) {
-        const y = ev.date ? new Date(ev.date).getFullYear().toString() : 'Unknown'
-        if (y !== currentYear) {
-            currentYear = y
-            yearGroups.push({ year: y, items: [] })
+    // Filter by type and date range
+    const filteredEvents = events.filter(ev => {
+        if (typeFilter !== 'all' && ev.type !== typeFilter) return false
+        if (ev.date) {
+            const evDate = ev.date.split('T')[0]
+            if (dateFrom && evDate < dateFrom) return false
+            if (dateTo && evDate > dateTo) return false
         }
-        yearGroups[yearGroups.length - 1].items.push(ev)
+        return true
+    })
+
+    const visibleEvents = filteredEvents.slice(0, visibleCount)
+
+    // Group by month+year, then merge same-day events of same type
+    const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+    const monthGroups: { label: string; key: string; merged: MergedEvent[] }[] = []
+    let curMonthKey = ''
+    for (const ev of visibleEvents) {
+        const d = ev.date ? new Date(ev.date) : null
+        const mKey = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'unknown'
+        const mLabel = d ? `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}` : 'Unknown'
+        if (mKey !== curMonthKey) {
+            curMonthKey = mKey
+            monthGroups.push({ label: mLabel, key: mKey, merged: [] })
+        }
+        const dateStr = ev.date ? ev.date.split('T')[0] : ''
+        const groupKey = `${dateStr}|${ev.type}`
+        const currentGroup = monthGroups[monthGroups.length - 1]
+        const existing = currentGroup.merged.find(m => `${m.date}|${m.type}` === groupKey)
+        if (existing) {
+            existing.count++
+            existing.items.push(ev)
+            if (ev.type === 'document') {
+                existing.title = `${existing.count} documents uploaded`
+            } else if (ev.type === 'audit') {
+                existing.title = `${existing.count} field changes`
+            } else if (ev.type === 'policy') {
+                existing.title = `${existing.count} policies created`
+            } else if (ev.type === 'survey') {
+                existing.title = `${existing.count} surveys`
+            } else if (ev.type === 'warranty') {
+                existing.title = `${existing.count} warranties`
+            } else if (ev.type === 'sanctions') {
+                existing.title = `${existing.count} sanctions checks`
+            }
+        } else {
+            currentGroup.merged.push({
+                date: dateStr,
+                type: ev.type,
+                title: ev.title,
+                count: 1,
+                items: [ev],
+                icon: ev.iconType,
+                color: ev.color
+            })
+        }
+    }
+
+    const toggleExpanded = (key: string) => {
+        setExpandedKeys(prev => {
+            const next = new Set(prev)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+        })
     }
 
     const getIcon = (iconType: string) => {
@@ -2959,7 +3046,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
 
     return (
         <div className="fade-in" style={{ maxWidth: '800px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <GitCommit size={20} color="var(--accent-primary)" />
                 <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Vessel Timeline</span>
                 <span style={{
@@ -2971,8 +3058,84 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                     fontSize: '0.78rem',
                     fontWeight: 600
                 }}>
-                    {events.length} events
+                    {filteredEvents.length} events
                 </span>
+            </div>
+
+            {/* Filter chips */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                <button
+                    onClick={() => { setTypeFilter('all'); setVisibleCount(TIMELINE_PAGE_SIZE) }}
+                    style={{
+                        padding: '4px 12px',
+                        borderRadius: '14px',
+                        border: typeFilter === 'all' ? '1.5px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                        background: typeFilter === 'all' ? 'rgba(0,210,255,0.12)' : 'transparent',
+                        color: typeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                    }}
+                >
+                    All <span style={{ opacity: 0.7 }}>{events.length}</span>
+                </button>
+                {Object.entries(TIMELINE_TYPE_META).map(([key, meta]) => {
+                    const cnt = typeCounts[key] || 0
+                    if (cnt === 0) return null
+                    const isActive = typeFilter === key
+                    return (
+                        <button
+                            key={key}
+                            onClick={() => { setTypeFilter(key); setVisibleCount(TIMELINE_PAGE_SIZE) }}
+                            style={{
+                                padding: '4px 12px',
+                                borderRadius: '14px',
+                                border: isActive ? `1.5px solid ${meta.color}` : '1px solid var(--glass-border)',
+                                background: isActive ? `${meta.color}18` : 'transparent',
+                                color: isActive ? meta.color : 'var(--text-secondary)',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                            }}
+                        >
+                            {meta.label} <span style={{ opacity: 0.7 }}>{cnt}</span>
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* Date range filter */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>From</span>
+                <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={e => { setDateFrom(e.target.value); setVisibleCount(TIMELINE_PAGE_SIZE) }}
+                    style={{
+                        padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem',
+                        background: 'var(--input-bg)', color: 'var(--text-primary)',
+                        border: '1px solid var(--input-border)',
+                        colorScheme: isLight ? 'light' : 'dark'
+                    }}
+                />
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>To</span>
+                <input
+                    type="date"
+                    value={dateTo}
+                    onChange={e => { setDateTo(e.target.value); setVisibleCount(TIMELINE_PAGE_SIZE) }}
+                    style={{
+                        padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem',
+                        background: 'var(--input-bg)', color: 'var(--text-primary)',
+                        border: '1px solid var(--input-border)',
+                        colorScheme: isLight ? 'light' : 'dark'
+                    }}
+                />
             </div>
 
             <div style={{ position: 'relative', paddingLeft: '32px' }}>
@@ -2986,17 +3149,21 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                     background: isLight ? 'rgba(0,170,200,0.2)' : 'rgba(0,210,255,0.15)'
                 }} />
 
-                {yearGroups.map(group => (
-                    <div key={group.year}>
-                        {/* Year header */}
+                {monthGroups.map(group => (
+                    <div key={group.key}>
+                        {/* Month header — sticky */}
                         <div style={{
-                            position: 'relative',
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 2,
                             marginBottom: '16px',
-                            marginTop: '8px'
+                            marginTop: '8px',
+                            marginLeft: '-32px',
+                            paddingLeft: '32px'
                         }}>
                             <div style={{
                                 position: 'absolute',
-                                left: '-32px',
+                                left: '0',
                                 top: '50%',
                                 transform: 'translateY(-50%)',
                                 width: '24px',
@@ -3018,70 +3185,125 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                                 borderRadius: '8px',
                                 border: '1px solid var(--glass-border)'
                             }}>
-                                {group.year}
+                                {group.label}
                             </span>
                         </div>
 
-                        {group.items.map((ev, idx) => (
-                            <div key={`${group.year}-${idx}`} style={{
-                                position: 'relative',
-                                marginBottom: '12px',
-                                padding: '10px 16px',
-                                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-                                borderRadius: '8px',
-                                borderLeft: `3px solid ${ev.color}`,
-                                transition: 'background 0.15s'
-                            }}>
-                                {/* Dot on the line */}
-                                <div style={{
-                                    position: 'absolute',
-                                    left: '-37px',
-                                    top: '14px',
-                                    width: '12px',
-                                    height: '12px',
-                                    borderRadius: '50%',
-                                    background: ev.color,
-                                    border: `2px solid ${isLight ? '#f4f6fb' : '#14172a'}`
-                                }} />
+                        {group.merged.map((me, idx) => {
+                            const expandKey = `${group.key}-${me.date}-${me.type}`
+                            const isExpanded = expandedKeys.has(expandKey)
+                            const isMerged = me.count > 1
+                            return (
+                                <div key={`${group.key}-${idx}`}>
+                                    <div
+                                        style={{
+                                            position: 'relative',
+                                            marginBottom: '12px',
+                                            padding: '10px 16px',
+                                            background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                                            borderRadius: '8px',
+                                            borderLeft: `3px solid ${me.color}`,
+                                            transition: 'background 0.15s',
+                                            cursor: isMerged ? 'pointer' : 'default'
+                                        }}
+                                        onClick={isMerged ? () => toggleExpanded(expandKey) : undefined}
+                                    >
+                                        {/* Dot on the line */}
+                                        <div style={{
+                                            position: 'absolute',
+                                            left: '-37px',
+                                            top: '14px',
+                                            width: '12px',
+                                            height: '12px',
+                                            borderRadius: '50%',
+                                            background: me.color,
+                                            border: `2px solid ${isLight ? '#f4f6fb' : '#14172a'}`
+                                        }} />
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                                    <span style={{ color: ev.color, display: 'flex', alignItems: 'center' }}>
-                                        {getIcon(ev.iconType)}
-                                    </span>
-                                    <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                                        {ev.title}
-                                    </span>
-                                    <span style={{
-                                        marginLeft: 'auto',
-                                        fontSize: '0.75rem',
-                                        color: 'var(--text-secondary)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                    }}>
-                                        <Clock size={11} />
-                                        {ev.date ? formatDate(ev.date) : 'Unknown'}
-                                    </span>
-                                </div>
-                                {ev.subtitle && (
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '22px' }}>
-                                        {ev.subtitle}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                            <span style={{ color: me.color, display: 'flex', alignItems: 'center' }}>
+                                                {getIcon(me.icon)}
+                                            </span>
+                                            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                                                {me.title}
+                                            </span>
+                                            {isMerged && (
+                                                <span style={{
+                                                    padding: '1px 8px',
+                                                    borderRadius: '10px',
+                                                    background: `${me.color}20`,
+                                                    color: me.color,
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 700
+                                                }}>
+                                                    {me.count}
+                                                </span>
+                                            )}
+                                            {isMerged && (
+                                                <ChevronDown size={14} style={{
+                                                    color: 'var(--text-secondary)',
+                                                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                    transition: 'transform 0.15s'
+                                                }} />
+                                            )}
+                                            <span style={{
+                                                marginLeft: 'auto',
+                                                fontSize: '0.75rem',
+                                                color: 'var(--text-secondary)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}>
+                                                <Clock size={11} />
+                                                {me.date ? formatDate(me.date) : 'Unknown'}
+                                            </span>
+                                        </div>
+                                        {!isMerged && me.items[0]?.subtitle && (
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '22px' }}>
+                                                {me.items[0].subtitle}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        ))}
+
+                                    {/* Expanded items */}
+                                    {isMerged && isExpanded && (
+                                        <div style={{ marginLeft: '20px', marginBottom: '12px', borderLeft: `2px solid ${me.color}30`, paddingLeft: '12px' }}>
+                                            {me.items.map((ev, eIdx) => (
+                                                <div key={eIdx} style={{
+                                                    padding: '6px 12px',
+                                                    marginBottom: '4px',
+                                                    background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.82rem'
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ color: ev.color, display: 'flex', alignItems: 'center' }}>{getIcon(ev.iconType)}</span>
+                                                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{ev.title}</span>
+                                                    </div>
+                                                    {ev.subtitle && (
+                                                        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', paddingLeft: '20px' }}>
+                                                            {ev.subtitle}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
                 ))}
             </div>
 
-            {visibleCount < events.length && (
+            {visibleCount < filteredEvents.length && (
                 <div style={{ textAlign: 'center', marginTop: '16px' }}>
                     <button
                         onClick={() => setVisibleCount(prev => prev + TIMELINE_PAGE_SIZE)}
                         className="btn-secondary"
                         style={{ padding: '8px 24px', fontSize: '0.85rem' }}
                     >
-                        Load more ({events.length - visibleCount} remaining)
+                        Load more ({filteredEvents.length - visibleCount} remaining)
                     </button>
                 </div>
             )}

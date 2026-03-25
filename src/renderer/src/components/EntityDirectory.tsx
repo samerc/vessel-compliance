@@ -25,6 +25,7 @@ import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
 import { exportCustomerCompliancePDF } from './CustomerComplianceReport'
 import { formatDateTime } from '../utils/dateUtils'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 function jaroWinkler(s1: string, s2: string): number {
   s1 = s1.toLowerCase().trim()
@@ -93,6 +94,17 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
   const debouncedSearch = useDebounceValue(searchTerm, 500)
 
+  // Column preferences
+  const ENTITY_COLUMNS: ColumnDef[] = [
+    { id: 'name', label: 'Name', defaultVisible: true },
+    { id: 'type', label: 'Type', defaultVisible: true },
+    { id: 'sanctions', label: 'Sanctions', defaultVisible: true },
+    { id: 'documents', label: 'Documents', defaultVisible: true },
+    { id: 'vessels', label: 'Vessels', defaultVisible: true }
+  ]
+  const { visibleColumns: entVisibleCols, setVisibleColumns: setEntVisibleCols } = useColumnPrefs('entities', ENTITY_COLUMNS)
+  const entVisSet = new Set(entVisibleCols)
+
   const [checkingId, setCheckingId] = useState<string | null>(null)
 
   const [sanctionsModal, setSanctionsModal] = useState<{
@@ -130,6 +142,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const [dupThreshold, setDupThreshold] = useState(85)
 
   // Bulk selection state
+  const [selectMode, setSelectMode] = useState(false)
   const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set())
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
@@ -833,10 +846,24 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
             style={{ paddingLeft: '34px', paddingRight: '10px', width: '220px', fontSize: '0.88rem' }}
           />
         </div>
+        <button
+          onClick={() => {
+            setSelectMode(prev => {
+              if (prev) setSelectedEntityIds(new Set())
+              return !prev
+            })
+          }}
+          className={selectMode ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '7px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+          title={selectMode ? 'Exit select mode' : 'Enter select mode'}
+        >
+          <CheckSquare size={15} />
+          Select
+        </button>
       </div>
 
       {/* Bulk Action Toolbar */}
-      {selectedEntityIds.size > 0 && (
+      {selectMode && selectedEntityIds.size > 0 && (
         <div className="glass-card fade-in" style={{
           padding: '10px 20px',
           marginBottom: '12px',
@@ -887,7 +914,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: '40px' }} />
+                {selectMode && <col style={{ width: '40px' }} />}
                 <col style={{ width: 'auto' }} />
                 <col style={{ width: '110px' }} />
                 <col style={{ width: '150px' }} />
@@ -896,6 +923,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)', position: 'sticky', top: 0, zIndex: 1 }}>
+                  {selectMode && (
                   <th style={{ padding: '10px 8px 10px 16px', width: '40px' }}>
                     <div
                       onClick={toggleSelectAllEntities}
@@ -908,19 +936,34 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                       }
                     </div>
                   </th>
-                  {['Name', 'Type', 'Sanctions', 'Documents', 'Vessels'].map(col => (
-                    <th key={col} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{col}</th>
+                  )}
+                  {[
+                    { id: 'name', label: 'Name' },
+                    { id: 'type', label: 'Type' },
+                    { id: 'sanctions', label: 'Sanctions' },
+                    { id: 'documents', label: 'Documents' },
+                    { id: 'vessels', label: 'Vessels' }
+                  ].filter(col => entVisSet.has(col.id)).map(col => (
+                    <th key={col.id} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{col.label}</th>
                   ))}
+                  <th style={{ padding: '10px 8px', width: '36px' }}>
+                    <ColumnSelector
+                      pageKey="entities"
+                      allColumns={ENTITY_COLUMNS}
+                      visibleColumns={entVisibleCols}
+                      onChange={setEntVisibleCols}
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading && entities.length === 0 ? (
-                  <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <tr><td colSpan={selectMode ? 6 : 5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <Loader2 size={22} className="spinner" style={{ marginBottom: '10px', display: 'block', margin: '0 auto 10px' }} />
                     Loading entities...
                   </td></tr>
                 ) : entities.length === 0 ? (
-                  <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <tr><td colSpan={selectMode ? 6 : 5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <Shield size={30} style={{ marginBottom: '10px', opacity: 0.25, display: 'block', margin: '0 auto 10px' }} />
                     No entities found
                   </td></tr>
@@ -949,6 +992,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                       }}
                     >
                       {/* Checkbox */}
+                      {selectMode && (
                       <td style={{ padding: '11px 8px 11px 16px', width: '40px' }} onClick={e => e.stopPropagation()}>
                         <div
                           onClick={() => toggleSelectEntity(entity.id)}
@@ -957,7 +1001,9 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                           {isBulkChecked ? <CheckSquare size={15} /> : <Square size={15} style={{ opacity: 0.4 }} />}
                         </div>
                       </td>
+                      )}
                       {/* Name */}
+                      {entVisSet.has('name') && (
                       <td style={{ padding: '11px 16px', overflow: 'hidden' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: entity.type === 'company' ? accentBg : (isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)'), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -971,21 +1017,29 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                           </div>
                         </div>
                       </td>
+                      )}
                       {/* Type */}
+                      {entVisSet.has('type') && (
                       <td style={{ padding: '11px 16px' }}>
                         <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', background: entity.type === 'company' ? accentBg : (isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)'), color: entity.type === 'company' ? companyColor : personColor }}>
                           {entity.type}
                         </span>
                       </td>
+                      )}
                       {/* Sanctions */}
+                      {entVisSet.has('sanctions') && (
                       <td style={{ padding: '11px 16px' }}>
                         <OfacBadge entity={entity} onRecheck={() => handleOfacRecheck(entity)} />
                       </td>
+                      )}
                       {/* Documents */}
+                      {entVisSet.has('documents') && (
                       <td style={{ padding: '11px 16px' }}>
                         <span style={{ fontSize: '0.82rem', fontWeight: 600, color: docColor }}>{score.have}/{score.total}</span>
                       </td>
+                      )}
                       {/* Vessels */}
+                      {entVisSet.has('vessels') && (
                       <td style={{ padding: '11px 16px' }}>
                         {vcount > 0 ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)', background: accentBg, padding: '2px 8px', borderRadius: '10px' }}>
@@ -995,6 +1049,8 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>—</span>
                         )}
                       </td>
+                      )}
+                      <td style={{ width: '36px' }} />
                     </tr>
                   )
                 })}

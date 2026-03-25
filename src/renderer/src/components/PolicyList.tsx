@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateShort } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 interface PolicyListItem {
     id: string
@@ -66,6 +67,19 @@ function getTypeBadgeColors(typeName: string): { bg: string; text: string } {
     return { bg: 'rgba(0, 170, 200, 0.12)', text: '#00aac8' }
 }
 
+const POLICY_COLUMNS: ColumnDef[] = [
+    { id: 'policyNo', label: 'Policy No.', defaultVisible: true },
+    { id: 'type', label: 'Type', defaultVisible: true },
+    { id: 'vessel', label: 'Vessel', defaultVisible: true },
+    { id: 'customer', label: 'Customer', defaultVisible: true },
+    { id: 'period', label: 'Period', defaultVisible: true },
+    { id: 'status', label: 'Status', defaultVisible: true },
+    { id: 'premium', label: 'Premium', defaultVisible: true },
+    { id: 'converted', label: 'Converted', defaultVisible: false },
+    { id: 'exported', label: 'Exported', defaultVisible: false },
+    { id: 'actions', label: 'Actions', defaultVisible: true }
+]
+
 export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const [policies, setPolicies] = useState<PolicyListItem[]>([])
     const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string }[]>([])
@@ -81,6 +95,8 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const { hasPermission } = useAuth()
     const { theme } = useTheme()
     const isLight = theme === 'light'
+    const { visibleColumns, setVisibleColumns } = useColumnPrefs('policies', POLICY_COLUMNS)
+    const visibleSet = new Set(visibleColumns)
 
     useEffect(() => { loadData() }, [])
 
@@ -271,34 +287,62 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                         <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                            {visibleSet.has('policyNo') && (
                             <th style={thStyle('policyNumber')} onClick={() => toggleSort('policyNumber')}>
                                 Policy No. <SortIcon field="policyNumber" />
                             </th>
+                            )}
+                            {visibleSet.has('type') && (
                             <th style={thStyle('policyTypeName')} onClick={() => toggleSort('policyTypeName')}>
                                 Type <SortIcon field="policyTypeName" />
                             </th>
+                            )}
+                            {visibleSet.has('vessel') && (
                             <th style={thStyle('vesselName')} onClick={() => toggleSort('vesselName')}>
                                 Vessel <SortIcon field="vesselName" />
                             </th>
+                            )}
+                            {visibleSet.has('customer') && (
                             <th style={thStyle('customerName')} onClick={() => toggleSort('customerName')}>
                                 Customer <SortIcon field="customerName" />
                             </th>
+                            )}
+                            {visibleSet.has('period') && (
                             <th style={{ ...thStyle('inceptionDate'), whiteSpace: 'nowrap' }} onClick={() => toggleSort('inceptionDate')}>
                                 Period <SortIcon field="inceptionDate" />
                             </th>
+                            )}
+                            {visibleSet.has('status') && (
                             <th style={thStyle('status')} onClick={() => toggleSort('status')}>
                                 Status <SortIcon field="status" />
                             </th>
+                            )}
+                            {visibleSet.has('premium') && (
                             <th style={thStyle('premiumAmount', 'right')} onClick={() => toggleSort('premiumAmount')}>
                                 Premium <SortIcon field="premiumAmount" />
                             </th>
+                            )}
+                            {visibleSet.has('converted') && (
                             <th style={thStyle('createdAt')} onClick={() => toggleSort('createdAt')}>
                                 Converted <SortIcon field="createdAt" />
                             </th>
+                            )}
+                            {visibleSet.has('exported') && (
                             <th style={thStyle('exportedAt')} onClick={() => toggleSort('exportedAt')}>
                                 Exported <SortIcon field="exportedAt" />
                             </th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Actions</th>
+                            )}
+                            <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                                    {visibleSet.has('actions') && 'Actions'}
+                                    <ColumnSelector
+                                        pageKey="policies"
+                                        allColumns={POLICY_COLUMNS}
+                                        visibleColumns={visibleColumns}
+                                        onChange={setVisibleColumns}
+                                    />
+                                </div>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -321,9 +365,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     className="hover-effect"
                                     onClick={() => onSelectPolicy(p.id)}
                                 >
+                                    {visibleSet.has('policyNo') && (
                                     <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem', color: isLight ? '#007a91' : '#00aac8' }}>
                                         {p.policyNumber ? `${p.policyNumber}${(p as any).revisionNumber > 0 ? `-R${(p as any).revisionNumber}` : ''}` : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>--</span>}
                                     </td>
+                                    )}
+                                    {visibleSet.has('type') && (
                                     <td style={{ padding: '12px 14px' }}>
                                         <span style={{
                                             display: 'inline-block',
@@ -335,15 +382,23 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                             {p.policyTypeName || '-'}
                                         </span>
                                     </td>
+                                    )}
+                                    {visibleSet.has('vessel') && (
                                     <td style={{ padding: '12px 14px', fontSize: '0.85rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {p.vesselName || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>--</span>}
                                     </td>
+                                    )}
+                                    {visibleSet.has('customer') && (
                                     <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: 'var(--text-secondary)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {p.customerName || <span style={{ fontStyle: 'italic' }}>--</span>}
                                     </td>
+                                    )}
+                                    {visibleSet.has('period') && (
                                     <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                                         {formatPeriod(p.inceptionDate, p.expiryDate)}
                                     </td>
+                                    )}
+                                    {visibleSet.has('status') && (
                                     <td style={{ padding: '12px 14px' }}>
                                         <span style={{
                                             padding: '3px 9px', borderRadius: '10px',
@@ -354,17 +409,24 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                             {p.status}
                                         </span>
                                     </td>
+                                    )}
+                                    {visibleSet.has('premium') && (
                                     <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.82rem', fontWeight: p.premiumAmount ? 600 : 400, whiteSpace: 'nowrap' }}>
                                         {formatCurrency(p.premiumAmount, p.currency)}
                                     </td>
+                                    )}
+                                    {visibleSet.has('converted') && (
                                     <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                                         {p.createdAt ? formatDateShort(p.createdAt) : '-'}
                                     </td>
+                                    )}
+                                    {visibleSet.has('exported') && (
                                     <td style={{ padding: '12px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: p.exportedAt ? (isLight ? '#047857' : '#34d399') : 'var(--text-secondary)' }}>
                                         {p.exportedAt ? formatDateShort(p.exportedAt) : <span style={{ fontStyle: 'italic' }}>Not exported</span>}
                                     </td>
+                                    )}
                                     <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                                        {hasPermission('policies:manage') && (
+                                        {visibleSet.has('actions') && hasPermission('policies:manage') && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation()

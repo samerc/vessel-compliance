@@ -65,6 +65,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
 
     // Bulk selection state
+    const [selectMode, setSelectMode] = useState(false)
     const [selectedVesselIds, setSelectedVesselIds] = useState<Set<string>>(new Set())
     const [bulkFleetDropdown, setBulkFleetDropdown] = useState(false)
 
@@ -635,10 +636,24 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                         <option value="all">All Vessels</option>
                     </select>
                 </div>
+                <button
+                    onClick={() => {
+                        setSelectMode(prev => {
+                            if (prev) setSelectedVesselIds(new Set())
+                            return !prev
+                        })
+                    }}
+                    className={selectMode ? 'btn-primary' : 'btn-secondary'}
+                    style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                    title={selectMode ? 'Exit select mode' : 'Enter select mode'}
+                >
+                    <CheckSquare size={16} />
+                    Select
+                </button>
             </div>
 
             {/* Bulk Action Toolbar */}
-            {selectedVesselIds.size > 0 && (
+            {selectMode && selectedVesselIds.size > 0 && (
                 <div className="glass-card fade-in" style={{
                     padding: '10px 20px',
                     marginBottom: '12px',
@@ -760,6 +775,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                         <caption className="sr-only">Vessel registry</caption>
                         <thead>
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                {selectMode && (
                                 <th scope="col" style={{ padding: '14px 8px 14px 16px', width: '40px' }}>
                                     <div
                                         onClick={toggleSelectAll}
@@ -772,6 +788,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                         }
                                     </div>
                                 </th>
+                                )}
                                 {visibleSet.has('name') && (
                                     <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => toggleSort('name')}>
                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -825,6 +842,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                 const isBulkChecked = selectedVesselIds.has(v.id)
                                 return (
                                     <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)', background: isBulkChecked ? (isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.04)') : undefined }} className="hover-effect">
+                                        {selectMode && (
                                         <td style={{ padding: '16px 8px 16px 16px', width: '40px' }}>
                                             <div
                                                 onClick={(e) => { e.stopPropagation(); toggleSelectVessel(v.id) }}
@@ -833,6 +851,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                 {isBulkChecked ? <CheckSquare size={16} /> : <Square size={16} style={{ opacity: 0.4 }} />}
                                             </div>
                                         </td>
+                                        )}
                                         {visibleSet.has('name') && (
                                         <td style={{ padding: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

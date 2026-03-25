@@ -3,6 +3,7 @@ import { Search, RefreshCw, Eye, ChevronUp, ChevronDown } from 'lucide-react'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { formatDate } from '../utils/dateUtils'
+import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 interface Props {
   onNavigateToVessel: (vesselId: string) => void
@@ -15,6 +16,16 @@ interface SurveyWithCounts extends ConditionSurvey {
 
 type SortKey = 'vessel' | 'date' | 'type' | 'surveyor' | 'location' | 'defects'
 
+const SURVEY_COLUMNS: ColumnDef[] = [
+  { id: 'vessel', label: 'Vessel', defaultVisible: true },
+  { id: 'date', label: 'Survey Date', defaultVisible: true },
+  { id: 'type', label: 'Type', defaultVisible: true },
+  { id: 'surveyor', label: 'Surveyor', defaultVisible: true },
+  { id: 'location', label: 'Location', defaultVisible: true },
+  { id: 'defects', label: 'Defects', defaultVisible: true },
+  { id: 'actions', label: 'Actions', defaultVisible: true }
+]
+
 export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const [surveys, setSurveys] = useState<SurveyWithCounts[]>([])
   const [vessels, setVessels] = useState<Vessel[]>([])
@@ -24,6 +35,8 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const { showError } = useToast()
+  const { visibleColumns: svVisibleCols, setVisibleColumns: setSvVisibleCols } = useColumnPrefs('surveys', SURVEY_COLUMNS)
+  const svVisSet = new Set(svVisibleCols)
 
   const vesselMap = useMemo(() => {
     const map = new Map<string, Vessel>()
@@ -225,36 +238,48 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                   borderBottom: '1px solid var(--table-border)'
                 }}
               >
+                {svVisSet.has('vessel') && (
                 <th style={thStyle} onClick={() => handleSort('vessel')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     Vessel <SortIcon col="vessel" />
                   </span>
                 </th>
+                )}
+                {svVisSet.has('date') && (
                 <th style={thStyle} onClick={() => handleSort('date')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     Survey Date <SortIcon col="date" />
                   </span>
                 </th>
+                )}
+                {svVisSet.has('type') && (
                 <th style={thStyle} onClick={() => handleSort('type')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     Type <SortIcon col="type" />
                   </span>
                 </th>
+                )}
+                {svVisSet.has('surveyor') && (
                 <th style={thStyle} onClick={() => handleSort('surveyor')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     Surveyor <SortIcon col="surveyor" />
                   </span>
                 </th>
+                )}
+                {svVisSet.has('location') && (
                 <th style={thStyle} onClick={() => handleSort('location')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     Location <SortIcon col="location" />
                   </span>
                 </th>
+                )}
+                {svVisSet.has('defects') && (
                 <th style={thStyle} onClick={() => handleSort('defects')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     Defects <SortIcon col="defects" />
                   </span>
                 </th>
+                )}
                 <th
                   style={{
                     padding: '12px 16px',
@@ -266,7 +291,15 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                     color: 'var(--text-secondary)'
                   }}
                 >
-                  Actions
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    {svVisSet.has('actions') && 'Actions'}
+                    <ColumnSelector
+                      pageKey="surveys"
+                      allColumns={SURVEY_COLUMNS}
+                      visibleColumns={svVisibleCols}
+                      onChange={setSvVisibleCols}
+                    />
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -312,6 +345,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                       }}
                       className="hover-effect"
                     >
+                      {svVisSet.has('vessel') && (
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ fontWeight: '600', textTransform: 'uppercase' }}>
                           {vessel?.name || 'Unknown Vessel'}
@@ -328,18 +362,28 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                           </div>
                         )}
                       </td>
+                      )}
+                      {svVisSet.has('date') && (
                       <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
                         {formatDate(survey.surveyDate)}
                       </td>
+                      )}
+                      {svVisSet.has('type') && (
                       <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
                         {survey.surveyType || '-'}
                       </td>
+                      )}
+                      {svVisSet.has('surveyor') && (
                       <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
                         {surveyor?.companyName || '-'}
                       </td>
+                      )}
+                      {svVisSet.has('location') && (
                       <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
                         {survey.location || '-'}
                       </td>
+                      )}
+                      {svVisSet.has('defects') && (
                       <td style={{ padding: '12px 16px' }}>
                         <span
                           style={{
@@ -363,7 +407,9 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                           {survey.openDefects} open / {survey.totalDefects} total
                         </span>
                       </td>
+                      )}
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        {svVisSet.has('actions') && (
                         <button
                           onClick={() => onNavigateToVessel(survey.vesselId)}
                           title="View vessel surveys"
@@ -384,6 +430,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                           <Eye size={14} />
                           View
                         </button>
+                        )}
                       </td>
                     </tr>
                   )
