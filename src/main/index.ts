@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen, Menu } from 'electron'
 import { join, dirname, resolve, normalize, extname } from 'path'
 import { Worker } from 'worker_threads'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -284,6 +284,18 @@ function createWindow(): void {
     } finally {
       mainWindow.show()
     }
+  })
+
+  // Right-click context menu (Cut/Copy/Paste/Select All)
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    const menu = Menu.buildFromTemplate([
+      { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut },
+      { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy },
+      { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { label: 'Select All', role: 'selectAll', enabled: params.editFlags.canSelectAll },
+    ])
+    menu.popup()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
