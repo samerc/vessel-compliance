@@ -35,9 +35,9 @@ const WIDGET_REGISTRY: WidgetDef[] = [
   { id: 'dataQuality', name: 'Data Quality', description: 'Missing customer assignments, contacts, policy dates', icon: AlertTriangle, category: 'compliance', defaultEnabled: true, defaultOrder: 6, size: 'third' },
   { id: 'weekRenewals', name: 'Renewals This Week', description: 'Policies renewing within the current week', icon: Calendar, category: 'operations', defaultEnabled: true, defaultOrder: 7, size: 'third' },
   { id: 'renewalCalendar', name: 'Renewal Calendar', description: 'Upcoming policy renewals by month', icon: Calendar, category: 'operations', defaultEnabled: false, defaultOrder: 8, size: 'half' },
-  { id: 'quotationPipeline', name: 'Quotation Pipeline', description: 'Quotations by workflow status', icon: GitBranch, category: 'operations', defaultEnabled: false, defaultOrder: 9, size: 'half' },
-  { id: 'quickActions', name: 'Quick Actions', description: 'Shortcuts to create vessels, quotations, entities', icon: Zap, category: 'overview', defaultEnabled: false, defaultOrder: 10, size: 'third' },
-  { id: 'fleetOverview', name: 'Fleet Overview', description: 'Vessel count by fleet with compliance rate', icon: Layers, category: 'overview', defaultEnabled: false, defaultOrder: 11, size: 'half' },
+  { id: 'quickActions', name: 'Quick Actions', description: 'Shortcuts to create vessels, quotations, entities', icon: Zap, category: 'overview', defaultEnabled: false, defaultOrder: 9, size: 'third' },
+  { id: 'quotationPipeline', name: 'Quotation Pipeline', description: 'Quotations by workflow status', icon: GitBranch, category: 'operations', defaultEnabled: false, defaultOrder: 10, size: 'half' },
+  { id: 'fleetOverview', name: 'Fleet Overview', description: 'Vessel count by fleet with compliance rate', icon: Layers, category: 'overview', defaultEnabled: false, defaultOrder: 11, size: 'third' },
 ]
 
 interface WidgetLayout {
@@ -689,8 +689,8 @@ export default function Dashboard({
           const def = getWidgetDef(w.id)
           if (!def) return null
           return (
-            <div key={w.id} style={{ gridColumn: sizeToSpan(def.size) }}>
-              <WidgetRenderer id={w.id} data={widgetData} cardStyle={cardStyle} />
+            <div key={w.id} style={{ gridColumn: sizeToSpan(def.size), maxHeight: '420px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <WidgetRenderer id={w.id} data={widgetData} cardStyle={{ ...cardStyle, maxHeight: '420px', overflow: 'auto', flex: 1 }} />
             </div>
           )
         })}
@@ -780,7 +780,7 @@ function ExpirationsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: R
             </tr>
           </thead>
           <tbody>
-            {upcomingItems.map((item, idx) => {
+            {upcomingItems.slice(0, 12).map((item, idx) => {
               const isExp = item.severity === 'expired'
               const isMiss = item.severity === 'missing'
               const isSoon = item.severity === 'soon'
@@ -1050,7 +1050,7 @@ function WeekRenewalsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: 
         <EmptyActivity label="No renewals this week" />
       ) : (
         <div>
-          {activity.weekRenewals.map((r, idx) => {
+          {activity.weekRenewals.slice(0, 10).map((r, idx) => {
             const days = daysUntil(r.endDate)
             return (
               <div key={idx} style={{
@@ -1072,6 +1072,11 @@ function WeekRenewalsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: 
               </div>
             )
           })}
+          {activity.weekRenewals.length > 10 && (
+            <div style={{ textAlign: 'center', padding: '8px', fontSize: '0.78rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+              +{activity.weekRenewals.length - 10} more
+            </div>
+          )}
         </div>
       )}
     </div>
