@@ -1330,8 +1330,20 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
               borderRadius: '10px',
               border: '1px solid var(--glass-border)'
             }}>
+              <div style={{
+                width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                background: sig ? '#22c55e' : 'var(--text-secondary)',
+                opacity: sig ? 1 : 0.3
+              }} title={sig ? 'Signature uploaded' : 'No signature'} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{u.username}</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {u.username}
+                  {sig ? (
+                    <span style={{ fontSize: '0.68rem', padding: '1px 8px', borderRadius: '8px', background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontWeight: 600 }}>UPLOADED</span>
+                  ) : (
+                    <span style={{ fontSize: '0.68rem', padding: '1px 8px', borderRadius: '8px', background: 'rgba(128,128,128,0.1)', color: 'var(--text-secondary)', fontWeight: 600 }}>NO SIGNATURE</span>
+                  )}
+                </div>
                 {sig && (
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                     {sig.fileName} &middot; uploaded {new Date(sig.uploadedAt).toLocaleDateString()}
