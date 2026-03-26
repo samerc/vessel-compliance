@@ -10922,12 +10922,12 @@ export class MySQLAdapter {
                         )
                     )
                     LEFT JOIN (
-                        SELECT vpv2.dynamic_policy_id,
+                        SELECT vpv2.policy_id,
                                SUM(CASE WHEN ptc2.name LIKE '%premium%' THEN CAST(vpv2.value_text AS DECIMAL(15,2)) ELSE 0 END) AS policyPremium
                         FROM vessel_policy_values vpv2
                         JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
                         WHERE ptc2.field_type = 'number'
-                        GROUP BY vpv2.dynamic_policy_id
+                        GROUP BY vpv2.policy_id
                     ) vprem ON vprem.dynamic_policy_id = vdp.id`,
                 columnMap: {
                     vesselName: 'v.name AS vesselName',
@@ -11124,7 +11124,7 @@ export class MySQLAdapter {
                 columnMap: {
                     vesselName: 'v.name AS vesselName',
                     docTypeName: 'dt.name AS docTypeName',
-                    requirement: 'CASE WHEN dt.is_mandatory = TRUE THEN \'Mandatory\' ELSE \'Optional\' END AS requirement',
+                    requirement: 'CASE WHEN dt.required = TRUE THEN \'Mandatory\' ELSE \'Optional\' END AS requirement',
                     fileStatus: 'CASE WHEN vd.file_path IS NOT NULL THEN \'Linked\' ELSE \'Missing\' END AS fileStatus',
                     receivedDate: 'vd.received_date AS receivedDate',
                     expiryDate: 'vd.expiry_date AS expiryDate',

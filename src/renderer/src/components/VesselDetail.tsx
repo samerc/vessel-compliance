@@ -2328,9 +2328,10 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                     let newExpiry: string | null = null
                     if (oldExpiryDate) {
                         newInception = oldExpiryDate
-                        const d = new Date(oldExpiryDate)
-                        d.setFullYear(d.getFullYear() + 1)
-                        newExpiry = d.toISOString().split('T')[0]
+                        // Add 1 year using string manipulation to avoid timezone issues
+                        const parts = oldExpiryDate.split('-')
+                        const yr = parseInt(parts[0], 10) + 1
+                        newExpiry = `${yr}-${parts[1]}-${parts[2]}`
                     }
 
                     // Generate new policy number: type letter + inverted year from new inception
@@ -2346,7 +2347,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                     const newId = await window.api.addVesselDynamicPolicy({
                         vesselId: p.vesselId,
                         policyTypeId: p.policyTypeId,
-                        policyNumber: newPolicyNumber,
+                        policyNumber: newPolicyNumber + ' (RENEWED - PLEASE VERIFY)',
                         conditionId: p.conditionId,
                         status: 'active',
                         currency: p.currency,
