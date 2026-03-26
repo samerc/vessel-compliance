@@ -101,7 +101,7 @@ export interface Api {
   getFilePath: (file: File) => string
 
   dialogOpenFile: () => Promise<string | null>
-  dialogOpenImageFile: () => Promise<{ data: number[]; fileName: string } | null>
+  dialogOpenImageFile: () => Promise<{ filePath: string; fileName: string } | null>
   dialogOpenFileAny: () => Promise<string | null>
   excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
   dialogOpenFileWord: () => Promise<string | null>
@@ -749,7 +749,7 @@ export interface Api {
   signatureGet: () => Promise<{ id: string; userId: string; imageData: number[]; fileName: string; uploadedAt: string } | null>
   signatureGetForUser: (userId: string) => Promise<{ id: string; userId: string; imageData: number[]; fileName: string; uploadedAt: string } | null>
   signatureUpload: (imageData: number[], fileName: string) => Promise<string>
-  signatureUploadForUser: (userId: string, imageData: number[], fileName: string) => Promise<string>
+  signatureUploadForUser: (userId: string, filePath: string) => Promise<string>
   signatureDelete: () => Promise<void>
   signatureDeleteForUser: (userId: string) => Promise<void>
   signatureGetAll: () => Promise<Array<{ id: string; userId: string; fileName: string; uploadedAt: string; username: string }>>

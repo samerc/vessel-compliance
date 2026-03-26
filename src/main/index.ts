@@ -1597,9 +1597,8 @@ app.whenReady().then(() => {
     })
     if (result.canceled || !result.filePaths[0]) return null
     const filePath = result.filePaths[0]
-    const data = fs.readFileSync(filePath)
     const fileName = path.basename(filePath)
-    return { data: Array.from(data), fileName }
+    return { filePath, fileName }
   })
 
   safeHandle('dialog:openFileAny', async (event) => {
@@ -2641,13 +2640,11 @@ app.whenReady().then(() => {
     const buf = Buffer.from(imageData)
     return db.uploadUserSignature(user.id, buf, fileName)
   })
-  safeHandle('signature:uploadForUser', async (event, userId: string, imageData: number[], fileName: string) => {
+  safeHandle('signature:uploadForUser', async (event, userId: string, filePath: string) => {
     await requirePermission(event, 'admin:settings')
-    console.log('[Signature Upload]', 'userId:', userId, 'imageData type:', typeof imageData, 'length:', imageData?.length, 'fileName:', fileName)
-    if (!imageData || !Array.isArray(imageData)) {
-      throw new Error('Invalid image data — expected array of bytes')
-    }
-    const buf = Buffer.from(imageData)
+    if (!filePath || !fs.existsSync(filePath)) throw new Error('File not found')
+    const buf = fs.readFileSync(filePath)
+    const fileName = path.basename(filePath)
     return db.uploadUserSignature(userId, buf, fileName)
   })
   safeHandle('signature:delete', async (event) => {

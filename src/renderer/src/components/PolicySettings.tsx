@@ -1285,7 +1285,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
     try {
       const result = await window.api.dialogOpenImageFile()
       if (!result) { setUploading(null); return }
-      const uploadResult = await window.api.signatureUploadForUser(userId, result.data, result.fileName)
+      const uploadResult = await window.api.signatureUploadForUser(userId, result.filePath)
       if (uploadResult && (uploadResult as any).error) {
         showError((uploadResult as any).message || 'Failed to upload')
         return
