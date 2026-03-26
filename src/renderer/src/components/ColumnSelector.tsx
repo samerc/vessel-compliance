@@ -90,6 +90,8 @@ export default function ColumnSelector({ allColumns, visibleColumns, onChange }:
     onChange(defaults)
   }
 
+  const hiddenCount = allColumns.length - visibleColumns.length
+
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button
@@ -101,12 +103,26 @@ export default function ColumnSelector({ allColumns, visibleColumns, onChange }:
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
-          fontSize: '0.8rem'
+          fontSize: '0.8rem',
+          color: hiddenCount > 0 ? 'var(--accent-primary)' : undefined,
+          borderColor: hiddenCount > 0 ? 'var(--accent-primary)' : undefined
         }}
-        title="Configure visible columns"
+        title={hiddenCount > 0 ? `${hiddenCount} column${hiddenCount > 1 ? 's' : ''} hidden` : 'Configure visible columns'}
         aria-label="Column settings"
       >
         <Settings size={14} />
+        {hiddenCount > 0 && (
+          <span style={{
+            position: 'absolute', top: '-4px', right: '-4px',
+            width: '16px', height: '16px', borderRadius: '50%',
+            background: 'var(--accent-primary)', color: '#fff',
+            fontSize: '0.6rem', fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            lineHeight: 1
+          }}>
+            {hiddenCount}
+          </span>
+        )}
       </button>
 
       {open && createPortal(
