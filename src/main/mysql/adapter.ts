@@ -10908,14 +10908,14 @@ export class MySQLAdapter {
                     LEFT JOIN entities cust ON v.customer_id = cust.id
                     LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id
                     LEFT JOIN vessel_policy_values vpv_inc ON (
-                        vpv_inc.dynamic_policy_id = vdp.id
+                        vpv_inc.policy_id = vdp.id
                         AND vpv_inc.characteristic_id IN (
                             SELECT ptc.id FROM policy_type_characteristics ptc
                             WHERE ptc.name LIKE '%inception%' AND ptc.field_type = 'date'
                         )
                     )
                     LEFT JOIN vessel_policy_values vpv_exp ON (
-                        vpv_exp.dynamic_policy_id = vdp.id
+                        vpv_exp.policy_id = vdp.id
                         AND vpv_exp.characteristic_id IN (
                             SELECT ptc.id FROM policy_type_characteristics ptc
                             WHERE ptc.name LIKE '%end%' AND ptc.field_type = 'date'
@@ -10928,7 +10928,7 @@ export class MySQLAdapter {
                         JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
                         WHERE ptc2.field_type = 'number'
                         GROUP BY vpv2.policy_id
-                    ) vprem ON vprem.dynamic_policy_id = vdp.id`,
+                    ) vprem ON vprem.policy_id = vdp.id`,
                 columnMap: {
                     vesselName: 'v.name AS vesselName',
                     imoNumber: 'v.imo_number AS imoNumber',
@@ -11002,7 +11002,7 @@ export class MySQLAdapter {
                     LEFT JOIN entities cust ON v.customer_id = cust.id
                     LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
                     LEFT JOIN vessel_policy_values vpv_end ON (
-                        vpv_end.dynamic_policy_id = vdp.id
+                        vpv_end.policy_id = vdp.id
                         AND vpv_end.characteristic_id IN (
                             SELECT ptc.id FROM policy_type_characteristics ptc
                             WHERE ptc.name LIKE '%end%' AND ptc.field_type = 'date'
