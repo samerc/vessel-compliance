@@ -3,8 +3,9 @@ import {
   Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X,
   Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload, Merge, Link2,
-  ScanSearch, MapPin, CheckSquare, Square, Download
+  ScanSearch, MapPin, CheckSquare, Square, Download, FolderOpen
 } from 'lucide-react'
+import RemapFilePathsModal from './RemapFilePathsModal'
 import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress } from '../../../shared/types'
 import { CaseToggleBtn } from './CaseToggle'
 
@@ -147,6 +148,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const [selectMode, setSelectMode] = useState(false)
   const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set())
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [showEntityRemapModal, setShowEntityRemapModal] = useState(false)
 
   const openMergeModal = async (entity: Entity) => {
     setMergeSource(entity)
@@ -1186,7 +1188,17 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
             {/* Documents section */}
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
-              <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '10px' }}>Documents</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600 }}>Documents</div>
+                <button
+                  onClick={() => setShowEntityRemapModal(true)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px' }}
+                  className="hover-effect"
+                  title="Remap entity file paths"
+                >
+                  <FolderOpen size={12} /> Remap
+                </button>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {selectedEntity.type === 'person' ? (
                   <DocBadge label="ID / Passport" hasFile={!!selectedEntity.passportFilePath}
@@ -1560,6 +1572,15 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
           isDangerous={true}
           onConfirm={handleBulkDeleteEntities}
           onCancel={() => setShowBulkDeleteConfirm(false)}
+        />
+      )}
+
+      {/* Entity Remap Modal */}
+      {showEntityRemapModal && selectedEntity && (
+        <RemapFilePathsModal
+          entityId={selectedEntity.id}
+          entityName={selectedEntity.name}
+          onClose={() => setShowEntityRemapModal(false)}
         />
       )}
 

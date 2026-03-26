@@ -617,6 +617,8 @@ const api = {
   // File Path Remap
   vesselGetFilePaths: (vesselId: string) => ipcRenderer.invoke('vessel:getFilePaths', vesselId),
   vesselRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => ipcRenderer.invoke('vessel:remapFilePaths', remaps),
+  entityGetFilePaths: (entityId: string) => ipcRenderer.invoke('entity:getFilePaths', entityId),
+  entityRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => ipcRenderer.invoke('entity:remapFilePaths', remaps),
   dialogOpenFolder: () => ipcRenderer.invoke('dialog:openFolder'),
   dialogLocateFile: () => ipcRenderer.invoke('dialog:locateFile'),
   shellShowItemInFolder: (filePath: string) => ipcRenderer.invoke('shell:showItemInFolder', filePath),

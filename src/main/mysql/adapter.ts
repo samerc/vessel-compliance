@@ -8983,6 +8983,36 @@ export class MySQLAdapter {
         }
     }
 
+    async getEntityFilePaths(entityId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT id, name, type, certificate_of_incorporation_path, articles_of_association_path, kyc_file_path, passport_file_path FROM entities WHERE id = ?', [entityId])
+        const entity = (rows as any[])[0]
+        if (!entity) return []
+        const entries: any[] = []
+        const fields = [
+            { key: 'certificate_of_incorporation_path', label: 'Certificate of Incorporation' },
+            { key: 'articles_of_association_path', label: 'Articles of Association' },
+            { key: 'kyc_file_path', label: 'KYC' },
+            { key: 'passport_file_path', label: 'ID / Passport' },
+        ]
+        for (const f of fields) {
+            if (entity[f.key]) {
+                entries.push({ id: entityId, source: f.key, filePath: entity[f.key], label: f.label })
+            }
+        }
+        return entries
+    }
+
+    async remapEntityFilePaths(remaps: { source: string; id: string; newPath: string }[]): Promise<void> {
+        if (!this.pool || remaps.length === 0) return
+        for (const remap of remaps) {
+            const allowedCols = ['certificate_of_incorporation_path', 'articles_of_association_path', 'kyc_file_path', 'passport_file_path']
+            if (allowedCols.includes(remap.source)) {
+                await this.pool.execute(`UPDATE entities SET ${remap.source} = ? WHERE id = ?`, [remap.newPath, remap.id])
+            }
+        }
+    }
+
     // --- War Breach Records ---
 
     async saveWarBreachRecord(record: {

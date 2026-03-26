@@ -1497,6 +1497,17 @@ app.whenReady().then(() => {
     return db.remapVesselFilePaths(remaps)
   })
 
+  safeHandle('entity:getFilePaths', (event, entityId: string) => {
+    requireSession(event)
+    return db.getEntityFilePaths(entityId)
+  })
+
+  safeHandle('entity:remapFilePaths', async (event, remaps: { source: string; id: string; newPath: string }[]) => {
+    await requirePermission(event, 'entities:edit')
+    if (!Array.isArray(remaps)) throw new Error('Invalid remaps payload')
+    return db.remapEntityFilePaths(remaps)
+  })
+
   safeHandle('dialog:openFolder', async (event) => {
     requireSession(event)
     const { dialog } = require('electron')

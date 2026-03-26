@@ -20,8 +20,10 @@ interface MappedRow {
 }
 
 interface RemapFilePathsModalProps {
-    vesselId: string
-    vesselName: string
+    vesselId?: string
+    vesselName?: string
+    entityId?: string
+    entityName?: string
     onClose: () => void
 }
 
@@ -56,10 +58,14 @@ function applyPrefix(filePath: string, oldPrefix: string, newPrefix: string): st
     return newPrefix + filePath.slice(oldPrefix.length)
 }
 
-export default function RemapFilePathsModal({ vesselId, vesselName, onClose }: RemapFilePathsModalProps) {
+export default function RemapFilePathsModal({ vesselId, vesselName, entityId, entityName, onClose }: RemapFilePathsModalProps) {
     const { theme } = useTheme()
     const { showSuccess, showError } = useToast()
     const isLight = theme === 'light'
+    const isEntity = !!entityId
+    const targetId = entityId || vesselId || ''
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const targetName = entityName || vesselName || ''
 
     const [step, setStep] = useState<'pick' | 'preview'>('pick')
     const [loading, setLoading] = useState(true)
@@ -71,7 +77,10 @@ export default function RemapFilePathsModal({ vesselId, vesselName, onClose }: R
     const [checking, setChecking] = useState(false)
 
     useEffect(() => {
-        window.api.vesselGetFilePaths(vesselId).then(data => {
+        const loadFn = isEntity
+            ? window.api.entityGetFilePaths(targetId)
+            : window.api.vesselGetFilePaths(targetId)
+        loadFn.then(data => {
             setEntries(data)
             if (data.length > 0) {
                 const detected = detectCommonPrefix(data.map(d => d.filePath))
@@ -79,7 +88,7 @@ export default function RemapFilePathsModal({ vesselId, vesselName, onClose }: R
             }
             setLoading(false)
         })
-    }, [vesselId])
+    }, [targetId, isEntity])
 
     async function handlePreview() {
         if (!oldPrefix || !newPrefix) return
@@ -118,7 +127,11 @@ export default function RemapFilePathsModal({ vesselId, vesselName, onClose }: R
                 id: r.entry.id,
                 newPath: r.customPath ?? r.candidatePath
             }))
-            await window.api.vesselRemapFilePaths(remaps)
+            if (isEntity) {
+                await window.api.entityRemapFilePaths(remaps)
+            } else {
+                await window.api.vesselRemapFilePaths(remaps)
+            }
             showSuccess(`Updated ${toUpdate.length} file path${toUpdate.length !== 1 ? 's' : ''} for ${vesselName}`)
             onClose()
         } catch (e: any) {
@@ -169,7 +182,7 @@ export default function RemapFilePathsModal({ vesselId, vesselName, onClose }: R
                     </div>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
-                            Remap File Paths
+                            Remap File Paths — {targetName}
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                             {vesselName} — {entries.length} file{entries.length !== 1 ? 's' : ''} with paths

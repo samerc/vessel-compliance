@@ -652,6 +652,8 @@ export interface Api {
 
   vesselGetFilePaths: (vesselId: string) => Promise<{ id: string; source: string; filePath: string; label: string }[]>
   vesselRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => Promise<void>
+  entityGetFilePaths: (entityId: string) => Promise<{ id: string; source: string; filePath: string; label: string }[]>
+  entityRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => Promise<void>
   dialogOpenFolder: () => Promise<string | null>
   dialogLocateFile: () => Promise<string | null>
   shellShowItemInFolder: (filePath: string) => Promise<void>
