@@ -10953,7 +10953,7 @@ export class MySQLAdapter {
                         return ''
                     },
                     dateFrom: (params, val) => { params.push(val); return 'vpv_inc.value_date >= ?' },
-                    dateTo: (params, val) => { params.push(val); return 'vpv_inc.value_date <= ?' },
+                    dateTo: (params, val) => { params.push(val); return 'vpv_exp.value_date <= ?' },
                     search: (params, val) => {
                         const s = `%${val}%`
                         params.push(s, s, s)

@@ -144,7 +144,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
         ]
       },
       { key: 'dateFrom', label: 'Inception From', type: 'date' },
-      { key: 'dateTo', label: 'Inception To', type: 'date' },
+      { key: 'dateTo', label: 'Expiry To', type: 'date' },
       { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, policy #, customer...' }
     ],
     groupBy: [
