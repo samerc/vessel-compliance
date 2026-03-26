@@ -11119,8 +11119,8 @@ export class MySQLAdapter {
             documents: {
                 baseQuery: `FROM document_types dt
                     CROSS JOIN vessels v
-                    LEFT JOIN vessel_documents vd ON vd.vessel_id = v.id AND vd.doc_type_id = dt.id
-                    WHERE dt.is_active = TRUE`,
+                    LEFT JOIN vessel_documents vd ON vd.vessel_id = v.id AND vd.document_type_id = dt.id
+                    WHERE 1=1`,
                 columnMap: {
                     vesselName: 'v.name AS vesselName',
                     docTypeName: 'dt.name AS docTypeName',
