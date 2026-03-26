@@ -7,17 +7,37 @@ import * as os from 'os'
 const execAsync = promisify(exec)
 
 /**
- * Convert a DOCX file to PDF using Microsoft Word COM automation via PowerShell.
+ * Convert a DOCX file to PDF.
+ * Tries Microsoft Word COM first, falls back to LibreOffice.
  * Returns the path to the generated PDF file.
  */
 export async function convertDocxToPdf(docxPath: string): Promise<string> {
   const pdfPath = docxPath.replace(/\.docx$/i, '.pdf')
+
+  // Try Word COM first
+  try {
+    await convertViaWord(docxPath, pdfPath)
+    if (fs.existsSync(pdfPath)) return pdfPath
+  } catch (wordErr) {
+    console.log('[DocxToPdf] Word COM failed, trying LibreOffice...', (wordErr as Error).message)
+  }
+
+  // Fall back to LibreOffice
+  try {
+    await convertViaLibreOffice(docxPath, pdfPath)
+    if (fs.existsSync(pdfPath)) return pdfPath
+  } catch (loErr) {
+    console.log('[DocxToPdf] LibreOffice failed:', (loErr as Error).message)
+  }
+
+  throw new Error('PDF conversion failed — neither Microsoft Word nor LibreOffice could convert the file. Please install one of them.')
+}
+
+async function convertViaWord(docxPath: string, pdfPath: string): Promise<void> {
   const absDocx = path.resolve(docxPath).replace(/\//g, '\\')
   const absPdf = path.resolve(pdfPath).replace(/\//g, '\\')
-
   const tmpScript = path.join(os.tmpdir(), `vc_convert_${Date.now()}.ps1`)
 
-  // wdFormatPDF = 17
   const script = [
     '$ErrorActionPreference = "Stop"',
     '$word = New-Object -ComObject Word.Application',
@@ -33,25 +53,44 @@ export async function convertDocxToPdf(docxPath: string): Promise<string> {
   ].join('\n')
 
   fs.writeFileSync(tmpScript, script, 'utf-8')
-
   try {
     await execAsync(
       `powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpScript}"`,
       { timeout: 120000 }
     )
   } finally {
+    try { fs.unlinkSync(tmpScript) } catch { /* ignore */ }
+  }
+}
+
+async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise<void> {
+  const absDocx = path.resolve(docxPath)
+  const outDir = path.dirname(path.resolve(pdfPath))
+
+  // Try common LibreOffice locations
+  const loPaths = [
+    'soffice',
+    'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+    'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+    '/usr/bin/soffice',
+    '/usr/bin/libreoffice',
+  ]
+
+  let loPath = ''
+  for (const p of loPaths) {
     try {
-      fs.unlinkSync(tmpScript)
-    } catch {
-      /* ignore cleanup error */
-    }
+      await execAsync(`"${p}" --version`, { timeout: 5000 })
+      loPath = p
+      break
+    } catch { /* try next */ }
   }
 
-  if (!fs.existsSync(absPdf)) {
-    throw new Error('PDF conversion failed — output file not found. Is Microsoft Word installed?')
-  }
+  if (!loPath) throw new Error('LibreOffice not found')
 
-  return absPdf
+  await execAsync(
+    `"${loPath}" --headless --convert-to pdf --outdir "${outDir}" "${absDocx}"`,
+    { timeout: 120000 }
+  )
 }
 
 /**
