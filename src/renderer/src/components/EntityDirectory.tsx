@@ -934,7 +934,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
         {/* Table */}
         <div className="glass-card" style={{ flex: 1, minWidth: 0, overflow: 'hidden', padding: 0 }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)', position: 'relative' }}>
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <colgroup>
                 {selectMode && <col style={{ width: '40px' }} />}
                 <col style={{ width: 'auto' }} />
