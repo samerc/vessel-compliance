@@ -2633,7 +2633,11 @@ app.whenReady().then(() => {
   })
   safeHandle('signature:getForUser', async (event, userId: string) => {
     requireSession(event)
-    return db.getUserSignature(userId)
+    const sig = await db.getUserSignature(userId)
+    if (sig && sig.imageData) {
+      sig.imageData = Array.from(Buffer.isBuffer(sig.imageData) ? sig.imageData : Buffer.from(sig.imageData))
+    }
+    return sig
   })
   safeHandle('signature:upload', async (event, imageData: number[], fileName: string) => {
     const user = await requirePermission(event, 'policies:sign')
@@ -2678,7 +2682,11 @@ app.whenReady().then(() => {
   })
   safeHandle('policy:getSignature', async (event, policyId: string) => {
     requireSession(event)
-    return db.getPolicySignature(policyId)
+    const sig = await db.getPolicySignature(policyId)
+    if (sig && sig.imageData) {
+      sig.imageData = Array.from(Buffer.isBuffer(sig.imageData) ? sig.imageData : Buffer.from(sig.imageData))
+    }
+    return sig
   })
 
   // Policy Expiry Alerts
