@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, screen, Menu } from 'electron'
-import { join, dirname, resolve, normalize, extname } from 'path'
+import { join, dirname, resolve, normalize, extname, basename } from 'path'
 import { Worker } from 'worker_threads'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -1597,7 +1597,7 @@ app.whenReady().then(() => {
     })
     if (result.canceled || !result.filePaths[0]) return null
     const filePath = result.filePaths[0]
-    const fileName = path.basename(filePath)
+    const fileName = basename(filePath)
     return { filePath, fileName }
   })
 
@@ -2642,9 +2642,9 @@ app.whenReady().then(() => {
   })
   safeHandle('signature:uploadForUser', async (event, userId: string, filePath: string) => {
     await requirePermission(event, 'admin:settings')
-    if (!filePath || !fs.existsSync(filePath)) throw new Error('File not found')
-    const buf = fs.readFileSync(filePath)
-    const fileName = path.basename(filePath)
+    if (!filePath || !existsSync(filePath)) throw new Error('File not found')
+    const buf = readFileSync(filePath)
+    const fileName = basename(filePath)
     return db.uploadUserSignature(userId, buf, fileName)
   })
   safeHandle('signature:delete', async (event) => {
