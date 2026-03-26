@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ScrollText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Filter, ShieldAlert, FileText } from 'lucide-react'
+import { ScrollText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Filter, ShieldAlert, FileText, Table } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { ActivityLogEntry, ActivityLogFilters } from '../../../shared/types'
@@ -248,6 +249,37 @@ export default function ActivityLog() {
     }
   }
 
+  const handleExportExcel = async () => {
+    try {
+      const allEntries = await window.api.activityGetLog({
+        page: 1, limit: 5000,
+        module: moduleFilter || undefined,
+        action: actionFilter || undefined,
+        userId: userFilter || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        search: search || undefined,
+      })
+      const rows = (allEntries.data || []).map((e: ActivityLogEntry) => ({
+        'Date/Time': formatDateTime(e.createdAt),
+        'User': e.username || '',
+        'Action': e.action || '',
+        'Module': e.module || '',
+        'Entity': e.entityName || '',
+        'Details': e.details || '',
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Activity Log')
+      const colWidths = [{ wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 50 }]
+      ws['!cols'] = colWidths
+      XLSX.writeFile(wb, 'Activity_Log.xlsx')
+      showSuccess('Activity log exported to Excel')
+    } catch (err: any) {
+      showError(err.message || 'Failed to export')
+    }
+  }
+
   const selectStyle: React.CSSProperties = {
     padding: '6px 10px',
     borderRadius: '6px',
@@ -297,6 +329,19 @@ export default function ActivityLog() {
               title="Export filtered entries to PDF"
             >
               <FileText size={14} /> Export PDF
+            </button>
+            <button
+              onClick={handleExportExcel}
+              style={{
+                background: 'transparent', border: '1px solid var(--glass-border)',
+                borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
+                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '0.8rem',
+              }}
+              className="hover-effect"
+              title="Export filtered entries to Excel"
+            >
+              <Table size={14} /> Export Excel
             </button>
             <button
               onClick={() => { loadData(); loadFilters() }}
