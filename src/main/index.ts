@@ -2642,7 +2642,7 @@ app.whenReady().then(() => {
     return db.uploadUserSignature(user.id, buf, fileName)
   })
   safeHandle('signature:uploadForUser', async (event, userId: string, imageData: number[], fileName: string) => {
-    await requirePermission(event, 'admin:users')
+    await requirePermission(event, 'admin:settings')
     const buf = Buffer.from(imageData)
     return db.uploadUserSignature(userId, buf, fileName)
   })
