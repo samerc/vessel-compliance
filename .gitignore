@@ -99,6 +99,7 @@ Thumbs.db
 # Project Specific
 *.md
 !RELEASE_NOTES.md
+!TESTING.md
 !.claude/design-guide.md
 !.claude/lessons-learned.md
 db/db-config.json
