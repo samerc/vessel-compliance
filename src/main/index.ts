@@ -2643,6 +2643,10 @@ app.whenReady().then(() => {
   })
   safeHandle('signature:uploadForUser', async (event, userId: string, imageData: number[], fileName: string) => {
     await requirePermission(event, 'admin:settings')
+    console.log('[Signature Upload]', 'userId:', userId, 'imageData type:', typeof imageData, 'length:', imageData?.length, 'fileName:', fileName)
+    if (!imageData || !Array.isArray(imageData)) {
+      throw new Error('Invalid image data — expected array of bytes')
+    }
     const buf = Buffer.from(imageData)
     return db.uploadUserSignature(userId, buf, fileName)
   })
