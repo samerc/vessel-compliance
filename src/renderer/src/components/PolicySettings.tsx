@@ -1283,14 +1283,9 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
   const handleUpload = async (userId: string) => {
     setUploading(userId)
     try {
-      const filePath = await window.api.dialogOpenFile()
-      if (!filePath) { setUploading(null); return }
-      // Read the file via fetch (electron file:// protocol)
-      const response = await fetch(`file://${filePath}`)
-      const arrayBuffer = await response.arrayBuffer()
-      const data = Array.from(new Uint8Array(arrayBuffer))
-      const fileName = filePath.split(/[\\/]/).pop() || 'signature.png'
-      await window.api.signatureUploadForUser(userId, data, fileName)
+      const result = await window.api.dialogOpenImageFile()
+      if (!result) { setUploading(null); return }
+      await window.api.signatureUploadForUser(userId, result.data, result.fileName)
       showSuccess('Signature uploaded')
       await loadData()
     } catch (err: any) {

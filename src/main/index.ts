@@ -1585,6 +1585,23 @@ app.whenReady().then(() => {
   })
 
   // General file picker (for document uploads)
+  safeHandle('dialog:openImageFile', async (event) => {
+    requireSession(event)
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    const filePath = result.filePaths[0]
+    const data = fs.readFileSync(filePath)
+    const fileName = path.basename(filePath)
+    return { data: Array.from(data), fileName }
+  })
+
   safeHandle('dialog:openFileAny', async (event) => {
     requireSession(event)
     const { dialog } = require('electron')

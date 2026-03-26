@@ -83,6 +83,7 @@ const api = {
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 
   dialogOpenFile: () => ipcRenderer.invoke('dialog:openFile'),
+  dialogOpenImageFile: () => ipcRenderer.invoke('dialog:openImageFile'),
   dialogOpenFileAny: () => ipcRenderer.invoke('dialog:openFileAny'),
   excelImport: (filePath) => ipcRenderer.invoke('excel:import', filePath),
   dialogOpenFileWord: () => ipcRenderer.invoke('dialog:openFileWord'),

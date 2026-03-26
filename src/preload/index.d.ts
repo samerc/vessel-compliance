@@ -101,6 +101,7 @@ export interface Api {
   getFilePath: (file: File) => string
 
   dialogOpenFile: () => Promise<string | null>
+  dialogOpenImageFile: () => Promise<{ data: number[]; fileName: string } | null>
   dialogOpenFileAny: () => Promise<string | null>
   excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
   dialogOpenFileWord: () => Promise<string | null>
