@@ -1438,6 +1438,27 @@ export interface ReportConfig {
 
 // ==================== Document Templates ====================
 
+export interface CustomValidationRule {
+  id: string
+  name: string
+  description?: string | null
+  entityType: string
+  fieldName: string
+  operator: string
+  value?: string | null
+  severity: string
+  isEnabled: boolean
+  order: number
+}
+
+export interface CustomValidationViolation {
+  ruleId: string
+  ruleName: string
+  severity: string
+  count: number
+  items: { id: string; name: string }[]
+}
+
 export interface DocumentTemplate {
   id: string
   name: string

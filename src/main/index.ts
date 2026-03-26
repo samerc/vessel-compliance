@@ -1438,6 +1438,14 @@ app.whenReady().then(() => {
   safeHandle('dashboard:getCalendarEvents', (event, year: number, month: number) => { requireSession(event); return db.getCalendarEvents(year, month) })
   safeHandle('compliance:getDataValidation', (event) => { requireSession(event); return db.getDataValidationResults() })
 
+  // Custom Validation Rules
+  safeHandle('validationRules:getAll', (event) => { requireSession(event); return db.getCustomValidationRules() })
+  safeHandle('validationRules:add', async (event, rule) => { await requirePermission(event, 'admin:settings'); return db.addCustomValidationRule(rule) })
+  safeHandle('validationRules:update', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updateCustomValidationRule(id, updates) })
+  safeHandle('validationRules:delete', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteCustomValidationRule(id) })
+  safeHandle('validationRules:reorder', async (event, ids) => { await requirePermission(event, 'admin:settings'); return db.reorderCustomValidationRules(ids) })
+  safeHandle('validationRules:run', (event) => { requireSession(event); return db.runCustomValidationRules() })
+
   safeHandle('dashboard:getLayout', async (event) => {
     const user = requireSession(event)
     const val = await db.getSetting(`dashboard_layout_${user.id}`)

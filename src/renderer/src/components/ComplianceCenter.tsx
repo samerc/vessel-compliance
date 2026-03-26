@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings } from 'lucide-react'
-import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult } from '../../../shared/types'
+import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +17,71 @@ const STATIC_RULES = [
     { id: 'empty_fleets', name: 'Empty fleets', description: 'Fleets with no vessels assigned' },
 ]
 
+const RULE_FIELDS: Record<string, { key: string; label: string; type: 'text' | 'number' | 'boolean' }[]> = {
+    vessel: [
+        { key: 'name', label: 'Name', type: 'text' },
+        { key: 'imo_number', label: 'IMO Number', type: 'text' },
+        { key: 'vessel_type', label: 'Vessel Type', type: 'text' },
+        { key: 'flag_state_id', label: 'Flag State', type: 'text' },
+        { key: 'built_year', label: 'Built Year', type: 'number' },
+        { key: 'gross_tonnage', label: 'Gross Tonnage', type: 'number' },
+        { key: 'customer_id', label: 'Customer', type: 'text' },
+        { key: 'fleet_id', label: 'Fleet', type: 'text' },
+        { key: 'classification_society', label: 'Classification', type: 'text' },
+        { key: 'is_active', label: 'Active Status', type: 'boolean' },
+    ],
+    entity: [
+        { key: 'name', label: 'Name', type: 'text' },
+        { key: 'type', label: 'Type', type: 'text' },
+        { key: 'email', label: 'Email', type: 'text' },
+        { key: 'phone', label: 'Phone', type: 'text' },
+        { key: 'identifier', label: 'Identifier', type: 'text' },
+    ],
+    policy: [
+        { key: 'policy_number', label: 'Policy Number', type: 'text' },
+        { key: 'status', label: 'Status', type: 'text' },
+        { key: 'premium_amount', label: 'Premium', type: 'number' },
+        { key: 'commission_percent', label: 'Commission %', type: 'number' },
+    ],
+    fleet: [
+        { key: 'name', label: 'Name', type: 'text' },
+    ],
+}
+
+const OPERATORS = [
+    { key: 'is_null', label: 'Is Null', needsValue: false },
+    { key: 'is_empty', label: 'Is Empty', needsValue: false },
+    { key: 'equals', label: 'Equals', needsValue: true },
+    { key: 'not_equals', label: 'Not Equals', needsValue: true },
+    { key: 'less_than', label: 'Less Than', needsValue: true },
+    { key: 'greater_than', label: 'Greater Than', needsValue: true },
+    { key: 'contains', label: 'Contains', needsValue: true },
+    { key: 'not_contains', label: 'Not Contains', needsValue: true },
+]
+
+const ENTITY_TYPES = [
+    { key: 'vessel', label: 'Vessel' },
+    { key: 'entity', label: 'Entity' },
+    { key: 'policy', label: 'Policy' },
+    { key: 'fleet', label: 'Fleet' },
+]
+
+const SEVERITIES = [
+    { key: 'warning', label: 'Warning', color: '#f59e0b' },
+    { key: 'error', label: 'Error', color: '#ff4d4d' },
+    { key: 'info', label: 'Info', color: '#00aac8' },
+]
+
+const EMPTY_RULE_FORM = {
+    name: '',
+    description: '',
+    entityType: 'vessel',
+    fieldName: '',
+    operator: 'is_null',
+    value: '',
+    severity: 'warning',
+}
+
 interface ComplianceCenterProps {
     onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
 }
@@ -27,7 +92,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
     const [activeTab, setActiveTab] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>('documents')
-    const { showSuccess } = useToast()
+    const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
     const isLight = theme === 'light'
@@ -53,10 +118,18 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [showRuleSettings, setShowRuleSettings] = useState(false)
     const [ruleToggles, setRuleToggles] = useState<Record<string, boolean>>({})
 
+    // Custom validation rules state
+    const [customRules, setCustomRules] = useState<CustomValidationRule[]>([])
+    const [customRuleViolations, setCustomRuleViolations] = useState<{ ruleId: string; ruleName: string; severity: string; count: number; items: { id: string; name: string }[] }[]>([])
+    const [showAddRule, setShowAddRule] = useState(false)
+    const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
+    const [ruleForm, setRuleForm] = useState(EMPTY_RULE_FORM)
+
     useEffect(() => {
         loadData()
         loadSanctionsData()
         loadPolicyAlerts()
+        loadCustomRules()
         window.api.getSetting('data_validation_rules').then(raw => {
             if (raw) {
                 try { setRuleToggles(JSON.parse(raw)) } catch { /* ignore */ }
@@ -120,14 +193,21 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const loadDataValidation = async () => {
         setValidationLoading(true)
         try {
-            const result = await window.api.complianceGetDataValidation()
+            const [result, customResults] = await Promise.all([
+                window.api.complianceGetDataValidation(),
+                window.api.validationRulesRun()
+            ])
             if (result && Array.isArray(result.rules)) {
                 setValidationRules(result.rules)
             } else {
                 setValidationRules([])
             }
+            if (Array.isArray(customResults)) {
+                setCustomRuleViolations(customResults)
+            }
         } catch {
             setValidationRules([])
+            setCustomRuleViolations([])
         } finally {
             setValidationLoading(false)
         }
@@ -146,6 +226,87 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
         const next = { ...ruleToggles, [ruleId]: !(ruleToggles[ruleId] !== false) }
         setRuleToggles(next)
         window.api.setSetting('data_validation_rules', JSON.stringify(next))
+    }
+
+    const loadCustomRules = async () => {
+        try {
+            const rules = await window.api.validationRulesGetAll()
+            if (Array.isArray(rules)) setCustomRules(rules)
+        } catch { setCustomRules([]) }
+    }
+
+    const handleSaveRule = async () => {
+        if (!ruleForm.name.trim()) { showError('Rule name is required'); return }
+        if (!ruleForm.fieldName) { showError('Field is required'); return }
+        const operatorDef = OPERATORS.find(o => o.key === ruleForm.operator)
+        if (operatorDef?.needsValue && !ruleForm.value.trim()) { showError('Value is required for this operator'); return }
+
+        try {
+            if (editingRuleId) {
+                await window.api.validationRulesUpdate(editingRuleId, {
+                    name: ruleForm.name,
+                    description: ruleForm.description || null,
+                    entityType: ruleForm.entityType,
+                    fieldName: ruleForm.fieldName,
+                    operator: ruleForm.operator,
+                    value: operatorDef?.needsValue ? ruleForm.value : null,
+                    severity: ruleForm.severity,
+                })
+                showSuccess('Rule updated')
+            } else {
+                await window.api.validationRulesAdd({
+                    name: ruleForm.name,
+                    description: ruleForm.description || null,
+                    entityType: ruleForm.entityType,
+                    fieldName: ruleForm.fieldName,
+                    operator: ruleForm.operator,
+                    value: operatorDef?.needsValue ? ruleForm.value : null,
+                    severity: ruleForm.severity,
+                    isEnabled: true,
+                    order: customRules.length,
+                })
+                showSuccess('Rule created')
+            }
+            setShowAddRule(false)
+            setEditingRuleId(null)
+            setRuleForm(EMPTY_RULE_FORM)
+            loadCustomRules()
+        } catch (e: any) {
+            showError(e?.message || 'Failed to save rule')
+        }
+    }
+
+    const handleDeleteRule = async (id: string) => {
+        try {
+            await window.api.validationRulesDelete(id)
+            showSuccess('Rule deleted')
+            loadCustomRules()
+        } catch (e: any) {
+            showError(e?.message || 'Failed to delete rule')
+        }
+    }
+
+    const handleToggleCustomRule = async (rule: CustomValidationRule) => {
+        try {
+            await window.api.validationRulesUpdate(rule.id, { isEnabled: !rule.isEnabled })
+            loadCustomRules()
+        } catch (e: any) {
+            showError(e?.message || 'Failed to toggle rule')
+        }
+    }
+
+    const handleEditRule = (rule: CustomValidationRule) => {
+        setEditingRuleId(rule.id)
+        setRuleForm({
+            name: rule.name,
+            description: rule.description || '',
+            entityType: rule.entityType,
+            fieldName: rule.fieldName,
+            operator: rule.operator,
+            value: rule.value || '',
+            severity: rule.severity,
+        })
+        setShowAddRule(true)
     }
 
     const handleDecideMatch = async (resultId: string, decision: 'sanctioned' | 'cleared') => {
@@ -482,8 +643,10 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <Database size={20} color="var(--accent-primary)" />
                             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Data Quality</h3>
-                            {validationRules.length > 0 && (() => {
-                                const totalIssues = validationRules.filter(r => ruleToggles[r.id] !== false).reduce((sum, r) => sum + r.count, 0)
+                            {(validationRules.length > 0 || customRuleViolations.length > 0) && (() => {
+                                const builtInIssues = validationRules.filter(r => ruleToggles[r.id] !== false).reduce((sum, r) => sum + r.count, 0)
+                                const customIssues = customRuleViolations.reduce((sum, r) => sum + r.count, 0)
+                                const totalIssues = builtInIssues + customIssues
                                 return (
                                     <span style={{
                                         padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '700',
@@ -569,6 +732,218 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                                     boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
                                                 }} />
                                             </button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            {/* Divider */}
+                            <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
+                            {/* Custom Rules Section */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Custom Rules</span>
+                                {hasPermission('admin:settings') && (
+                                    <button
+                                        onClick={() => {
+                                            setEditingRuleId(null)
+                                            setRuleForm(EMPTY_RULE_FORM)
+                                            setShowAddRule(!showAddRule)
+                                        }}
+                                        className="hover-effect"
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '4px',
+                                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem',
+                                            background: 'rgba(0,210,255,0.1)', border: '1px solid rgba(0,210,255,0.3)',
+                                            color: 'var(--accent-primary)', cursor: 'pointer'
+                                        }}
+                                    >
+                                        <Plus size={13} />
+                                        Add Rule
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Add/Edit Rule Form */}
+                            {showAddRule && (
+                                <div style={{
+                                    padding: '14px', borderRadius: '8px', marginBottom: '12px',
+                                    background: isLight ? '#fff' : 'rgba(255,255,255,0.04)',
+                                    border: '1px solid var(--accent-primary)'
+                                }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Name</label>
+                                            <input
+                                                value={ruleForm.name}
+                                                onChange={e => setRuleForm(f => ({ ...f, name: e.target.value }))}
+                                                placeholder="Rule name"
+                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Entity Type</label>
+                                            <select
+                                                value={ruleForm.entityType}
+                                                onChange={e => setRuleForm(f => ({ ...f, entityType: e.target.value, fieldName: RULE_FIELDS[e.target.value]?.[0]?.key || '' }))}
+                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                            >
+                                                {ENTITY_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Field</label>
+                                            <select
+                                                value={ruleForm.fieldName}
+                                                onChange={e => setRuleForm(f => ({ ...f, fieldName: e.target.value }))}
+                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                            >
+                                                <option value="">Select field...</option>
+                                                {(RULE_FIELDS[ruleForm.entityType] || []).map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Operator</label>
+                                            <select
+                                                value={ruleForm.operator}
+                                                onChange={e => setRuleForm(f => ({ ...f, operator: e.target.value }))}
+                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                            >
+                                                {OPERATORS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Value</label>
+                                            <input
+                                                value={ruleForm.value}
+                                                onChange={e => setRuleForm(f => ({ ...f, value: e.target.value }))}
+                                                placeholder={OPERATORS.find(o => o.key === ruleForm.operator)?.needsValue ? 'Value...' : '(not needed)'}
+                                                disabled={!OPERATORS.find(o => o.key === ruleForm.operator)?.needsValue}
+                                                style={{
+                                                    width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)',
+                                                    background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box',
+                                                    opacity: OPERATORS.find(o => o.key === ruleForm.operator)?.needsValue ? 1 : 0.4
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Severity</label>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                {SEVERITIES.map(s => (
+                                                    <button
+                                                        key={s.key}
+                                                        onClick={() => setRuleForm(f => ({ ...f, severity: s.key }))}
+                                                        style={{
+                                                            padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600',
+                                                            background: ruleForm.severity === s.key ? s.color + '22' : 'transparent',
+                                                            border: ruleForm.severity === s.key ? `2px solid ${s.color}` : '1px solid var(--glass-border)',
+                                                            color: ruleForm.severity === s.key ? s.color : 'var(--text-secondary)',
+                                                            cursor: 'pointer', textTransform: 'capitalize'
+                                                        }}
+                                                    >
+                                                        {s.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignSelf: 'flex-end' }}>
+                                            <button
+                                                onClick={() => { setShowAddRule(false); setEditingRuleId(null); setRuleForm(EMPTY_RULE_FORM) }}
+                                                className="btn-secondary"
+                                                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleSaveRule}
+                                                className="btn-primary"
+                                                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                                            >
+                                                {editingRuleId ? 'Update' : 'Save'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Custom Rules List */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {customRules.length === 0 && !showAddRule && (
+                                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                                        No custom validation rules configured.
+                                    </div>
+                                )}
+                                {customRules.map(rule => {
+                                    const sevDef = SEVERITIES.find(s => s.key === rule.severity) || SEVERITIES[0]
+                                    const fieldDef = RULE_FIELDS[rule.entityType]?.find(f => f.key === rule.fieldName)
+                                    const opDef = OPERATORS.find(o => o.key === rule.operator)
+                                    return (
+                                        <div
+                                            key={rule.id}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '8px 12px', borderRadius: '8px',
+                                                background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
+                                                border: '1px solid var(--glass-border)',
+                                                opacity: rule.isEnabled ? 1 : 0.5
+                                            }}
+                                        >
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ fontWeight: '600', fontSize: '0.84rem' }}>{rule.name}</span>
+                                                    <span style={{
+                                                        padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '700',
+                                                        background: sevDef.color + '22', color: sevDef.color, textTransform: 'uppercase'
+                                                    }}>
+                                                        {rule.severity}
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                                                    {rule.entityType} &rarr; {fieldDef?.label || rule.fieldName} {opDef?.label.toLowerCase() || rule.operator}{opDef?.needsValue ? ` "${rule.value}"` : ''}
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                                {hasPermission('admin:settings') && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleEditRule(rule)}
+                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px', display: 'flex' }}
+                                                            title="Edit rule"
+                                                        >
+                                                            <Pencil size={13} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteRule(rule.id)}
+                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', display: 'flex' }}
+                                                            title="Delete rule"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button
+                                                    onClick={() => handleToggleCustomRule(rule)}
+                                                    style={{
+                                                        width: '40px', height: '22px', borderRadius: '11px', border: 'none',
+                                                        background: rule.isEnabled ? 'var(--accent-primary)' : (isLight ? '#ccc' : 'rgba(255,255,255,0.15)'),
+                                                        cursor: 'pointer', position: 'relative', flexShrink: 0,
+                                                        transition: 'background 0.2s'
+                                                    }}
+                                                    title={rule.isEnabled ? 'Disable rule' : 'Enable rule'}
+                                                >
+                                                    <span style={{
+                                                        position: 'absolute', top: '2px',
+                                                        left: rule.isEnabled ? '20px' : '2px',
+                                                        width: '18px', height: '18px', borderRadius: '50%',
+                                                        background: '#fff', transition: 'left 0.2s',
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                                                    }} />
+                                                </button>
+                                            </div>
                                         </div>
                                     )
                                 })}
@@ -675,7 +1050,77 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                             </>
                                         )
                                     })}
-                                    {validationRules.length === 0 && !validationLoading && (
+                                    {/* Custom rule violations */}
+                                    {customRuleViolations.map(rule => {
+                                        const isExpanded = expandedRules.has(rule.ruleId)
+                                        const hasIssues = rule.count > 0
+                                        const sevDef = SEVERITIES.find(s => s.key === rule.severity) || SEVERITIES[0]
+                                        return (
+                                            <>{/* Fragment wrapper for custom rule + expanded rows */}
+                                                <tr
+                                                    key={rule.ruleId}
+                                                    onClick={() => hasIssues && toggleRule(rule.ruleId)}
+                                                    style={{
+                                                        borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
+                                                        cursor: hasIssues ? 'pointer' : 'default',
+                                                        borderLeft: `4px solid ${hasIssues ? sevDef.color : 'var(--success)'}`
+                                                    }}
+                                                >
+                                                    <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                                                        {hasIssues ? (
+                                                            <ChevronDownIcon size={16} color="var(--text-secondary)" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                                                        ) : (
+                                                            <CheckCircle size={16} color="var(--success)" />
+                                                        )}
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px' }}>
+                                                        <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>{rule.ruleName}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>Custom rule</div>
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px' }}>
+                                                        <span style={{
+                                                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600',
+                                                            background: sevDef.color + '1a', color: sevDef.color, textTransform: 'uppercase'
+                                                        }}>
+                                                            {rule.severity}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                                                        <span style={{
+                                                            padding: '4px 12px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: '800',
+                                                            background: hasIssues ? sevDef.color + '26' : 'rgba(0, 255, 136, 0.15)',
+                                                            color: hasIssues ? sevDef.color : 'var(--success)'
+                                                        }}>
+                                                            {rule.count}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && rule.items.length > 0 && (
+                                                    <tr key={`${rule.ruleId}-items`}>
+                                                        <td colSpan={4} style={{ padding: '0 16px 16px 48px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)', borderBottom: '1px solid var(--table-border)' }}>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '240px', overflowY: 'auto' }}>
+                                                                {rule.items.map((item, idx) => (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        style={{
+                                                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                                                            padding: '6px 10px', borderRadius: '6px',
+                                                                            background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'),
+                                                                            fontSize: '0.82rem'
+                                                                        }}
+                                                                    >
+                                                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sevDef.color, flexShrink: 0 }} />
+                                                                        <span style={{ fontWeight: '500' }}>{item.name}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </>
+                                        )
+                                    })}
+                                    {validationRules.length === 0 && customRuleViolations.length === 0 && !validationLoading && (
                                         <tr>
                                             <td colSpan={4} style={{ padding: '64px', textAlign: 'center' }}>
                                                 <Database size={48} style={{ opacity: 0.15, marginBottom: '16px' }} />

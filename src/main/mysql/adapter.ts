@@ -2477,6 +2477,25 @@ export class MySQLAdapter {
                 }
             } catch (e) { /* email_templates table may not exist */ }
 
+            // Migration: custom_validation_rules table
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS custom_validation_rules (
+                        id VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT DEFAULT NULL,
+                        entity_type VARCHAR(50) NOT NULL,
+                        field_name VARCHAR(100) NOT NULL,
+                        operator VARCHAR(20) NOT NULL,
+                        value VARCHAR(255) DEFAULT NULL,
+                        severity VARCHAR(20) DEFAULT 'warning',
+                        is_enabled BOOLEAN DEFAULT TRUE,
+                        order_index INT DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                `)
+            } catch (e) { console.error('custom_validation_rules migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -4509,6 +4528,153 @@ export class MySQLAdapter {
         })
 
         return { rules }
+    }
+
+    // --- Custom Validation Rules ---
+
+    private static RULE_FIELDS: Record<string, { key: string; label: string; type: string }[]> = {
+        vessel: [
+            { key: 'name', label: 'Name', type: 'text' },
+            { key: 'imo_number', label: 'IMO Number', type: 'text' },
+            { key: 'vessel_type', label: 'Vessel Type', type: 'text' },
+            { key: 'flag_state_id', label: 'Flag State', type: 'text' },
+            { key: 'built_year', label: 'Built Year', type: 'number' },
+            { key: 'gross_tonnage', label: 'Gross Tonnage', type: 'number' },
+            { key: 'customer_id', label: 'Customer', type: 'text' },
+            { key: 'fleet_id', label: 'Fleet', type: 'text' },
+            { key: 'classification_society', label: 'Classification', type: 'text' },
+            { key: 'is_active', label: 'Active Status', type: 'boolean' },
+        ],
+        entity: [
+            { key: 'name', label: 'Name', type: 'text' },
+            { key: 'type', label: 'Type', type: 'text' },
+            { key: 'email', label: 'Email', type: 'text' },
+            { key: 'phone', label: 'Phone', type: 'text' },
+            { key: 'identifier', label: 'Identifier', type: 'text' },
+        ],
+        policy: [
+            { key: 'policy_number', label: 'Policy Number', type: 'text' },
+            { key: 'status', label: 'Status', type: 'text' },
+            { key: 'premium_amount', label: 'Premium', type: 'number' },
+            { key: 'commission_percent', label: 'Commission %', type: 'number' },
+        ],
+        fleet: [
+            { key: 'name', label: 'Name', type: 'text' },
+        ],
+    }
+
+    private getTableForEntityType(type: string): string {
+        const map: Record<string, string> = {
+            vessel: 'vessels',
+            entity: 'entities',
+            policy: 'vessel_dynamic_policies',
+            fleet: 'fleets',
+        }
+        return map[type] || 'vessels'
+    }
+
+    private validateFieldName(entityType: string, fieldName: string): string | null {
+        const allowed = MySQLAdapter.RULE_FIELDS[entityType]?.map(f => f.key) || []
+        return allowed.includes(fieldName) ? fieldName : null
+    }
+
+    async getCustomValidationRules(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, name, description, entity_type AS entityType, field_name AS fieldName, operator, value, severity, is_enabled AS isEnabled, order_index AS `order` FROM custom_validation_rules ORDER BY order_index ASC'
+        )
+        return (rows as any[]).map(r => ({ ...r, isEnabled: Boolean(r.isEnabled) }))
+    }
+
+    async addCustomValidationRule(rule: any): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO custom_validation_rules (id, name, description, entity_type, field_name, operator, value, severity, is_enabled, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, rule.name, rule.description || null, rule.entityType, rule.fieldName, rule.operator, rule.value || null, rule.severity || 'warning', rule.isEnabled !== false ? 1 : 0, rule.order || 0]
+        )
+        return { ...rule, id }
+    }
+
+    async updateCustomValidationRule(id: string, updates: any): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
+        if (updates.entityType !== undefined) { fields.push('entity_type = ?'); values.push(updates.entityType) }
+        if (updates.fieldName !== undefined) { fields.push('field_name = ?'); values.push(updates.fieldName) }
+        if (updates.operator !== undefined) { fields.push('operator = ?'); values.push(updates.operator) }
+        if (updates.value !== undefined) { fields.push('value = ?'); values.push(updates.value) }
+        if (updates.severity !== undefined) { fields.push('severity = ?'); values.push(updates.severity) }
+        if (updates.isEnabled !== undefined) { fields.push('is_enabled = ?'); values.push(updates.isEnabled ? 1 : 0) }
+        if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE custom_validation_rules SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteCustomValidationRule(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM custom_validation_rules WHERE id = ?', [id])
+    }
+
+    async reorderCustomValidationRules(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE custom_validation_rules SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
+    async runCustomValidationRules(): Promise<{ ruleId: string; ruleName: string; severity: string; count: number; items: { id: string; name: string }[] }[]> {
+        if (!this.pool) return []
+        const rules = await this.getCustomValidationRules()
+        const results: { ruleId: string; ruleName: string; severity: string; count: number; items: { id: string; name: string }[] }[] = []
+
+        for (const rule of rules) {
+            if (!rule.isEnabled) continue
+
+            const tableName = this.getTableForEntityType(rule.entityType)
+            const fieldName = this.validateFieldName(rule.entityType, rule.fieldName)
+            if (!fieldName) continue
+
+            let whereClause = ''
+            const params: any[] = []
+
+            switch (rule.operator) {
+                case 'is_null': whereClause = `${fieldName} IS NULL`; break
+                case 'is_empty': whereClause = `(${fieldName} IS NULL OR ${fieldName} = '')`; break
+                case 'equals': whereClause = `${fieldName} = ?`; params.push(rule.value); break
+                case 'not_equals': whereClause = `${fieldName} != ?`; params.push(rule.value); break
+                case 'less_than': whereClause = `${fieldName} < ?`; params.push(Number(rule.value)); break
+                case 'greater_than': whereClause = `${fieldName} > ?`; params.push(Number(rule.value)); break
+                case 'contains': whereClause = `${fieldName} LIKE ?`; params.push(`%${rule.value}%`); break
+                case 'not_contains': whereClause = `${fieldName} NOT LIKE ?`; params.push(`%${rule.value}%`); break
+                default: continue
+            }
+
+            const nameCol = rule.entityType === 'fleet' ? 'name'
+                : rule.entityType === 'policy' ? 'policy_number'
+                : 'name'
+
+            try {
+                const [rows] = await this.pool.query(
+                    `SELECT id, ${nameCol} as name FROM ${tableName} WHERE ${whereClause} LIMIT 100`,
+                    params
+                )
+                results.push({
+                    ruleId: rule.id,
+                    ruleName: rule.name,
+                    severity: rule.severity,
+                    count: (rows as any[]).length,
+                    items: (rows as any[]).map((r: any) => ({ id: r.id, name: r.name || r.id }))
+                })
+            } catch (e) {
+                console.error(`Custom validation rule "${rule.name}" failed:`, e)
+            }
+        }
+
+        return results
     }
 
     // --- Survey Warranties ---

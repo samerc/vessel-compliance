@@ -933,7 +933,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
         {/* Table */}
         <div className="glass-card" style={{ flex: 1, minWidth: 0, overflow: 'hidden', padding: 0 }}>
-          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)', position: 'relative' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
                 {selectMode && <col style={{ width: '40px' }} />}
@@ -943,10 +943,10 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 <col style={{ width: '90px' }} />
                 <col style={{ width: '80px' }} />
               </colgroup>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--table-header-bg)' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--table-header-bg)', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                 <tr style={{ background: 'inherit', borderBottom: '1px solid var(--table-border)' }}>
                   {selectMode && (
-                  <th style={{ padding: '10px 8px 10px 16px', width: '40px' }}>
+                  <th style={{ padding: '10px 8px 10px 16px', width: '40px', background: 'inherit' }}>
                     <div
                       onClick={toggleSelectAllEntities}
                       style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--accent-primary)' }}
@@ -966,9 +966,9 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                     { id: 'documents', label: 'Documents' },
                     { id: 'vessels', label: 'Vessels' }
                   ].filter(col => entVisSet.has(col.id)).map(col => (
-                    <th key={col.id} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{col.label}</th>
+                    <th key={col.id} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap', background: 'inherit' }}>{col.label}</th>
                   ))}
-                  <th style={{ padding: '10px 8px', width: '36px' }}>
+                  <th style={{ padding: '10px 8px', width: '36px', background: 'inherit' }}>
                     <ColumnSelector
                       pageKey="entities"
                       allColumns={ENTITY_COLUMNS}

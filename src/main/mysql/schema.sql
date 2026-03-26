@@ -868,3 +868,17 @@ CREATE TABLE IF NOT EXISTS saved_reports (
   is_shared BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS custom_validation_rules (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT DEFAULT NULL,
+  entity_type VARCHAR(50) NOT NULL,
+  field_name VARCHAR(100) NOT NULL,
+  operator VARCHAR(20) NOT NULL,
+  value VARCHAR(255) DEFAULT NULL,
+  severity VARCHAR(20) DEFAULT 'warning',
+  is_enabled BOOLEAN DEFAULT TRUE,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

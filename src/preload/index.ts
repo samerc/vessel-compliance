@@ -768,6 +768,14 @@ const api = {
   docTemplateReorder: (ids: string[]) => ipcRenderer.invoke('docTemplate:reorder', ids),
   docTemplateGenerate: (templateId: string, context: { vesselId?: string; policyId?: string; entityId?: string }) => ipcRenderer.invoke('docTemplate:generate', templateId, context),
 
+  // Custom Validation Rules
+  validationRulesGetAll: () => ipcRenderer.invoke('validationRules:getAll'),
+  validationRulesAdd: (rule: any) => ipcRenderer.invoke('validationRules:add', rule),
+  validationRulesUpdate: (id: string, updates: any) => ipcRenderer.invoke('validationRules:update', id, updates),
+  validationRulesDelete: (id: string) => ipcRenderer.invoke('validationRules:delete', id),
+  validationRulesReorder: (ids: string[]) => ipcRenderer.invoke('validationRules:reorder', ids),
+  validationRulesRun: () => ipcRenderer.invoke('validationRules:run'),
+
   // Global Search
   globalSearch: (query: string) => ipcRenderer.invoke('global:search', query),
 
