@@ -215,6 +215,7 @@ export const PERMISSION_CATEGORIES = [
     permissions: [
       { key: 'policies:view', label: 'View policies' },
       { key: 'policies:manage', label: 'Create / edit / delete policies' },
+      { key: 'policies:sign', label: 'Sign policies' },
     ],
   },
   {
@@ -1438,6 +1439,16 @@ export interface ReportConfig {
 
 // ==================== Document Templates ====================
 
+// ==================== User Signatures ====================
+
+export interface UserSignature {
+  id: string
+  userId: string
+  imageData: Buffer | number[]
+  fileName: string
+  uploadedAt?: string
+}
+
 export interface CustomValidationRule {
   id: string
   name: string
@@ -1470,6 +1481,14 @@ export interface DocumentTemplate {
   createdBy?: string | null
   order: number
   createdAt?: string
+}
+
+export interface PolicyTcTemplate {
+  id: string
+  typeCode: string
+  fileName: string
+  pageCount: number
+  uploadedAt: string
 }
 
 export const TEMPLATE_CATEGORIES = [

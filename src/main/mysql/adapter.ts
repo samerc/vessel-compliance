@@ -2477,6 +2477,29 @@ export class MySQLAdapter {
                 }
             } catch (e) { /* email_templates table may not exist */ }
 
+            // Migration: user_signatures table
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS user_signatures (
+                        id VARCHAR(36) PRIMARY KEY,
+                        user_id VARCHAR(36) NOT NULL UNIQUE,
+                        image_data LONGBLOB NOT NULL,
+                        file_name VARCHAR(255) NOT NULL,
+                        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_usig_user (user_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                `)
+            } catch (e) { console.error('user_signatures migration:', e) }
+
+            // Migration: add signed_by and signed_at to policy_documents
+            {
+                const [sbCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'signed_by'")
+                if ((sbCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE policy_documents ADD COLUMN signed_by VARCHAR(36) DEFAULT NULL')
+                    await this.pool.query('ALTER TABLE policy_documents ADD COLUMN signed_at TIMESTAMP NULL DEFAULT NULL')
+                }
+            }
+
             // Migration: custom_validation_rules table
             try {
                 await this.pool.query(`
@@ -2496,10 +2519,79 @@ export class MySQLAdapter {
                 `)
             } catch (e) { console.error('custom_validation_rules migration:', e) }
 
+            // Migration: policy_tc_templates table
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS policy_tc_templates (
+                        id VARCHAR(36) PRIMARY KEY,
+                        type_code VARCHAR(10) NOT NULL,
+                        file_data LONGBLOB NOT NULL,
+                        file_name VARCHAR(255) NOT NULL,
+                        page_count INT DEFAULT 0,
+                        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE KEY idx_tc_type (type_code)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                `)
+            } catch (e) { console.error('policy_tc_templates migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
         }
+    }
+
+    // --- T&C Templates ---
+    async getTcTemplate(typeCode: string): Promise<import('../../../src/shared/types').PolicyTcTemplate | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            'SELECT id, type_code AS typeCode, file_name AS fileName, page_count AS pageCount, uploaded_at AS uploadedAt FROM policy_tc_templates WHERE type_code = ?',
+            [typeCode]
+        )
+        const arr = rows as any[]
+        return arr.length > 0 ? arr[0] : null
+    }
+
+    async getTcTemplateFile(typeCode: string): Promise<Buffer | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            'SELECT file_data FROM policy_tc_templates WHERE type_code = ?',
+            [typeCode]
+        )
+        const arr = rows as any[]
+        return arr.length > 0 ? arr[0].file_data : null
+    }
+
+    async getAllTcTemplates(): Promise<import('../../../src/shared/types').PolicyTcTemplate[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, type_code AS typeCode, file_name AS fileName, page_count AS pageCount, uploaded_at AS uploadedAt FROM policy_tc_templates ORDER BY type_code'
+        )
+        return rows as any[]
+    }
+
+    async uploadTcTemplate(typeCode: string, fileData: Buffer, fileName: string, pageCount: number = 0): Promise<void> {
+        if (!this.pool) throw new Error('Not connected')
+        const { v4: uuid } = require('uuid')
+        const id = uuid()
+        await this.pool.query(
+            `INSERT INTO policy_tc_templates (id, type_code, file_data, file_name, page_count)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE file_data = VALUES(file_data), file_name = VALUES(file_name), page_count = VALUES(page_count), uploaded_at = CURRENT_TIMESTAMP`,
+            [id, typeCode, fileData, fileName, pageCount]
+        )
+    }
+
+    async updateTcTemplatePageCount(typeCode: string, pageCount: number): Promise<void> {
+        if (!this.pool) return
+        await this.pool.query(
+            'UPDATE policy_tc_templates SET page_count = ? WHERE type_code = ?',
+            [pageCount, typeCode]
+        )
+    }
+
+    async deleteTcTemplate(typeCode: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.query('DELETE FROM policy_tc_templates WHERE type_code = ?', [typeCode])
     }
 
     // --- Document Types ---
@@ -8217,7 +8309,8 @@ export class MySQLAdapter {
                    e.name as customerName,
                    b.name as bankName, b.details as bankDetails,
                    f.name as fleetName,
-                   u.username as createdByName
+                   u.username as createdByName,
+                   signer.username as signedByName
             FROM policy_documents pd
             LEFT JOIN quotations q ON pd.quotation_id = q.id
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
@@ -8227,6 +8320,7 @@ export class MySQLAdapter {
             LEFT JOIN banks b ON pd.bank_id = b.id
             LEFT JOIN fleets f ON v.fleet_id = f.id
             LEFT JOIN users u ON pd.created_by = u.id
+            LEFT JOIN users signer ON pd.signed_by = signer.id
             WHERE pd.id = ?
         `, [id])
         const r = (rows as any[])[0]
@@ -8264,6 +8358,9 @@ export class MySQLAdapter {
             classificationSociety: r.classificationSociety || null,
             customerType: r.customerType || null,
             createdByName: r.createdByName || null,
+            signedBy: r.signed_by || null,
+            signedAt: r.signed_at || null,
+            signedByName: r.signedByName || null,
         }
     }
 
@@ -11284,6 +11381,69 @@ export class MySQLAdapter {
 
         const query = `SELECT ${selectCols} ${def.baseQuery} ${whereClause} ${orderClause} LIMIT 5000`
         const [rows] = await this.pool.query(query, params)
+        return rows as any[]
+    }
+
+    // ── User Signatures ─────────────────────────────────────────────
+
+    async getUserSignature(userId: string): Promise<any | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            'SELECT id, user_id AS userId, image_data AS imageData, file_name AS fileName, uploaded_at AS uploadedAt FROM user_signatures WHERE user_id = ?',
+            [userId]
+        )
+        const r = (rows as any[])[0]
+        return r || null
+    }
+
+    async uploadUserSignature(userId: string, imageData: Buffer, fileName: string): Promise<string> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO user_signatures (id, user_id, image_data, file_name)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE image_data = VALUES(image_data), file_name = VALUES(file_name), uploaded_at = CURRENT_TIMESTAMP`,
+            [id, userId, imageData, fileName]
+        )
+        return id
+    }
+
+    async deleteUserSignature(userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM user_signatures WHERE user_id = ?', [userId])
+    }
+
+    async signPolicy(policyId: string, userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE policy_documents SET signed_by = ?, signed_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [userId, policyId]
+        )
+    }
+
+    async getPolicySignature(policyId: string): Promise<{ imageData: Buffer; signedBy: string; signedAt: string; signerName: string } | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            `SELECT us.image_data AS imageData, pd.signed_by AS signedBy, pd.signed_at AS signedAt, u.username AS signerName
+             FROM policy_documents pd
+             JOIN user_signatures us ON us.user_id = pd.signed_by
+             JOIN users u ON u.id = pd.signed_by
+             WHERE pd.id = ? AND pd.signed_by IS NOT NULL`,
+            [policyId]
+        )
+        const r = (rows as any[])[0]
+        return r || null
+    }
+
+    async getAllUserSignatures(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT us.id, us.user_id AS userId, us.file_name AS fileName, us.uploaded_at AS uploadedAt,
+                    u.username
+             FROM user_signatures us
+             JOIN users u ON u.id = us.user_id
+             ORDER BY u.username`
+        )
         return rows as any[]
     }
 }

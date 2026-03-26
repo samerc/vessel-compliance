@@ -14,7 +14,13 @@ import {
   Landmark,
   AlertTriangle,
   DollarSign,
-  Shield
+  Shield,
+  Upload,
+  X,
+  FileCheck,
+  Loader2,
+  PenTool,
+  QrCode
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -46,6 +52,9 @@ type PolicySettingsTab =
   | 'warClosing'
   | 'warNotice'
   | 'warPremiumIntro'
+  | 'tcTemplates'
+  | 'signatures'
+  | 'qrVerification'
 
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
@@ -65,6 +74,9 @@ const CATEGORY_TABS: Record<PolicySettingsCategory, { id: PolicySettingsTab; lab
     { id: 'cancelReplace', label: 'Cancel & Replace', icon: <AlertTriangle size={15} /> },
     { id: 'premiumIntro', label: 'Premium Intro', icon: <DollarSign size={15} /> },
     { id: 'blueCardTexts', label: 'Blue Card Texts', icon: <Shield size={15} /> },
+    { id: 'tcTemplates', label: 'T&C Templates', icon: <FileCheck size={15} /> },
+    { id: 'signatures', label: 'Signatures', icon: <PenTool size={15} /> },
+    { id: 'qrVerification', label: 'QR Verification', icon: <QrCode size={15} /> },
   ],
   pi: [
     { id: 'piOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
@@ -179,6 +191,9 @@ export default function PolicySettings() {
         {activeTab === 'cancelReplace' && <CancelReplaceTab showSuccess={showSuccess} />}
         {activeTab === 'premiumIntro' && <PremiumIntroTab showSuccess={showSuccess} />}
         {activeTab === 'blueCardTexts' && <BlueCardTextsTab showSuccess={showSuccess} />}
+        {activeTab === 'tcTemplates' && <TcTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+        {activeTab === 'signatures' && <SignaturesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+        {activeTab === 'qrVerification' && <QrVerificationTab showSuccess={showSuccess} />}
         {activeTab === 'piOpening' && <RichTextSettingTab settingKey="policy_text_P_openingClause" label="P&I Opening Clause" description="The opening clause text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piClosing' && <RichTextSettingTab settingKey="policy_text_P_closingText" label="P&I Closing Text" description="The closing section text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piNotice' && <RichTextSettingTab settingKey="policy_text_P_importantNotice" label="P&I Important Notice" description="The important notice section for P&I policy documents." showSuccess={showSuccess} />}
@@ -975,6 +990,216 @@ function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void 
   )
 }
 
+// ==================== T&C Templates Tab ====================
+const TC_TYPE_LABELS: Record<string, string> = {
+  P: 'P&I',
+  H: 'H&M',
+  W: 'War Risk',
+  F: 'FDD',
+  L: 'Loss of Hire'
+}
+
+function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg: string) => void; showError: (msg: string) => void; isLight: boolean }) {
+  const [templates, setTemplates] = useState<Array<{ id: string; typeCode: string; fileName: string; pageCount: number; uploadedAt: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState<string | null>(null)
+
+  const loadTemplates = async () => {
+    try {
+      const result = await window.api.tcGetAllTemplates()
+      if (Array.isArray(result)) setTemplates(result)
+    } catch { /* ignore */ }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => { loadTemplates() }, [])
+
+  const handleUpload = async (typeCode: string) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.docx'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+
+      setUploading(typeCode)
+      try {
+        const arrayBuffer = await file.arrayBuffer()
+        const fileData = Array.from(new Uint8Array(arrayBuffer))
+        const result = await window.api.tcUpload({ typeCode, fileName: file.name, fileData })
+        if (result && !(result as any).error) {
+          showSuccess(`T&C template uploaded for ${TC_TYPE_LABELS[typeCode] || typeCode}`)
+          await loadTemplates()
+        } else {
+          showError((result as any)?.message || 'Upload failed')
+        }
+      } catch (err: any) {
+        showError(err.message || 'Upload failed')
+      } finally {
+        setUploading(null)
+      }
+    }
+    input.click()
+  }
+
+  const handleDelete = async (typeCode: string) => {
+    try {
+      await window.api.tcDelete(typeCode)
+      showSuccess(`T&C template removed for ${TC_TYPE_LABELS[typeCode] || typeCode}`)
+      await loadTemplates()
+    } catch (err: any) {
+      showError(err.message || 'Delete failed')
+    }
+  }
+
+  const handleDownload = async (typeCode: string, fileName: string) => {
+    try {
+      const fileData = await window.api.tcGetTemplateFile(typeCode)
+      if (!fileData) { showError('Template file not found'); return }
+      const blob = new Blob([new Uint8Array(fileData)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      showError(err.message || 'Download failed')
+    }
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+  const typeCodes = Object.keys(TC_TYPE_LABELS)
+
+  return (
+    <div>
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Terms & Conditions Templates</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+        Upload a Word document (.docx) per policy type. When exporting a policy as PDF + T&C,
+        the template will be appended with correct page numbering.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {typeCodes.map(tc => {
+          const tmpl = templates.find(t => t.typeCode === tc)
+          const isUploading = uploading === tc
+
+          return (
+            <div key={tc} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 16px',
+              borderRadius: '10px',
+              background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)',
+              border: '1px solid var(--glass-border)'
+            }}>
+              {/* Type label */}
+              <div style={{
+                minWidth: '80px',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                color: tc === 'P' ? '#6464ff' : tc === 'H' ? '#ff64c8' : tc === 'W' ? '#ffb020' : 'var(--text-primary)'
+              }}>
+                {TC_TYPE_LABELS[tc]}
+              </div>
+
+              {tmpl ? (
+                <>
+                  {/* File info */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{tmpl.fileName}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      Uploaded {new Date(tmpl.uploadedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {/* Download button */}
+                  <button
+                    onClick={() => handleDownload(tc, tmpl.fileName)}
+                    title="Download template"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent-primary)',
+                      cursor: 'pointer',
+                      padding: '6px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <FileText size={16} />
+                  </button>
+
+                  {/* Replace button */}
+                  <button
+                    onClick={() => handleUpload(tc)}
+                    disabled={isUploading}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--glass-border)',
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    {isUploading ? <Loader2 size={13} className="spin" /> : <Upload size={13} />} Replace
+                  </button>
+
+                  {/* Delete button */}
+                  <button
+                    onClick={() => handleDelete(tc)}
+                    title="Remove template"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--danger)',
+                      cursor: 'pointer',
+                      padding: '6px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ flex: 1, fontSize: '0.83rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                    No template uploaded
+                  </div>
+                  <button
+                    onClick={() => handleUpload(tc)}
+                    disabled={isUploading}
+                    className="btn-primary"
+                    style={{
+                      padding: '5px 14px',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    {isUploading ? <Loader2 size={13} className="spin" /> : <Upload size={13} />} Upload
+                  </button>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ==================== Rich Text Setting Tab (reusable) ====================
 function RichTextSettingTab({ settingKey, label, description, showSuccess }: { settingKey: string; label: string; description: string; showSuccess: (msg: string) => void }) {
   const [value, setValue] = useState('')
@@ -1009,6 +1234,217 @@ function RichTextSettingTab({ settingKey, label, description, showSuccess }: { s
         minHeight={120}
       />
       <button className="btn-primary" onClick={handleSave} style={{ marginTop: '12px', padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Save size={14} /> Save
+      </button>
+    </div>
+  )
+}
+
+// ==================== Signatures Tab ====================
+function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg: string) => void; showError: (msg: string) => void; isLight: boolean }) {
+  const [signatures, setSignatures] = useState<Array<{ id: string; userId: string; fileName: string; uploadedAt: string; username: string }>>([])
+  const [users, setUsers] = useState<Array<{ id: string; username: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [previewData, setPreviewData] = useState<Record<string, string>>({})
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [sigs, allUsers] = await Promise.all([
+        window.api.signatureGetAll(),
+        window.api.getUsers()
+      ])
+      if (Array.isArray(sigs)) setSignatures(sigs)
+      if (Array.isArray(allUsers)) setUsers(allUsers.map((u: any) => ({ id: u.id, username: u.username })))
+
+      // Load preview images for each signature
+      const previews: Record<string, string> = {}
+      for (const sig of (Array.isArray(sigs) ? sigs : [])) {
+        try {
+          const full = await window.api.signatureGetForUser(sig.userId)
+          if (full?.imageData) {
+            const bytes = new Uint8Array(full.imageData)
+            const blob = new Blob([bytes], { type: 'image/png' })
+            previews[sig.userId] = URL.createObjectURL(blob)
+          }
+        } catch { /* skip */ }
+      }
+      setPreviewData(previews)
+    } catch (err: any) {
+      showError(err.message || 'Failed to load signatures')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  const handleUpload = async (userId: string) => {
+    setUploading(userId)
+    try {
+      const filePath = await window.api.dialogOpenFile()
+      if (!filePath) { setUploading(null); return }
+      // Read the file via fetch (electron file:// protocol)
+      const response = await fetch(`file://${filePath}`)
+      const arrayBuffer = await response.arrayBuffer()
+      const data = Array.from(new Uint8Array(arrayBuffer))
+      const fileName = filePath.split(/[\\/]/).pop() || 'signature.png'
+      await window.api.signatureUploadForUser(userId, data, fileName)
+      showSuccess('Signature uploaded')
+      await loadData()
+    } catch (err: any) {
+      showError(err.message || 'Failed to upload signature')
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  const handleDelete = async (userId: string) => {
+    try {
+      await window.api.signatureDeleteForUser(userId)
+      showSuccess('Signature deleted')
+      await loadData()
+    } catch (err: any) {
+      showError(err.message || 'Failed to delete signature')
+    }
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+  const sigMap = new Map(signatures.map(s => [s.userId, s]))
+
+  return (
+    <div>
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>User Signatures</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+        Manage digital signatures for policy signing. Upload PNG or JPG images (transparent background recommended).
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {users.map(u => {
+          const sig = sigMap.get(u.id)
+          const preview = previewData[u.id]
+          return (
+            <div key={u.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              padding: '12px 16px',
+              background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)',
+              borderRadius: '10px',
+              border: '1px solid var(--glass-border)'
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{u.username}</div>
+                {sig && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    {sig.fileName} &middot; uploaded {new Date(sig.uploadedAt).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+
+              {preview && (
+                <div style={{
+                  width: '150px',
+                  height: '60px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: isLight ? '#ffffff' : 'rgba(255,255,255,0.06)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--glass-border)',
+                  overflow: 'hidden'
+                }}>
+                  <img src={preview} alt="Signature" style={{ maxWidth: '140px', maxHeight: '54px', objectFit: 'contain' }} />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  className="btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => handleUpload(u.id)}
+                  disabled={uploading === u.id}
+                >
+                  {uploading === u.id ? <Loader2 size={14} className="spinning" /> : <Upload size={14} />}
+                  {sig ? 'Replace' : 'Upload'}
+                </button>
+                {sig && (
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '0.78rem', color: 'var(--danger)' }}
+                    onClick={() => handleDelete(u.id)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ==================== QR Verification Tab ====================
+function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+  const [url, setUrl] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const raw = await window.api.getSetting('qr_verification_url')
+        if (raw) setUrl(raw)
+      } catch { /* default */ }
+      finally { setLoading(false) }
+    })()
+  }, [])
+
+  const handleSave = async () => {
+    await window.api.setSetting('qr_verification_url', url)
+    showSuccess('QR verification URL saved')
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+  return (
+    <div>
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>QR Code Verification</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+        Configure the base URL for policy verification QR codes. The policy number will be appended to generate the full verification URL.
+        A QR code and verification link will be embedded on the closing page of exported policy documents.
+      </p>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '6px' }}>
+          Verification URL Base
+        </label>
+        <input
+          type="url"
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://your-domain.com/verify/"
+          style={{
+            width: '100%',
+            maxWidth: '500px',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            border: '1px solid var(--input-border)',
+            background: 'var(--bg-primary)',
+            color: 'var(--text-primary)',
+            fontSize: '0.88rem'
+          }}
+        />
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+          Example: If URL is <code>https://example.com/verify/</code> and policy is <code>P/PI/001</code>,
+          the full link will be <code>https://example.com/verify/P/PI/001</code>
+        </p>
+      </div>
+
+      <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Save size={14} /> Save
       </button>
     </div>

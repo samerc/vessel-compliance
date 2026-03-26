@@ -2610,6 +2610,59 @@ app.whenReady().then(() => {
     return { quotationId }
   })
 
+  // ── Signatures ─────────────────────────────────────────────
+  safeHandle('signature:get', async (event) => {
+    const user = requireSession(event)
+    return db.getUserSignature(user.id)
+  })
+  safeHandle('signature:getForUser', async (event, userId: string) => {
+    requireSession(event)
+    return db.getUserSignature(userId)
+  })
+  safeHandle('signature:upload', async (event, imageData: number[], fileName: string) => {
+    const user = await requirePermission(event, 'policies:sign')
+    const buf = Buffer.from(imageData)
+    return db.uploadUserSignature(user.id, buf, fileName)
+  })
+  safeHandle('signature:uploadForUser', async (event, userId: string, imageData: number[], fileName: string) => {
+    await requirePermission(event, 'admin:users')
+    const buf = Buffer.from(imageData)
+    return db.uploadUserSignature(userId, buf, fileName)
+  })
+  safeHandle('signature:delete', async (event) => {
+    const user = await requirePermission(event, 'policies:sign')
+    return db.deleteUserSignature(user.id)
+  })
+  safeHandle('signature:deleteForUser', async (event, userId: string) => {
+    await requirePermission(event, 'admin:users')
+    return db.deleteUserSignature(userId)
+  })
+  safeHandle('signature:getAll', async (event) => {
+    requireSession(event)
+    return db.getAllUserSignatures()
+  })
+  safeHandle('policy:sign', async (event, policyId: string) => {
+    const user = await requirePermission(event, 'policies:sign')
+    // Verify user has a signature uploaded
+    const sig = await db.getUserSignature(user.id)
+    if (!sig) throw new Error('No signature uploaded. Please upload your signature first.')
+    await db.signPolicy(policyId, user.id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'SIGN',
+      module: 'Policies',
+      entityType: 'policy',
+      entityId: policyId,
+      details: `Signed policy ${policyId}`
+    }).catch(() => {})
+    return { success: true }
+  })
+  safeHandle('policy:getSignature', async (event, policyId: string) => {
+    requireSession(event)
+    return db.getPolicySignature(policyId)
+  })
+
   // Policy Expiry Alerts
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })
@@ -3712,6 +3765,101 @@ app.whenReady().then(() => {
 
     const outputBuffer = await zip.generateAsync({ type: 'nodebuffer' })
     return { data: Array.from(outputBuffer as Buffer), fileName: template.fileName }
+  })
+
+  // --- T&C Templates ---
+  safeHandle('tc:getTemplate', async (event, typeCode: string) => {
+    requireSession(event)
+    return db.getTcTemplate(typeCode)
+  })
+
+  safeHandle('tc:getTemplateFile', async (event, typeCode: string) => {
+    requireSession(event)
+    const buf = await db.getTcTemplateFile(typeCode)
+    if (!buf) return null
+    return Array.from(buf as Buffer)
+  })
+
+  safeHandle('tc:getAllTemplates', async (event) => {
+    requireSession(event)
+    return db.getAllTcTemplates()
+  })
+
+  safeHandle('tc:upload', async (event, data: { typeCode: string; fileName: string; fileData: number[] }) => {
+    await requirePermission(event, 'admin:settings')
+    const buf = Buffer.from(data.fileData)
+    await db.uploadTcTemplate(data.typeCode, buf, data.fileName, 0)
+    return db.getTcTemplate(data.typeCode)
+  })
+
+  safeHandle('tc:delete', async (event, typeCode: string) => {
+    await requirePermission(event, 'admin:settings')
+    await db.deleteTcTemplate(typeCode)
+  })
+
+  // --- DOCX-to-PDF Conversion & Merging ---
+  safeHandle('convert:docxToPdf', async (event, docxPath: string) => {
+    requireSession(event)
+    const { convertDocxToPdf } = await import('./services/DocxToPdfService')
+    return convertDocxToPdf(docxPath)
+  })
+
+  safeHandle('convert:countPdfPages', async (event, pdfPath: string) => {
+    requireSession(event)
+    const { countPdfPages } = await import('./services/DocxToPdfService')
+    return countPdfPages(pdfPath)
+  })
+
+  safeHandle('convert:mergePdfs', async (event, pdfPaths: string[], outputPath: string) => {
+    requireSession(event)
+    const { mergePdfs } = await import('./services/DocxToPdfService')
+    await mergePdfs(pdfPaths, outputPath)
+    return outputPath
+  })
+
+  safeHandle('convert:setDocxPageStart', async (event, data: { fileData: number[]; startPage: number }) => {
+    requireSession(event)
+    const { setDocxPageStart } = await import('./services/DocxToPdfService')
+    const buf = Buffer.from(data.fileData)
+    const result = await setDocxPageStart(buf, data.startPage)
+    return Array.from(result)
+  })
+
+  safeHandle('convert:buildPolicyWithTC', async (event, data: {
+    policyDocxData: number[]
+    tcTypeCode: string
+    filePrefix: string
+  }) => {
+    requireSession(event)
+    const { buildPolicyWithTC } = await import('./services/DocxToPdfService')
+    const os = require('os')
+    const fs = require('fs')
+
+    const policyBuf = Buffer.from(data.policyDocxData)
+
+    // Get the T&C template file from DB
+    const tcBuf = await db.getTcTemplateFile(data.tcTypeCode)
+    if (!tcBuf) {
+      throw new Error('No T&C template found for this policy type')
+    }
+
+    const outputDir = os.tmpdir()
+    const { pdfPath, tempFiles } = await buildPolicyWithTC(
+      policyBuf,
+      tcBuf as Buffer,
+      outputDir,
+      data.filePrefix
+    )
+
+    // Read the merged PDF and return as array
+    const pdfData = fs.readFileSync(pdfPath)
+
+    // Clean up temp files
+    for (const f of tempFiles) {
+      try { fs.unlinkSync(f) } catch { /* ignore */ }
+    }
+
+    return { data: Array.from(pdfData as Buffer), fileName: `${data.filePrefix}.pdf` }
   })
 
   // Initialize update service with main window

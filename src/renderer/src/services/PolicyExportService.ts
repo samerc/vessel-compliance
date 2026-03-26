@@ -1280,7 +1280,15 @@ function polMakeDefaultFooter() {
   })
 }
 
+// Capture mode: when enabled, polDownloadBlob stores the blob instead of downloading
+let _polCaptureMode = false
+let _polCapturedBlob: Blob | null = null
+
 function polDownloadBlob(blob: Blob, filename: string) {
+  if (_polCaptureMode) {
+    _polCapturedBlob = blob
+    return
+  }
   const url = URL.createObjectURL(blob)
   const a = window.document.createElement('a')
   a.href = url
@@ -2243,6 +2251,23 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
   }
 
+  // QR Verification reference
+  try {
+    const qrBase = await window.api.getSetting('qr_verification_url')
+    if (qrBase) {
+      const qrFullUrl = `${qrBase}${encodeURIComponent(data.policy.policyNumber)}`
+      children.push(polEmptyP())
+      children.push(new Paragraph({
+        spacing: { before: 0, after: 60 },
+        children: [
+          new TextRun({ text: 'Verify: ', size: POL_FONT_SIZE - 2, font: 'Arial', color: '666666', italics: true }),
+          new TextRun({ text: qrFullUrl, size: POL_FONT_SIZE - 2, font: 'Arial', color: '0066CC', italics: true })
+        ]
+      }))
+      children.push(polEmptyP())
+    }
+  } catch { /* no QR url configured */ }
+
   // Closing
   const closingCity = data.policy.closingCity || 'Beirut'
   const closingDate = polFormatDateUS(data.policy.createdAt)
@@ -2250,9 +2275,47 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   children.push(polEmptyP())
   children.push(polEmptyP())
 
-  // Signature block
+  // Signature block — load digital signature if policy is signed
+  let signatureImageRun: ImageRun | null = null
+  let signerName = ''
+  try {
+    const sigData = await window.api.policyGetSignature(policyId)
+    if (sigData && sigData.imageData) {
+      const sigBuf = new Uint8Array(sigData.imageData)
+      signatureImageRun = new ImageRun({
+        data: sigBuf,
+        transformation: { width: 120, height: 60 },
+        type: 'png'
+      })
+      signerName = sigData.signerName || ''
+    }
+  } catch { /* no signature */ }
+
   const sigLabelW = Math.round(POL_CONTENT_W * 0.45)
   const sigGapW = POL_CONTENT_W - 2 * sigLabelW
+
+  // Build insurer cell children: signature image (if present) + label
+  const insurerCellChildren: Paragraph[] = []
+  if (signatureImageRun) {
+    insurerCellChildren.push(new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 40 },
+      children: [signatureImageRun]
+    }))
+    if (signerName) {
+      insurerCellChildren.push(new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 20 },
+        children: [new TextRun({ text: signerName, size: POL_FONT_SIZE - 2, font: 'Arial', color: '666666', italics: true })]
+      }))
+    }
+  }
+  insurerCellChildren.push(new Paragraph({
+    alignment: AlignmentType.RIGHT,
+    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: 'THE INSURER', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+  }))
+
   children.push(new Table({
     width: { size: POL_CONTENT_W, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
@@ -2261,7 +2324,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       children: [
         new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'THE INSURED', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] }),
         new TableCell({ width: { size: sigGapW, type: WidthType.DXA }, borders: polNoBorders(), children: [polEmptyP()] }),
-        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'THE INSURER', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
+        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: insurerCellChildren })
       ]
     })]
   }))
@@ -2372,6 +2435,74 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`)
+
+  // Mark policy as exported
+  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString() }) } catch { /* non-critical */ }
+}
+
+/**
+ * Generate a policy DOCX as an ArrayBuffer (without downloading).
+ * Uses capture mode to intercept the blob from exportPolicyDocx.
+ */
+async function generatePolicyDocxBuffer(policyId: string): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
+  const data = await loadPolicyExportData(policyId)
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+  const vName = data.vesselInfo?.name || ''
+  const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
+  const fileName = `${data.policy.policyNumber} - ${vName}${revSuffix}`
+
+  // Enable capture mode so polDownloadBlob stores blob instead of downloading
+  _polCaptureMode = true
+  _polCapturedBlob = null
+  try {
+    await exportPolicyDocx(policyId)
+    // _polCapturedBlob is set by polDownloadBlob during exportPolicyDocx (TS can't track this)
+    const captured = _polCapturedBlob as Blob | null
+    if (!captured) throw new Error('Failed to generate policy document')
+    const buffer = await captured.arrayBuffer()
+    return { buffer, fileName, typeCode }
+  } finally {
+    _polCaptureMode = false
+    _polCapturedBlob = null
+  }
+}
+
+/**
+ * Export a policy as PDF with T&C appended.
+ * Pipeline:
+ * 1. Generate policy DOCX in renderer
+ * 2. Send to main process for Word COM conversion to PDF
+ * 3. Main process appends T&C with correct page numbering
+ * 4. Download the merged PDF
+ */
+export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
+  // Check if T&C template exists for this policy type
+  const data = await loadPolicyExportData(policyId)
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+
+  const tcTemplate = await window.api.tcGetTemplate(typeCode)
+  if (!tcTemplate || (tcTemplate as any).error) {
+    throw new Error('No T&C template uploaded for this policy type. Upload one in Policy Settings > T&C Templates.')
+  }
+
+  // Generate the policy DOCX blob
+  const { buffer, fileName } = await generatePolicyDocxBuffer(policyId)
+  const policyDocxData = Array.from(new Uint8Array(buffer))
+
+  // Send to main process for conversion and merging
+  const result = await window.api.convertBuildPolicyWithTC({
+    policyDocxData,
+    tcTypeCode: typeCode,
+    filePrefix: fileName
+  })
+
+  if (!result || (result as any).error) {
+    throw new Error((result as any)?.message || 'PDF conversion failed')
+  }
+
+  // Download the merged PDF
+  const pdfBlob = new Blob([new Uint8Array(result.data)], { type: 'application/pdf' })
+  polDownloadBlob(pdfBlob, result.fileName)
 
   // Mark policy as exported
   try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString() }) } catch { /* non-critical */ }

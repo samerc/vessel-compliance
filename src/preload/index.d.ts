@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText, FlagStatePort, Notification, NotificationGroup, RecentItem, DocumentTemplate, SavedReport, ReportConfig, CustomValidationRule } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText, FlagStatePort, Notification, NotificationGroup, RecentItem, DocumentTemplate, SavedReport, ReportConfig, CustomValidationRule, PolicyTcTemplate } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -741,6 +741,17 @@ export interface Api {
     exchangeRate?: number
   }) => Promise<any[]>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>
+  policySign: (policyId: string) => Promise<{ success: boolean }>
+  policyGetSignature: (policyId: string) => Promise<{ imageData: number[]; signedBy: string; signedAt: string; signerName: string } | null>
+
+  // Signatures
+  signatureGet: () => Promise<{ id: string; userId: string; imageData: number[]; fileName: string; uploadedAt: string } | null>
+  signatureGetForUser: (userId: string) => Promise<{ id: string; userId: string; imageData: number[]; fileName: string; uploadedAt: string } | null>
+  signatureUpload: (imageData: number[], fileName: string) => Promise<string>
+  signatureUploadForUser: (userId: string, imageData: number[], fileName: string) => Promise<string>
+  signatureDelete: () => Promise<void>
+  signatureDeleteForUser: (userId: string) => Promise<void>
+  signatureGetAll: () => Promise<Array<{ id: string; userId: string; fileName: string; uploadedAt: string; username: string }>>
 
   // Notification Groups
   notifGroupGetAll: () => Promise<NotificationGroup[]>
@@ -848,6 +859,20 @@ export interface Api {
   // Recent Items
   recentItemsGet: () => Promise<RecentItem[]>
   recentItemsAdd: (itemType: string, itemId: string, itemLabel: string, itemSublabel?: string) => Promise<void>
+
+  // T&C Templates
+  tcGetTemplate: (typeCode: string) => Promise<PolicyTcTemplate | null>
+  tcGetTemplateFile: (typeCode: string) => Promise<number[] | null>
+  tcGetAllTemplates: () => Promise<PolicyTcTemplate[]>
+  tcUpload: (data: { typeCode: string; fileName: string; fileData: number[] }) => Promise<PolicyTcTemplate>
+  tcDelete: (typeCode: string) => Promise<void>
+
+  // DOCX-to-PDF Conversion
+  convertDocxToPdf: (docxPath: string) => Promise<string>
+  convertCountPdfPages: (pdfPath: string) => Promise<number>
+  convertMergePdfs: (pdfPaths: string[], outputPath: string) => Promise<string>
+  convertSetDocxPageStart: (data: { fileData: number[]; startPage: number }) => Promise<number[]>
+  convertBuildPolicyWithTC: (data: { policyDocxData: number[]; tcTypeCode: string; filePrefix: string }) => Promise<{ data: number[]; fileName: string }>
 }
 
 declare global {

@@ -717,6 +717,17 @@ const api = {
   policyDelete: (id: string) => ipcRenderer.invoke('policy:delete', id),
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
   policyRenew: (policyId: string) => ipcRenderer.invoke('policy:renew', policyId),
+  policySign: (policyId: string) => ipcRenderer.invoke('policy:sign', policyId),
+  policyGetSignature: (policyId: string) => ipcRenderer.invoke('policy:getSignature', policyId),
+
+  // Signatures
+  signatureGet: () => ipcRenderer.invoke('signature:get'),
+  signatureGetForUser: (userId: string) => ipcRenderer.invoke('signature:getForUser', userId),
+  signatureUpload: (imageData: number[], fileName: string) => ipcRenderer.invoke('signature:upload', imageData, fileName),
+  signatureUploadForUser: (userId: string, imageData: number[], fileName: string) => ipcRenderer.invoke('signature:uploadForUser', userId, imageData, fileName),
+  signatureDelete: () => ipcRenderer.invoke('signature:delete'),
+  signatureDeleteForUser: (userId: string) => ipcRenderer.invoke('signature:deleteForUser', userId),
+  signatureGetAll: () => ipcRenderer.invoke('signature:getAll'),
 
   // Notification Groups
   notifGroupGetAll: () => ipcRenderer.invoke('notifGroup:getAll'),
@@ -784,6 +795,20 @@ const api = {
   // Recent Items
   recentItemsGet: () => ipcRenderer.invoke('recent:get'),
   recentItemsAdd: (itemType: string, itemId: string, itemLabel: string, itemSublabel?: string) => ipcRenderer.invoke('recent:add', itemType, itemId, itemLabel, itemSublabel),
+
+  // T&C Templates
+  tcGetTemplate: (typeCode: string) => ipcRenderer.invoke('tc:getTemplate', typeCode),
+  tcGetTemplateFile: (typeCode: string) => ipcRenderer.invoke('tc:getTemplateFile', typeCode),
+  tcGetAllTemplates: () => ipcRenderer.invoke('tc:getAllTemplates'),
+  tcUpload: (data: { typeCode: string; fileName: string; fileData: number[] }) => ipcRenderer.invoke('tc:upload', data),
+  tcDelete: (typeCode: string) => ipcRenderer.invoke('tc:delete', typeCode),
+
+  // DOCX-to-PDF Conversion
+  convertDocxToPdf: (docxPath: string) => ipcRenderer.invoke('convert:docxToPdf', docxPath),
+  convertCountPdfPages: (pdfPath: string) => ipcRenderer.invoke('convert:countPdfPages', pdfPath),
+  convertMergePdfs: (pdfPaths: string[], outputPath: string) => ipcRenderer.invoke('convert:mergePdfs', pdfPaths, outputPath),
+  convertSetDocxPageStart: (data: { fileData: number[]; startPage: number }) => ipcRenderer.invoke('convert:setDocxPageStart', data),
+  convertBuildPolicyWithTC: (data: { policyDocxData: number[]; tcTypeCode: string; filePrefix: string }) => ipcRenderer.invoke('convert:buildPolicyWithTC', data),
 }
 
 // Expose curated API to renderer via context bridge

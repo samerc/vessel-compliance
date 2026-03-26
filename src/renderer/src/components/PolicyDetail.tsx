@@ -23,7 +23,8 @@ import {
   ChevronRight,
   Copy,
   FileSpreadsheet,
-  MoreHorizontal
+  MoreHorizontal,
+  PenTool
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -34,7 +35,8 @@ import {
   exportPolicyDocx,
   exportDebitAdviceDocx,
   exportCreditAdviceDocx,
-  exportBlueCardDocx
+  exportBlueCardDocx,
+  exportPolicyPdfWithTC
 } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
@@ -102,6 +104,9 @@ interface PolicyRecord {
   fleetName: string | null
   classificationSociety: string | null
   createdByName: string | null
+  signedBy: string | null
+  signedAt: string | null
+  signedByName: string | null
 }
 
 interface Instalment {
@@ -207,10 +212,12 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [exportingCA, setExportingCA] = useState(false)
   const [, setExportingBC] = useState(false)
   const [exportingQB, setExportingQB] = useState(false)
+  const [exportingPdfTC, setExportingPdfTC] = useState(false)
   const [showActionsMenu, setShowActionsMenu] = useState(false)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
   const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
   const [, setRenewing] = useState(false)
+  const [signing, setSigning] = useState(false)
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -272,7 +279,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [assuredEntities, setAssuredEntities] = useState<Array<{ id: string; name: string; address?: string }>>([])
 
   const { showError, showSuccess } = useToast()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const { theme } = useTheme()
   const isLight = theme === 'light'
 
@@ -1035,6 +1042,23 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       ? Math.round((policy.premiumAmount - commissionAmount) * 100) / 100
       : null
 
+  const handleSignPolicy = async () => {
+    setSigning(true)
+    try {
+      const result = await window.api.policySign(policyId) as any
+      if (result?.error) {
+        showError(result.message || 'Failed to sign policy')
+      } else {
+        showSuccess('Policy signed successfully')
+        await loadData()
+      }
+    } catch (err: any) {
+      showError(err.message || 'Failed to sign policy')
+    } finally {
+      setSigning(false)
+    }
+  }
+
   const handleExportPolicy = async () => {
     setExportingPolicy(true)
     try {
@@ -1045,6 +1069,19 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       showError(err.message || 'Failed to export policy')
     } finally {
       setExportingPolicy(false)
+    }
+  }
+
+  const handleExportPdfTC = async () => {
+    setExportingPdfTC(true)
+    try {
+      await exportPolicyPdfWithTC(policyId)
+      showSuccess('Policy PDF with T&C exported')
+      await loadData()
+    } catch (err: any) {
+      showError(err.message || 'Failed to export PDF with T&C')
+    } finally {
+      setExportingPdfTC(false)
     }
   }
 
@@ -1181,6 +1218,52 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             </button>
           )}
 
+          {/* Sign Policy button — only for users with policies:sign AND policy not yet signed */}
+          {!isEditing && hasPermission('policies:sign') && policy.status === 'active' && !policy.signedBy && (
+            <button
+              className="btn-secondary"
+              style={{ ...headerBtnStyle }}
+              disabled={signing}
+              onClick={() => {
+                setConfirmation({
+                  show: true,
+                  title: 'Sign Policy',
+                  message: `Sign this policy as ${user?.username || 'current user'}? This action cannot be undone.`,
+                  onConfirm: async () => {
+                    setConfirmation(prev => ({ ...prev, show: false }))
+                    handleSignPolicy()
+                  }
+                })
+              }}
+              title="Sign Policy"
+            >
+              <PenTool size={16} /> {signing ? 'Signing...' : 'Sign'}
+            </button>
+          )}
+
+          {/* Signed badge */}
+          {policy.signedBy && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                background: 'rgba(0, 200, 100, 0.12)',
+                color: isLight ? '#007744' : '#00c864',
+                border: '1px solid rgba(0, 200, 100, 0.25)'
+              }}
+              title={`Signed by ${policy.signedByName || 'unknown'} on ${policy.signedAt ? formatDateShort(policy.signedAt) : 'unknown date'}`}
+            >
+              <PenTool size={14} />
+              Signed by {policy.signedByName || 'unknown'}
+              {policy.signedAt && ` · ${formatDateShort(policy.signedAt)}`}
+            </span>
+          )}
+
           {/* Actions dropdown */}
           <div style={{ position: 'relative' }} ref={actionsMenuRef}>
             <button
@@ -1235,7 +1318,10 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                       {/* Exports */}
                       <button onClick={() => { setShowActionsMenu(false); handleExportPolicy() }} disabled={exportingPolicy} style={actionItemStyle} className="hover-effect">
-                        <Download size={15} /> Export Policy
+                        <Download size={15} /> Export Policy (DOCX)
+                      </button>
+                      <button onClick={() => { setShowActionsMenu(false); handleExportPdfTC() }} disabled={exportingPdfTC} style={actionItemStyle} className="hover-effect">
+                        <FileCheck size={15} /> {exportingPdfTC ? 'Converting...' : 'Export Policy (PDF + T&C)'}
                       </button>
                       <button onClick={() => { setShowActionsMenu(false); handleExportDA() }} disabled={exportingDA} style={actionItemStyle} className="hover-effect">
                         <Download size={15} /> Export Debit Advice
