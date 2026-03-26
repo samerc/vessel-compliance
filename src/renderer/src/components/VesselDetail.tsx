@@ -3056,13 +3056,16 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                 }
 
                 // Document uploads
+                const allDocTypes = await window.api.getDocumentTypes().catch(() => [])
+                const docTypeMap = new Map((allDocTypes as any[]).map((dt: any) => [dt.id, dt.name]))
                 if (Array.isArray(docs)) {
                     for (const doc of docs) {
                         if (doc.uploadedDate) {
+                            const docTypeName = docTypeMap.get(doc.documentTypeId) || 'Document'
                             allEvents.push({
                                 date: doc.uploadedDate,
                                 type: 'document',
-                                title: 'Document uploaded',
+                                title: `${docTypeName} uploaded`,
                                 subtitle: doc.uploadedBy ? `by ${doc.uploadedBy}` : undefined,
                                 iconType: 'document',
                                 color: '#00aac8'
@@ -3186,7 +3189,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
             curMonthKey = mKey
             monthGroups.push({ label: mLabel, key: mKey, merged: [] })
         }
-        const dateStr = ev.date ? ev.date.split('T')[0] : ''
+        const dateStr = ev.date ? (ev.date.includes('T') ? ev.date.split('T')[0] : ev.date.substring(0, 10)) : ''
         const groupKey = `${dateStr}|${ev.type}`
         const currentGroup = monthGroups[monthGroups.length - 1]
         const existing = currentGroup.merged.find(m => `${m.date}|${m.type}` === groupKey)

@@ -797,10 +797,10 @@ export default function WarBreachCalculator() {
                   >
                     {/* Date */}
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: 90, flexShrink: 0 }}>{date}</div>
-                    {/* Cover note */}
+                    {/* Vessel name(s) */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {rec.coverNoteNo || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No cover note</span>}
+                        {vessels.filter((v: any) => v.vesselName).map((v: any) => v.vesselName).join(', ') || rec.coverNoteNo || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No vessel</span>}
                       </div>
                       {rec.breachDetails && (
                         <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
