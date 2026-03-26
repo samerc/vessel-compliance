@@ -943,8 +943,8 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 <col style={{ width: '90px' }} />
                 <col style={{ width: '80px' }} />
               </colgroup>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--table-header-bg)' }}>
+                <tr style={{ background: 'inherit', borderBottom: '1px solid var(--table-border)' }}>
                   {selectMode && (
                   <th style={{ padding: '10px 8px 10px 16px', width: '40px' }}>
                     <div
