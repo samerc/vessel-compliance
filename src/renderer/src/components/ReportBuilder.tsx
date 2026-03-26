@@ -8,6 +8,9 @@ import {
   Share2,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
   Layers,
   ArrowUpDown,
   Filter,
@@ -528,6 +531,8 @@ export default function ReportBuilder() {
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [hasRun, setHasRun] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ROWS_PER_PAGE = 50
 
   // Saved reports
   const [savedReports, setSavedReports] = useState<SavedReport[]>([])
@@ -699,6 +704,18 @@ export default function ReportBuilder() {
     const maxVal = Math.max(...items.map((i) => i.value), 1)
     return items.map((i) => ({ ...i, percent: (i.value / maxVal) * 100 }))
   }, [results, groupBy, chartMetric, dataSource])
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(results.length / ROWS_PER_PAGE))
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * ROWS_PER_PAGE
+    return results.slice(start, start + ROWS_PER_PAGE)
+  }, [results, currentPage, ROWS_PER_PAGE])
+
+  // Reset page when results change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [results])
 
   // Save report
   const handleSave = async () => {
@@ -1368,7 +1385,9 @@ export default function ReportBuilder() {
                     fontWeight: '600'
                   }}
                 >
-                  {results.length} rows
+                  {results.length > ROWS_PER_PAGE && !groupBy
+                    ? `Showing ${(currentPage - 1) * ROWS_PER_PAGE + 1}-${Math.min(currentPage * ROWS_PER_PAGE, results.length)} of ${results.length} rows`
+                    : `${results.length} rows`}
                 </span>
               )}
               {groupBy && hasRun && (
@@ -1633,11 +1652,70 @@ export default function ReportBuilder() {
 
             {/* Table View */}
             {hasRun && results.length > 0 && viewMode === 'table' && !groupedResults && (
-              <ResultsTable
-                columns={sourceDef.columns.filter((c) => selectedColumns.has(c.key))}
-                rows={results}
-                isLight={isLight}
-              />
+              <>
+                <ResultsTable
+                  columns={sourceDef.columns.filter((c) => selectedColumns.has(c.key))}
+                  rows={paginatedResults}
+                  isLight={isLight}
+                />
+                {totalPages > 1 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 16px',
+                      borderTop: '1px solid var(--table-border)',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-secondary)',
+                      flexShrink: 0
+                    }}
+                  >
+                    <span>
+                      Showing {(currentPage - 1) * ROWS_PER_PAGE + 1}-
+                      {Math.min(currentPage * ROWS_PER_PAGE, results.length)} of{' '}
+                      {results.length} results
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="btn-secondary"
+                        style={{ padding: '5px 8px', fontSize: '0.78rem' }}
+                      >
+                        <ChevronsLeft size={14} />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="btn-secondary"
+                        style={{ padding: '5px' }}
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span style={{ padding: '0 8px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                        className="btn-secondary"
+                        style={{ padding: '5px' }}
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage >= totalPages}
+                        className="btn-secondary"
+                        style={{ padding: '5px 8px', fontSize: '0.78rem' }}
+                      >
+                        <ChevronsRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {hasRun && results.length > 0 && viewMode === 'table' && groupedResults && (

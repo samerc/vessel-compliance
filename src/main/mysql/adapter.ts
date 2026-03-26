@@ -10923,10 +10923,10 @@ export class MySQLAdapter {
                     )
                     LEFT JOIN (
                         SELECT vpv2.policy_id,
-                               SUM(CASE WHEN ptc2.name LIKE '%premium%' THEN CAST(vpv2.value_text AS DECIMAL(15,2)) ELSE 0 END) AS policyPremium
+                               SUM(CASE WHEN ptc2.name LIKE '%premium%' THEN COALESCE(vpv2.value_amount, CAST(vpv2.value_text AS DECIMAL(15,2))) ELSE 0 END) AS policyPremium
                         FROM vessel_policy_values vpv2
                         JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
-                        WHERE ptc2.field_type = 'number'
+                        WHERE ptc2.field_type IN ('amount', 'number')
                         GROUP BY vpv2.policy_id
                     ) vprem ON vprem.policy_id = vdp.id`,
                 columnMap: {
