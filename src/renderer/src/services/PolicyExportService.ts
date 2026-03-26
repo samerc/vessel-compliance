@@ -2277,14 +2277,21 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
 
   // Signature block — load digital signature if policy is signed
   let signatureImageRun: ImageRun | null = null
+  let signatureFooterRun: ImageRun | null = null
   let signerName = ''
+  let sigBuf: Uint8Array | null = null
   try {
     const sigData = await window.api.policyGetSignature(policyId)
     if (sigData && sigData.imageData) {
-      const sigBuf = new Uint8Array(sigData.imageData)
+      sigBuf = new Uint8Array(sigData.imageData)
       signatureImageRun = new ImageRun({
         data: sigBuf,
         transformation: { width: 120, height: 60 },
+        type: 'png'
+      })
+      signatureFooterRun = new ImageRun({
+        data: sigBuf,
+        transformation: { width: 90, height: 45 },
         type: 'png'
       })
       signerName = sigData.signerName || ''
@@ -2390,7 +2397,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   }
   const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
 
-  const footerChildren: Paragraph[] = []
+  const footerChildren: (Paragraph | Table)[] = []
   // Cancel and replace on every page (in footer) — uses cancelReplaceResolved from above
   if (cancelReplaceResolved) {
     footerChildren.push(new Paragraph({
@@ -2410,15 +2417,63 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       }))
     }
   }
-  footerChildren.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0 },
-    children: [
-      new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
-      new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
-      new TextRun({ text: configTotalPages ? ` of ${configTotalPages}` : '', size: 16, font: 'Arial', color: '999999' })
-    ]
-  }))
+  // Footer layout: left=empty/text, center=page number, right=signature
+  if (signatureFooterRun) {
+    // Use a table for footer layout: 3 columns (left text | center page | right signature)
+    const footerW = POL_CONTENT_W || 9000
+    const fColW = Math.round(footerW / 3)
+    footerChildren.push(new Table({
+      width: { size: footerW, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [fColW, fColW, fColW],
+      rows: [new TableRow({
+        children: [
+          new TableCell({
+            width: { size: fColW, type: WidthType.DXA },
+            borders: polNoBorders(),
+            verticalAlign: VerticalAlign.BOTTOM,
+            children: [new Paragraph({ spacing: { after: 0 }, children: [] })]
+          }),
+          new TableCell({
+            width: { size: fColW, type: WidthType.DXA },
+            borders: polNoBorders(),
+            verticalAlign: VerticalAlign.BOTTOM,
+            children: [new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0 },
+              children: [
+                new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
+                new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
+                new TextRun({ text: configTotalPages ? ` of ${configTotalPages}` : '', size: 16, font: 'Arial', color: '999999' })
+              ]
+            })]
+          }),
+          new TableCell({
+            width: { size: fColW, type: WidthType.DXA },
+            borders: polNoBorders(),
+            verticalAlign: VerticalAlign.BOTTOM,
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                spacing: { after: 0 },
+                children: [signatureFooterRun]
+              })
+            ]
+          })
+        ]
+      })]
+    }))
+  } else {
+    footerChildren.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0 },
+      children: [
+        new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
+        new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
+        new TextRun({ text: configTotalPages ? ` of ${configTotalPages}` : '', size: 16, font: 'Arial', color: '999999' })
+      ]
+    }))
+  }
   const policyFooter = new Footer({ children: footerChildren })
 
   const document = new Document({
