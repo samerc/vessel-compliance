@@ -11253,7 +11253,9 @@ export class MySQLAdapter {
         }
 
         const query = `SELECT ${selectCols} ${def.baseQuery} ${whereClause} ${orderClause} LIMIT 5000`
+        console.log('[RunReport]', dataSource, query, params)
         const [rows] = await this.pool.query(query, params)
+        if ((rows as any[]).length > 0) console.log('[RunReport] Sample row:', JSON.stringify((rows as any[])[0]))
         return rows as any[]
     }
 }
