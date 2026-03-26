@@ -368,9 +368,20 @@ export const ReportServiceV2 = {
       const entityRows: [string, string, string][] = []
       const entityRowMeta: EntityRowMeta[] = []
 
+      // Deduplicate entities with multiple roles — merge roles into one header
+      const seenEntityIds = new Set<string>()
       for (const va of vesselAssureds as any[]) {
         const entity = (allEntities as any[]).find(e => e.id === va.entityId)
         if (!entity) continue
+        if (seenEntityIds.has(entity.id)) {
+          // Already shown — just append role to the last header for this entity
+          const lastHeaderIdx = entityRows.length - 1 - [...entityRowMeta].reverse().findIndex(m => m === 'entityHeader')
+          if (lastHeaderIdx >= 0 && entityRows[lastHeaderIdx]) {
+            entityRows[lastHeaderIdx][1] += `, ${va.role}`
+          }
+          continue
+        }
+        seenEntityIds.add(entity.id)
 
         entityRows.push([entity.name, `${va.role}  ·  ${entity.type.toUpperCase()}`, ''])
         entityRowMeta.push('entityHeader')

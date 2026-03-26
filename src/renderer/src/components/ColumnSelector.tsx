@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Settings } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -52,12 +53,15 @@ export default function ColumnSelector({ allColumns, visibleColumns, onChange }:
   const { theme } = useTheme()
   const isLight = theme === 'light'
   const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
 
+  const dropdownRef = useRef<HTMLDivElement>(null)
   // Close on click outside
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (ref.current && !ref.current.contains(target) && (!dropdownRef.current || !dropdownRef.current.contains(target))) {
         setOpen(false)
       }
     }
@@ -89,6 +93,7 @@ export default function ColumnSelector({ allColumns, visibleColumns, onChange }:
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         className="btn-secondary"
         style={{
@@ -104,12 +109,11 @@ export default function ColumnSelector({ allColumns, visibleColumns, onChange }:
         <Settings size={14} />
       </button>
 
-      {open && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          right: 0,
-          marginTop: '4px',
+      {open && createPortal(
+        <div ref={dropdownRef} style={{
+          position: 'fixed',
+          top: (() => { const r = btnRef.current?.getBoundingClientRect(); return r ? r.bottom + 4 : 0 })(),
+          left: (() => { const r = btnRef.current?.getBoundingClientRect(); return r ? Math.max(8, r.right - 200) : 0 })(),
           padding: '10px',
           minWidth: '200px',
           maxHeight: '320px',
@@ -118,7 +122,7 @@ export default function ColumnSelector({ allColumns, visibleColumns, onChange }:
           border: '1px solid var(--glass-border)',
           borderRadius: '10px',
           boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
-          zIndex: 200
+          zIndex: 9999
         }}>
           <div style={{
             fontSize: '0.7rem',
@@ -176,7 +180,8 @@ export default function ColumnSelector({ allColumns, visibleColumns, onChange }:
               Reset to defaults
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
