@@ -17,6 +17,26 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '7.0.0',
+    date: 'March 2026',
+    items: [
+      { tag: 'New', text: 'Policy System — 6-step conversion wizard, DOCX exports (policy, debit/credit advice, blue cards), revisions with cancel & replace' },
+      { tag: 'New', text: 'Policy renewal with change highlighting — differences shown in red text in exported documents' },
+      { tag: 'New', text: 'Notification system — personal notifications, notification groups, daily alert scheduler, threaded note replies, @mentions' },
+      { tag: 'New', text: 'Customizable dashboard — 12 widgets including deadline calendar, quotation pipeline, quick actions, fleet overview' },
+      { tag: 'New', text: 'Global search (Ctrl+K) — search across vessels, entities, quotations, and policies' },
+      { tag: 'New', text: 'Report Builder — 9 data sources with column/filter/group selection, chart view, save/share templates' },
+      { tag: 'New', text: 'Custom validation rules — create data quality rules in Compliance Center with configurable conditions' },
+      { tag: 'New', text: 'Document templates — rich text with placeholder auto-fill, generate DOCX or copy text' },
+      { tag: 'New', text: 'QuickBooks Excel export — 64-column accounting format with deductible encoding' },
+      { tag: 'New', text: 'Vessel timeline, comparison, per-vessel hull clauses, rebuilt year tracking' },
+      { tag: 'Improved', text: 'Table row density toggle, column preferences on all tables, bulk operations, right-click menu' },
+      { tag: 'Improved', text: 'Flag states — ratification tracking, maritime authority, ports of registry, display names' },
+      { tag: 'Improved', text: 'Unified renewals page with KPI cards, premium column, days-until-expiry coloring' },
+      { tag: 'Fixed', text: 'Various bug fixes and performance improvements across all modules' },
+    ],
+  },
+  {
     version: '6.5.0',
     date: 'March 2026',
     items: [
