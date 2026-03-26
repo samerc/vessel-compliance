@@ -1271,7 +1271,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
             const blob = new Blob([bytes], { type: ext })
             previews[sig.userId] = URL.createObjectURL(blob)
           }
-        } catch { /* skip */ }
+        } catch (e) { console.error('[SigPreview] Error:', e) }
       }
       setPreviewData(previews)
     } catch (err: any) {
