@@ -195,8 +195,8 @@ export default function Dashboard({
         setLayout(mergeLayoutWithRegistry(saved))
       }
       layoutLoadedRef.current = true
-      // Check onboarding
-      if (!user.dashboardOnboarded) {
+      // Check onboarding (use localStorage as fallback since session may be stale)
+      if (!user.dashboardOnboarded && !localStorage.getItem('dashboard_onboarded_' + user.id)) {
         setShowOnboarding(true)
       }
     }).catch(() => {
@@ -434,6 +434,7 @@ export default function Dashboard({
 
   const dismissOnboarding = () => {
     setShowOnboarding(false)
+    localStorage.setItem('dashboard_onboarded_' + user?.id, 'true')
     window.api.dashboardSetOnboarded().catch(() => {})
   }
 
