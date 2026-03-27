@@ -650,6 +650,247 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - Add new table migrations before the `} catch (error)` block at the end of `initSchema()`
 - Use unique variable names per migration block (block-scoped `const [cols]` repeated = TS2451 error)
 
+### Role-Based Access Control (RBAC)
+
+User groups and granular permissions:
+
+- **User Groups** (`user_groups`): Named groups with descriptions, assignable to multiple users
+- **Group Permissions** (`group_permissions`): Permission keys per group from `PERMISSION_CATEGORIES`
+- **User-Group Membership** (`user_group_members`): Many-to-many, permissions are union of all groups
+- **Per-User Overrides** (`user_permission_overrides`): Grant or deny specific permissions per user
+- **Permission Resolution**: `rbacResolveUserPermissions` computes effective permissions (groups + overrides)
+- **UI Enforcement**: `hasPermission()` from `useAuth()` gates buttons, tabs, sidebar items
+- **Server Enforcement**: `requirePermission(event, 'key')` in IPC handlers
+- **System Groups**: "Administrator" (all permissions) seeded on first run
+
+### Policy System
+
+Insurance policy document management:
+
+- **Policy Documents** (`policy_documents`): Created from quotations via 6-step conversion wizard
+- **Policy Numbering**: `{type_code}{inverted_year}{4-digit serial}` (e.g., P26200001)
+- **Conversion Wizard** (`PolicySetupWizard.tsx`): Step 1: Vessel & Alternative, Step 2: Period & Premium, Step 3: Instalments, Step 4: Details, Step 5: Blue Cards (P&I only), Step 6: Review
+- **Policy Detail** (`PolicyDetail.tsx`): Overview, Financial, Addresses, Blue Cards, Revision History, editing mode with 4 tabs
+- **Policy List** (`PolicyList.tsx`): Stats, search, filters, sortable table with conversion/export dates
+- **Policy Settings** (`PolicySettings.tsx`): Two-tier navigation (General/P&I/Hull/War) for opening clause, closing text, important notice, premium intro, font size, timezones, page numbering, footer, header titles, banks, cancel & replace, blue card texts, signatures, QR verification, T&C templates
+- **Exports**: Policy DOCX, Debit Advice, Credit Advice, Blue Cards (individual), PDF+T&C combined
+- **Instalment Dates**: Each 30 days = 1 calendar month from inception
+- **Premium**: Uses payable amount (after NCB/UPCC discounts)
+
+### Policy Revisions
+
+- **Create Revision**: Clones policy with incremented revision number, old marked "Superseded"
+- **Revision Suffix**: Internal `-R1`, `-R2` etc. appended to policy number
+- **Blue Cards**: Carried over to new revision
+- **Cancel & Replace**: Configurable footer text per document type, shown on revised documents
+- **Edit vs Revise**: Edit available before first export, New Revision required after
+
+### Policy Renewals
+
+- **Renew Button**: Creates new quotation pre-filled from expiring policy
+- **Period**: New inception = old expiry, new expiry = +1 year (string math, no timezone issues)
+- **Change Highlighting**: Renewal quotation DOCX exports show differences in red (added) and red strikethrough (removed)
+- **Tracking**: `renewed_from_policy_id` and `renewed_from_policy_number` on quotations
+
+### Blue Cards
+
+P&I insurance certificates:
+
+- **Types**: BBC (Bunker), WRC (Wreck Removal), MLC4.2 (Shipowners' Liability), MLC2.5.2 (Repatriation)
+- **Issue/Reissue**: Per-type with auto-incremented numbers (P26200001/BBC, P26200001-2/BBC)
+- **Owner Override**: Per-card owner entity selection
+- **Port of Registry**: From flag state ports, auto-selected if single
+- **Addressed To**: BBC/WRC addressed to flag authority; warns if flag not ratified, offers alternative
+- **Cancel & Replace**: Auto-checked if periods overlap, configurable text with placeholders
+- **Status**: Active / Superseded (one active per type)
+- **Export**: Individual DOCX per card matching real certificate templates
+
+### Digital Signatures
+
+- **User Signatures** (`user_signatures`): LONGBLOB image per user, managed in Policy Settings
+- **Permission**: `policies:sign` — only authorized signers
+- **Sign Button**: In PolicyDetail header, requires signature uploaded
+- **Placement**: Signature image in footer (every page, bottom-right) + closing section (above THE INSURER)
+- **Tracking**: `signed_by`, `signed_at` on policy_documents
+
+### Terms & Conditions Automation
+
+- **T&C Templates** (`policy_tc_templates`): One DOCX per policy type, uploaded in Policy Settings
+- **DOCX→PDF**: Via Microsoft Word COM (PowerShell) or LibreOffice (headless fallback)
+- **Dynamic Page Numbering**: Counts policy PDF pages, injects `w:pgNumType` into T&C DOCX
+- **PDF Merging**: `pdf-lib` combines policy + T&C into single document
+- **Export**: "Export Policy (PDF + T&C)" button in PolicyDetail
+
+### QR Verification
+
+- **Settings**: Configurable verification URL base in Policy Settings → QR tab
+- **Placement**: Verification link on last policy page before closing
+- **Format**: `{baseUrl}{policyNumber}`
+
+### QuickBooks Export
+
+- **64-column Excel**: Matches accounting system template
+- **Deductible Encoding**: Letter codes + amount/1000 (e.g., C10P5O25)
+- **Base Currency**: App setting (default USD) with exchange rate per policy
+- **Export Button**: "QB Export" in PolicyDetail
+
+### Notification System
+
+Personal event-driven notifications:
+
+- **Bell Icon**: Sidebar with unread count badge, polls every 30 seconds
+- **Notifications Page** (`NotificationsPage.tsx`): Filters (All/Unread/Notes/Policies/System), type icons, relative time
+- **Event Triggers**: Note replies, @mentions, workflow transitions, policy conversions
+- **Notification Groups** (`notification_groups`): Route notifications to teams with event subscriptions
+- **Daily Alert Scheduler** (`DailyAlertScheduler.ts`): Automated checks for expiring documents, policies, blue cards, warranty deadlines
+- **Auto-cleanup**: Read notifications deleted after 90 days
+
+### Note Replies & @Mentions
+
+- **Threaded Replies**: `parent_note_id` on note tables, indented view in UI
+- **@Mentions**: Type `@` for username autocomplete, creates `note_mention` notification
+- **Vessel Notes + Quotation Notes**: Both support replies and mentions
+
+### Activity Log
+
+- **Table**: `activity_log` with indexes on created_at, module, user_id
+- **Page** (`ActivityLog.tsx`): Filters by module/action/user/date, pagination (25/page)
+- **Colored Badges**: Action (CREATE/UPDATE/DELETE/LOGIN/EXPORT) and module badges
+- **Export**: PDF audit report + Excel export
+- **Retention**: Configurable (90/180/365 days/never), auto-cleanup on startup
+
+### Document Templates
+
+Unified template system (merged email + document):
+
+- **Templates** (`document_templates`): Rich text body with `{{placeholder}}` markers
+- **Categories**: General, Policy, Quotation, Vessel, Entity, Certificate, Email
+- **Placeholders**: 20+ fields (vesselName, imoNumber, policyNumber, customerName, today, etc.)
+- **Actions**: Generate DOCX (with policy header/footer) or Copy Text (for emails)
+- **Template Manager** (`DocumentTemplateManager.tsx`): Two-panel layout, placeholder chips
+
+### Report Builder
+
+Customizable reports with 9 data sources:
+
+- **Data Sources**: Vessels, Policies, Entities, Renewals, Quotations, Policy Documents, Documents, Surveys, Survey Warranties
+- **Config**: Column checkboxes, dynamic filters per source, group-by, sort
+- **Chart View**: Horizontal bar charts with metrics (Count, Sum Premium, Avg Premium)
+- **Save/Share**: Named report configs saved to DB, shareable with team
+- **Export**: Excel + PDF with company header
+- **Pagination**: 50 rows per page
+
+### Global Search
+
+- **Shortcut**: Ctrl+K / Cmd+K opens search modal
+- **Sources**: Vessels (name/IMO), Entities (name), Quotations (reference), Policies (number)
+- **UI**: Grouped results, keyboard navigation (arrows/Enter/Esc), debounced input
+
+### Customizable Dashboard
+
+Widget-based dashboard with per-user layout:
+
+- **12 Widgets**: Key Metrics, Expirations, Operational Status, Recent Vessels/Entities/Changes, Data Quality, Week Renewals, Renewal Calendar, Quotation Pipeline, Quick Actions, Fleet Overview
+- **Edit Mode**: Toggle widgets on/off, reorder, category filter
+- **Calendar Widget**: Monthly grid with colored dots for policy/document/survey/warranty events
+- **Onboarding**: First-time overlay explaining customization
+- **Layout**: CSS Grid (full/half/third column spans), saved per user with debounce
+
+### Recent Items
+
+- **Table**: `user_recent_items` with UPSERT, max 20 per user
+- **Sidebar**: Collapsible RECENT section, last 8 items with type-specific icons
+- **Tracked**: Vessel, quotation, policy, entity views
+
+### Vessel Timeline
+
+- **Tab**: In VesselDetail, aggregates 6 data sources (audit, documents, policies, surveys, warranties, sanctions)
+- **Merged Events**: Same-day same-type events grouped with count + expand
+- **Filters**: Type chips + date range (default last 12 months)
+- **Layout**: Vertical timeline with month+year headers, colored icons per type
+
+### Data Validation Rules
+
+- **Built-in Rules**: 8 predefined (vessels without customer, entities without email, etc.)
+- **Custom Rules** (`custom_validation_rules`): Admin-created with entity type, field, operator, value, severity
+- **Compliance Center Tab**: "Data Quality" with toggle on/off per rule
+- **Operators**: is_null, is_empty, equals, not_equals, less_than, greater_than, contains, not_contains
+
+### Entity Addresses
+
+- **Table**: `entity_addresses` (id, entity_id, label, address_text)
+- **Per-Vessel-Role**: `vessel_assureds.address_id` links to specific address
+- **Add from Policy**: Addresses entered in policy editing sync back to entity
+- **Remap**: File path remap extended to entity documents
+
+### Flag State Enhancements
+
+- **Ratification**: `ratified_bunker`, `ratified_wreck` boolean flags
+- **Maritime Authority**: `authority_name`, `authority_address` for blue card addressing
+- **Ports of Registry** (`flag_state_ports`): Multiple per flag with default selection
+- **Display Name**: Formal name for documents (e.g., "Union of Comoros")
+- **Redesigned**: Table + slide-in panel layout with stats strip
+
+### P&I Alternatives
+
+Per-quotation P&I alternatives (similar to hull):
+
+- **Table**: `quotation_pi_alternatives` with label, premium_amount
+- **Alternative Selector Bar**: Below tab row, colored chips per alternative
+- **Per-Alternative Scoping**: Conditions, warranties, deductibles, exclusions can be scoped to specific alternatives
+- **Export**: Alternative-specific content with "Additional applicable to Alternative N" sections
+
+### Per-Vessel Hull Clauses
+
+- **`vessel_scope_id`** on `quotation_hull_alternatives`: Links alternative to a specific vessel
+- **Vessel Selector**: In HullConditionsTab when 2+ vessels
+- **Export**: Per-vessel sections with vessel names instead of "Alternative 1/2"
+
+### Survey Warranty Templates for Quotations
+
+- **Templates** (`survey_warranty_templates`): Text with {deadline}, {days}, {event} placeholders
+- **Sets** (`survey_warranty_template_sets`): Named groups for batch-apply
+- **Editor Tab**: "Survey Warranties" in all quotation types
+- **Placeholder Inputs**: Dropdown presets for deadline, number input for days, text for event
+
+### Bulk Operations
+
+- **Vessel Table**: Multi-select with toolbar (Assign Fleet, Change Status, Export, Clear)
+- **Entity Table**: Multi-select with toolbar (Export, Delete, Clear)
+- **Hidden by Default**: "Select" toggle button shows/hides checkboxes
+
+### Column Preferences
+
+- **Table**: `user_column_prefs` (user_id, page_key, visible_columns JSON)
+- **ColumnSelector Component**: Gear icon with checkbox dropdown, hidden count badge
+- **Applied To**: VesselManager, QuotationList, PolicyList, PolicyRenewals, EntityDirectory, ConditionSurveyList, FleetManager, FleetDetail, SurveyorDirectory, ActivityLog, UserManager
+
+### Vessel Comparison
+
+- **Location**: VesselFilter results page
+- **Select**: Checkboxes on 2 vessels → "Compare" button
+- **Modal**: Side-by-side: General info, Policies, Documents, Sanctions
+
+### Rebuilt Year
+
+- **Field**: `vessels.rebuilt_year` (nullable)
+- **Edit**: Hidden "+ Rebuilt Year" button, expandable
+- **Display**: "1972/1992" in quotations/reports, "Built: 1972 - Rebuilt: 1992" in policies
+
+### Table Row Density
+
+- **Toggle**: Compact/Normal/Spacious in user profile dropdown
+- **CSS Classes**: `density-compact`, `density-normal`, `density-spacious` on body
+- **Persisted**: localStorage per user
+
+### UI Polish
+
+- **Animations**: Page fade+slide (0.25s), card hover shadow, button scale on click
+- **Scrollbars**: Thin 6px, theme-aware
+- **Input Focus**: Accent border + glow ring
+- **Print CSS**: @media print styles for paper output
+- **Right-Click**: Context menu with Cut/Copy/Paste/Select All
+
 ### Key Tables
 
 - `users` - User accounts with auth, theme, window preferences, sidebar state, sanctions threshold
@@ -684,3 +925,29 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 - `trading_warranty_templates` - Reusable trading warranty intro text templates
 - `renewal_status_types` - Custom renewal status labels for policies
 - `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, section_order_defaults_{typeCode}, etc.)
+- `policy_documents` - Insurance policy records with dates, premium, commission, bank, signature
+- `policy_doc_instalments` - Policy instalment schedule
+- `policy_doc_addresses` - Per-policy insured addresses
+- `policy_blue_cards` - Blue card certificates with status, owner, port, addressed-to
+- `policy_tc_templates` - T&C Word templates per policy type
+- `banks` - Bank details for debit advice
+- `user_groups`, `group_permissions`, `user_group_members` - RBAC groups and permissions
+- `user_permission_overrides` - Per-user permission grants/denies
+- `notifications` - Personal event-driven notifications
+- `notification_groups`, `notification_group_members`, `notification_group_subscriptions` - Notification routing
+- `activity_log` - System-wide audit trail
+- `document_templates` - Rich text templates with placeholders
+- `saved_reports` - Report Builder saved configurations
+- `user_recent_items` - Recently viewed items per user
+- `user_signatures` - Digital signature images per user
+- `user_column_prefs` - Per-user table column visibility
+- `custom_validation_rules` - Admin-created data quality rules
+- `entity_addresses` - Multiple addresses per entity
+- `flag_state_ports` - Ports of registry per flag state
+- `quotation_pi_alternatives` - P&I alternatives per quotation
+- `survey_warranty_templates`, `survey_warranty_template_sets` - Survey warranty templates
+- `quotation_survey_warranties` - Per-quotation survey warranty selections
+- `premium_text_templates` - NCB/UPCC text templates
+- `trading_custom_texts` - Custom trading warranty replacement texts
+- `email_templates` - Legacy email templates (migrated to document_templates)
+- `analytics_presets` - Fleet analytics saved filter presets
