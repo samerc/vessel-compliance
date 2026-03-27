@@ -1149,6 +1149,22 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               <FileCheck size={26} />
               {policy.policyNumber || 'Untitled Policy'}{policy.revisionNumber > 0 ? `-R${policy.revisionNumber}` : ''}
             </h1>
+            {(policy.policyNumber || '').startsWith('POL-DRAFT-') && (
+              <span
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  background: 'rgba(150, 150, 150, 0.15)',
+                  color: isLight ? '#666' : '#999',
+                  letterSpacing: '0.05em'
+                }}
+              >
+                Draft
+              </span>
+            )}
             <span
               style={{
                 padding: '4px 12px',

@@ -161,6 +161,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [_workflowLog, setWorkflowLog] = useState<import('../../../shared/types').QuotationWorkflowLog[]>([])
     const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
     const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
+    const [showDraftExportModal, setShowDraftExportModal] = useState<'pdf' | 'word' | null>(null)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
@@ -287,6 +288,77 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             showSuccess('Reloaded texts and data from settings')
         } catch (err: any) {
             showError(err.message || 'Failed to reload from settings')
+        }
+    }
+
+    const isDraft = (q.referenceNumber || '').startsWith('DRAFT-')
+
+    const handleExportWithDraftCheck = async (format: 'pdf' | 'word') => {
+        if (isDraft && hasPermission('quotations:approve')) {
+            setShowDraftExportModal(format)
+            return
+        }
+        // If draft but no approve permission, just export as-is with draft number
+        try {
+            if (format === 'pdf') {
+                await exportQuotationToPDF(q)
+                showSuccess('PDF exported')
+            } else {
+                await exportQuotationToWord(q)
+                showSuccess('Word exported')
+            }
+        } catch (err: any) {
+            showError(err.message || `${format.toUpperCase()} export failed`)
+        }
+    }
+
+    const handleApproveAndExport = async (format: 'pdf' | 'word') => {
+        try {
+            // First move to Approved step
+            const steps = await window.api.workflowGetReachableSteps(q.id)
+            const approvedStep = (Array.isArray(steps) ? steps : []).find(
+                (s: any) => s.name.toLowerCase() === 'approved'
+            )
+            if (approvedStep) {
+                await window.api.workflowMoveQuotation(q.id, approvedStep.id)
+            } else {
+                // No Approved step reachable — just assign number directly
+                await window.api.workflowAssignQuotationNumber(q.id)
+            }
+            // Reload quotation to get updated reference
+            const fullQ = await window.api.getQuotation(q.id)
+            if (fullQ && !(fullQ as any).error) {
+                setQ(fullQ)
+                // Reload reachable steps
+                const newSteps = await window.api.workflowGetReachableSteps(fullQ.id)
+                setReachableSteps(Array.isArray(newSteps) ? newSteps : [])
+                // Export with updated data
+                if (format === 'pdf') {
+                    await exportQuotationToPDF(fullQ)
+                    showSuccess('Approved and PDF exported')
+                } else {
+                    await exportQuotationToWord(fullQ)
+                    showSuccess('Approved and Word exported')
+                }
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to approve and export')
+        }
+        setShowDraftExportModal(null)
+    }
+
+    const handleExportAsDraft = async (format: 'pdf' | 'word') => {
+        setShowDraftExportModal(null)
+        try {
+            if (format === 'pdf') {
+                await exportQuotationToPDF(q)
+                showSuccess('PDF exported (as draft)')
+            } else {
+                await exportQuotationToWord(q)
+                showSuccess('Word exported (as draft)')
+            }
+        } catch (err: any) {
+            showError(err.message || `${format.toUpperCase()} export failed`)
         }
     }
 
@@ -438,6 +510,12 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         disabled={isLocked || !canEdit}
                         style={{ padding: '6px 10px', borderRadius: '6px', width: '150px', fontSize: '1rem', fontWeight: 700 }}
                     />
+                    {/* DRAFT badge */}
+                    {(q.referenceNumber || '').startsWith('DRAFT-') && (
+                        <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', background: 'rgba(150, 150, 150, 0.15)', color: isLight ? '#666' : '#999', letterSpacing: '0.05em' }}>
+                            Draft
+                        </span>
+                    )}
                     {/* Type badge */}
                     {q.quotationTypeName && (
                         <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(0,170,200,0.15)', color: isLight ? '#007a91' : '#00aac8' }}>
@@ -577,8 +655,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
                                     borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                 }}>
-                                    {!policyContext && canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToPDF(q); showSuccess('PDF exported') } catch (err: any) { showError(err.message || 'PDF export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
-                                    {!policyContext && canExport && <button onClick={async () => { setShowActionsMenu(false); try { await exportQuotationToWord(q); showSuccess('Word exported') } catch (err: any) { showError(err.message || 'Word export failed') } }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
+                                    {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('pdf') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
+                                    {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('word') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
                                     <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
                                     {!isLocked && canEdit && <button onClick={async () => { setShowActionsMenu(false); await handleReloadFromSettings() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Reload from Settings</button>}
                                     {!policyContext && !isLocked && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
@@ -606,6 +684,23 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
                             <button className="btn-secondary" onClick={() => { setShowStepCommentModal(null); setStepComment('') }}>Cancel</button>
                             <button className="btn-primary" onClick={() => handleMoveToStep(showStepCommentModal, stepComment || undefined)}>Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Draft export confirmation modal */}
+            {showDraftExportModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowDraftExportModal(null)}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '440px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 8px', fontSize: '1rem' }}>Quotation Not Approved</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 20px', lineHeight: 1.5 }}>
+                            This quotation still has a draft reference number. Would you like to approve it first to assign an official number?
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button className="btn-secondary" onClick={() => setShowDraftExportModal(null)}>Cancel</button>
+                            <button className="btn-secondary" onClick={() => handleExportAsDraft(showDraftExportModal)}>Export as Draft</button>
+                            <button className="btn-primary" onClick={() => handleApproveAndExport(showDraftExportModal)}>Approve &amp; Export</button>
                         </div>
                     </div>
                 </div>

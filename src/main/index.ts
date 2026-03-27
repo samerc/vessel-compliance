@@ -2669,6 +2669,11 @@ app.whenReady().then(() => {
     const sig = await db.getUserSignature(user.id)
     if (!sig) throw new Error('No signature uploaded. Please upload your signature first.')
     await db.signPolicy(policyId, user.id)
+    // Assign real policy number if still a draft number
+    let policyNumber = policyId
+    try {
+      policyNumber = await db.assignPolicyNumber(policyId)
+    } catch (e) { console.error('Failed to assign policy number:', e) }
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -2676,9 +2681,9 @@ app.whenReady().then(() => {
       module: 'Policies',
       entityType: 'policy',
       entityId: policyId,
-      details: `Signed policy ${policyId}`
+      details: `Signed policy ${policyNumber}`
     }).catch(() => {})
-    return { success: true }
+    return { success: true, policyNumber }
   })
   safeHandle('policy:getSignature', async (event, policyId: string) => {
     requireSession(event)
@@ -3286,7 +3291,25 @@ app.whenReady().then(() => {
     // Log activity
     const steps = await db.getWorkflowSteps()
     const toStep = steps.find(s => s.id === toStepId)
-    db.logActivity({ userId: user.id, username: user.username, action: 'WORKFLOW', module: 'Quotations', entityType: 'quotation', entityId: quotationId, entityName: '', details: `Moved to ${toStep?.name || 'unknown'}${comment ? ': ' + comment : ''}` }).catch(() => {})
+
+    // Assign real quotation number when moving TO "Approved" step
+    let assignedRef: string | undefined
+    if (toStep && toStep.name.toLowerCase() === 'approved') {
+      try {
+        assignedRef = await db.assignQuotationNumber(quotationId)
+      } catch (e) { console.error('Failed to assign quotation number:', e) }
+    }
+
+    // Get the current step info to check if we're moving FROM "Approved"
+    const fromStep = steps.find(s => s.id === currentStepId)
+    if (fromStep && fromStep.name.toLowerCase() === 'approved' && toStep && toStep.name.toLowerCase() !== 'approved') {
+      // Moving away from Approved — release the number
+      try {
+        await db.releaseQuotationNumber(quotationId)
+      } catch (e) { console.error('Failed to release quotation number:', e) }
+    }
+
+    db.logActivity({ userId: user.id, username: user.username, action: 'WORKFLOW', module: 'Quotations', entityType: 'quotation', entityId: quotationId, entityName: assignedRef || '', details: `Moved to ${toStep?.name || 'unknown'}${comment ? ': ' + comment : ''}` }).catch(() => {})
     // Notify users with relevant permissions about workflow transitions
     try {
       const toStepName = toStep?.name || 'unknown'
@@ -3309,6 +3332,12 @@ app.whenReady().then(() => {
       }
     } catch (err) { console.error('Workflow notification error:', err) }
     return { success: true }
+  })
+
+  safeHandle('workflow:assignQuotationNumber', async (event, quotationId: string) => {
+    await requirePermission(event, 'quotations:approve')
+    const ref = await db.assignQuotationNumber(quotationId)
+    return { referenceNumber: ref }
   })
 
   safeHandle('workflow:getQuotationLog', async (event, quotationId: string) => {

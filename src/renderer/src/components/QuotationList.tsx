@@ -32,6 +32,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     const [statusFilter, setStatusFilter] = useState<string>('all')
     const [typeFilter, setTypeFilter] = useState<string>('all')
     const [renewalFilter, setRenewalFilter] = useState<string>('all')
+    const [registryOnly, setRegistryOnly] = useState(false)
     const [sortField, setSortField] = useState<SortField>('updatedAt')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [page, setPage] = useState(0)
@@ -122,6 +123,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     // Filter
     const filtered = useMemo(() => {
         return quotations.filter(q => {
+            if (registryOnly && (q.referenceNumber || '').startsWith('DRAFT-')) return false
             if (statusFilter !== 'all' && q.status !== statusFilter) return false
             if (typeFilter !== 'all' && q.quotationTypeId !== typeFilter) return false
             if (renewalFilter === 'renewal' && !q.isRenewal) return false
@@ -133,7 +135,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
             }
             return true
         })
-    }, [quotations, statusFilter, typeFilter, renewalFilter, search])
+    }, [quotations, statusFilter, typeFilter, renewalFilter, search, registryOnly])
 
     const getConditions = (q: Quotation): string => {
         const a = q as any
@@ -171,7 +173,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
     // Reset page when filters change
-    useEffect(() => { setPage(0) }, [search, statusFilter, typeFilter, renewalFilter])
+    useEffect(() => { setPage(0) }, [search, statusFilter, typeFilter, renewalFilter, registryOnly])
 
     // Stats
     const stats = useMemo(() => {
@@ -275,6 +277,24 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                     <option value="new">New Business</option>
                     <option value="renewal">Renewal</option>
                 </select>
+                <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--input-border)' }}>
+                    <button
+                        onClick={() => setRegistryOnly(false)}
+                        style={{
+                            padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                            background: !registryOnly ? 'var(--accent-primary)' : 'transparent',
+                            color: !registryOnly ? '#fff' : 'var(--text-secondary)'
+                        }}
+                    >All</button>
+                    <button
+                        onClick={() => setRegistryOnly(true)}
+                        style={{
+                            padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                            background: registryOnly ? 'var(--accent-primary)' : 'transparent',
+                            color: registryOnly ? '#fff' : 'var(--text-secondary)'
+                        }}
+                    >Registry Only</button>
+                </div>
                 <button onClick={loadData} className="btn-secondary" style={{ padding: '8px', flexShrink: 0 }} title="Refresh">
                     <RotateCw size={16} />
                 </button>
@@ -386,7 +406,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                     className="hover-effect"
                                     onClick={() => onOpenQuotation(q)}
                                 >
-                                    {qVisibleSet.has('referenceNumber') && <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem' }}>
+                                    {qVisibleSet.has('referenceNumber') && <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem', color: (q.referenceNumber || '').startsWith('DRAFT-') ? (isLight ? '#888' : '#777') : (isLight ? '#007a91' : '#00aac8') }}>
                                         {q.referenceNumber || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>}
                                         {(q.revisionNumber || 0) > 0 && (
                                             <span style={{

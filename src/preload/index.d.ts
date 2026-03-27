@@ -702,6 +702,7 @@ export interface Api {
   workflowUpdateTransition: (id: string, updates: Partial<{ permissionKey: string | null; autoCreateRevision: boolean }>) => Promise<void>
   workflowDeleteTransition: (id: string) => Promise<void>
   workflowMoveQuotation: (quotationId: string, toStepId: string, comment?: string) => Promise<{ success: boolean }>
+  workflowAssignQuotationNumber: (quotationId: string) => Promise<{ referenceNumber: string }>
   workflowGetQuotationLog: (quotationId: string) => Promise<QuotationWorkflowLog[]>
   workflowGetReachableSteps: (quotationId: string) => Promise<WorkflowStep[]>
 

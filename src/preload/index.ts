@@ -669,6 +669,7 @@ const api = {
   workflowUpdateTransition: (id: string, updates: any) => ipcRenderer.invoke('workflow:updateTransition', id, updates),
   workflowDeleteTransition: (id: string) => ipcRenderer.invoke('workflow:deleteTransition', id),
   workflowMoveQuotation: (quotationId: string, toStepId: string, comment?: string) => ipcRenderer.invoke('workflow:moveQuotation', quotationId, toStepId, comment),
+  workflowAssignQuotationNumber: (quotationId: string) => ipcRenderer.invoke('workflow:assignQuotationNumber', quotationId),
   workflowGetQuotationLog: (quotationId: string) => ipcRenderer.invoke('workflow:getQuotationLog', quotationId),
   workflowGetReachableSteps: (quotationId: string) => ipcRenderer.invoke('workflow:getReachableSteps', quotationId),
 

@@ -2534,6 +2534,27 @@ export class MySQLAdapter {
                 `)
             } catch (e) { console.error('policy_tc_templates migration:', e) }
 
+            // Migration: Seed draft and real quotation sequence counters from existing data
+            try {
+                const existingRealSeq = await this.getSetting('real_quotation_seq')
+                if (!existingRealSeq) {
+                    // Count existing real (non-DRAFT) quotation references to seed the counter
+                    const [realCountRows] = await this.pool.query(
+                        "SELECT COUNT(*) as cnt FROM quotations WHERE reference_number IS NOT NULL AND reference_number NOT LIKE 'DRAFT-%'"
+                    )
+                    const realCount = (realCountRows as any[])[0]?.cnt || 0
+                    await this.setSetting('real_quotation_seq', String(realCount))
+                }
+                const existingDraftSeq = await this.getSetting('draft_quotation_seq')
+                if (!existingDraftSeq) {
+                    await this.setSetting('draft_quotation_seq', '0')
+                }
+                const existingPolDraftSeq = await this.getSetting('draft_policy_seq')
+                if (!existingPolDraftSeq) {
+                    await this.setSetting('draft_policy_seq', '0')
+                }
+            } catch (e) { console.error('Draft numbering migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -6525,14 +6546,13 @@ export class MySQLAdapter {
     async addQuotation(q: Partial<Quotation>): Promise<Quotation> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        // Auto-generate reference: Q/{type_code}/{global_sequential}
+        // Auto-generate draft reference: DRAFT-XXXX
         let referenceNumber = q.referenceNumber || null
-        if (!referenceNumber && q.quotationTypeId) {
-            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [q.quotationTypeId]) as any[]
-            const typeCode = typeRow.length > 0 ? typeRow[0].code : '?'
-            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotations') as any[]
-            const seq = (countRow[0].cnt || 0) + 1
-            referenceNumber = `Q/${typeCode}/${seq}`
+        if (!referenceNumber) {
+            const curSeq = await this.getSetting('draft_quotation_seq')
+            const nextSeq = (parseInt(curSeq || '0', 10) || 0) + 1
+            await this.setSetting('draft_quotation_seq', String(nextSeq))
+            referenceNumber = `DRAFT-${String(nextSeq).padStart(4, '0')}`
         }
         await this.pool.execute(`
             INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number)
@@ -6594,6 +6614,137 @@ export class MySQLAdapter {
     async deleteQuotation(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotations WHERE id = ?', [id])
+    }
+
+    /** Assign a real quotation reference number (Q/{type}/{seq}) to a draft quotation */
+    async assignQuotationNumber(quotationId: string): Promise<string> {
+        if (!this.pool) throw new Error('DB not connected')
+        const [qRows] = await this.pool.query(
+            'SELECT reference_number, quotation_type_id FROM quotations WHERE id = ?', [quotationId]
+        )
+        const row = (qRows as any[])[0]
+        if (!row) throw new Error('Quotation not found')
+
+        // Only assign if currently a DRAFT number
+        if (row.reference_number && !String(row.reference_number).startsWith('DRAFT-')) {
+            return row.reference_number // Already has a real number
+        }
+
+        // Get type code
+        let typeCode = '?'
+        if (row.quotation_type_id) {
+            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [row.quotation_type_id])
+            typeCode = (typeRow as any[])[0]?.code || '?'
+        }
+
+        // Get next real sequential number from app_settings
+        const curSeq = await this.getSetting('real_quotation_seq')
+        const nextSeq = (parseInt(curSeq || '0', 10) || 0) + 1
+        await this.setSetting('real_quotation_seq', String(nextSeq))
+
+        const referenceNumber = `Q/${typeCode}/${nextSeq}`
+        await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [referenceNumber, quotationId])
+        return referenceNumber
+    }
+
+    /** Release a real quotation number — if it's the last assigned, decrement the counter; otherwise void it */
+    async releaseQuotationNumber(quotationId: string): Promise<void> {
+        if (!this.pool) return
+        const [qRows] = await this.pool.query(
+            'SELECT reference_number, quotation_type_id FROM quotations WHERE id = ?', [quotationId]
+        )
+        const row = (qRows as any[])[0]
+        if (!row || !row.reference_number) return
+
+        const ref = String(row.reference_number)
+        // Only release real numbers (Q/...)
+        if (ref.startsWith('DRAFT-') || !ref.startsWith('Q/')) return
+
+        // Parse the sequence number from Q/{code}/{seq}
+        const parts = ref.split('/')
+        const refSeq = parseInt(parts[2], 10)
+        if (isNaN(refSeq)) {
+            // Can't parse — just set to draft
+            const draftSeqVal = await this.getSetting('draft_quotation_seq')
+            const draftSeq = (parseInt(draftSeqVal || '0', 10) || 0) + 1
+            await this.setSetting('draft_quotation_seq', String(draftSeq))
+            const newDraftRef = `DRAFT-${String(draftSeq).padStart(4, '0')}`
+            await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [newDraftRef, quotationId])
+            return
+        }
+
+        // Check if this is the last assigned number
+        const curSeq = await this.getSetting('real_quotation_seq')
+        const currentMax = parseInt(curSeq || '0', 10) || 0
+
+        if (refSeq === currentMax) {
+            // Last number — decrement the counter
+            await this.setSetting('real_quotation_seq', String(currentMax - 1))
+        }
+        // In all cases, revert to a new draft number
+        const draftSeqVal = await this.getSetting('draft_quotation_seq')
+        const draftSeq = (parseInt(draftSeqVal || '0', 10) || 0) + 1
+        await this.setSetting('draft_quotation_seq', String(draftSeq))
+        const newDraftRef = `DRAFT-${String(draftSeq).padStart(4, '0')}`
+        await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [newDraftRef, quotationId])
+    }
+
+    /** Assign a real policy number to a draft policy */
+    async assignPolicyNumber(policyId: string): Promise<string> {
+        if (!this.pool) throw new Error('DB not connected')
+        const [pRows] = await this.pool.query(
+            'SELECT pd.policy_number, pd.quotation_id FROM policy_documents pd WHERE pd.id = ?', [policyId]
+        )
+        const row = (pRows as any[])[0]
+        if (!row) throw new Error('Policy not found')
+
+        // Only assign if currently a POL-DRAFT number
+        if (row.policy_number && !String(row.policy_number).startsWith('POL-DRAFT-')) {
+            return row.policy_number // Already has a real number
+        }
+
+        // Get quotation type code
+        let typeCode = 'P'
+        if (row.quotation_id) {
+            const [qRows] = await this.pool.query(
+                `SELECT qt.code FROM quotations q
+                 JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                 WHERE q.id = ?`, [row.quotation_id]
+            )
+            typeCode = (qRows as any[])[0]?.code || 'P'
+        }
+
+        // Generate policy number: type + inverted year + 4-digit serial
+        const yearStr = String(new Date().getFullYear())
+        const invertedYear = yearStr.slice(2) + yearStr.slice(0, 2)
+
+        // Get next serial number
+        const [serialRow] = await this.pool.query(
+            `SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 6) AS UNSIGNED)), 0) as maxSerial
+             FROM policy_documents WHERE LENGTH(policy_number) >= 9 AND policy_number REGEXP '^[A-Z][0-9]{4,}'`
+        )
+        let nextSerial = ((serialRow as any[])[0]?.maxSerial || 0) + 1
+        if (nextSerial > 99999) {
+            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM policy_documents WHERE policy_number NOT LIKE ?', ['POL-DRAFT-%'])
+            nextSerial = ((countRow as any[])[0]?.cnt || 0) + 1
+        }
+
+        const policyNumber = typeCode + invertedYear + String(nextSerial).padStart(4, '0')
+        await this.pool.execute('UPDATE policy_documents SET policy_number = ? WHERE id = ?', [policyNumber, policyId])
+
+        // Also update any blue cards that reference the old draft number
+        const oldNumber = row.policy_number
+        if (oldNumber) {
+            const [bcRows] = await this.pool.query(
+                'SELECT id, card_type FROM policy_blue_cards WHERE policy_doc_id = ?', [policyId]
+            )
+            for (const bc of bcRows as any[]) {
+                const newCardNumber = policyNumber + '/' + bc.card_type
+                await this.pool.execute('UPDATE policy_blue_cards SET card_number = ? WHERE id = ?', [newCardNumber, bc.id])
+            }
+        }
+
+        return policyNumber
     }
 
     // ==================== Quotation Revisions & Duplication ====================
@@ -6751,9 +6902,18 @@ export class MySQLAdapter {
         const revisionGroupId = source.revisionGroupId || source.id
         const newRevisionNumber = (source.revisionNumber || 0) + 1
 
-        // Build revision reference: strip existing -RN suffix, append new one
-        const baseRef = (source.referenceNumber || '').replace(/-R\d+$/, '')
-        const newRef = `${baseRef}-R${newRevisionNumber}`
+        // Build revision reference: if source has a real number, append -RN; otherwise new draft
+        let newRef: string
+        const sourceRef = source.referenceNumber || ''
+        if (sourceRef.startsWith('DRAFT-')) {
+            const revDraftSeqVal = await this.getSetting('draft_quotation_seq')
+            const revDraftSeq = (parseInt(revDraftSeqVal || '0', 10) || 0) + 1
+            await this.setSetting('draft_quotation_seq', String(revDraftSeq))
+            newRef = `DRAFT-${String(revDraftSeq).padStart(4, '0')}`
+        } else {
+            const baseRef = sourceRef.replace(/-R\d+$/, '')
+            newRef = `${baseRef}-R${newRevisionNumber}`
+        }
 
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -6849,15 +7009,11 @@ export class MySQLAdapter {
 
         const newId = uuidv4()
 
-        // Auto-generate new reference number
-        let newRef: string | null = null
-        if (source.quotationTypeId) {
-            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [source.quotationTypeId]) as any[]
-            const typeCode = typeRow.length > 0 ? typeRow[0].code : '?'
-            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotations') as any[]
-            const seq = (countRow[0].cnt || 0) + 1
-            newRef = `Q/${typeCode}/${seq}`
-        }
+        // Auto-generate new draft reference number
+        const dupDraftSeqVal = await this.getSetting('draft_quotation_seq')
+        const dupDraftSeq = (parseInt(dupDraftSeqVal || '0', 10) || 0) + 1
+        await this.setSetting('draft_quotation_seq', String(dupDraftSeq))
+        const newRef = `DRAFT-${String(dupDraftSeq).padStart(4, '0')}`
 
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -6916,15 +7072,11 @@ export class MySQLAdapter {
 
         const newId = uuidv4()
 
-        // Auto-generate new reference number
-        let newRef: string | null = null
-        if (source.quotationTypeId) {
-            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [source.quotationTypeId]) as any[]
-            const typeCode = typeRow.length > 0 ? typeRow[0].code : '?'
-            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotations') as any[]
-            const seq = (countRow[0].cnt || 0) + 1
-            newRef = `Q/${typeCode}/${seq}`
-        }
+        // Auto-generate new draft reference number
+        const renewDraftSeqVal = await this.getSetting('draft_quotation_seq')
+        const renewDraftSeq = (parseInt(renewDraftSeqVal || '0', 10) || 0) + 1
+        await this.setSetting('draft_quotation_seq', String(renewDraftSeq))
+        const newRef = `DRAFT-${String(renewDraftSeq).padStart(4, '0')}`
 
         // Calculate new period: add 1 year to inception/expiry
         const addOneYear = (dateStr: string): string => {
@@ -8690,26 +8842,9 @@ export class MySQLAdapter {
         const quotation = await this.getQuotation(quotationId)
         if (!quotation) throw new Error('Quotation not found')
 
-        // Get quotation type code for policy number generation
-        const typeCode = quotation.quotationTypeCode || 'P'
-
-        // Generate policy numbers: type + inverted year (swap pairs) + 4-digit serial
-        // 2026 → swap "20" and "26" → "2620"
-        const yearStr = String(new Date().getFullYear())
-        const invertedYear = yearStr.slice(2) + yearStr.slice(0, 2)
-
-        // Get next serial number (global across all types)
-        // Extract serial from right side of policy number (after type code + 4-digit year = 5 chars)
-        const [serialRow] = await this.pool.query(
-            `SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 6) AS UNSIGNED)), 0) as maxSerial
-             FROM policy_documents WHERE LENGTH(policy_number) >= 9 AND policy_number REGEXP '^[A-Z][0-9]{4,}'`
-        )
-        let nextSerial = ((serialRow as any[])[0]?.maxSerial || 0) + 1
-        // If corrupted data exists, just count total + 1
-        if (nextSerial > 99999) {
-            const [countRow] = await this.pool.query('SELECT COUNT(*) as cnt FROM policy_documents')
-            nextSerial = ((countRow as any[])[0]?.cnt || 0) + 1
-        }
+        // Generate POL-DRAFT numbers for new policies — real numbers assigned on signing
+        const polDraftSeqVal = await this.getSetting('draft_policy_seq')
+        let polDraftSeq = (parseInt(polDraftSeqVal || '0', 10) || 0)
 
         const createdPolicies: any[] = []
         const vessels = await this.getQuotationVessels(quotationId)
@@ -8718,7 +8853,8 @@ export class MySQLAdapter {
             const vessel = vessels.find(v => v.vesselId === vid || v.id === vid)
             // Resolve actual vessel_id (vid might be quotation_vessels junction ID or actual vessel ID)
             const actualVesselId = vessel?.vesselId || vid
-            const policyNumber = typeCode + invertedYear + String(nextSerial).padStart(4, '0')
+            polDraftSeq++
+            const policyNumber = `POL-DRAFT-${String(polDraftSeq).padStart(4, '0')}`
             const policyId = uuidv4()
 
             // Get payable premium: sum of instalments (most accurate) or vessel premium or quotation premium
@@ -8778,8 +8914,10 @@ export class MySQLAdapter {
             }
 
             createdPolicies.push({ id: policyId, policyNumber, vesselId: actualVesselId })
-            nextSerial++
         }
+
+        // Save updated draft policy sequence
+        await this.setSetting('draft_policy_seq', String(polDraftSeq))
 
         // Auto-move quotation to "Converted" workflow step
         try {

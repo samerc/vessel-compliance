@@ -86,6 +86,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<string>('all')
     const [typeFilter, setTypeFilter] = useState<string>('all')
+    const [registryOnly, setRegistryOnly] = useState(false)
     const [sortField, setSortField] = useState<SortField>('expiryDate')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [page, setPage] = useState(0)
@@ -153,6 +154,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     // Filter
     const filtered = useMemo(() => {
         return policies.filter(p => {
+            if (registryOnly && (p.policyNumber || '').startsWith('POL-DRAFT-')) return false
             if (statusFilter !== 'all' && p.status !== statusFilter) return false
             if (typeFilter !== 'all' && p.policyTypeId !== typeFilter) return false
             if (search) {
@@ -162,7 +164,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
             }
             return true
         })
-    }, [policies, statusFilter, typeFilter, search])
+    }, [policies, statusFilter, typeFilter, search, registryOnly])
 
     // Sort
     const sorted = useMemo(() => {
@@ -191,7 +193,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
     // Reset page when filters change
-    useEffect(() => { setPage(0) }, [search, statusFilter, typeFilter])
+    useEffect(() => { setPage(0) }, [search, statusFilter, typeFilter, registryOnly])
 
     const formatCurrency = (amount?: number, currency?: string) => {
         if (!amount) return '-'
@@ -277,6 +279,24 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                     <option value="expired">Expired</option>
                     <option value="cancelled">Cancelled</option>
                 </select>
+                <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--input-border)' }}>
+                    <button
+                        onClick={() => setRegistryOnly(false)}
+                        style={{
+                            padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                            background: !registryOnly ? 'var(--accent-primary)' : 'transparent',
+                            color: !registryOnly ? '#fff' : 'var(--text-secondary)'
+                        }}
+                    >All</button>
+                    <button
+                        onClick={() => setRegistryOnly(true)}
+                        style={{
+                            padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                            background: registryOnly ? 'var(--accent-primary)' : 'transparent',
+                            color: registryOnly ? '#fff' : 'var(--text-secondary)'
+                        }}
+                    >Registry Only</button>
+                </div>
                 <button onClick={loadData} className="btn-secondary" style={{ padding: '8px', flexShrink: 0 }} title="Refresh">
                     <RotateCw size={16} />
                 </button>
@@ -366,7 +386,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     onClick={() => onSelectPolicy(p.id)}
                                 >
                                     {visibleSet.has('policyNo') && (
-                                    <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem', color: isLight ? '#007a91' : '#00aac8' }}>
+                                    <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem', color: (p.policyNumber || '').startsWith('POL-DRAFT-') ? (isLight ? '#888' : '#777') : (isLight ? '#007a91' : '#00aac8') }}>
                                         {p.policyNumber ? `${p.policyNumber}${(p as any).revisionNumber > 0 ? `-R${(p as any).revisionNumber}` : ''}` : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>--</span>}
                                     </td>
                                     )}
