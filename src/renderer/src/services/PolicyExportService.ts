@@ -1548,7 +1548,7 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   const currency = data.quotation.premiumCurrency || 'USD'
   if (hc.length === 0 && ha.length === 0) return
 
-  const condCol1W = Math.round(POL_BODY_W * 0.30)
+  const condCol1W = Math.round(POL_BODY_W * 0.20)
   const condCol2W = POL_BODY_W - condCol1W
 
   // Resolve amount: check the condition itself, then any sibling with the same conditionId
@@ -1776,20 +1776,20 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     if (data.quotation.ivEnabled && data.quotation.ivValue != null) {
       // Section A / Section B format
       if (data.quotation.agreedValue != null) {
-        content.push(polBp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)}`))
+        content.push(polBp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)} (${numberToWords(data.quotation.agreedValue, hmCurrency)})`))
       }
       if (hmItems.length > 0) {
         for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
       content.push(polEmptyP())
-      content.push(polBp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)}`))
+      content.push(polBp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)})`))
       if (ivItems.length > 0) {
         for (const it of ivItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
     } else {
       // Single value format (no IV)
       if (data.quotation.agreedValue != null) {
-        content.push(polBp(polFormatCurrency(data.quotation.agreedValue, hmCurrency)))
+        content.push(polBp(`${polFormatCurrency(data.quotation.agreedValue, hmCurrency)} (${numberToWords(data.quotation.agreedValue, hmCurrency)})`))
       }
       if (hmItems.length > 0) {
         content.push(polEmptyP())
@@ -1798,7 +1798,8 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     }
   } else if (typeCode === 'W') {
     if (data.quotation.agreedValue != null) {
-      content.push(polBp(polFormatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')))
+      const wCurrency = data.quotation.agreedValueCurrency || 'USD'
+      content.push(polBp(`${polFormatCurrency(data.quotation.agreedValue, wCurrency)} (${numberToWords(data.quotation.agreedValue, wCurrency)})`))
     }
   }
 
@@ -1896,6 +1897,18 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
   }
   if (polSt(data, 'warrantiesAdditionalText')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'warrantiesAdditionalText'))) }
   if (polSt(data, 'warrantiesBreach')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'warrantiesBreach'))) }
+
+  // H&M warranty NOTE — from warrantiesNote section text or hardcoded default
+  if (data.quotation.quotationTypeCode === 'H') {
+    const noteText = polSt(data, 'warrantiesNote')
+    const defaultNote = 'NOTE: The Insured\'s attention is drawn to the provisions of the H&M Terms and Conditions, which also include Warranties.'
+    content.push(polEmptyP())
+    if (noteText) {
+      content.push(...polMp(noteText))
+    } else {
+      content.push(polNp(defaultNote))
+    }
+  }
 
   return content
 }
@@ -2097,8 +2110,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     // Agreed Insured Value (amounts)
     const avContent: (Paragraph | Table)[] = []
     const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
-    if (data.quotation.agreedValue != null) avContent.push(polNp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)}`))
-    avContent.push(polNp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)}`))
+    if (data.quotation.agreedValue != null) avContent.push(polNp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)} (${numberToWords(data.quotation.agreedValue, hmCurrency)})`))
+    avContent.push(polNp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)})`))
     rows.push(makeRow('Agreed Insured\nValue', avContent))
   } else {
     const valueContent = polBuildValueSection(data)
@@ -2251,9 +2264,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
   }
 
-  // QR Verification reference
+  // QR Verification reference — P&I only
   try {
-    const qrBase = await window.api.getSetting('qr_verification_url')
+    const qrBase = data.quotation.quotationTypeCode === 'P' ? await window.api.getSetting('qr_verification_url') : null
     if (qrBase) {
       const qrFullUrl = `${qrBase}${encodeURIComponent(data.policy.policyNumber)}`
       children.push(polEmptyP())
@@ -2278,7 +2291,6 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   // Signature block — load digital signature if policy is signed
   let signatureImageRun: ImageRun | null = null
   let signatureFooterRun: ImageRun | null = null
-  let signerName = ''
   let sigBuf: Uint8Array | null = null
   try {
     const sigData = await window.api.policyGetSignature(policyId)
@@ -2286,15 +2298,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       sigBuf = new Uint8Array(sigData.imageData)
       signatureImageRun = new ImageRun({
         data: sigBuf,
-        transformation: { width: 120, height: 60 },
+        transformation: { width: 150, height: 75 },
         type: 'png'
       })
       signatureFooterRun = new ImageRun({
         data: sigBuf,
-        transformation: { width: 90, height: 45 },
+        transformation: { width: 120, height: 60 },
         type: 'png'
       })
-      signerName = sigData.signerName || ''
     }
   } catch { /* no signature */ }
 
@@ -2309,13 +2320,6 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       spacing: { after: 40 },
       children: [signatureImageRun]
     }))
-    if (signerName) {
-      insurerCellChildren.push(new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 20 },
-        children: [new TextRun({ text: signerName, size: POL_FONT_SIZE - 2, font: 'Arial', color: '666666', italics: true })]
-      }))
-    }
   }
   insurerCellChildren.push(new Paragraph({
     alignment: AlignmentType.RIGHT,
@@ -2395,6 +2399,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       ]
     }))
   }
+  // Add spacing after vessel name line before header ends
+  headerParas.push(new Paragraph({ spacing: { after: 60 }, children: [] }))
   const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
 
   const footerChildren: (Paragraph | Table)[] = []

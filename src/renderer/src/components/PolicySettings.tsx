@@ -1264,7 +1264,8 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
         try {
           const full = await window.api.signatureGetForUser(sig.userId)
           if (full?.imageData) {
-            const arr = Array.isArray(full.imageData) ? full.imageData : (full.imageData.data || Object.values(full.imageData))
+            const imgData = full.imageData as any
+            const arr = Array.isArray(imgData) ? imgData : (imgData.data || Object.values(imgData))
             const bytes = new Uint8Array(arr)
             let base64 = ''
             const chunk = 8192

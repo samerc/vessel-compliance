@@ -156,12 +156,16 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         if (bcSetting) setBaseCurrency(bcSetting)
       } catch { /* use default USD */ }
 
-      // Calculate payable premium
+      // Calculate payable premium — use per-vessel premium when multi-vessel
       const quot = q as Quotation
       let techPremium = quot.premiumAmount || 0
-      if (vessels.length > 0) {
-        const vesselPremSum = vessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
-        if (vesselPremSum > 0) techPremium = vesselPremSum
+      if (vessels.length > 1) {
+        // Multi-vessel: use first vessel's premium (each vessel gets its own policy)
+        const firstVesselPrem = vessels[0]?.premiumAmount || 0
+        if (firstVesselPrem > 0) techPremium = firstVesselPrem
+      } else if (vessels.length === 1) {
+        const singlePrem = vessels[0]?.premiumAmount || 0
+        if (singlePrem > 0) techPremium = singlePrem
       }
       const allAltsLocal = [...safePiAlts, ...safeHullAlts]
       let firstAltId = ''
