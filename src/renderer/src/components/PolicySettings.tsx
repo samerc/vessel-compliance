@@ -1255,7 +1255,9 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
         window.api.signatureGetAll(),
         window.api.getUsers()
       ])
+      console.log('[Signatures] sigs:', sigs, 'users:', allUsers?.length)
       if (Array.isArray(sigs)) setSignatures(sigs)
+      else if (sigs && (sigs as any).error) console.error('[Signatures] Error loading:', (sigs as any).message)
       if (Array.isArray(allUsers)) setUsers(allUsers.map((u: any) => ({ id: u.id, username: u.username })))
 
       // Load preview images for each signature
