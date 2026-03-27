@@ -2635,7 +2635,7 @@ app.whenReady().then(() => {
     requireSession(event)
     const sig = await db.getUserSignature(userId)
     if (sig && sig.imageData) {
-      sig.imageData = Array.from(Buffer.isBuffer(sig.imageData) ? sig.imageData : Buffer.from(sig.imageData))
+      return { ...sig, imageData: Array.from(Buffer.isBuffer(sig.imageData) ? sig.imageData : Buffer.from(sig.imageData)) }
     }
     return sig
   })
@@ -2684,7 +2684,7 @@ app.whenReady().then(() => {
     requireSession(event)
     const sig = await db.getPolicySignature(policyId)
     if (sig && sig.imageData) {
-      sig.imageData = Array.from(Buffer.isBuffer(sig.imageData) ? sig.imageData : Buffer.from(sig.imageData))
+      return { ...sig, imageData: Array.from(Buffer.isBuffer(sig.imageData) ? sig.imageData : Buffer.from(sig.imageData)) }
     }
     return sig
   })
