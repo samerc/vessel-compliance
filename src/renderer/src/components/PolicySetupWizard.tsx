@@ -207,11 +207,22 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           const endDate = resolveEffectivePolicyExpiry(policies)
           if (endDate) {
             inception = endDate
-            const exp = new Date(endDate)
-            exp.setDate(exp.getDate() + 365)
-            expiry = exp.toISOString().split('T')[0]
+            // Add 1 year using string math (no timezone issues)
+            const parts = endDate.split('-')
+            const yr = parseInt(parts[0], 10) + 1
+            expiry = `${yr}-${parts[1]}-${parts[2]}`
           }
         } catch { /* ignore */ }
+      }
+
+      // Calculate instalment dates from inception if we have both
+      if (inception && safeInstalments.length > 0) {
+        initDates = safeInstalments.map(inst => {
+          const [y, mo, day] = inception.split('-').map(Number)
+          const months = Math.round(inst.daysFromInception / 30)
+          const d = new Date(y, mo - 1 + months, day)
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        })
       }
 
       setData(prev => ({
