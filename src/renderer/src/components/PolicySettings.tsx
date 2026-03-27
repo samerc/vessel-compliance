@@ -1265,13 +1265,16 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
       for (const sig of (Array.isArray(sigs) ? sigs : [])) {
         try {
           const full = await window.api.signatureGetForUser(sig.userId)
-          console.log('[SigPreview]', sig.userId, 'imageData type:', typeof full?.imageData, 'isArray:', Array.isArray(full?.imageData), 'length:', full?.imageData?.length, 'first bytes:', full?.imageData?.slice?.(0, 4))
           if (full?.imageData) {
-            const arr = Array.isArray(full.imageData) ? full.imageData : (full.imageData.data || full.imageData)
+            const arr = Array.isArray(full.imageData) ? full.imageData : (full.imageData.data || Object.values(full.imageData))
             const bytes = new Uint8Array(arr)
+            let base64 = ''
+            const chunk = 8192
+            for (let i = 0; i < bytes.length; i += chunk) {
+              base64 += String.fromCharCode(...bytes.subarray(i, i + chunk))
+            }
             const ext = sig.fileName?.toLowerCase()?.endsWith('.jpg') || sig.fileName?.toLowerCase()?.endsWith('.jpeg') ? 'image/jpeg' : 'image/png'
-            const blob = new Blob([bytes], { type: ext })
-            previews[sig.userId] = URL.createObjectURL(blob)
+            previews[sig.userId] = `data:${ext};base64,${btoa(base64)}`
           }
         } catch (e) { console.error('[SigPreview] Error:', e) }
       }
