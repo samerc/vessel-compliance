@@ -1255,9 +1255,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
         window.api.signatureGetAll(),
         window.api.getUsers()
       ])
-      console.log('[Signatures] sigs:', sigs, 'users:', allUsers?.length)
       if (Array.isArray(sigs)) setSignatures(sigs)
-      else if (sigs && (sigs as any).error) console.error('[Signatures] Error loading:', (sigs as any).message)
       if (Array.isArray(allUsers)) setUsers(allUsers.map((u: any) => ({ id: u.id, username: u.username })))
 
       // Load preview images for each signature
@@ -1276,7 +1274,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
             const ext = sig.fileName?.toLowerCase()?.endsWith('.jpg') || sig.fileName?.toLowerCase()?.endsWith('.jpeg') ? 'image/jpeg' : 'image/png'
             previews[sig.userId] = `data:${ext};base64,${btoa(base64)}`
           }
-        } catch (e) { console.error('[SigPreview] Error:', e) }
+        } catch { /* skip */ }
       }
       setPreviewData(previews)
     } catch (err: any) {
@@ -1299,9 +1297,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
         return
       }
       showSuccess('Signature uploaded')
-      console.log('[Signatures] Upload success, reloading...')
       await loadData()
-      console.log('[Signatures] Reload complete, signatures:', signatures.length)
     } catch (err: any) {
       showError(err.message || 'Failed to upload signature')
     } finally {
