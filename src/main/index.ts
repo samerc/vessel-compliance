@@ -2810,6 +2810,25 @@ app.whenReady().then(() => {
     }).catch(() => {})
     return result
   })
+  safeHandle('db:getQuotationRevisionCount', async (event, revisionGroupId) => {
+    requireSession(event)
+    return db.getQuotationRevisionCount(revisionGroupId)
+  })
+  safeHandle('db:deleteQuotationGroup', async (event, revisionGroupId) => {
+    const user = await requirePermission(event, 'quotations:delete')
+    const result = await db.deleteQuotationGroup(revisionGroupId)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Quotations',
+      entityType: 'quotation',
+      entityId: revisionGroupId,
+      entityName: revisionGroupId,
+      details: `Deleted all revisions in group ${revisionGroupId}`
+    }).catch(() => {})
+    return result
+  })
   safeHandle('db:createQuotationRevision', async (event, sourceId) => {
     const user = await requirePermission(event, 'quotations:create')
     const source = await db.getQuotation(sourceId)

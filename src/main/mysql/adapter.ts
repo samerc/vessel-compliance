@@ -7214,6 +7214,26 @@ export class MySQLAdapter {
         return newId
     }
 
+    async getQuotationRevisionCount(revisionGroupId: string): Promise<number> {
+        if (!this.pool) return 0
+        const [rows] = await this.pool.query(
+            'SELECT COUNT(*) as cnt FROM quotations WHERE revision_group_id = ?',
+            [revisionGroupId]
+        )
+        return (rows as any[])[0]?.cnt || 0
+    }
+
+    async deleteQuotationGroup(revisionGroupId: string): Promise<void> {
+        if (!this.pool) return
+        const [rows] = await this.pool.query(
+            'SELECT id FROM quotations WHERE revision_group_id = ?',
+            [revisionGroupId]
+        )
+        for (const row of rows as any[]) {
+            await this.deleteQuotation(row.id)
+        }
+    }
+
     async getQuotationRevisions(revisionGroupId: string): Promise<Quotation[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(`

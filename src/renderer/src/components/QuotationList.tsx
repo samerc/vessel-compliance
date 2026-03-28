@@ -36,7 +36,12 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     const [sortField, setSortField] = useState<SortField>('updatedAt')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [page, setPage] = useState(0)
-    const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; quotation: Quotation | null }>({ show: false, quotation: null })
+    const [deleteModal, setDeleteModal] = useState<{
+        show: boolean
+        quotation: Quotation | null
+        revisionCount: number
+        deleteMode: 'single' | 'all'
+    } | null>(null)
     const [showNewMenu, setShowNewMenu] = useState(false)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
@@ -86,12 +91,32 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
         }
     }
 
-    const handleDelete = async () => {
-        if (!deleteConfirm.quotation) return
+    const openDeleteModal = async (q: Quotation) => {
+        const groupId = q.revisionGroupId || q.id
+        let count = 1
         try {
-            await window.api.deleteQuotation(deleteConfirm.quotation.id)
-            showSuccess('Quotation deleted')
-            setDeleteConfirm({ show: false, quotation: null })
+            count = await window.api.getQuotationRevisionCount(groupId)
+        } catch { /* fallback */ }
+        setDeleteModal({
+            show: true,
+            quotation: q,
+            revisionCount: count,
+            deleteMode: 'single'
+        })
+    }
+
+    const handleDelete = async () => {
+        if (!deleteModal?.quotation) return
+        try {
+            if (deleteModal.deleteMode === 'all' && deleteModal.revisionCount > 1) {
+                const groupId = deleteModal.quotation.revisionGroupId || deleteModal.quotation.id
+                await window.api.deleteQuotationGroup(groupId)
+                showSuccess('All revisions deleted')
+            } else {
+                await window.api.deleteQuotation(deleteModal.quotation.id)
+                showSuccess('Quotation deleted')
+            }
+            setDeleteModal(null)
             loadData()
         } catch (err: any) {
             showError(err.message || 'Failed to delete quotation')
@@ -500,7 +525,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                                         )}
                                         {hasPermission('quotations:delete') && (
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ show: true, quotation: q }) }}
+                                                onClick={(e) => { e.stopPropagation(); openDeleteModal(q) }}
                                                 className="btn-secondary"
                                                 style={{ padding: '5px', color: 'var(--danger)' }}
                                                 title="Delete"
@@ -558,15 +583,149 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                 </div>
             )}
 
-            {deleteConfirm.show && deleteConfirm.quotation && (
-                <ConfirmationModal
-                    title="Delete Quotation?"
-                    message={`Delete quotation ${deleteConfirm.quotation.referenceNumber || '(no ref)'}? This cannot be undone.`}
-                    confirmLabel="Delete"
-                    isDangerous
-                    onConfirm={handleDelete}
-                    onCancel={() => setDeleteConfirm({ show: false, quotation: null })}
-                />
+            {deleteModal?.show && deleteModal.quotation && (
+                deleteModal.revisionCount <= 1 ? (
+                    <ConfirmationModal
+                        title="Delete Quotation?"
+                        message={`Delete quotation ${deleteModal.quotation.referenceNumber || '(no ref)'}? This cannot be undone.`}
+                        confirmLabel="Delete"
+                        isDangerous
+                        onConfirm={handleDelete}
+                        onCancel={() => setDeleteModal(null)}
+                    />
+                ) : (
+                    <div
+                        style={{
+                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                            background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                        }}
+                        onClick={() => setDeleteModal(null)}
+                    >
+                        <div
+                            style={{
+                                width: '90%', maxWidth: '480px',
+                                background: isLight ? '#ffffff' : '#1a1d28',
+                                borderRadius: '14px', border: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
+                                boxShadow: isLight ? '0 10px 40px rgba(0,0,0,0.2)' : '0 10px 40px rgba(0,0,0,0.5)'
+                            }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div style={{ padding: '24px 24px 10px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{
+                                    background: 'rgba(255, 77, 77, 0.1)', padding: '10px', borderRadius: '12px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    <Trash2 size={24} color="var(--danger)" />
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>
+                                    Delete Quotation {deleteModal.quotation.referenceNumber || '(no ref)'}
+                                    {(deleteModal.quotation.revisionNumber || 0) > 0 && (
+                                        <span style={{
+                                            marginLeft: '6px', padding: '2px 6px', borderRadius: '4px',
+                                            fontSize: '0.65rem', fontWeight: 700,
+                                            background: 'rgba(180, 100, 255, 0.15)',
+                                            color: isLight ? '#7a3db8' : '#b464ff'
+                                        }}>R{deleteModal.quotation.revisionNumber}</span>
+                                    )}
+                                </h3>
+                            </div>
+
+                            <div style={{ padding: '16px 24px 20px 24px' }}>
+                                <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                                    This quotation has {deleteModal.revisionCount} revision{deleteModal.revisionCount > 1 ? 's' : ''}. Choose how to delete:
+                                </p>
+
+                                {/* Radio: Delete this revision only */}
+                                <label
+                                    style={{
+                                        display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px',
+                                        borderRadius: '8px', cursor: 'pointer', marginBottom: '8px',
+                                        border: deleteModal.deleteMode === 'single'
+                                            ? `2px solid var(--accent-primary)`
+                                            : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
+                                        background: deleteModal.deleteMode === 'single'
+                                            ? (isLight ? 'rgba(0,170,200,0.05)' : 'rgba(0,170,200,0.08)')
+                                            : 'transparent'
+                                    }}
+                                    onClick={() => setDeleteModal(prev => prev ? { ...prev, deleteMode: 'single' } : prev)}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="deleteMode"
+                                        checked={deleteModal.deleteMode === 'single'}
+                                        onChange={() => setDeleteModal(prev => prev ? { ...prev, deleteMode: 'single' } : prev)}
+                                        style={{ marginTop: '2px', accentColor: 'var(--accent-primary)' }}
+                                    />
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
+                                            Delete this revision only
+                                            {(deleteModal.quotation.revisionNumber || 0) > 0 && ` (R${deleteModal.quotation.revisionNumber})`}
+                                        </div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                            {(deleteModal.quotation.revisionNumber || 0) === 0
+                                                ? 'This is the original. The next revision will become the base.'
+                                                : 'The previous revision will become the latest version.'
+                                            }
+                                        </div>
+                                    </div>
+                                </label>
+
+                                {/* Radio: Delete all revisions */}
+                                <label
+                                    style={{
+                                        display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px',
+                                        borderRadius: '8px', cursor: 'pointer',
+                                        border: deleteModal.deleteMode === 'all'
+                                            ? '2px solid var(--danger)'
+                                            : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
+                                        background: deleteModal.deleteMode === 'all'
+                                            ? (isLight ? 'rgba(255,77,77,0.05)' : 'rgba(255,77,77,0.08)')
+                                            : 'transparent'
+                                    }}
+                                    onClick={() => setDeleteModal(prev => prev ? { ...prev, deleteMode: 'all' } : prev)}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="deleteMode"
+                                        checked={deleteModal.deleteMode === 'all'}
+                                        onChange={() => setDeleteModal(prev => prev ? { ...prev, deleteMode: 'all' } : prev)}
+                                        style={{ marginTop: '2px', accentColor: 'var(--danger)' }}
+                                    />
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
+                                            Delete all revisions ({deleteModal.revisionCount})
+                                        </div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                            This will permanently remove the entire quotation history.
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div style={{
+                                padding: '16px 24px',
+                                background: isLight ? '#fafafa' : 'rgba(0,0,0,0.02)',
+                                borderTop: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '0 0 14px 14px',
+                                display: 'flex', justifyContent: 'flex-end', gap: '12px'
+                            }}>
+                                <button onClick={() => setDeleteModal(null)} className="btn-secondary" style={{ padding: '8px 16px' }}>Cancel</button>
+                                <button
+                                    onClick={handleDelete}
+                                    className="btn-primary"
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: 'var(--danger)',
+                                        borderColor: 'var(--danger)'
+                                    }}
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
             )}
         </div>
     )

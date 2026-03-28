@@ -505,6 +505,8 @@ export interface Api {
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>
   deleteQuotation: (id: string) => Promise<void>
+  getQuotationRevisionCount: (revisionGroupId: string) => Promise<number>
+  deleteQuotationGroup: (revisionGroupId: string) => Promise<void>
   createQuotationRevision: (sourceId: string) => Promise<Quotation>
   stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) => Promise<void>
   duplicateQuotation: (sourceId: string) => Promise<Quotation>
