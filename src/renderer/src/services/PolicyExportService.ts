@@ -730,6 +730,7 @@ interface PolicyDocRecord {
   quotationTypeCode?: string
   quotationTypeName?: string
   createdAt?: string
+  exportSnapshot?: string | null
 }
 
 interface PolicyInstalment {
@@ -831,6 +832,21 @@ interface PolVesselInfo {
 
 async function loadPolicyExportData(policyId: string): Promise<PolicyExportData> {
   const policy: PolicyDocRecord = await window.api.policyGetById(policyId)
+
+  // If policy has a frozen export snapshot, use it instead of live data
+  if (policy.exportSnapshot) {
+    try {
+      const snapshot = JSON.parse(policy.exportSnapshot) as PolicyExportData
+      // Restore the policy record from snapshot but keep current signedBy/signedAt
+      if (snapshot.policy) {
+        snapshot.policy.exportSnapshot = policy.exportSnapshot
+      }
+      return snapshot
+    } catch {
+      console.warn('[PolicyExport] Invalid snapshot JSON, falling back to live data')
+    }
+  }
+
   const quotationOrNull = await window.api.getQuotation(policy.quotationId)
   if (!quotationOrNull) throw new Error('Quotation not found')
   const quotation: Quotation = quotationOrNull
@@ -986,6 +1002,25 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     surveyWarranties: Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) : [],
     companyName: reportSettings.companyName || 'Insurance Company'
   }
+}
+
+// ---- Export Snapshot ----
+
+/**
+ * Capture all export data for a signed policy and freeze it as a JSON snapshot.
+ * Future exports will use this snapshot so documents never change after signing.
+ */
+export async function capturePolicyExportSnapshot(policyId: string): Promise<void> {
+  const data = await loadPolicyExportData(policyId)
+  // Strip the exportSnapshot field from the nested policy to avoid storing a snapshot-of-a-snapshot
+  const snapshotPolicy = { ...data.policy }
+  delete snapshotPolicy.exportSnapshot
+  const snapshot = {
+    ...data,
+    policy: snapshotPolicy,
+    snapshotAt: new Date().toISOString()
+  }
+  await window.api.policyUpdate(policyId, { exportSnapshot: JSON.stringify(snapshot) })
 }
 
 // ---- Number to Words ----

@@ -36,7 +36,8 @@ import {
   exportDebitAdviceDocx,
   exportCreditAdviceDocx,
   exportBlueCardDocx,
-  exportPolicyPdfWithTC
+  exportPolicyPdfWithTC,
+  capturePolicyExportSnapshot
 } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
@@ -107,6 +108,7 @@ interface PolicyRecord {
   signedBy: string | null
   signedAt: string | null
   signedByName: string | null
+  exportSnapshot: string | null
 }
 
 interface Instalment {
@@ -1049,6 +1051,13 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       if (result?.error) {
         showError(result.message || 'Failed to sign policy')
       } else {
+        // Capture export snapshot so future exports are frozen
+        try {
+          await capturePolicyExportSnapshot(policyId)
+        } catch (snapErr: any) {
+          console.error('Failed to capture export snapshot:', snapErr)
+          // Non-blocking — signing still succeeds even if snapshot fails
+        }
         showSuccess('Policy signed successfully')
         await loadData()
       }
@@ -1277,6 +1286,28 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               <PenTool size={14} />
               Signed by {policy.signedByName || 'unknown'}
               {policy.signedAt && ` · ${formatDateShort(policy.signedAt)}`}
+            </span>
+          )}
+
+          {/* Exports frozen badge */}
+          {policy.exportSnapshot && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                background: 'rgba(0, 170, 200, 0.10)',
+                color: isLight ? '#006688' : '#00aac8',
+                border: '1px solid rgba(0, 170, 200, 0.25)'
+              }}
+              title="Exports use frozen data captured at signing"
+            >
+              <Shield size={13} />
+              Exports frozen
             </span>
           )}
 

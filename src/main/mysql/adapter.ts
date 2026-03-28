@@ -2555,6 +2555,18 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('Draft numbering migration:', e) }
 
+            // Migration: Add export_snapshot column to policy_documents
+            try {
+                const [snapCols] = await this.pool.query(
+                    "SHOW COLUMNS FROM policy_documents LIKE 'export_snapshot'"
+                )
+                if ((snapCols as any[]).length === 0) {
+                    await this.pool.query(
+                        'ALTER TABLE policy_documents ADD COLUMN export_snapshot MEDIUMTEXT DEFAULT NULL'
+                    )
+                }
+            } catch (e) { console.error('export_snapshot migration:', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -8513,6 +8525,7 @@ export class MySQLAdapter {
             signedBy: r.signed_by || null,
             signedAt: r.signed_at || null,
             signedByName: r.signedByName || null,
+            exportSnapshot: r.export_snapshot || null,
         }
     }
 
@@ -8689,6 +8702,7 @@ export class MySQLAdapter {
             selectedAlternativeId: 'selected_alternative_id',
             exportedAt: 'exported_at',
             exchangeRate: 'exchange_rate',
+            exportSnapshot: 'export_snapshot',
         }
         const sets: string[] = []
         const vals: any[] = []
