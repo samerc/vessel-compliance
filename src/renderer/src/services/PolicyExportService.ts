@@ -984,7 +984,9 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     allExclusions: Array.isArray(allExclusions) ? allExclusions : [],
     customExclusions: filterByAlt(Array.isArray(customExclusions) ? customExclusions : []),
     excludedCountries: Array.isArray(excludedCountries) ? excludedCountries : [],
-    subjectivities: Array.isArray(subjectivities) ? subjectivities : [],
+    subjectivities: (Array.isArray(subjectivities) ? subjectivities : []).filter(
+      (s: QuotationSubjectivity) => !s.vesselScope || !vessel || s.vesselScope.includes(vessel.id)
+    ),
     sectionTexts: mergedTexts,
     sanctionsVersions: Array.isArray(sanctionsVersions) ? sanctionsVersions : [],
     clauseOverrides,

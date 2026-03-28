@@ -3595,6 +3595,7 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
     const [editText, setEditText] = useState('')
     const [showMasterPicker, setShowMasterPicker] = useState(false)
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [scopeAutoDetected, setScopeAutoDetected] = useState(false)
     const autoPopulateRan = useRef(false)
 
     useEffect(() => { loadData() }, [])
@@ -3705,7 +3706,23 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
 
             // Reload after auto-populate
             const refreshed = await window.api.getQuotationSubjectivities(quotation.id)
-            setItems(Array.isArray(refreshed) ? refreshed : [])
+            const safeRefreshed = Array.isArray(refreshed) ? refreshed : []
+            setItems(safeRefreshed)
+
+            // Auto-detect vessel scopes when 2+ vessels
+            if (qVessels.length >= 2 && safeRefreshed.length > 0) {
+                try {
+                    const scopes = await autoSetSubjectivityScopes(safeRefreshed, qVessels, masters)
+                    const withScopes = safeRefreshed.map(s => ({ ...s, vesselScope: scopes[s.id] !== undefined ? scopes[s.id] : s.vesselScope }))
+                    setItems(withScopes)
+                    for (const s of withScopes) {
+                        if (scopes[s.id] !== undefined) {
+                            await window.api.updateQuotationSubjectivity(s.id, { vesselScope: scopes[s.id] })
+                        }
+                    }
+                    setScopeAutoDetected(true)
+                } catch { /* scope detection is best-effort */ }
+            }
         } catch (err) {
             console.error('Auto-populate subjectivities error:', err)
         }
@@ -3764,6 +3781,114 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
         await window.api.updateQuotationSubjectivity(id, { vesselScope: scope })
     }
 
+    const autoSetSubjectivityScopes = async (
+        subjs: QuotationSubjectivity[],
+        vessels: QuotationVessel[],
+        allSubjDefs: PISubjectivity[]
+    ): Promise<Record<string, string[] | null>> => {
+        const scopes: Record<string, string[] | null> = {}
+
+        // Pre-fetch all entities once for entity doc checks
+        let allEntities: Entity[] = []
+        try {
+            const ents = await window.api.getEntities()
+            allEntities = Array.isArray(ents) ? ents : []
+        } catch { /* ignore */ }
+
+        // Pre-fetch vessel docs and assureds per vessel
+        const vesselDocsMap = new Map<string, any[]>()
+        const vesselAssuredsMap = new Map<string, any[]>()
+        for (const qv of vessels) {
+            if (!qv.vesselId) continue
+            try {
+                const [docs, assureds] = await Promise.all([
+                    window.api.getVesselDocuments(qv.vesselId),
+                    window.api.getVesselAssureds(qv.vesselId)
+                ])
+                vesselDocsMap.set(qv.vesselId, Array.isArray(docs) ? docs : [])
+                vesselAssuredsMap.set(qv.vesselId, Array.isArray(assureds) ? assureds : [])
+            } catch { /* ignore */ }
+        }
+
+        for (const subj of subjs) {
+            const def = allSubjDefs.find(s => s.id === subj.piSubjectivityId)
+            if (!def || !def.docTypeIds || def.docTypeIds.length === 0) {
+                scopes[subj.id] = null // no doc mapping — applies to all
+                continue
+            }
+
+            const entityDocTypeIds = def.docTypeIds.filter(id => id.startsWith('entity:'))
+            const vesselDocTypeIds = def.docTypeIds.filter(id => !id.startsWith('entity:'))
+            const needsVessels: string[] = []
+
+            for (const qv of vessels) {
+                if (!qv.vesselId) {
+                    // Manual vessel — always needs the subjectivity
+                    needsVessels.push(qv.id)
+                    continue
+                }
+
+                const vesselDocs = vesselDocsMap.get(qv.vesselId) || []
+                let vesselHasAll = true
+
+                // Check vessel document types
+                for (const dtId of vesselDocTypeIds) {
+                    const hasDoc = vesselDocs.some((d: any) => (d.documentTypeId || d.document_type_id) === dtId && d.filePath)
+                    if (!hasDoc) { vesselHasAll = false; break }
+                }
+
+                // Check entity documents (CoI, AoA, KYC, Passport)
+                if (vesselHasAll && entityDocTypeIds.length > 0) {
+                    const assureds = vesselAssuredsMap.get(qv.vesselId) || []
+                    for (const assured of assureds) {
+                        if (!assured.entityId) continue
+                        const entity = allEntities.find(e => e.id === assured.entityId)
+                        if (!entity) continue
+                        for (const eid of entityDocTypeIds) {
+                            if (eid === 'entity:coi' && !entity.certificateOfIncorporationPath && entity.type === 'company') { vesselHasAll = false; break }
+                            if (eid === 'entity:aoa' && !entity.articlesOfAssociationPath && entity.type === 'company') { vesselHasAll = false; break }
+                            if (eid === 'entity:kyc' && !entity.kycFilePath && entity.type === 'company') { vesselHasAll = false; break }
+                            if (eid === 'entity:passport' && !entity.passportFilePath && entity.type === 'person') { vesselHasAll = false; break }
+                        }
+                        if (!vesselHasAll) break
+                    }
+                }
+
+                if (!vesselHasAll) needsVessels.push(qv.id)
+            }
+
+            // If all vessels need it → null (all). If none need it → null (keep for all, user can remove).
+            if (needsVessels.length === vessels.length || needsVessels.length === 0) {
+                scopes[subj.id] = null
+            } else {
+                scopes[subj.id] = needsVessels
+            }
+        }
+
+        return scopes
+    }
+
+    const handleAutoDetectScopes = async () => {
+        if (qVessels.length < 2) {
+            showSuccess('Auto-detect requires 2 or more vessels')
+            return
+        }
+        try {
+            const scopes = await autoSetSubjectivityScopes(items, qVessels, masterList)
+            const updated = items.map(s => ({ ...s, vesselScope: scopes[s.id] !== undefined ? scopes[s.id] : s.vesselScope }))
+            setItems(updated)
+            for (const s of updated) {
+                if (scopes[s.id] !== undefined) {
+                    await window.api.updateQuotationSubjectivity(s.id, { vesselScope: scopes[s.id] })
+                }
+            }
+            setScopeAutoDetected(true)
+            showSuccess('Vessel scopes auto-detected from uploaded documents')
+        } catch (err) {
+            console.error('Auto-detect scopes error:', err)
+        }
+    }
+
     const handleRePopulate = async () => {
         if (masterList.length === 0) {
             showSuccess('No master subjectivities configured — add them in Quotation Settings first')
@@ -3789,6 +3914,11 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
                 <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Subjectivities</h3>
                 <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', background: 'var(--table-header-bg)', color: 'var(--text-secondary)' }}>{items.length}</span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                    {qVessels.length >= 2 && items.length > 0 && (
+                        <button onClick={handleAutoDetectScopes} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Search size={14} /> Auto-detect Scopes
+                        </button>
+                    )}
                     {availableMasters.length > 0 && (
                         <button onClick={() => setShowMasterPicker(!showMasterPicker)} className="btn-secondary" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Plus size={14} /> From Master
@@ -3836,6 +3966,7 @@ function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quo
                                     {item.text}
                                     {item.isAutoPopulated && <span style={{ fontSize: '0.68rem', color: 'var(--accent-primary)', marginLeft: '6px' }}>(auto)</span>}
                                     {item.isCustom && <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '6px' }}>(custom)</span>}
+                                    {scopeAutoDetected && item.vesselScope && item.vesselScope.length > 0 && <span style={{ fontSize: '0.68rem', color: '#44cc88', marginLeft: '4px' }}>(scope auto-detected)</span>}
                                 </span>
                                 <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><ChevronUp size={14} /></button>
                                 <button onClick={() => handleMove(idx, 1)} disabled={idx === items.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><ChevronDown size={14} /></button>
