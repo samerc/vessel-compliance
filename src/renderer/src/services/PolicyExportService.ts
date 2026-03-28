@@ -1015,9 +1015,23 @@ export async function capturePolicyExportSnapshot(policyId: string): Promise<voi
   // Strip the exportSnapshot field from the nested policy to avoid storing a snapshot-of-a-snapshot
   const snapshotPolicy = { ...data.policy }
   delete snapshotPolicy.exportSnapshot
+
+  // Capture the signature image so it's frozen with the policy
+  let signatureSnapshot: { imageData: number[]; signerName: string } | null = null
+  try {
+    const sigData = await window.api.policyGetSignature(policyId)
+    if (sigData && sigData.imageData) {
+      signatureSnapshot = {
+        imageData: Array.isArray(sigData.imageData) ? sigData.imageData : Array.from(sigData.imageData as any),
+        signerName: sigData.signerName || ''
+      }
+    }
+  } catch { /* no signature */ }
+
   const snapshot = {
     ...data,
     policy: snapshotPolicy,
+    signatureSnapshot,
     snapshotAt: new Date().toISOString()
   }
   await window.api.policyUpdate(policyId, { exportSnapshot: JSON.stringify(snapshot) })
@@ -2309,14 +2323,22 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   children.push(polEmptyP())
   children.push(polEmptyP())
 
-  // Signature block — load digital signature if policy is signed
+  // Signature block — use snapshot if available, otherwise load live
   let signatureImageRun: ImageRun | null = null
   let signatureFooterRun: ImageRun | null = null
   let sigBuf: Uint8Array | null = null
   try {
-    const sigData = await window.api.policyGetSignature(policyId)
-    if (sigData && sigData.imageData) {
-      sigBuf = new Uint8Array(sigData.imageData)
+    const snapshotSig = (data as any).signatureSnapshot
+    let imageData: any = null
+    if (snapshotSig && snapshotSig.imageData) {
+      imageData = snapshotSig.imageData
+    } else {
+      const sigData = await window.api.policyGetSignature(policyId)
+      if (sigData) imageData = sigData.imageData
+    }
+    if (imageData) {
+      const arr = Array.isArray(imageData) ? imageData : (imageData.data || Object.values(imageData))
+      sigBuf = new Uint8Array(arr)
       signatureImageRun = new ImageRun({
         data: sigBuf,
         transformation: { width: 150, height: 75 },
@@ -2738,13 +2760,21 @@ function polBuildAdviceClosing(
 }
 
 /** Load digital signature for closing + footer */
-async function polLoadSignature(policyId: string): Promise<{ sigBuf: Uint8Array | null; signatureImageRun: ImageRun | null }> {
+async function polLoadSignature(policyId: string, snapshotSig?: any): Promise<{ sigBuf: Uint8Array | null; signatureImageRun: ImageRun | null }> {
   let sigBuf: Uint8Array | null = null
   let signatureImageRun: ImageRun | null = null
   try {
-    const sigData = await window.api.policyGetSignature(policyId)
-    if (sigData && sigData.imageData) {
-      sigBuf = new Uint8Array(sigData.imageData)
+    // Use snapshot signature if available (frozen at signing time)
+    let imageData: any = null
+    if (snapshotSig && snapshotSig.imageData) {
+      imageData = snapshotSig.imageData
+    } else {
+      const sigData = await window.api.policyGetSignature(policyId)
+      if (sigData) imageData = sigData.imageData
+    }
+    if (imageData) {
+      const arr = Array.isArray(imageData) ? imageData : (imageData.data || Object.values(imageData))
+      sigBuf = new Uint8Array(arr)
       signatureImageRun = new ImageRun({
         data: sigBuf,
         transformation: { width: 150, height: 75 },
@@ -2803,7 +2833,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
   // Load signature
-  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId)
+  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
   // Build header + footer
   const headerParas = await polBuildAdviceHeader(data, `${headerTitle} ${data.policy.policyNumber}`)
@@ -2968,7 +2998,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
   // Load signature
-  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId)
+  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
   // Build header + footer
   const headerParas = await polBuildAdviceHeader(data, `${headerTitle} ${data.policy.policyNumber}`)
