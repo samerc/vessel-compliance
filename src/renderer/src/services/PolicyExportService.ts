@@ -737,9 +737,10 @@ interface PolicyInstalment {
   policyId: string
   instalmentNumber: number
   dueDate: string
-  amount: number
+  amount?: number
+  premiumAmount?: number
   commissionAmount?: number
-  currency: string
+  currency?: string
   isNonRefundable?: boolean
 }
 
@@ -2622,7 +2623,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   children.push(polEmptyP())
 
   // PREMIUM
-  const totalPremium = data.instalments.reduce((sum, i) => sum + (i.amount || 0), 0) || data.quotation.premiumAmount || 0
+  const totalPremium = data.instalments.reduce((sum, i) => sum + (i.premiumAmount || i.amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
   children.push(polBup('PREMIUM'))
   children.push(polEmptyP())
   children.push(polBp(polFormatCurrency(totalPremium, currency)))
@@ -2654,7 +2655,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
         children: [
           new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
           new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(inst.amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
+          new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency((inst.premiumAmount || inst.amount || 0), currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
         ]
       }))
     }))
@@ -2758,7 +2759,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   children.push(polEmptyP())
 
   // CREDIT AMOUNT
-  const totalPremium = data.instalments.reduce((sum, i) => sum + (i.amount || 0), 0) || data.quotation.premiumAmount || 0
+  const totalPremium = data.instalments.reduce((sum, i) => sum + (i.premiumAmount || i.amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
   const commissionPercent = data.policy.commissionPercent || 0
   const commissionAmount = totalPremium * commissionPercent / 100
 
@@ -2793,7 +2794,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
       layout: TableLayoutType.FIXED,
       columnWidths: [labelW, dateW, amtW],
       rows: data.instalments.map(inst => {
-        const commAmt = inst.commissionAmount != null ? inst.commissionAmount : (inst.amount * commissionPercent / 100)
+        const commAmt = inst.commissionAmount != null ? inst.commissionAmount : ((inst.premiumAmount || inst.amount || 0) * commissionPercent / 100)
         return new TableRow({
           children: [
             new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
