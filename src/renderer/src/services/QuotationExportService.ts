@@ -846,17 +846,31 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       // Returns array of [ref, text] pairs for table-like rendering
       const getCondPairs = (conds: typeof hc): [string, string][] => {
         const pairs: [string, string][] = []
+        const currency = data.quotation.premiumCurrency || 'USD'
         for (const qc of conds) {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
           if (!def) continue
-          let t = qc.textOverride || def.text
-          const amount = resolveAmount(qc)
-          if (def.hasAmount && def.amountPlaceholder && amount != null) {
-            const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            t = t.replace(new RegExp(escaped, 'g'), formatCurrency(amount, data.quotation.premiumCurrency || 'USD'))
+          // If vesselAmounts exist and differ, emit one line per vessel
+          if (qc.vesselAmounts && def.hasAmount && def.amountPlaceholder && Object.keys(qc.vesselAmounts).length > 0) {
+            for (const vessel of data.quotationVessels) {
+              const va = qc.vesselAmounts[vessel.id]
+              if (va == null) continue
+              let t = qc.textOverride || def.text
+              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              t = t.replace(new RegExp(escaped, 'g'), formatCurrency(va, currency))
+              const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
+              pairs.push([`Cl. ${def.conditionNumber}`, `${t} ${vName}`])
+            }
+          } else {
+            let t = qc.textOverride || def.text
+            const amount = resolveAmount(qc)
+            if (def.hasAmount && def.amountPlaceholder && amount != null) {
+              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              t = t.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
+            }
+            const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+            pairs.push([`Cl. ${def.conditionNumber}`, `${t}${scope}`])
           }
-          const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
-          pairs.push([`Cl. ${def.conditionNumber}`, `${t}${scope}`])
         }
         return pairs
       }
@@ -2151,30 +2165,53 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return sibling?.amount
       }
 
-      const makeCondTable = (conds: typeof hc) => new Table({
-        width: { size: condTableW, type: WidthType.DXA },
-        layout: TableLayoutType.FIXED,
-        columnWidths: [condCol1W, condCol2W],
-        rows: conds.map(qc => {
+      const makeCondTable = (conds: typeof hc) => {
+        const currency = data.quotation.premiumCurrency || 'USD'
+        const tableRows: TableRow[] = []
+        for (const qc of conds) {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
-          if (!def) return null
-          let text = qc.textOverride || def.text
-          const amount = dResolveAmount(qc)
-          if (def.hasAmount && def.amountPlaceholder && amount != null) {
-            const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, data.quotation.premiumCurrency || 'USD'))
-          }
-          const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+          if (!def) continue
           const isNewHC = origData && !origHullConditionIds.has(qc.hullConditionId)
           const hcColor = isNewHC ? RED : '000000'
-          return new TableRow({
-            children: [
-              new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: hcColor })] })] }),
-              new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: hcColor })] })] })
-            ]
-          })
-        }).filter(Boolean) as TableRow[]
-      })
+          // If vesselAmounts exist and differ, emit one row per vessel
+          if (qc.vesselAmounts && def.hasAmount && def.amountPlaceholder && Object.keys(qc.vesselAmounts).length > 0) {
+            for (const vessel of data.quotationVessels) {
+              const va = qc.vesselAmounts[vessel.id]
+              if (va == null) continue
+              let text = qc.textOverride || def.text
+              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              text = text.replace(new RegExp(escaped, 'g'), formatCurrency(va, currency))
+              const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
+              tableRows.push(new TableRow({
+                children: [
+                  new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: hcColor })] })] }),
+                  new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + ' ' + vName, size: 22, font: 'Arial', color: hcColor })] })] })
+                ]
+              }))
+            }
+          } else {
+            let text = qc.textOverride || def.text
+            const amount = dResolveAmount(qc)
+            if (def.hasAmount && def.amountPlaceholder && amount != null) {
+              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
+            }
+            const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
+            tableRows.push(new TableRow({
+              children: [
+                new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: `Cl. ${def.conditionNumber}`, size: 22, font: 'Arial', color: hcColor })] })] }),
+                new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: noBordersObj(), children: [new Paragraph({ children: [new TextRun({ text: text + scope, size: 22, font: 'Arial', color: hcColor })] })] })
+              ]
+            }))
+          }
+        }
+        return new Table({
+          width: { size: condTableW, type: WidthType.DXA },
+          layout: TableLayoutType.FIXED,
+          columnWidths: [condCol1W, condCol2W],
+          rows: tableRows
+        })
+      }
 
       const dGetCondClauseId = (qc: typeof hc[0]) => {
         const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)

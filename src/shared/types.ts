@@ -852,6 +852,7 @@ export interface QuotationHullCondition {
   vesselScope?: string[] | null
   conditionSection?: HullConditionSection
   amount?: number
+  vesselAmounts?: Record<string, number> | null
   alternativeId?: string | null
 }
 

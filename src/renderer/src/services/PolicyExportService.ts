@@ -1588,8 +1588,12 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   const condCol1W = Math.round(POL_BODY_W * 0.20)
   const condCol2W = POL_BODY_W - condCol1W
 
-  // Resolve amount: check the condition itself, then any sibling with the same conditionId
+  // Resolve amount: check vesselAmounts for this vessel first, then the condition itself, then any sibling
+  const policyVesselId = data.vessel?.id || null
   const resolveAmount = (qc: typeof hc[0]): number | null | undefined => {
+    if (policyVesselId && qc.vesselAmounts && qc.vesselAmounts[policyVesselId] != null) {
+      return qc.vesselAmounts[policyVesselId]
+    }
     if (qc.amount != null) return qc.amount
     const sibling = hc.find(c => c.hullConditionId === qc.hullConditionId && c.id !== qc.id && c.amount != null)
     return sibling?.amount

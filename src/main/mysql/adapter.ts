@@ -1747,6 +1747,14 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Per-vessel amounts on hull conditions
+            {
+                const [vaCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_conditions LIKE 'vessel_amounts'") as any[]
+                if ((vaCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_hull_conditions ADD COLUMN vessel_amounts TEXT DEFAULT NULL")
+                }
+            }
+
             // Migration: Hull additional conditions amount support
             {
                 const [hacAmt] = await this.pool.query("SHOW COLUMNS FROM hull_additional_conditions LIKE 'has_amount'") as any[]
@@ -6861,7 +6869,7 @@ export class MySQLAdapter {
 
         // Tables with alternative_id + vessel_scope (hull conditions + P&I tables)
         const altScopeTables = [
-            { table: 'quotation_hull_conditions', cols: 'quotation_id, hull_condition_id, text_override, condition_section, amount, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_hull_conditions', cols: 'quotation_id, hull_condition_id, text_override, condition_section, amount, vessel_amounts, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_hull_additional_conditions', cols: 'quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_clauses', cols: 'quotation_id, pi_clause_id, description_override, vessel_scope, alternative_id' },
             { table: 'quotation_additional_clauses', cols: 'quotation_id, pi_additional_clause_id, custom_text, order_index, vessel_scope, alternative_id' },
@@ -9658,11 +9666,11 @@ export class MySQLAdapter {
 
     async getQuotationHullConditions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_condition_id as hullConditionId, text_override as textOverride, condition_section as conditionSection, amount, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: r.amount ? Number(r.amount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, conditionSection: r.conditionSection || 'both', alternativeId: r.alternativeId || null }))
+        const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_condition_id as hullConditionId, text_override as textOverride, condition_section as conditionSection, amount, vessel_amounts as vesselAmounts, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
+        return (rows as any[]).map(r => ({ ...r, amount: r.amount ? Number(r.amount) : undefined, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, conditionSection: r.conditionSection || 'both', alternativeId: r.alternativeId || null }))
     }
 
-    async setQuotationHullConditions(quotationId: string, items: { hullConditionId: string; textOverride?: string; conditionSection?: string; amount?: number; vesselScope?: string[] | null; alternativeId?: string | null }[]): Promise<void> {
+    async setQuotationHullConditions(quotationId: string, items: { hullConditionId: string; textOverride?: string; conditionSection?: string; amount?: number; vesselAmounts?: Record<string, number> | null; vesselScope?: string[] | null; alternativeId?: string | null }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -9670,8 +9678,8 @@ export class MySQLAdapter {
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
                 await this.pool.execute(
-                    'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, condition_section, amount, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [uuidv4(), quotationId, item.hullConditionId, item.textOverride || null, item.conditionSection || 'both', item.amount ?? null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null]
+                    'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, condition_section, amount, vessel_amounts, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [uuidv4(), quotationId, item.hullConditionId, item.textOverride || null, item.conditionSection || 'both', item.amount ?? null, item.vesselAmounts ? JSON.stringify(item.vesselAmounts) : null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null]
                 )
             }
         } finally {

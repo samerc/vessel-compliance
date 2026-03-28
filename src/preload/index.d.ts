@@ -300,7 +300,7 @@ export interface Api {
   hullDeleteQuotationAlternative: (id: string) => Promise<void>
   hullReorderQuotationAlternatives: (ids: string[]) => Promise<void>
   hullGetQuotationHullConditions: (qId: string) => Promise<QuotationHullCondition[]>
-  hullSetQuotationHullConditions: (qId: string, items: { hullConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
+  hullSetQuotationHullConditions: (qId: string, items: { hullConditionId: string; textOverride?: string; vesselAmounts?: Record<string, number> | null; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
   hullGetQuotationHullAdditionalConditions: (qId: string) => Promise<QuotationHullAdditionalCondition[]>
   hullSetQuotationHullAdditionalConditions: (qId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null; amount?: number | null }[]) => Promise<void>
 

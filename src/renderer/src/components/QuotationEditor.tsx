@@ -5909,7 +5909,7 @@ function HullClauseDropdown({ clauses, selectedId, onChange, description }: {
 
 // ==================== Hull Condition Picker (shared) ====================
 
-function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, onOverrideChange, onOverrideBlur, scopes, onScopeChange, vessels, emptyText, amounts, onAmountChange, onAmountBlur, allConditions: _allConds }: {
+function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, onOverrideChange, onOverrideBlur, scopes, onScopeChange, vessels, emptyText, amounts, onAmountChange, onAmountBlur, allConditions: _allConds, vesselAmountsMap, onVesselAmountChange, onVesselAmountBlur }: {
     label: string
     items: { id: string; label: string; text: string; hasAmount?: boolean; amountPlaceholder?: string }[]
     selectedIds: Set<string>
@@ -5925,6 +5925,9 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
     onAmountChange?: (id: string, amount: number | undefined) => void
     onAmountBlur?: () => void
     allConditions?: HullClauseCondition[]
+    vesselAmountsMap?: Record<string, Record<string, number> | null>
+    onVesselAmountChange?: (condId: string, vesselId: string, amount: number | undefined) => void
+    onVesselAmountBlur?: () => void
 }) {
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const { theme } = useTheme()
@@ -6063,17 +6066,43 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                                             style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem', resize: 'vertical', fontFamily: 'inherit' }}
                                         />
                                         {item.hasAmount && amounts && onAmountChange && onAmountBlur && (
-                                            <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{item.amountPlaceholder || 'Amount'}:</span>
-                                                <input
-                                                    type="number"
-                                                    value={amounts[item.id] ?? ''}
-                                                    onChange={e => onAmountChange(item.id, e.target.value ? Number(e.target.value) : undefined)}
-                                                    onBlur={onAmountBlur}
-                                                    placeholder="0.00"
-                                                    style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem' }}
-                                                />
-                                            </div>
+                                            vessels.length >= 2 && vesselAmountsMap && onVesselAmountChange && onVesselAmountBlur && !scopes[item.id] ? (
+                                                <div style={{ marginTop: '6px' }}>
+                                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{item.amountPlaceholder || 'Amount'} (per vessel):</span>
+                                                    {vessels.map(v => {
+                                                        const va = vesselAmountsMap[item.id]
+                                                        const perVesselVal = va ? va[v.id] : undefined
+                                                        const displayVal = perVesselVal ?? amounts[item.id] ?? ''
+                                                        return (
+                                                            <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={(v.name || v.vesselLabel).toUpperCase()}>
+                                                                    {(v.name || v.vesselLabel).toUpperCase()}
+                                                                </span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={displayVal}
+                                                                    onChange={e => onVesselAmountChange(item.id, v.id, e.target.value ? Number(e.target.value) : undefined)}
+                                                                    onBlur={onVesselAmountBlur}
+                                                                    placeholder="0.00"
+                                                                    style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem' }}
+                                                                />
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{item.amountPlaceholder || 'Amount'}:</span>
+                                                    <input
+                                                        type="number"
+                                                        value={amounts[item.id] ?? ''}
+                                                        onChange={e => onAmountChange(item.id, e.target.value ? Number(e.target.value) : undefined)}
+                                                        onBlur={onAmountBlur}
+                                                        placeholder="0.00"
+                                                        style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem' }}
+                                                    />
+                                                </div>
+                                            )
                                         )}
                                         {vessels.length > 1 && (
                                             <div style={{ marginTop: '4px' }}>
@@ -6781,6 +6810,11 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         getAltConditions(altId).forEach(c => { if (c.amount != null) m[c.hullConditionId] = c.amount })
         return m
     }
+    const getAltVesselAmounts = (altId: string | null) => {
+        const m: Record<string, Record<string, number> | null> = {}
+        getAltConditions(altId).forEach(c => { m[c.hullConditionId] = c.vesselAmounts || null })
+        return m
+    }
     const getAltScopes = (altId: string | null) => {
         const m: Record<string, string[] | null> = {}
         getAltConditions(altId).forEach(c => { if (c.vesselScope) m[c.hullConditionId] = c.vesselScope })
@@ -6792,6 +6826,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         textOverride: c.textOverride,
         conditionSection: c.conditionSection || getCondSection(c.hullConditionId),
         amount: c.amount,
+        vesselAmounts: c.vesselAmounts,
         vesselScope: c.vesselScope,
         alternativeId: c.alternativeId
     })
@@ -6823,6 +6858,24 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
 
     const updateConditionAmount = (condId: string, amount: number | undefined) => {
         setQConditions(prev => prev.map(c => c.hullConditionId === condId ? { ...c, amount } : c))
+    }
+
+    const updateConditionVesselAmount = (condId: string, vesselId: string, amount: number | undefined) => {
+        setQConditions(prev => prev.map(c => {
+            if (c.hullConditionId !== condId) return c
+            const va = { ...(c.vesselAmounts || {}) }
+            if (amount == null) {
+                delete va[vesselId]
+            } else {
+                va[vesselId] = amount
+            }
+            // If all vessel amounts are the same, collapse to single amount
+            const vals = Object.values(va)
+            if (vals.length === qVessels.length && vals.length > 0 && vals.every(v => v === vals[0])) {
+                return { ...c, amount: vals[0], vesselAmounts: null }
+            }
+            return { ...c, vesselAmounts: Object.keys(va).length > 0 ? va : null }
+        }))
     }
 
     const saveConditionOverrides = async () => {
@@ -6954,6 +7007,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                     conditionSection: c.conditionSection || 'both',
                     textOverride: c.textOverride,
                     amount: c.amount,
+                    vesselAmounts: c.vesselAmounts,
                     vesselScope: c.vesselScope,
                     alternativeId: c.alternativeId
                 })), ...newConds.map((c: any) => ({
@@ -7046,6 +7100,9 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                                     onAmountChange={updateConditionAmount}
                                     onAmountBlur={saveConditionOverrides}
                                     allConditions={allConditions}
+                                    vesselAmountsMap={getAltVesselAmounts(alt.id)}
+                                    onVesselAmountChange={updateConditionVesselAmount}
+                                    onVesselAmountBlur={saveConditionOverrides}
                                 />
                             )}
                         </div>
@@ -7316,6 +7373,9 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                                 onAmountChange={updateConditionAmount}
                                 onAmountBlur={saveConditionOverrides}
                                 allConditions={allConditions}
+                                vesselAmountsMap={getAltVesselAmounts(null)}
+                                onVesselAmountChange={updateConditionVesselAmount}
+                                onVesselAmountBlur={saveConditionOverrides}
                             />
                         )}
                     </div>
