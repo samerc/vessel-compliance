@@ -3006,8 +3006,32 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
         showSuccess('Custom deductible added'); loadData()
     }
 
-    const handleUpdate = async (id: string, updates: { title?: string; amount?: number; currency?: string; secondaryAmount?: number; description?: string }) => {
+    const handleUpdate = async (id: string, updates: { title?: string; amount?: number; currency?: string; secondaryAmount?: number; description?: string; vesselAmounts?: Record<string, number> | null }) => {
         await window.api.updateQuotationDeductible(id, updates)
+    }
+
+    const updateDeductibleVesselAmount = (dedId: string, vesselId: string, amount: number | undefined) => {
+        setDeductibles(prev => prev.map(d => {
+            if (d.id !== dedId) return d
+            const va = { ...(d.vesselAmounts || {}) }
+            if (amount == null) {
+                delete va[vesselId]
+            } else {
+                va[vesselId] = amount
+            }
+            // If all vessel amounts are the same, collapse to single amount
+            const vals = Object.values(va)
+            if (vals.length === qVessels.length && vals.length > 0 && vals.every(v => v === vals[0])) {
+                return { ...d, amount: vals[0], vesselAmounts: null }
+            }
+            return { ...d, vesselAmounts: Object.keys(va).length > 0 ? va : null }
+        }))
+    }
+
+    const saveDeductibleVesselAmounts = async (dedId: string) => {
+        const ded = deductibles.find(d => d.id === dedId)
+        if (!ded) return
+        await handleUpdate(dedId, { amount: ded.amount, vesselAmounts: ded.vesselAmounts || null })
     }
 
     const moveDeductible = async (index: number, direction: 'up' | 'down') => {
@@ -3086,7 +3110,9 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                         </div>
                         {d.title && <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{d.title}</span>}
                         <input type="text" defaultValue={d.currency} onBlur={e => handleUpdate(d.id, { currency: e.target.value })} style={{ width: '60px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
-                        <input type="number" defaultValue={d.amount} onBlur={e => handleUpdate(d.id, { amount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                        {!(qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts)) && (
+                            <input type="number" defaultValue={d.amount} onBlur={e => handleUpdate(d.id, { amount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                        )}
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
@@ -3098,6 +3124,32 @@ function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiv
                         <button onClick={() => { setEditingDescId(editingDescId === d.id ? null : d.id); setEditDescText(d.description) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
                         <button onClick={async () => { await window.api.deleteQuotationDeductible(d.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                     </div>
+                    {/* Per-vessel amount inputs */}
+                    {qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts) && (
+                        <div style={{ paddingLeft: '24px', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Amount (per vessel):</span>
+                            {qVessels.map(v => {
+                                const va = d.vesselAmounts
+                                const perVesselVal = va ? va[v.id] : undefined
+                                const displayVal = perVesselVal ?? d.amount ?? ''
+                                return (
+                                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={(v.name || v.vesselLabel).toUpperCase()}>
+                                            {(v.name || v.vesselLabel).toUpperCase()}
+                                        </span>
+                                        <input
+                                            type="number"
+                                            value={displayVal}
+                                            onChange={e => updateDeductibleVesselAmount(d.id, v.id, e.target.value ? Number(e.target.value) : undefined)}
+                                            onBlur={() => saveDeductibleVesselAmounts(d.id)}
+                                            placeholder="0"
+                                            style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
+                                        />
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
                     {/* Description (editable) */}
                     {editingDescId === d.id ? (
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>

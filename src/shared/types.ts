@@ -1078,6 +1078,7 @@ export interface QuotationDeductible {
   order: number
   vesselScope?: string[] | null
   alternativeId?: string | null
+  vesselAmounts?: Record<string, number> | null
 }
 
 export interface PITextDeductible {

@@ -2587,6 +2587,14 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('export_snapshot migration:', e) }
 
+            // Migration: Per-vessel amounts on deductibles
+            {
+                const [dvaCols] = await this.pool.query("SHOW COLUMNS FROM quotation_deductibles LIKE 'vessel_amounts'") as any[]
+                if ((dvaCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_deductibles ADD COLUMN vessel_amounts TEXT DEFAULT NULL")
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -6875,7 +6883,7 @@ export class MySQLAdapter {
             { table: 'quotation_additional_clauses', cols: 'quotation_id, pi_additional_clause_id, custom_text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_warranties', cols: 'quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_custom_warranties', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
-            { table: 'quotation_deductibles', cols: 'quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_deductibles', cols: 'quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, alternative_id, vessel_amounts' },
             { table: 'quotation_text_deductibles', cols: 'quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_exclusions', cols: 'quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id' },
             { table: 'quotation_custom_exclusions', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
@@ -7535,21 +7543,21 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_deductible_id as piDeductibleId, title, description, amount, currency,
-                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId
+                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId, vessel_amounts as vesselAmounts
              FROM quotation_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null }))
     }
 
-    async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[] }): Promise<any> {
+    async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[]; vesselAmounts?: Record<string, number> | null }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO quotation_deductibles (id, quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, data.quotationId, data.piDeductibleId || null, data.title || '', data.description, data.amount, data.currency, data.secondaryAmount || null, data.secondaryDescription || null, data.order || 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
+            'INSERT INTO quotation_deductibles (id, quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, vessel_amounts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.piDeductibleId || null, data.title || '', data.description, data.amount, data.currency, data.secondaryAmount || null, data.secondaryDescription || null, data.order || 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null, data.vesselAmounts ? JSON.stringify(data.vesselAmounts) : null])
         return { id, ...data }
     }
 
-    async updateQuotationDeductible(id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null }): Promise<void> {
+    async updateQuotationDeductible(id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null; vesselAmounts?: Record<string, number> | null }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
@@ -7560,6 +7568,7 @@ export class MySQLAdapter {
         if (updates.secondaryAmount !== undefined) { fields.push('secondary_amount = ?'); values.push(updates.secondaryAmount) }
         if (updates.secondaryDescription !== undefined) { fields.push('secondary_description = ?'); values.push(updates.secondaryDescription) }
         if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
+        if (updates.vesselAmounts !== undefined) { fields.push('vessel_amounts = ?'); values.push(updates.vesselAmounts ? JSON.stringify(updates.vesselAmounts) : null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_deductibles SET ${fields.join(', ')} WHERE id = ?`, values)

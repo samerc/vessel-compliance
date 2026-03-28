@@ -1963,16 +1963,34 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
   const dedDescW = POL_BODY_W - dedAmtW
 
   if (data.deductibles.length > 0) {
+    const policyVesselId = data.vessel?.id || null
+    const dedRows: TableRow[] = []
+    for (const d of data.deductibles) {
+      const resolvedAmount = (policyVesselId && d.vesselAmounts && d.vesselAmounts[policyVesselId] != null)
+        ? d.vesselAmounts[policyVesselId]
+        : d.amount
+      const mainDesc = d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+      dedRows.push(new TableRow({
+        children: [
+          new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(resolvedAmount, d.currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: mainDesc, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+        ]
+      }))
+      if (d.secondaryDescription) {
+        const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+        dedRows.push(new TableRow({
+          children: [
+            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? polFormatCurrency(d.secondaryAmount, d.currency) : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          ]
+        }))
+      }
+    }
     content.push(new Table({
       width: { size: POL_BODY_W, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [dedAmtW, dedDescW],
-      rows: data.deductibles.map(d => new TableRow({
-        children: [
-          new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(d.amount, d.currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___'), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
-        ]
-      }))
+      rows: dedRows
     }))
   }
   if (data.textDeductibles.length > 0) {

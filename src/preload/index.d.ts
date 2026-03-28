@@ -556,8 +556,8 @@ export interface Api {
   reorderQuotationCustomWarranties: (ids: string[]) => Promise<void>
 
   getQuotationDeductibles: (qId: string) => Promise<QuotationDeductible[]>
-  addQuotationDeductible: (data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[] }) => Promise<QuotationDeductible>
-  updateQuotationDeductible: (id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null }) => Promise<void>
+  addQuotationDeductible: (data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[]; vesselAmounts?: Record<string, number> | null }) => Promise<QuotationDeductible>
+  updateQuotationDeductible: (id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null; vesselAmounts?: Record<string, number> | null }) => Promise<void>
   deleteQuotationDeductible: (id: string) => Promise<void>
   reorderQuotationDeductibles: (orderedIds: string[]) => Promise<void>
 

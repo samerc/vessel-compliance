@@ -1242,12 +1242,28 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const mainDesc = d.description
           .replace(/\{currency\}/g, d.currency)
           .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
-        t += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}${dScope}\n`
-        if (d.secondaryDescription) {
-          const secDesc = d.secondaryDescription
-            .replace(/\{currency\}/g, d.currency)
-            .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
-          t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc}\n`
+        // Per-vessel amounts: emit one line per vessel
+        if (d.vesselAmounts && Object.keys(d.vesselAmounts).length > 0) {
+          for (const vessel of data.quotationVessels) {
+            const va = d.vesselAmounts[vessel.id]
+            if (va == null) continue
+            const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
+            t += `${formatCurrency(va, d.currency)}  \u2014  ${mainDesc} ${vName}\n`
+            if (d.secondaryDescription) {
+              const secDesc = d.secondaryDescription
+                .replace(/\{currency\}/g, d.currency)
+                .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+              t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc} ${vName}\n`
+            }
+          }
+        } else {
+          t += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}${dScope}\n`
+          if (d.secondaryDescription) {
+            const secDesc = d.secondaryDescription
+              .replace(/\{currency\}/g, d.currency)
+              .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+            t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc}\n`
+          }
         }
       }
       return t
@@ -2714,20 +2730,47 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const origDed = origData && d.piDeductibleId ? origData.deductibles.find(od => od.piDeductibleId === d.piDeductibleId) : null
         const amountChanged = origDed && origDed.amount !== d.amount
         const dedColor = (isNewDed || amountChanged) ? RED : '000000'
-        dedRows.push(new TableRow({
-          children: [
-            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: dedColor })] })] }),
-            new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___') + dScope, size: 22, font: 'Arial', color: dedColor })] })] })
-          ]
-        }))
-        if (d.secondaryDescription) {
-          const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+        const mainDesc = d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+        // Per-vessel amounts: emit one row per vessel
+        if (d.vesselAmounts && Object.keys(d.vesselAmounts).length > 0) {
+          for (const vessel of data.quotationVessels) {
+            const va = d.vesselAmounts[vessel.id]
+            if (va == null) continue
+            const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
+            const vaOrigDed = origDed
+            const vaColor = (isNewDed || (vaOrigDed && vaOrigDed.amount !== va)) ? RED : '000000'
+            dedRows.push(new TableRow({
+              children: [
+                new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(va, d.currency), size: 22, font: 'Arial', color: vaColor })] })] }),
+                new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${mainDesc} ${vName}`, size: 22, font: 'Arial', color: vaColor })] })] })
+              ]
+            }))
+            if (d.secondaryDescription) {
+              const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+              dedRows.push(new TableRow({
+                children: [
+                  new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: vaColor })] })] }),
+                  new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${secDesc} ${vName}`, size: 22, font: 'Arial', color: vaColor })] })] })
+                ]
+              }))
+            }
+          }
+        } else {
           dedRows.push(new TableRow({
             children: [
-              new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: dedColor })] })] }),
-              new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: dedColor })] })] })
+              new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: dedColor })] })] }),
+              new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: mainDesc + dScope, size: 22, font: 'Arial', color: dedColor })] })] })
             ]
           }))
+          if (d.secondaryDescription) {
+            const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+            dedRows.push(new TableRow({
+              children: [
+                new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: dedColor })] })] }),
+                new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: dedColor })] })] })
+              ]
+            }))
+          }
         }
       }
       return new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [dedAmtW, dedDescW], layout: TableLayoutType.FIXED, rows: dedRows })
