@@ -6197,11 +6197,11 @@ export class MySQLAdapter {
         return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, rebuiltYear: data.rebuiltYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign, agreedValue: data.agreedValue ?? null, ivValue: data.ivValue ?? null }
     }
 
-    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; rebuiltYear: number | null; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; premiumAmount: number; agreedValue: number | null; ivValue: number | null }>): Promise<void> {
+    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; rebuiltYear: number | null; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; orderIndex: number; premiumAmount: number; agreedValue: number | null; ivValue: number | null }>): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value' }
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', orderIndex: 'order_index', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value' }
         for (const [key, col] of Object.entries(colMap)) {
             if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
         }

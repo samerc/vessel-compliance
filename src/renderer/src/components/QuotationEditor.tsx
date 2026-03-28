@@ -1466,6 +1466,29 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
         }
     }
 
+    const handleMoveVessel = async (vesselId: string, direction: 'up' | 'down') => {
+        const idx = qVessels.findIndex(v => v.id === vesselId)
+        if (idx < 0) return
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+        if (swapIdx < 0 || swapIdx >= qVessels.length) return
+
+        const newVessels = [...qVessels]
+        const temp = newVessels[idx]
+        newVessels[idx] = newVessels[swapIdx]
+        newVessels[swapIdx] = temp
+
+        // Reorder and relabel
+        const orderedIds = newVessels.map(v => v.id)
+        await window.api.reorderQuotationVessels(orderedIds)
+        for (let i = 0; i < newVessels.length; i++) {
+            const newLabel = `V${i + 1}`
+            if (newVessels[i].vesselLabel !== newLabel) {
+                await window.api.updateQuotationVessel(newVessels[i].id, { vesselLabel: newLabel })
+            }
+        }
+        loadData()
+    }
+
     const alreadyAdded = new Set(qVessels.map(v => v.vesselId).filter(Boolean) as string[])
     const availableVessels = vessels.filter(v => !alreadyAdded.has(v.id))
 
@@ -1704,6 +1727,12 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                 const classif = reg?.classificationSociety || qv.classification
                 return (
                     <div key={qv.id} style={{ padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--table-border)', marginBottom: '10px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        {qVessels.length > 1 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
+                                <button onClick={() => handleMoveVessel(qv.id, 'up')} disabled={qVessels.indexOf(qv) === 0} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button onClick={() => handleMoveVessel(qv.id, 'down')} disabled={qVessels.indexOf(qv) === qVessels.length - 1} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === qVessels.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                            </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', borderRadius: '8px', background: 'rgba(0,210,255,0.12)', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'monospace', flexShrink: 0 }}>
                             {qv.vesselLabel}
                         </div>
