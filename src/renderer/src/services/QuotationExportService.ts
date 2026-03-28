@@ -903,7 +903,11 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       // For virtual alts (shared alts rendered for non-override vessels), resolve from the original shared alt
       const getAltCondsResolved = (alt: typeof alts[0]) => {
         const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
-        const ownConds = hc.filter(qc => qc.alternativeId === realAltId)
+        const ownConds = hc.filter(qc =>
+          qc.alternativeId === realAltId &&
+          getCondClauseId(qc) === alt.hullClauseId &&
+          !(ivClauseId && getCondClauseId(qc) === ivClauseId)
+        )
         const nullConds = hc.filter(qc =>
           !qc.alternativeId &&
           getCondClauseId(qc) === alt.hullClauseId &&
@@ -971,13 +975,17 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           }
         }
         const allAltsAddl = renderAddlForSection(b => b.type === 'allAlts')
-        const allLabel = isPerVesselExport ? 'Applicable to all vessels' : 'Applicable to all alternatives'
-        if (allAltsAddl) hcBlocks.push({ title: allLabel, underline: true, addl: allAltsAddl })
-        if (hasIvSection) {
-          hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
-        }
         const bothAddl = renderAddlForSection(b => b.type === 'both')
-        if (bothAddl) hcBlocks.push({ title: hasIvSection ? 'Applicable to all sections' : allLabel, underline: true, addl: bothAddl })
+        const allLabel = isPerVesselExport ? 'Applicable to all vessels' : 'Applicable to all alternatives'
+        if (hasIvSection) {
+          if (allAltsAddl) hcBlocks.push({ title: allLabel, underline: true, addl: allAltsAddl })
+          hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
+          if (bothAddl) hcBlocks.push({ title: 'Applicable to all sections', underline: true, addl: bothAddl })
+        } else {
+          // Merge allAlts + both into one block to avoid duplicate headers
+          const combinedAddl = (allAltsAddl || '') + (bothAddl || '')
+          if (combinedAddl) hcBlocks.push({ title: allLabel, underline: true, addl: combinedAddl })
+        }
       } else if (hasIvSection) {
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
@@ -2222,9 +2230,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       // For virtual alts (shared alts rendered for non-override vessels), resolve from the original shared alt
       const dGetAltCondsResolved = (alt: typeof dAlts[0]) => {
         const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
-        // Alt-specific conditions: exclude IV conditions
+        // Alt-specific conditions: must belong to this alt's clause, exclude IV conditions
         const ownConds = hc.filter(qc =>
           qc.alternativeId === realAltId &&
+          dGetCondClauseId(qc) === alt.hullClauseId &&
           !(dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
         )
         // Null-scoped conditions: must belong to this alt's clause, exclude IV
@@ -2299,15 +2308,17 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Applicable to all alternatives/vessels
         const dAllLabel = dIsPerVessel ? 'Applicable to all vessels' : 'Applicable to all alternatives'
         const allAltsAddl = dRenderAddlForSection(b => b.type === 'allAlts')
-        if (allAltsAddl.length > 0) {
-          hcContent.push(bup(dAllLabel))
-          hcContent.push(emptyP())
-          hcContent.push(...allAltsAddl)
-          hcContent.push(emptyP())
-        }
+        const dBothAddl = dRenderAddlForSection(b => b.type === 'both')
 
-        // IV section
         if (dHasIvSection) {
+          if (allAltsAddl.length > 0) {
+            hcContent.push(bup(dAllLabel))
+            hcContent.push(emptyP())
+            hcContent.push(...allAltsAddl)
+            hcContent.push(emptyP())
+          }
+
+          // IV section
           if (dSelectedIvClause) {
             hcContent.push(bup('Increased Value'))
             hcContent.push(emptyP())
@@ -2321,14 +2332,22 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const dIvAddl = dRenderAddlForSection(b => b.type === 'iv')
           if (dIvAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...dIvAddl) }
           hcContent.push(emptyP())
-        }
 
-        // Applicable to all sections
-        const dBothAddl = dRenderAddlForSection(b => b.type === 'both')
-        if (dBothAddl.length > 0) {
-          hcContent.push(bup(dHasIvSection ? 'Applicable to all sections' : dAllLabel))
-          hcContent.push(emptyP())
-          hcContent.push(...dBothAddl)
+          // Applicable to all sections
+          if (dBothAddl.length > 0) {
+            hcContent.push(bup('Applicable to all sections'))
+            hcContent.push(emptyP())
+            hcContent.push(...dBothAddl)
+          }
+        } else {
+          // Merge allAlts + both into one block to avoid duplicate headers
+          const combinedAddl = [...allAltsAddl, ...dBothAddl]
+          if (combinedAddl.length > 0) {
+            hcContent.push(bup(dAllLabel))
+            hcContent.push(emptyP())
+            hcContent.push(...combinedAddl)
+            hcContent.push(emptyP())
+          }
         }
       } else if (dHasIvSection) {
         // Single alternative with IV
