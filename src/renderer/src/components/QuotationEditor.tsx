@@ -6307,6 +6307,8 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     showSuccess: (m: string) => void
     showError: (m: string) => void
 }) {
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
     const [hullClauses, setHullClauses] = useState<HullClause[]>([])
     const [allConditions, setAllConditions] = useState<HullClauseCondition[]>([])
     const [allAdditional, setAllAdditional] = useState<HullAdditionalCondition[]>([])
@@ -6315,11 +6317,23 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     const [qConditions, setQConditions] = useState<QuotationHullCondition[]>([])
     const [qAdditional, setQAdditional] = useState<QuotationHullAdditionalCondition[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
-    const [selectedVesselTab, setSelectedVesselTab] = useState<string | null>(null) // null = 'All', string = vessel.id
+    const [selectedVesselScope, setSelectedVesselScope] = useState<string | null>(null) // null = "All Vessels"
+    const [addOverrideOpen, setAddOverrideOpen] = useState(false)
+    const addOverrideRef = useRef<HTMLDivElement>(null)
     const condDefaultsApplied = useRef(false)
     const addDefaultsApplied = useRef(false)
 
     useEffect(() => { loadData() }, [])
+
+    // Close add-override dropdown on outside click
+    useEffect(() => {
+        if (!addOverrideOpen) return
+        const handler = (e: MouseEvent) => {
+            if (addOverrideRef.current && !addOverrideRef.current.contains(e.target as Node)) setAddOverrideOpen(false)
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [addOverrideOpen])
 
     const loadData = async () => {
         const [clauses, conditions, additional, existCond, existAdd, qv, alts] = await Promise.all([
@@ -6344,9 +6358,8 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         setQAdditional(safeExistAdd)
         setQVessels(Array.isArray(qv) ? qv : [])
 
-        // If no alternatives exist yet, create one from the quotation's hullClauseId or first H&M clause
+        // If no alternatives exist yet, create one shared from the quotation's hullClauseId or first H&M clause
         const hmClauses = safeClauses.filter(c => c.conditionSection !== 'iv')
-        const safeVessels = Array.isArray(qv) ? qv : []
         if (safeAlts.length === 0 && hmClauses.length > 0) {
             const defaultClauseId = quotation.hullClauseId && safeClauses.some(c => c.id === quotation.hullClauseId)
                 ? quotation.hullClauseId
@@ -6355,22 +6368,17 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                 const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, defaultClauseId)
                 if (newAlt && !(newAlt as any).error) {
                     setAlternatives([newAlt])
-                    // Sync hullClauseId
                     try { updateField('hullClauseId', defaultClauseId) } catch {}
                 }
             } catch {}
         } else {
             setAlternatives(safeAlts)
-            // Sync hullClauseId from first alternative
-            const nonVesselAlts = safeAlts.filter(a => !a.vesselScopeId)
-            if (nonVesselAlts.length === 1 && nonVesselAlts[0].hullClauseId !== quotation.hullClauseId) {
-                try { updateField('hullClauseId', nonVesselAlts[0].hullClauseId) } catch {}
-            } else if (safeAlts.length > 1 && quotation.hullClauseId) {
+            // Sync hullClauseId from first shared alternative
+            const sharedAlts = safeAlts.filter(a => !a.vesselScopeId)
+            if (sharedAlts.length === 1 && sharedAlts[0].hullClauseId !== quotation.hullClauseId) {
+                try { updateField('hullClauseId', sharedAlts[0].hullClauseId) } catch {}
+            } else if (sharedAlts.length > 1 && quotation.hullClauseId) {
                 try { updateField('hullClauseId', null) } catch {}
-            }
-            // Auto-select first vessel tab if per-vessel mode is active
-            if (safeAlts.some(a => a.vesselScopeId) && safeVessels.length >= 2) {
-                setSelectedVesselTab(prev => prev !== null ? prev : safeVessels[0].id)
             }
         }
 
@@ -6389,8 +6397,6 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
             const defaults = safeConds.filter((c: any) => c.defaultSelected)
             if (defaults.length > 0) {
                 try {
-                    // For new quotations, insert defaults without alternative mapping
-                    // (alternatives are added later by the user)
                     await window.api.hullSetQuotationHullConditions(
                         quotation.id,
                         defaults.map((c: any) => ({
@@ -6426,64 +6432,108 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         }
     }
 
-    // Per-vessel mode detection
-    const isPerVesselMode = alternatives.some(a => a.vesselScopeId)
+    // Derived: which vessels have overrides
     const multiVessel = qVessels.length >= 2
+    const vesselIdsWithOverrides = useMemo(() => {
+        const ids = new Set<string>()
+        for (const a of alternatives) {
+            if (a.vesselScopeId) ids.add(a.vesselScopeId)
+        }
+        return ids
+    }, [alternatives])
+    const sharedAlternatives = useMemo(() => alternatives.filter(a => !a.vesselScopeId), [alternatives])
 
-    // Enable per-vessel mode: create one alternative per vessel from the existing single alt's clause
-    const enablePerVesselMode = async () => {
-        if (!multiVessel) return
+    // Vessels available for adding an override (don't already have one)
+    const vesselsWithoutOverrides = useMemo(
+        () => qVessels.filter(v => !vesselIdsWithOverrides.has(v.id)),
+        [qVessels, vesselIdsWithOverrides]
+    )
+
+    // Copy shared alternatives + conditions to a specific vessel
+    const handleCopyFromShared = async (vesselId: string) => {
         const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
         if (hmClauses.length === 0) return
-        // Use existing alt's clause as default, or quotation's hullClauseId
-        const baseClauseId = alternatives[0]?.hullClauseId || quotation.hullClauseId || hmClauses[0].id
+        const sharedAlts = alternatives.filter(a => !a.vesselScopeId)
+        if (sharedAlts.length === 0) {
+            // No shared alts to copy; create a fresh one
+            await handleStartFresh(vesselId)
+            return
+        }
         try {
-            // Delete existing non-vessel-scoped alternatives
-            for (const alt of alternatives.filter(a => !a.vesselScopeId)) {
-                await window.api.hullDeleteQuotationAlternative(alt.id)
-            }
-            // Create one alternative per vessel
             const newAlts: QuotationHullAlternative[] = []
-            for (const v of qVessels) {
-                const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, baseClauseId, undefined, v.id)
-                if (newAlt && !(newAlt as any).error) newAlts.push(newAlt)
+            for (const srcAlt of sharedAlts) {
+                const newAlt = await window.api.hullAddQuotationAlternative(
+                    quotation.id, srcAlt.hullClauseId, srcAlt.label, vesselId
+                )
+                if (newAlt && !(newAlt as any).error) {
+                    newAlts.push(newAlt)
+                    // Clone conditions for this alternative
+                    const altConds = qConditions.filter(c => c.alternativeId === srcAlt.id)
+                    if (altConds.length > 0) {
+                        const clonedConds = [
+                            ...qConditions.map(mapCondForSave),
+                            ...altConds.map(c => ({
+                                ...mapCondForSave(c),
+                                alternativeId: newAlt.id
+                            }))
+                        ]
+                        await window.api.hullSetQuotationHullConditions(quotation.id, clonedConds)
+                    }
+                }
             }
-            // Keep any existing vessel-scoped alternatives that still match
-            const existingVesselAlts = alternatives.filter(a => a.vesselScopeId)
-            setAlternatives([...existingVesselAlts, ...newAlts])
-            setSelectedVesselTab(qVessels[0].id)
-            try { updateField('hullClauseId', null) } catch {}
-            // Refresh conditions
-            const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
-            setQConditions(Array.isArray(fresh) ? fresh : [])
-            const freshAdd = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+            // Refresh all data
+            const [freshAlts, freshCond, freshAdd] = await Promise.all([
+                window.api.hullGetQuotationAlternatives(quotation.id),
+                window.api.hullGetQuotationHullConditions(quotation.id),
+                window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+            ])
+            setAlternatives(Array.isArray(freshAlts) ? freshAlts : [])
+            setQConditions(Array.isArray(freshCond) ? freshCond : [])
             setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
+            setSelectedVesselScope(vesselId)
+            showSuccess('Copied shared conditions to vessel override')
         } catch (err: any) {
-            showError(err.message || 'Failed to enable per-vessel mode')
+            showError(err.message || 'Failed to copy from shared')
         }
     }
 
-    // Disable per-vessel mode: merge all vessel-scoped alts into one shared alt
-    const disablePerVesselMode = async () => {
+    // Start fresh: create an empty alternative for a vessel
+    const handleStartFresh = async (vesselId: string) => {
         const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
         if (hmClauses.length === 0) return
-        const baseClauseId = alternatives[0]?.hullClauseId || quotation.hullClauseId || hmClauses[0].id
         try {
-            for (const alt of alternatives) {
+            const newAlt = await window.api.hullAddQuotationAlternative(
+                quotation.id, hmClauses[0].id, undefined, vesselId
+            )
+            if (newAlt && !(newAlt as any).error) {
+                setAlternatives(prev => [...prev, newAlt])
+                setSelectedVesselScope(vesselId)
+            }
+        } catch (err: any) {
+            showError(err.message || 'Failed to create vessel override')
+        }
+    }
+
+    // Remove all overrides for a vessel (falls back to shared)
+    const handleRemoveOverride = async (vesselId: string) => {
+        const vesselAlts = alternatives.filter(a => a.vesselScopeId === vesselId)
+        try {
+            for (const alt of vesselAlts) {
                 await window.api.hullDeleteQuotationAlternative(alt.id)
             }
-            const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, baseClauseId)
-            if (newAlt && !(newAlt as any).error) {
-                setAlternatives([newAlt])
-                try { updateField('hullClauseId', baseClauseId) } catch {}
-            }
-            setSelectedVesselTab(null)
-            const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
-            setQConditions(Array.isArray(fresh) ? fresh : [])
-            const freshAdd = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+            const updated = alternatives.filter(a => a.vesselScopeId !== vesselId)
+            setAlternatives(updated)
+            setSelectedVesselScope(null) // go back to "All Vessels"
+            // Refresh conditions
+            const [freshCond, freshAdd] = await Promise.all([
+                window.api.hullGetQuotationHullConditions(quotation.id),
+                window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+            ])
+            setQConditions(Array.isArray(freshCond) ? freshCond : [])
             setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
+            showSuccess('Vessel override removed, using shared conditions')
         } catch (err: any) {
-            showError(err.message || 'Failed to disable per-vessel mode')
+            showError(err.message || 'Failed to remove override')
         }
     }
 
@@ -6502,7 +6552,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
             if (newAlt && !(newAlt as any).error) {
                 const updated = [...alternatives, newAlt]
                 setAlternatives(updated)
-                // Clear hullClauseId when we have multiple alternatives
+                // Clear hullClauseId when we have multiple shared alternatives
                 if (updated.filter(a => !a.vesselScopeId).length > 1) {
                     try { updateField('hullClauseId', null) } catch {}
                 }
@@ -6514,12 +6564,13 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
 
     const removeAlternative = async (altId: string) => {
         const alt = alternatives.find(a => a.id === altId)
-        // In per-vessel mode, each vessel must keep at least one alternative
+        // Each scope must keep at least one alternative
         if (alt?.vesselScopeId) {
             const vesselAlts = alternatives.filter(a => a.vesselScopeId === alt.vesselScopeId)
             if (vesselAlts.length <= 1) return
-        } else if (alternatives.filter(a => !a.vesselScopeId).length <= 1 && !isPerVesselMode) {
-            return
+        } else {
+            const sharedCount = alternatives.filter(a => !a.vesselScopeId).length
+            if (sharedCount <= 1) return
         }
         try {
             await window.api.hullDeleteQuotationAlternative(altId)
@@ -6530,9 +6581,9 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
             setQConditions(Array.isArray(fresh) ? fresh : [])
             const freshAdd = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
             setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
-            // If back to single non-vessel alternative, sync hullClauseId
+            // If back to single shared alternative, sync hullClauseId
             const nonVesselAlts = updated.filter(a => !a.vesselScopeId)
-            if (nonVesselAlts.length === 1 && !isPerVesselMode) {
+            if (nonVesselAlts.length === 1) {
                 try { updateField('hullClauseId', nonVesselAlts[0].hullClauseId) } catch {}
             }
         } catch (err: any) {
@@ -6544,8 +6595,9 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         try {
             await window.api.hullUpdateQuotationAlternative(altId, { hullClauseId: clauseId })
             setAlternatives(prev => prev.map(a => a.id === altId ? { ...a, hullClauseId: clauseId } : a))
-            // If single alternative, sync to quotation
-            if (alternatives.length === 1) {
+            // If single shared alternative, sync to quotation
+            const sharedCount = alternatives.filter(a => !a.vesselScopeId).length
+            if (sharedCount === 1 && !alternatives.find(a => a.id === altId)?.vesselScopeId) {
                 try { updateField('hullClauseId', clauseId) } catch {}
             }
             // Auto-select default conditions for the new clause
@@ -6727,11 +6779,14 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
     const ivClauses = hullClauses.filter(c => c.conditionSection === 'iv')
     const selectedIvClause = hullClauses.find(c => c.id === selectedIvClauseId)
 
-    // In per-vessel mode, filter alternatives by the selected vessel tab
-    // In standard mode, show all non-vessel-scoped alternatives
-    const visibleAlternatives = isPerVesselMode && selectedVesselTab
-        ? alternatives.filter(a => a.vesselScopeId === selectedVesselTab)
-        : alternatives.filter(a => !a.vesselScopeId)
+    // Get alternatives for the current vessel scope view
+    const visibleAlternatives = useMemo(() => {
+        if (selectedVesselScope === null) {
+            return alternatives.filter(a => !a.vesselScopeId)
+        }
+        return alternatives.filter(a => a.vesselScopeId === selectedVesselScope)
+    }, [alternatives, selectedVesselScope])
+
     const multiAlt = visibleAlternatives.length > 1
 
     // Build condition items with amount inputs
@@ -6796,7 +6851,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         }
     }
 
-    // Render a set of alternatives (used both in standard and per-vessel mode)
+    // Render a set of alternatives (used both in shared and per-vessel views)
     const renderAlternatives = (alts: QuotationHullAlternative[], vesselScopeId?: string | null) => {
         const isMulti = alts.length > 1
         return (
@@ -6805,8 +6860,7 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                     const clause = hullClauses.find(c => c.id === alt.hullClauseId)
                     const clauseConditions = allConditions.filter(c => c.hullClauseId === alt.hullClauseId)
                     const altLabel = isMulti ? `Alternative ${idx + 1}` : (quotation.ivEnabled ? 'Section A — Hull and Machinery' : 'Hull Clause')
-                    const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
-                    const accentColor = isMulti ? altColors[idx % altColors.length] : 'transparent'
+                    const accentColor = isMulti ? ALT_COLORS[idx % ALT_COLORS.length] : 'transparent'
 
                     return (
                         <div key={alt.id} style={{
@@ -6883,21 +6937,14 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
         )
     }
 
+    // Check if the currently selected vessel scope has no overrides (empty state)
+    const isVesselEmptyState = selectedVesselScope !== null && visibleAlternatives.length === 0
+
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Hull Conditions</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {multiVessel && (
-                        <button
-                            onClick={isPerVesselMode ? disablePerVesselMode : enablePerVesselMode}
-                            className="btn-secondary"
-                            style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            title={isPerVesselMode ? 'Switch to shared hull clause for all vessels' : 'Assign different hull clauses per vessel'}
-                        >
-                            <Ship size={12} /> {isPerVesselMode ? 'Shared Clause' : 'Per-Vessel Clauses'}
-                        </button>
-                    )}
                     <button
                         onClick={handleSyncFromSettings}
                         className="btn-secondary"
@@ -6909,28 +6956,51 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                 </div>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
-                {isPerVesselMode
-                    ? 'Each vessel has its own hull clause and conditions. Select a vessel tab to configure.'
-                    : `Select hull clause${multiAlt ? ' alternatives' : ''}, configure clause conditions, and additional conditions.`}
+                {selectedVesselScope !== null
+                    ? 'Vessel-specific conditions override the shared defaults below.'
+                    : `Select hull clause${multiAlt ? ' alternatives' : ''}, configure clause conditions, and additional conditions.${multiVessel ? ' These apply to all vessels unless overridden.' : ''}`}
             </p>
 
-            {/* Per-vessel tabs */}
-            {isPerVesselMode && multiVessel && (
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                    {qVessels.map(v => {
-                        const isActive = selectedVesselTab === v.id
+            {/* Top-level vessel scope tabs (only when 2+ vessels) */}
+            {multiVessel && (
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {/* All Vessels tab */}
+                    <button
+                        onClick={() => setSelectedVesselScope(null)}
+                        style={{
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            border: selectedVesselScope === null ? '2px solid var(--accent)' : '1px solid var(--input-border)',
+                            background: selectedVesselScope === null ? 'rgba(0,170,200,0.1)' : 'transparent',
+                            color: selectedVesselScope === null ? 'var(--accent)' : 'var(--text-primary)',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            fontWeight: selectedVesselScope === null ? 600 : 400,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}
+                    >
+                        <Users size={13} />
+                        <span>All Vessels</span>
+                    </button>
+
+                    {/* Per-vessel override tabs */}
+                    {qVessels.filter(v => vesselIdsWithOverrides.has(v.id)).map((v, idx) => {
+                        const isActive = selectedVesselScope === v.id
                         const vesselAlts = alternatives.filter(a => a.vesselScopeId === v.id)
                         const vesselClause = vesselAlts[0] ? hullClauses.find(c => c.id === vesselAlts[0].hullClauseId) : null
+                        const color = ALT_COLORS[(idx + 1) % ALT_COLORS.length]
                         return (
                             <button
                                 key={v.id}
-                                onClick={() => setSelectedVesselTab(v.id)}
+                                onClick={() => setSelectedVesselScope(v.id)}
                                 style={{
                                     padding: '6px 14px',
                                     borderRadius: '6px',
-                                    border: isActive ? '2px solid var(--accent)' : '1px solid var(--input-border)',
-                                    background: isActive ? 'rgba(0,170,200,0.1)' : 'transparent',
-                                    color: isActive ? 'var(--accent)' : 'var(--text-primary)',
+                                    border: isActive ? `2px solid ${color}` : '1px solid var(--input-border)',
+                                    background: isActive ? `${color}18` : 'transparent',
+                                    color: isActive ? color : 'var(--text-primary)',
                                     cursor: 'pointer',
                                     fontSize: '0.8rem',
                                     fontWeight: isActive ? 600 : 400,
@@ -6949,14 +7019,139 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                             </button>
                         )
                     })}
+
+                    {/* Add Vessel Override dropdown */}
+                    {vesselsWithoutOverrides.length > 0 && (
+                        <div ref={addOverrideRef} style={{ position: 'relative', display: 'inline-block' }}>
+                            <button
+                                onClick={() => setAddOverrideOpen(!addOverrideOpen)}
+                                style={{
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px dashed var(--input-border)',
+                                    background: 'transparent',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.78rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                                title="Add vessel-specific override"
+                            >
+                                <Plus size={13} /> Add Vessel Override
+                            </button>
+                            {addOverrideOpen && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    zIndex: 9999,
+                                    marginTop: '4px',
+                                    minWidth: '200px',
+                                    maxHeight: '260px',
+                                    overflowY: 'auto',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+                                    background: isLight ? '#ffffff' : '#1a1d28',
+                                    boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
+                                }}>
+                                    {vesselsWithoutOverrides.map(v => (
+                                        <div
+                                            key={v.id}
+                                            onClick={() => {
+                                                setAddOverrideOpen(false)
+                                                setSelectedVesselScope(v.id)
+                                            }}
+                                            style={{
+                                                padding: '8px 14px',
+                                                fontSize: '0.82rem',
+                                                cursor: 'pointer',
+                                                color: isLight ? '#1c1e21' : '#e8e8e8',
+                                                borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`
+                                            }}
+                                            onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)')}
+                                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                        >
+                                            <Ship size={12} style={{ marginRight: '6px', opacity: 0.6 }} />
+                                            {(v.name || v.vesselLabel).toUpperCase()}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Alternatives (filtered by vessel tab in per-vessel mode) */}
-            {renderAlternatives(visibleAlternatives, isPerVesselMode ? selectedVesselTab : undefined)}
+            {/* Vessel override empty state */}
+            {isVesselEmptyState && (
+                <div style={{
+                    padding: '32px 24px',
+                    textAlign: 'center',
+                    borderRadius: '10px',
+                    border: '1px dashed var(--input-border)',
+                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                    marginBottom: '16px'
+                }}>
+                    <Ship size={28} style={{ color: 'var(--text-secondary)', opacity: 0.4, marginBottom: '12px' }} />
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 600, marginBottom: '6px' }}>
+                        {(qVessels.find(v => v.id === selectedVesselScope)?.name || qVessels.find(v => v.id === selectedVesselScope)?.vesselLabel || 'This vessel').toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                        This vessel uses shared conditions. Create an override to customise.
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        <button
+                            onClick={() => handleCopyFromShared(selectedVesselScope!)}
+                            className="btn-primary"
+                            style={{ padding: '6px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            <GitBranch size={14} /> Copy from shared
+                        </button>
+                        <button
+                            onClick={() => handleStartFresh(selectedVesselScope!)}
+                            className="btn-secondary"
+                            style={{ padding: '6px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            <Plus size={14} /> Start fresh
+                        </button>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '12px', fontStyle: 'italic' }}>
+                        Or select "All Vessels" to modify shared conditions.
+                    </div>
+                </div>
+            )}
 
-            {/* IV Clause Selector (only when IV enabled) */}
-            {quotation.ivEnabled && ivClauses.length > 0 && (
+            {/* Remove Override button (shown when viewing a vessel that has overrides) */}
+            {selectedVesselScope !== null && visibleAlternatives.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                    <button
+                        onClick={() => handleRemoveOverride(selectedVesselScope)}
+                        style={{
+                            background: 'none',
+                            border: '1px solid var(--input-border)',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            cursor: 'pointer',
+                            color: 'var(--danger)',
+                            fontSize: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                        }}
+                        title="Remove this vessel override and fall back to shared conditions"
+                    >
+                        <Trash2 size={12} /> Remove Override (use shared)
+                    </button>
+                </div>
+            )}
+
+            {/* Alternatives for the current scope */}
+            {!isVesselEmptyState && renderAlternatives(visibleAlternatives, selectedVesselScope)}
+
+            {/* IV Clause Selector (only when IV enabled, and viewing shared or single vessel) */}
+            {!isVesselEmptyState && quotation.ivEnabled && ivClauses.length > 0 && selectedVesselScope === null && (
                 <>
                     {multiAlt && <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />}
                     <div style={{
@@ -6996,26 +7191,111 @@ function HullConditionsTab({ quotation, updateField, showSuccess, showError }: {
                 </>
             )}
 
-            {/* Divider before additional conditions */}
-            <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />
+            {/* Divider before additional conditions (only when viewing shared scope) */}
+            {!isVesselEmptyState && selectedVesselScope === null && (
+                <>
+                    <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />
 
-            {/* Additional Conditions */}
-            <HullConditionPicker
-                label="Additional Conditions"
-                items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
-                selectedIds={selectedAddIds}
-                onToggle={toggleAdditional}
-                overrides={additionalOverrides}
-                onOverrideChange={updateAdditionalOverride}
-                onOverrideBlur={saveAdditionalOverrides}
-                scopes={additionalScopes}
-                onScopeChange={updateAdditionalScope}
-                vessels={qVessels}
-                emptyText="No additional conditions for the selected clause. Add them in Quotation Settings → Hull Additional Conditions."
-                amounts={additionalAmounts}
-                onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
-                onAmountBlur={saveAdditionalOverrides}
-            />
+                    {/* Additional Conditions */}
+                    <HullConditionPicker
+                        label="Additional Conditions"
+                        items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
+                        selectedIds={selectedAddIds}
+                        onToggle={toggleAdditional}
+                        overrides={additionalOverrides}
+                        onOverrideChange={updateAdditionalOverride}
+                        onOverrideBlur={saveAdditionalOverrides}
+                        scopes={additionalScopes}
+                        onScopeChange={updateAdditionalScope}
+                        vessels={qVessels}
+                        emptyText="No additional conditions for the selected clause. Add them in Quotation Settings → Hull Additional Conditions."
+                        amounts={additionalAmounts}
+                        onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
+                        onAmountBlur={saveAdditionalOverrides}
+                    />
+                </>
+            )}
+
+            {/* Shared section at bottom (always visible when viewing a vessel override) */}
+            {selectedVesselScope !== null && !isVesselEmptyState && sharedAlternatives.length > 0 && (
+                <>
+                    <div style={{
+                        borderTop: `2px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
+                        margin: '16px 0',
+                        position: 'relative'
+                    }}>
+                        <span style={{
+                            position: 'absolute',
+                            top: '-10px',
+                            left: '16px',
+                            background: isLight ? '#f4f6fb' : 'var(--bg-primary)',
+                            padding: '0 8px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            color: 'var(--text-secondary)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                        }}>
+                            Shared (all vessels & alternatives)
+                        </span>
+                    </div>
+                    <div style={{ opacity: 0.7, pointerEvents: 'none', marginTop: '12px' }}>
+                        {sharedAlternatives.map((alt, idx) => {
+                            const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                            const clauseConditions = allConditions.filter(c => c.hullClauseId === alt.hullClauseId)
+                            const selectedIds = getAltSelectedIds(alt.id)
+                            const selectedConditions = clauseConditions.filter(c => selectedIds.has(c.id))
+                            return (
+                                <div key={alt.id} style={{ marginBottom: '8px' }}>
+                                    {sharedAlternatives.length > 1 && (
+                                        <div style={{ fontSize: '0.78rem', color: ALT_COLORS[idx % ALT_COLORS.length], fontWeight: 600, marginBottom: '4px' }}>
+                                            Alt {idx + 1}: {clause?.code || clause?.name || ''}
+                                        </div>
+                                    )}
+                                    {sharedAlternatives.length === 1 && clause && (
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>
+                                            {clause.code || clause.name}
+                                        </div>
+                                    )}
+                                    {selectedConditions.map(c => (
+                                        <div key={c.id} style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', paddingLeft: '8px', marginBottom: '2px' }}>
+                                            Cl. {c.conditionNumber} — {c.text.substring(0, 60)}{c.text.length > 60 ? '...' : ''}
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        })}
+                        {filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length > 0 && (
+                            <div style={{ marginTop: '6px' }}>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>
+                                    Additional Conditions
+                                </div>
+                                {filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).map(ac => (
+                                    <div key={ac.id} style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', paddingLeft: '8px', marginBottom: '2px' }}>
+                                        {ac.title || ac.text.substring(0, 60)}{!ac.title && ac.text.length > 60 ? '...' : ''}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ marginTop: '8px' }}>
+                        <button
+                            onClick={() => setSelectedVesselScope(null)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--accent)',
+                                cursor: 'pointer',
+                                fontSize: '0.78rem',
+                                padding: '2px 0',
+                                textDecoration: 'underline'
+                            }}
+                        >
+                            Edit shared conditions
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     )
 }

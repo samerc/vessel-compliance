@@ -806,8 +806,30 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     if (hc.length > 0 || ha.length > 0) {
       const ivClauseId = data.quotation.ivClauseId
       const selectedIvClause = ivClauseId ? data.hullClauses.find(c => c.id === ivClauseId) : null
-      const isPerVesselExport = alts.some(a => a.vesselScopeId)
-      const multiAlt = alts.length > 1 || isPerVesselExport
+      const hasVesselScopedAlts = alts.some(a => a.vesselScopeId)
+      const sharedAlts = alts.filter(a => !a.vesselScopeId)
+
+      // Build effective alternatives list: for vessels with overrides, use their alts;
+      // for vessels without overrides, render shared alts under the vessel name
+      const vesselIdsWithOverrides = new Set(alts.filter(a => a.vesselScopeId).map(a => a.vesselScopeId!))
+      const isPerVesselExport = hasVesselScopedAlts && data.quotationVessels.length >= 2
+      let effectiveAlts: typeof alts
+      if (isPerVesselExport) {
+        // Build effective list: vessel-specific alts + shared alts expanded for non-override vessels
+        const vesselSpecificAlts = alts.filter(a => a.vesselScopeId)
+        const nonOverrideVessels = data.quotationVessels.filter(v => !vesselIdsWithOverrides.has(v.id))
+        // For vessels without overrides, create virtual entries using shared alts
+        const virtualAlts: typeof alts = []
+        for (const v of nonOverrideVessels) {
+          for (const sa of sharedAlts) {
+            virtualAlts.push({ ...sa, vesselScopeId: v.id, id: `${sa.id}_virtual_${v.id}` })
+          }
+        }
+        effectiveAlts = [...vesselSpecificAlts, ...virtualAlts]
+      } else {
+        effectiveAlts = alts
+      }
+      const multiAlt = effectiveAlts.length > 1 || isPerVesselExport
 
       const getCondClauseId = (qc: typeof hc[0]) => {
         const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
@@ -845,10 +867,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         if (!def) return { type: 'both' }
         const ids = def.hullClauseIds || []
         if (ids.length === 0) return { type: 'both' }
-        const matchedAlts = alts.filter(a => ids.includes(a.hullClauseId))
+        const matchedAlts = effectiveAlts.filter(a => ids.includes(a.hullClauseId))
         const matchesIv = ivClauseId && ids.includes(ivClauseId)
-        if (matchedAlts.length === alts.length && matchesIv) return { type: 'both' }
-        if (matchedAlts.length === alts.length && !matchesIv) return multiAlt ? { type: 'allAlts' } : { type: 'both' }
+        if (matchedAlts.length === effectiveAlts.length && matchesIv) return { type: 'both' }
+        if (matchedAlts.length === effectiveAlts.length && !matchesIv) return multiAlt ? { type: 'allAlts' } : { type: 'both' }
         if (matchedAlts.length === 0 && matchesIv) return { type: 'iv' }
         if (matchedAlts.length === 0 && !matchesIv) return { type: 'both' }
         if (matchedAlts.length === 1) return { type: 'alt', altId: matchedAlts[0].id }
@@ -878,8 +900,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const hasIvSection = data.quotation.ivEnabled && (ivConds.length > 0 || selectedIvClause)
 
       // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
+      // For virtual alts (shared alts rendered for non-override vessels), resolve from the original shared alt
       const getAltCondsResolved = (alt: typeof alts[0]) => {
-        const ownConds = hc.filter(qc => qc.alternativeId === alt.id)
+        const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
+        const ownConds = hc.filter(qc => qc.alternativeId === realAltId)
         const nullConds = hc.filter(qc =>
           !qc.alternativeId &&
           getCondClauseId(qc) === alt.hullClauseId &&
@@ -903,17 +927,48 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const hcBlocks: HcBlock[] = []
 
       if (multiAlt) {
-        for (let i = 0; i < alts.length; i++) {
-          const alt = alts[i]
-          const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-          const altConds = getAltCondsResolved(alt)
-          // Use vessel name as title in per-vessel mode, otherwise "Alternative N"
-          let altTitle = `Alternative ${i + 1}`
-          if (isPerVesselExport && alt.vesselScopeId) {
-            const vessel = data.quotationVessels.find(v => v.id === alt.vesselScopeId)
-            if (vessel) altTitle = `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}`
+        // Group effective alts by vessel for per-vessel export
+        if (isPerVesselExport) {
+          // Group by vessel: each vessel gets its alternatives rendered as a section
+          const vesselOrder = data.quotationVessels.map(v => v.id)
+          const altsByVessel = new Map<string, typeof effectiveAlts>()
+          for (const alt of effectiveAlts) {
+            if (!alt.vesselScopeId) continue
+            const existing = altsByVessel.get(alt.vesselScopeId) || []
+            existing.push(alt)
+            altsByVessel.set(alt.vesselScopeId, existing)
           }
-          hcBlocks.push({ title: altTitle, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
+          for (const vId of vesselOrder) {
+            const vAlts = altsByVessel.get(vId) || []
+            if (vAlts.length === 0) continue
+            const vessel = data.quotationVessels.find(v => v.id === vId)
+            const vesselTitle = vessel ? `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}` : `Vessel`
+            if (vAlts.length === 1) {
+              const alt = vAlts[0]
+              const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+              const altConds = getAltCondsResolved(alt)
+              const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
+              hcBlocks.push({ title: vesselTitle, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === realAltId) })
+            } else {
+              hcBlocks.push({ title: vesselTitle, underline: true })
+              for (let ai = 0; ai < vAlts.length; ai++) {
+                const alt = vAlts[ai]
+                const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+                const altConds = getAltCondsResolved(alt)
+                const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
+                hcBlocks.push({ title: `  Alternative ${ai + 1}`, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === realAltId) })
+              }
+            }
+          }
+        } else {
+          // Standard multi-alt (no per-vessel)
+          for (let i = 0; i < effectiveAlts.length; i++) {
+            const alt = effectiveAlts[i]
+            const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+            const altConds = getAltCondsResolved(alt)
+            const altTitle = `Alternative ${i + 1}`
+            hcBlocks.push({ title: altTitle, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
+          }
         }
         const allAltsAddl = renderAddlForSection(b => b.type === 'allAlts')
         const allLabel = isPerVesselExport ? 'Applicable to all vessels' : 'Applicable to all alternatives'
@@ -2060,8 +2115,26 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const noBordersObj = () => ({ top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } })
       const dIvClauseId = data.quotation.ivClauseId
       const dSelectedIvClause = dIvClauseId ? data.hullClauses.find(c => c.id === dIvClauseId) : null
-      const dIsPerVessel = dAlts.some(a => a.vesselScopeId)
-      const dMultiAlt = dAlts.length > 1 || dIsPerVessel
+      const dHasVesselScopedAlts = dAlts.some(a => a.vesselScopeId)
+      const dSharedAlts = dAlts.filter(a => !a.vesselScopeId)
+      const dVesselIdsWithOverrides = new Set(dAlts.filter(a => a.vesselScopeId).map(a => a.vesselScopeId!))
+      const dIsPerVessel = dHasVesselScopedAlts && data.quotationVessels.length >= 2
+      // Build effective alt list: vessel-specific + shared expanded for non-override vessels
+      let dEffectiveAlts: typeof dAlts
+      if (dIsPerVessel) {
+        const dVesselSpecific = dAlts.filter(a => a.vesselScopeId)
+        const dNonOverrideVessels = data.quotationVessels.filter(v => !dVesselIdsWithOverrides.has(v.id))
+        const dVirtualAlts: typeof dAlts = []
+        for (const v of dNonOverrideVessels) {
+          for (const sa of dSharedAlts) {
+            dVirtualAlts.push({ ...sa, vesselScopeId: v.id, id: `${sa.id}_virtual_${v.id}` })
+          }
+        }
+        dEffectiveAlts = [...dVesselSpecific, ...dVirtualAlts]
+      } else {
+        dEffectiveAlts = dAlts
+      }
+      const dMultiAlt = dEffectiveAlts.length > 1 || dIsPerVessel
 
       // Resolve amount: check the condition itself, then any sibling with the same conditionId
       const dResolveAmount = (qc: typeof hc[0]): number | null | undefined => {
@@ -2112,10 +2185,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (!def) return { type: 'both' }
         const ids = def.hullClauseIds || []
         if (ids.length === 0) return { type: 'both' }
-        const matchedAlts = dAlts.filter(a => ids.includes(a.hullClauseId))
+        const matchedAlts = dEffectiveAlts.filter(a => ids.includes(a.hullClauseId))
         const matchesIv = dIvClauseId && ids.includes(dIvClauseId)
-        if (matchedAlts.length === dAlts.length && matchesIv) return { type: 'both' }
-        if (matchedAlts.length === dAlts.length && !matchesIv) return dMultiAlt ? { type: 'allAlts' } : { type: 'both' }
+        if (matchedAlts.length === dEffectiveAlts.length && matchesIv) return { type: 'both' }
+        if (matchedAlts.length === dEffectiveAlts.length && !matchesIv) return dMultiAlt ? { type: 'allAlts' } : { type: 'both' }
         if (matchedAlts.length === 0 && matchesIv) return { type: 'iv' }
         if (matchedAlts.length === 0 && !matchesIv) return { type: 'both' }
         if (matchedAlts.length === 1) return { type: 'alt', altId: matchedAlts[0].id }
@@ -2146,10 +2219,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const dHasIvSection = data.quotation.ivEnabled && (dIvConds.length > 0 || dSelectedIvClause)
 
       // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
+      // For virtual alts (shared alts rendered for non-override vessels), resolve from the original shared alt
       const dGetAltCondsResolved = (alt: typeof dAlts[0]) => {
+        const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
         // Alt-specific conditions: exclude IV conditions
         const ownConds = hc.filter(qc =>
-          qc.alternativeId === alt.id &&
+          qc.alternativeId === realAltId &&
           !(dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
         )
         // Null-scoped conditions: must belong to this alt's clause, exclude IV
@@ -2171,23 +2246,54 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
 
       if (dMultiAlt) {
-        // Multiple alternatives or per-vessel
-        for (let i = 0; i < dAlts.length; i++) {
-          const alt = dAlts[i]
-          const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-          const altConds = dGetAltCondsResolved(alt)
-          let dAltTitle = `Alternative ${i + 1}`
-          if (dIsPerVessel && alt.vesselScopeId) {
-            const vessel = data.quotationVessels.find(v => v.id === alt.vesselScopeId)
-            if (vessel) dAltTitle = `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}`
+        if (dIsPerVessel) {
+          // Group by vessel: each vessel gets its alternatives rendered as a section
+          const dVesselOrder = data.quotationVessels.map(v => v.id)
+          const dAltsByVessel = new Map<string, typeof dEffectiveAlts>()
+          for (const alt of dEffectiveAlts) {
+            if (!alt.vesselScopeId) continue
+            const existing = dAltsByVessel.get(alt.vesselScopeId) || []
+            existing.push(alt)
+            dAltsByVessel.set(alt.vesselScopeId, existing)
           }
-          hcContent.push(bup(dAltTitle))
-          hcContent.push(emptyP())
-          if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
-          if (altConds.length > 0) hcContent.push(makeCondTable(altConds))
-          const altAddl = dRenderAddlForSection(b => b.type === 'alt' && b.altId === alt.id)
-          if (altAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...altAddl) }
-          hcContent.push(emptyP())
+          for (const vId of dVesselOrder) {
+            const vAlts = dAltsByVessel.get(vId) || []
+            if (vAlts.length === 0) continue
+            const vessel = data.quotationVessels.find(v => v.id === vId)
+            const vesselTitle = vessel ? `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}` : 'Vessel'
+            hcContent.push(bup(vesselTitle))
+            hcContent.push(emptyP())
+            for (let ai = 0; ai < vAlts.length; ai++) {
+              const alt = vAlts[ai]
+              const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+              const altConds = dGetAltCondsResolved(alt)
+              const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
+              if (vAlts.length > 1) {
+                hcContent.push(bup(`  Alternative ${ai + 1}`))
+                hcContent.push(emptyP())
+              }
+              if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
+              if (altConds.length > 0) hcContent.push(makeCondTable(altConds))
+              const altAddl = dRenderAddlForSection(b => b.type === 'alt' && b.altId === realAltId)
+              if (altAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...altAddl) }
+              hcContent.push(emptyP())
+            }
+          }
+        } else {
+          // Standard multi-alt (no per-vessel)
+          for (let i = 0; i < dEffectiveAlts.length; i++) {
+            const alt = dEffectiveAlts[i]
+            const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+            const altConds = dGetAltCondsResolved(alt)
+            const dAltTitle = `Alternative ${i + 1}`
+            hcContent.push(bup(dAltTitle))
+            hcContent.push(emptyP())
+            if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
+            if (altConds.length > 0) hcContent.push(makeCondTable(altConds))
+            const altAddl = dRenderAddlForSection(b => b.type === 'alt' && b.altId === alt.id)
+            if (altAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...altAddl) }
+            hcContent.push(emptyP())
+          }
         }
 
         // Applicable to all alternatives/vessels
