@@ -5418,29 +5418,91 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
             </p>
 
             {/* H&M Value + Currency */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
-                <div style={{ flex: 1, maxWidth: '250px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>H&M Value</label>
-                    <input
-                        type="number"
-                        value={quotation.agreedValue ?? ''}
-                        onChange={e => setQ(p => ({ ...p, agreedValue: e.target.value ? Number(e.target.value) : undefined }))}
-                        onBlur={e => updateField('agreedValue', e.target.value ? Number(e.target.value) : null)}
-                        placeholder="0.00"
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
-                    />
+            {qVessels.length > 1 ? (
+                <>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>H&M Values</label>
+                            <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {qVessels.map(qv => (
+                                    <div key={qv.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {qv.vesselLabel}: {qv.name || 'Unnamed'}
+                                        </span>
+                                        <input
+                                            type="number"
+                                            value={qv.agreedValue ?? ''}
+                                            onChange={e => {
+                                                const val = e.target.value ? Number(e.target.value) : null
+                                                setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, agreedValue: val } : v))
+                                            }}
+                                            onBlur={async e => {
+                                                const val = e.target.value ? Number(e.target.value) : null
+                                                await window.api.updateQuotationVessel(qv.id, { agreedValue: val })
+                                                // Sync total to quotation-level
+                                                const updatedVessels = qVessels.map(v => v.id === qv.id ? { ...v, agreedValue: val } : v)
+                                                const total = updatedVessels.reduce((sum, v) => sum + (v.agreedValue || 0), 0)
+                                                setQ(p => ({ ...p, agreedValue: total || undefined }))
+                                                updateField('agreedValue', total || null)
+                                            }}
+                                            placeholder="0.00"
+                                            style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                        />
+                                    </div>
+                                ))}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid var(--table-border)', paddingTop: '8px' }}>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '140px' }}>Total</span>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                                        {(qVessels.reduce((s, v) => s + (v.agreedValue || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ maxWidth: '120px' }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
+                            <input
+                                type="text"
+                                value={quotation.agreedValueCurrency || 'USD'}
+                                onChange={e => setQ(p => ({ ...p, agreedValueCurrency: e.target.value }))}
+                                onBlur={e => updateField('agreedValueCurrency', e.target.value)}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
+                            />
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
+                    <div style={{ flex: 1, maxWidth: '250px' }}>
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>H&M Value</label>
+                        <input
+                            type="number"
+                            value={quotation.agreedValue ?? ''}
+                            onChange={e => setQ(p => ({ ...p, agreedValue: e.target.value ? Number(e.target.value) : undefined }))}
+                            onBlur={async e => {
+                                const val = e.target.value ? Number(e.target.value) : null
+                                updateField('agreedValue', val)
+                                // Sync to single vessel record
+                                if (qVessels.length === 1) {
+                                    await window.api.updateQuotationVessel(qVessels[0].id, { agreedValue: val })
+                                    setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, agreedValue: val } : v))
+                                }
+                            }}
+                            placeholder="0.00"
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
+                        />
+                    </div>
+                    <div style={{ maxWidth: '120px' }}>
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
+                        <input
+                            type="text"
+                            value={quotation.agreedValueCurrency || 'USD'}
+                            onChange={e => setQ(p => ({ ...p, agreedValueCurrency: e.target.value }))}
+                            onBlur={e => updateField('agreedValueCurrency', e.target.value)}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
+                        />
+                    </div>
                 </div>
-                <div style={{ maxWidth: '120px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
-                    <input
-                        type="text"
-                        value={quotation.agreedValueCurrency || 'USD'}
-                        onChange={e => setQ(p => ({ ...p, agreedValueCurrency: e.target.value }))}
-                        onBlur={e => updateField('agreedValueCurrency', e.target.value)}
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
-                    />
-                </div>
-            </div>
+            )}
 
             {/* IV toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: quotation.ivEnabled ? '12px' : '20px' }}>
@@ -5450,6 +5512,57 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
 
             {/* IV Value + Currency */}
             {quotation.ivEnabled && (
+            qVessels.length > 1 ? (
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>IV Values</label>
+                        <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {qVessels.map(qv => (
+                                <div key={qv.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {qv.vesselLabel}: {qv.name || 'Unnamed'}
+                                    </span>
+                                    <input
+                                        type="number"
+                                        value={qv.ivValue ?? ''}
+                                        onChange={e => {
+                                            const val = e.target.value ? Number(e.target.value) : null
+                                            setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, ivValue: val } : v))
+                                        }}
+                                        onBlur={async e => {
+                                            const val = e.target.value ? Number(e.target.value) : null
+                                            await window.api.updateQuotationVessel(qv.id, { ivValue: val })
+                                            // Sync total to quotation-level
+                                            const updatedVessels = qVessels.map(v => v.id === qv.id ? { ...v, ivValue: val } : v)
+                                            const total = updatedVessels.reduce((sum, v) => sum + (v.ivValue || 0), 0)
+                                            setQ(p => ({ ...p, ivValue: total || undefined }))
+                                            updateField('ivValue', total || null)
+                                        }}
+                                        placeholder="0.00"
+                                        style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                    />
+                                </div>
+                            ))}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid var(--table-border)', paddingTop: '8px' }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '140px' }}>Total</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                                    {(qVessels.reduce((s, v) => s + (v.ivValue || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ maxWidth: '120px' }}>
+                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
+                        <input
+                            type="text"
+                            value={quotation.ivCurrency || 'USD'}
+                            onChange={e => setQ(p => ({ ...p, ivCurrency: e.target.value }))}
+                            onBlur={e => updateField('ivCurrency', e.target.value)}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
+                        />
+                    </div>
+                </div>
+            ) : (
             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
                 <div style={{ flex: 1, maxWidth: '250px' }}>
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>IV Value</label>
@@ -5457,7 +5570,15 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
                         type="number"
                         value={quotation.ivValue ?? ''}
                         onChange={e => setQ(p => ({ ...p, ivValue: e.target.value ? Number(e.target.value) : undefined }))}
-                        onBlur={e => updateField('ivValue', e.target.value ? Number(e.target.value) : null)}
+                        onBlur={async e => {
+                            const val = e.target.value ? Number(e.target.value) : null
+                            updateField('ivValue', val)
+                            // Sync to single vessel record
+                            if (qVessels.length === 1) {
+                                await window.api.updateQuotationVessel(qVessels[0].id, { ivValue: val })
+                                setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, ivValue: val } : v))
+                            }
+                        }}
                         placeholder="0.00"
                         style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
                     />
@@ -5473,6 +5594,7 @@ function AgreedValueTab({ quotation, updateField, setQ, showError }: {
                     />
                 </div>
             </div>
+            )
             )}
 
             {/* Template texts to add */}

@@ -1807,24 +1807,27 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
     const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
     const ivItems = data.quotation.ivEnabled ? data.hullAgreedValueItems.filter(it => it.section === 'iv') : []
+    // Use per-vessel agreed value if available, falling back to quotation-level
+    const vesselAgreedValue = data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
+    const vesselIvValue = data.vessel?.ivValue != null ? data.vessel.ivValue : data.quotation.ivValue
 
-    if (data.quotation.ivEnabled && data.quotation.ivValue != null) {
+    if (data.quotation.ivEnabled && vesselIvValue != null) {
       // Section A / Section B format
-      if (data.quotation.agreedValue != null) {
-        content.push(polBp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)} (${numberToWords(data.quotation.agreedValue, hmCurrency)})`))
+      if (vesselAgreedValue != null) {
+        content.push(polBp(`Section A: ${polFormatCurrency(vesselAgreedValue, hmCurrency)} (${numberToWords(vesselAgreedValue, hmCurrency)})`))
       }
       if (hmItems.length > 0) {
         for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
       content.push(polEmptyP())
-      content.push(polBp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)})`))
+      content.push(polBp(`Section B: ${polFormatCurrency(vesselIvValue, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(vesselIvValue, data.quotation.ivCurrency || hmCurrency)})`))
       if (ivItems.length > 0) {
         for (const it of ivItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
     } else {
       // Single value format (no IV)
-      if (data.quotation.agreedValue != null) {
-        content.push(polBp(`${polFormatCurrency(data.quotation.agreedValue, hmCurrency)} (${numberToWords(data.quotation.agreedValue, hmCurrency)})`))
+      if (vesselAgreedValue != null) {
+        content.push(polBp(`${polFormatCurrency(vesselAgreedValue, hmCurrency)} (${numberToWords(vesselAgreedValue, hmCurrency)})`))
       }
       if (hmItems.length > 0) {
         content.push(polEmptyP())
@@ -2132,25 +2135,30 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   rows.push(makeRow('Insured Vessel', [polBuildVesselTable(data)]))
 
   // VALUE / LIMIT — Hull with IV gets split into Interest + Agreed Insured Value
-  if (typeCode === 'H' && data.quotation.ivEnabled && data.quotation.ivValue != null) {
-    const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
-    const ivItems = data.hullAgreedValueItems.filter(it => it.section === 'iv')
-    // Interest section (text descriptions)
-    if (hmItems.length > 0 || ivItems.length > 0) {
-      const intContent: (Paragraph | Table)[] = []
-      if (hmItems.length > 0) intContent.push(polNp('A) ' + hmItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
-      if (ivItems.length > 0) intContent.push(polNp('B) ' + ivItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
-      rows.push(makeRow('Interest', intContent))
+  {
+    // Use per-vessel agreed value if available, falling back to quotation-level
+    const polVesselAv = data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
+    const polVesselIv = data.vessel?.ivValue != null ? data.vessel.ivValue : data.quotation.ivValue
+    if (typeCode === 'H' && data.quotation.ivEnabled && polVesselIv != null) {
+      const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
+      const ivItems = data.hullAgreedValueItems.filter(it => it.section === 'iv')
+      // Interest section (text descriptions)
+      if (hmItems.length > 0 || ivItems.length > 0) {
+        const intContent: (Paragraph | Table)[] = []
+        if (hmItems.length > 0) intContent.push(polNp('A) ' + hmItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
+        if (ivItems.length > 0) intContent.push(polNp('B) ' + ivItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
+        rows.push(makeRow('Interest', intContent))
+      }
+      // Agreed Insured Value (amounts)
+      const avContent: (Paragraph | Table)[] = []
+      const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
+      if (polVesselAv != null) avContent.push(polNp(`Section A: ${polFormatCurrency(polVesselAv, hmCurrency)} (${numberToWords(polVesselAv, hmCurrency)})`))
+      avContent.push(polNp(`Section B: ${polFormatCurrency(polVesselIv, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(polVesselIv, data.quotation.ivCurrency || hmCurrency)})`))
+      rows.push(makeRow('Agreed Insured\nValue', avContent))
+    } else {
+      const valueContent = polBuildValueSection(data)
+      if (valueContent.length > 0) rows.push(makeRow(polGetValueSectionTitle(typeCode), valueContent))
     }
-    // Agreed Insured Value (amounts)
-    const avContent: (Paragraph | Table)[] = []
-    const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
-    if (data.quotation.agreedValue != null) avContent.push(polNp(`Section A: ${polFormatCurrency(data.quotation.agreedValue, hmCurrency)} (${numberToWords(data.quotation.agreedValue, hmCurrency)})`))
-    avContent.push(polNp(`Section B: ${polFormatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(data.quotation.ivValue, data.quotation.ivCurrency || hmCurrency)})`))
-    rows.push(makeRow('Agreed Insured\nValue', avContent))
-  } else {
-    const valueContent = polBuildValueSection(data)
-    if (valueContent.length > 0) rows.push(makeRow(polGetValueSectionTitle(typeCode), valueContent))
   }
 
   // PERIOD

@@ -737,6 +737,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const hasHm = data.quotation.agreedValue != null
     const hasIv = data.quotation.ivEnabled && data.quotation.ivValue != null
 
+    const isMultiVessel = data.quotationVessels.length > 1
+    const hasPerVesselValues = isMultiVessel && data.quotationVessels.some(v => v.agreedValue != null)
+    const hmCurr = data.quotation.agreedValueCurrency || 'USD'
+
     if (hasIv) {
       // Interest section — A) H&M text inline, B) IV text inline
       const hmTextItems = avItems.filter(it => (it.section || 'hm') === 'hm')
@@ -753,16 +757,39 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
       // Agreed Insured Value — amounts only for IV
       let avText = ''
-      if (hasHm) avText += `Section A: ${formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')}\n`
-      avText += `Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}\n`
+      if (hasPerVesselValues) {
+        avText += 'Section A:\n'
+        for (const qv of data.quotationVessels) {
+          if (qv.agreedValue != null) avText += `M/V ${qv.name || 'Unnamed'}: ${formatCurrency(qv.agreedValue, hmCurr)}\n`
+        }
+        avText += `Total: ${formatCurrency(data.quotation.agreedValue, hmCurr)}\n`
+      } else if (hasHm) {
+        avText += `Section A: ${formatCurrency(data.quotation.agreedValue, hmCurr)}\n`
+      }
+      const ivCurr = data.quotation.ivCurrency || 'USD'
+      const hasPerVesselIv = isMultiVessel && data.quotationVessels.some(v => v.ivValue != null)
+      if (hasPerVesselIv) {
+        avText += 'Section B:\n'
+        for (const qv of data.quotationVessels) {
+          if (qv.ivValue != null) avText += `M/V ${qv.name || 'Unnamed'}: ${formatCurrency(qv.ivValue, ivCurr)}\n`
+        }
+        avText += `Total: ${formatCurrency(data.quotation.ivValue, ivCurr)}\n`
+      } else {
+        avText += `Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}\n`
+      }
       sectionMap.set('agreedValue', ['Agreed Insured Value', avText.trim()])
     } else if (avItems.length > 0 || hasHm) {
       // Standard agreed value — value not bold (body column), spacing between value and texts
       // Filter out IV items when IV is disabled
       const hmItems = avItems.filter(it => (it.section || 'hm') !== 'iv')
       let avText = ''
-      if (hasHm) {
-        avText += formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD') + '\n\n'
+      if (hasPerVesselValues) {
+        for (const qv of data.quotationVessels) {
+          if (qv.agreedValue != null) avText += `M/V ${qv.name || 'Unnamed'}: ${formatCurrency(qv.agreedValue, hmCurr)}\n`
+        }
+        avText += `Total: ${formatCurrency(data.quotation.agreedValue, hmCurr)}\n\n`
+      } else if (hasHm) {
+        avText += formatCurrency(data.quotation.agreedValue, hmCurr) + '\n\n'
       }
       for (const it of hmItems) {
         avText += it.text + vesselScopeSuffix(it.vesselScope, data.quotationVessels) + '\n'
@@ -1955,6 +1982,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dHasHm = data.quotation.agreedValue != null
     const dHasIv = data.quotation.ivEnabled && data.quotation.ivValue != null
 
+    const dIsMultiVessel = data.quotationVessels.length > 1
+    const dHasPerVesselValues = dIsMultiVessel && data.quotationVessels.some(v => v.agreedValue != null)
+    const dHmCurr = data.quotation.agreedValueCurrency || 'USD'
+
     if (dHasIv) {
       // Interest section — A) H&M texts, B) IV texts (labels as bullets)
       const dHmItems = avItems.filter(it => (it.section || 'hm') === 'hm')
@@ -1973,16 +2004,40 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       // Agreed Insured Value — amounts only for IV
       const avContent: Paragraph[] = []
-      if (dHasHm) avContent.push(np(`Section A: ${formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')}`))
-      avContent.push(np(`Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}`))
+      if (dHasPerVesselValues) {
+        avContent.push(np('Section A:'))
+        for (const qv of data.quotationVessels) {
+          if (qv.agreedValue != null) avContent.push(np(`M/V ${qv.name || 'Unnamed'}: ${formatCurrency(qv.agreedValue, dHmCurr)}`))
+        }
+        avContent.push(np(`Total: ${formatCurrency(data.quotation.agreedValue, dHmCurr)}`))
+      } else if (dHasHm) {
+        avContent.push(np(`Section A: ${formatCurrency(data.quotation.agreedValue, dHmCurr)}`))
+      }
+      const dIvCurr = data.quotation.ivCurrency || 'USD'
+      const dHasPerVesselIv = dIsMultiVessel && data.quotationVessels.some(v => v.ivValue != null)
+      if (dHasPerVesselIv) {
+        avContent.push(np('Section B:'))
+        for (const qv of data.quotationVessels) {
+          if (qv.ivValue != null) avContent.push(np(`M/V ${qv.name || 'Unnamed'}: ${formatCurrency(qv.ivValue, dIvCurr)}`))
+        }
+        avContent.push(np(`Total: ${formatCurrency(data.quotation.ivValue, dIvCurr)}`))
+      } else {
+        avContent.push(np(`Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}`))
+      }
       rowMap.set('agreedValue', makeRow('Agreed Insured Value', avContent))
     } else if (avItems.length > 0 || dHasHm) {
       // Standard agreed value — value not bold, spacing between value and texts
       // Filter out IV items when IV is disabled
       const dHmItems = avItems.filter(it => (it.section || 'hm') !== 'iv')
       const avContent: Paragraph[] = []
-      if (dHasHm) {
-        avContent.push(np(formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')))
+      if (dHasPerVesselValues) {
+        for (const qv of data.quotationVessels) {
+          if (qv.agreedValue != null) avContent.push(np(`M/V ${qv.name || 'Unnamed'}: ${formatCurrency(qv.agreedValue, dHmCurr)}`))
+        }
+        avContent.push(np(`Total: ${formatCurrency(data.quotation.agreedValue, dHmCurr)}`))
+        avContent.push(emptyP())
+      } else if (dHasHm) {
+        avContent.push(np(formatCurrency(data.quotation.agreedValue, dHmCurr)))
         avContent.push(emptyP())
       }
       for (const it of dHmItems) {

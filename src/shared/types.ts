@@ -1052,6 +1052,8 @@ export interface QuotationVessel {
   classification?: string
   callSign?: string
   premiumAmount?: number
+  agreedValue?: number | null
+  ivValue?: number | null
 }
 
 export interface QuotationSubLimit {

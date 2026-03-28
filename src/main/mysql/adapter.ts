@@ -755,6 +755,18 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Add agreed_value and iv_value to quotation_vessels
+            {
+                const [qvAvCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'agreed_value'") as any[]
+                if (qvAvCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_vessels ADD COLUMN agreed_value DECIMAL(15,2) DEFAULT NULL')
+                }
+                const [qvIvCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'iv_value'") as any[]
+                if (qvIvCol.length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_vessels ADD COLUMN iv_value DECIMAL(15,2) DEFAULT NULL')
+                }
+            }
+
             // Migration: Create pi_additional_clause_sets tables
             await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_additional_clause_sets (
                 id VARCHAR(36) PRIMARY KEY,
@@ -6139,7 +6151,8 @@ export class MySQLAdapter {
                     COALESCE(v.rebuilt_year, qv.rebuilt_year) as rebuiltYear,
                     COALESCE(v.gross_tonnage, qv.gross_tonnage) as grossTonnage,
                     qv.flag, qv.vessel_type as vesselType, qv.classification, qv.call_sign as callSign,
-                    qv.premium_amount as premiumAmount
+                    qv.premium_amount as premiumAmount,
+                    qv.agreed_value as agreedValue, qv.iv_value as ivValue
              FROM quotation_vessels qv
              LEFT JOIN vessels v ON qv.vessel_id = v.id
              WHERE qv.quotation_id = ?
@@ -6151,26 +6164,28 @@ export class MySQLAdapter {
             builtYear: r.builtYear != null ? Number(r.builtYear) : undefined,
             rebuiltYear: r.rebuiltYear != null ? Number(r.rebuiltYear) : undefined,
             grossTonnage: r.grossTonnage != null ? Number(r.grossTonnage) : undefined,
-            premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined
+            premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined,
+            agreedValue: r.agreedValue != null ? Number(r.agreedValue) : null,
+            ivValue: r.ivValue != null ? Number(r.ivValue) : null
         }))
     }
 
-    async addQuotationVessel(data: { quotationId: string; vesselId?: string; vesselLabel: string; order: number; name?: string; imoNumber?: string; builtYear?: number; rebuiltYear?: number | null; grossTonnage?: number; flag?: string; vesselType?: string; classification?: string; callSign?: string }): Promise<QuotationVessel> {
+    async addQuotationVessel(data: { quotationId: string; vesselId?: string; vesselLabel: string; order: number; name?: string; imoNumber?: string; builtYear?: number; rebuiltYear?: number | null; grossTonnage?: number; flag?: string; vesselType?: string; classification?: string; callSign?: string; agreedValue?: number | null; ivValue?: number | null }): Promise<QuotationVessel> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.quotationId, data.vesselId || null, data.vesselLabel, data.order, data.name || null, data.imoNumber || null, data.builtYear || null, data.rebuiltYear || null, data.grossTonnage || null, data.flag || null, data.vesselType || null, data.classification || null, data.callSign || null]
+            `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, agreed_value, iv_value)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.quotationId, data.vesselId || null, data.vesselLabel, data.order, data.name || null, data.imoNumber || null, data.builtYear || null, data.rebuiltYear || null, data.grossTonnage || null, data.flag || null, data.vesselType || null, data.classification || null, data.callSign || null, data.agreedValue ?? null, data.ivValue ?? null]
         )
-        return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, rebuiltYear: data.rebuiltYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign }
+        return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, rebuiltYear: data.rebuiltYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign, agreedValue: data.agreedValue ?? null, ivValue: data.ivValue ?? null }
     }
 
-    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; rebuiltYear: number | null; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; premiumAmount: number }>): Promise<void> {
+    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; rebuiltYear: number | null; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; premiumAmount: number; agreedValue: number | null; ivValue: number | null }>): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', premiumAmount: 'premium_amount' }
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value' }
         for (const [key, col] of Object.entries(colMap)) {
             if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
         }
@@ -6772,9 +6787,9 @@ export class MySQLAdapter {
             const newVId = uuidv4()
             vesselIdMap[v.id] = newVId
             await this.pool.execute(
-                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount]
+                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount, agreed_value, iv_value)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount, v.agreed_value, v.iv_value]
             )
         }
 
