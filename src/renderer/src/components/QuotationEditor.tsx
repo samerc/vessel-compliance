@@ -146,6 +146,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [q, setQ] = useState<Quotation>(quotation)
     // policyTypes removed — type shown as badge, not editable
     const [vessels, setVessels] = useState<Vessel[]>([])
+    const [vesselVersion, setVesselVersion] = useState(0)
     const [globalTexts, setGlobalTexts] = useState<PISectionTexts>(DEFAULT_SECTION_TEXTS)
     const [sanctionsVersions, setSanctionsVersions] = useState<PISanctionsVersion[]>([])
     const [showSectionOrder, setShowSectionOrder] = useState(false)
@@ -966,8 +967,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
             {/* Tab Content */}
             <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
-                {activeTab === 'insured' && <InsuredTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
-                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+                {activeTab === 'insured' && <InsuredTab key={vesselVersion} quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
+                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} isLight={isLight} onVesselsChanged={() => setVesselVersion(v => v + 1)} />}
                 {activeTab === 'agreedValue' && <AgreedValueTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />}
@@ -1248,7 +1249,7 @@ function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateFie
 
 const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
 
-function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean }) {
+function VesselTab({ quotation, vessels, showSuccess, showError, isLight, onVesselsChanged }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean; onVesselsChanged?: () => void }) {
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [showAddForm, setShowAddForm] = useState(false)
     const [addMode, setAddMode] = useState<'existing' | 'new' | 'fleet'>('existing')
@@ -1487,6 +1488,7 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
             }
         }
         loadData()
+        if (onVesselsChanged) onVesselsChanged()
     }
 
     const alreadyAdded = new Set(qVessels.map(v => v.vesselId).filter(Boolean) as string[])
