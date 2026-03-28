@@ -1251,7 +1251,7 @@ const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: 
 function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean }) {
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [showAddForm, setShowAddForm] = useState(false)
-    const [addMode, setAddMode] = useState<'existing' | 'new'>('existing')
+    const [addMode, setAddMode] = useState<'existing' | 'new' | 'fleet'>('existing')
     const [selectedVesselId, setSelectedVesselId] = useState('')
     const [vesselSearch, setVesselSearch] = useState('')
     const [vesselDropdownOpen, setVesselDropdownOpen] = useState(false)
@@ -1262,6 +1262,9 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
     const [flagStatesLocal, setFlagStatesLocal] = useState<any[]>([])
     const [classSocietiesLocal, setClassSocietiesLocal] = useState<any[]>([])
     const [vesselTypesLocal, setVesselTypesLocal] = useState<any[]>([])
+    const [availableFleets, setAvailableFleets] = useState<{ id: string; name: string; vesselCount: number }[]>([])
+    const [fleetSearch, setFleetSearch] = useState('')
+    const [addingFleet, setAddingFleet] = useState(false)
 
     useEffect(() => { loadData() }, [])
 
@@ -1369,6 +1372,100 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
         loadData()
     }
 
+    const loadFleets = async () => {
+        const fleets = await window.api.getFleets().catch(() => [])
+        const fleetsArr = Array.isArray(fleets) ? fleets : []
+        const withCounts = fleetsArr.map(f => ({
+            id: f.id,
+            name: f.name,
+            vesselCount: vessels.filter(v => v.fleetId === f.id && v.isActive).length
+        })).filter(f => f.vesselCount > 0)
+        setAvailableFleets(withCounts)
+    }
+
+    const handleAddFleet = async (fleetId: string) => {
+        const fleet = availableFleets.find(f => f.id === fleetId)
+        if (!fleet) return
+        setAddingFleet(true)
+        try {
+            const fleetVessels = vessels.filter(v => v.fleetId === fleetId && v.isActive)
+            const existingVesselIds = new Set(qVessels.map(qv => qv.vesselId).filter(Boolean) as string[])
+            const newVessels = fleetVessels.filter(v => !existingVesselIds.has(v.id))
+
+            if (newVessels.length === 0) {
+                showError('All vessels from this fleet are already added')
+                setAddingFleet(false)
+                return
+            }
+
+            const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
+            const [allEntities, existingQAssureds, assuredRoles] = await Promise.all([
+                window.api.getEntities(),
+                window.api.getQuotationAssureds(quotation.id),
+                window.api.getAssuredRoles()
+            ])
+            const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
+
+            let currentCount = qVessels.length
+            let totalAssuredsAdded = 0
+            let currentAssuredCount = existingQAssureds.length
+            const existingEntityIds = new Set(existingQAssureds.map(a => a.entityId).filter(Boolean))
+
+            for (const v of newVessels) {
+                const vLabel = `V${currentCount + 1}`
+                const flagName = v.flagStateId ? (flagStates.find((f: any) => f.id === v.flagStateId)?.name || '') : ''
+                await window.api.addQuotationVessel({
+                    quotationId: quotation.id,
+                    vesselId: v.id,
+                    vesselLabel: vLabel,
+                    order: currentCount,
+                    name: v.name,
+                    imoNumber: v.imoNumber,
+                    builtYear: v.builtYear,
+                    rebuiltYear: v.rebuiltYear,
+                    grossTonnage: v.grossTonnage,
+                    flag: flagName,
+                    vesselType: v.vesselType,
+                    classification: v.classificationSociety,
+                    callSign: v.callSign
+                })
+
+                // Auto-load vessel assureds
+                const vassureds = await window.api.getVesselAssureds(v.id).catch(() => [])
+                const toAdd = (Array.isArray(vassureds) ? vassureds : [])
+                    .filter(va => !existingEntityIds.has(va.entityId))
+                    .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+                for (let i = 0; i < toAdd.length; i++) {
+                    const va = toAdd[i]
+                    const entity = allEntities.find(e => e.id === va.entityId)
+                    if (entity) {
+                        await window.api.addQuotationAssured({
+                            quotationId: quotation.id,
+                            entityId: va.entityId,
+                            name: entity.name,
+                            role: va.role || undefined,
+                            vesselLabel: vLabel,
+                            order: currentAssuredCount + i
+                        })
+                        existingEntityIds.add(va.entityId)
+                        totalAssuredsAdded++
+                    }
+                }
+                currentAssuredCount += toAdd.length
+                currentCount++
+            }
+
+            setShowAddForm(false)
+            setFleetSearch('')
+            showSuccess(`Added ${newVessels.length} vessel${newVessels.length > 1 ? 's' : ''} from ${fleet.name}${totalAssuredsAdded > 0 ? ` — ${totalAssuredsAdded} assured(s) loaded` : ''}`)
+            loadData()
+        } catch (err: any) {
+            showError(err.message || 'Failed to add fleet vessels')
+        } finally {
+            setAddingFleet(false)
+        }
+    }
+
     const alreadyAdded = new Set(qVessels.map(v => v.vesselId).filter(Boolean) as string[])
     const availableVessels = vessels.filter(v => !alreadyAdded.has(v.id))
 
@@ -1390,9 +1487,48 @@ function VesselTab({ quotation, vessels, showSuccess, showError, isLight }: { qu
                 <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border)', marginBottom: '20px', background: 'rgba(0,210,255,0.03)' }}>
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
                         <button onClick={() => setAddMode('existing')} className={addMode === 'existing' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px' }}>From Registry</button>
+                        <button onClick={() => { setAddMode('fleet'); loadFleets() }} className={addMode === 'fleet' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '5px' }}><Layers size={13} /> Add Fleet</button>
                         <button onClick={() => setAddMode('new')} className={addMode === 'new' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px' }}>New Vessel</button>
                     </div>
-                    {addMode === 'existing' ? (
+                    {addMode === 'fleet' ? (
+                        <div>
+                            <div style={{ position: 'relative', maxWidth: '400px', marginBottom: '10px' }}>
+                                <input
+                                    type="text"
+                                    value={fleetSearch}
+                                    onChange={e => setFleetSearch(e.target.value)}
+                                    placeholder="Search fleets..."
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
+                                />
+                            </div>
+                            <div style={{ maxHeight: '220px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                                {(() => {
+                                    const q = fleetSearch.toLowerCase()
+                                    const filtered = availableFleets.filter(f => f.name.toLowerCase().includes(q))
+                                    if (filtered.length === 0) return (
+                                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                            {availableFleets.length === 0 ? 'No fleets with active vessels found' : 'No fleets match your search'}
+                                        </div>
+                                    )
+                                    return filtered.map(f => (
+                                        <div
+                                            key={f.id}
+                                            onClick={() => !addingFleet && handleAddFleet(f.id)}
+                                            style={{ padding: '10px 14px', cursor: addingFleet ? 'wait' : 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background 0.15s', opacity: addingFleet ? 0.6 : 1 }}
+                                            onMouseEnter={e => { if (!addingFleet) e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)' }}
+                                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                        >
+                                            <span style={{ fontWeight: 600 }}>{f.name}</span>
+                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', background: 'rgba(0,210,255,0.1)', padding: '2px 8px', borderRadius: '10px' }}>{f.vesselCount} vessel{f.vesselCount !== 1 ? 's' : ''}</span>
+                                        </div>
+                                    ))
+                                })()}
+                            </div>
+                            <div style={{ marginTop: '10px' }}>
+                                <button onClick={() => { setShowAddForm(false); setFleetSearch('') }} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+                            </div>
+                        </div>
+                    ) : addMode === 'existing' ? (
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                             <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
                                 <input
