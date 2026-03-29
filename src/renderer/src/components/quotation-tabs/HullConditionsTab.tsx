@@ -377,18 +377,9 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
         setQVessels(Array.isArray(qv) ? qv : [])
 
         // If no alternatives exist yet, create one shared from the quotation's hullClauseId or first H&M clause
-        const hmClauses = safeClauses.filter(c => c.conditionSection !== 'iv')
-        if (safeAlts.length === 0 && hmClauses.length > 0) {
-            const defaultClauseId = quotation.hullClauseId && safeClauses.some(c => c.id === quotation.hullClauseId)
-                ? quotation.hullClauseId
-                : hmClauses[0].id
-            try {
-                const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, defaultClauseId)
-                if (newAlt && !(newAlt as any).error) {
-                    setAlternatives([newAlt])
-                    try { updateField('hullClauseId', defaultClauseId) } catch {}
-                }
-            } catch {}
+        if (safeAlts.length === 0) {
+            // No alternatives yet — don't auto-create, let user choose
+            setAlternatives([])
         } else {
             setAlternatives(safeAlts)
             // Sync hullClauseId from first shared alternative
@@ -985,6 +976,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
 
     // Check if the currently selected vessel scope has no overrides (empty state)
     const isVesselEmptyState = selectedVesselScope !== null && visibleAlternatives.length === 0
+    const isSharedEmptyState = selectedVesselScope === null && visibleAlternatives.length === 0
 
     return (
         <div>
@@ -1194,10 +1186,37 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             )}
 
             {/* Alternatives for the current scope */}
-            {!isVesselEmptyState && renderAlternatives(visibleAlternatives, selectedVesselScope)}
+            {isSharedEmptyState && (
+                <div style={{
+                    padding: '32px 24px',
+                    textAlign: 'center',
+                    borderRadius: '10px',
+                    border: '1px dashed var(--input-border)',
+                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                    marginBottom: '16px'
+                }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '8px' }}>No hull clause selected</p>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>Select a hull clause to configure conditions for this quotation.</p>
+                    <HullClauseDropdown
+                        clauses={quotation.ivEnabled ? hmClauses : hullClauses}
+                        selectedId=""
+                        onChange={async (clauseId) => {
+                            try {
+                                const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, clauseId)
+                                if (newAlt && !(newAlt as any).error) {
+                                    setAlternatives([newAlt])
+                                    try { updateField('hullClauseId', clauseId) } catch {}
+                                }
+                            } catch {}
+                        }}
+                    />
+                </div>
+            )}
+
+            {!isVesselEmptyState && !isSharedEmptyState && renderAlternatives(visibleAlternatives, selectedVesselScope)}
 
             {/* IV Clause Selector (only when IV enabled, and viewing shared or single vessel) */}
-            {!isVesselEmptyState && quotation.ivEnabled && ivClauses.length > 0 && selectedVesselScope === null && (
+            {!isVesselEmptyState && !isSharedEmptyState && quotation.ivEnabled && ivClauses.length > 0 && selectedVesselScope === null && (
                 <>
                     {multiAlt && <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />}
                     <div style={{
@@ -1241,7 +1260,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             )}
 
             {/* Divider before additional conditions (only when viewing shared scope) */}
-            {!isVesselEmptyState && selectedVesselScope === null && (
+            {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
                 <>
                     <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />
 
@@ -1266,7 +1285,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             )}
 
             {/* Shared section at bottom (always visible when viewing a vessel override) */}
-            {selectedVesselScope !== null && !isVesselEmptyState && sharedAlternatives.length > 0 && (
+            {selectedVesselScope !== null && !isVesselEmptyState && !isSharedEmptyState && sharedAlternatives.length > 0 && (
                 <>
                     <div style={{
                         borderTop: `2px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
