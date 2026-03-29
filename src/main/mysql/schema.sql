@@ -647,7 +647,7 @@ CREATE TABLE IF NOT EXISTS hull_additional_condition_clauses (
 CREATE TABLE IF NOT EXISTS quotation_hull_alternatives (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
-  hull_clause_id VARCHAR(36) NOT NULL,
+  hull_clause_id VARCHAR(36) DEFAULT NULL,
   label VARCHAR(100) DEFAULT NULL,
   premium_amount DECIMAL(15,2) DEFAULT NULL,
   order_index INT DEFAULT 0,
@@ -697,6 +697,50 @@ CREATE TABLE IF NOT EXISTS quotation_war_conditions (
   text_override TEXT DEFAULT NULL,
   order_index INT DEFAULT 0,
   vessel_scope TEXT DEFAULT NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Main Institute Cargo Clauses (ICC A/B/C)
+CREATE TABLE IF NOT EXISTS cargo_institute_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  code VARCHAR(50) DEFAULT NULL,
+  description TEXT DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Cargo clause definitions (admin-managed)
+CREATE TABLE IF NOT EXISTS cargo_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  section ENUM('conditions','special','law') NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  text TEXT DEFAULT NULL,
+  code VARCHAR(50) DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Per-quotation selected cargo clauses
+CREATE TABLE IF NOT EXISTS quotation_cargo_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  cargo_clause_id VARCHAR(36) NOT NULL,
+  text_override TEXT DEFAULT NULL,
+  order_index INT DEFAULT 0,
+  section ENUM('conditions','special','law') NOT NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Per-quotation custom cargo clauses
+CREATE TABLE IF NOT EXISTS quotation_cargo_custom_clauses (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  text TEXT NOT NULL,
+  section ENUM('conditions','special','law') NOT NULL,
+  order_index INT DEFAULT 0,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -29,7 +29,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
         const safeMasters = Array.isArray(masters) ? masters : []
         const safeDts = Array.isArray(dts) ? dts : []
         // Filter masters by quotation type scope
-        const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
+        const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : quotation.quotationTypeCode?.toLowerCase() === 'c' ? 'cargo' : 'pi'
         const filteredMasters = safeMasters.filter(m => !m.typeScope || m.typeScope === 'all' || m.typeScope === typeCode)
         setItems(safeSubjs)
         setMasterList(filteredMasters)

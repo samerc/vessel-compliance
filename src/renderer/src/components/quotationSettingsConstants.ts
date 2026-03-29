@@ -25,10 +25,17 @@ export const WAR_SECTION_ORDER: string[] = [
     'ncb', 'upcc', 'premium', 'information'
 ]
 
+export const CARGO_SECTION_ORDER: string[] = [
+    'insured', 'vessel', 'insuredValue', 'voyage', 'subjectMatter',
+    'cargoConditions', 'cargoSpecial', 'cargoLaw',
+    'premium', 'subjectivities', 'information'
+]
+
 export function getDefaultSectionOrder(typeCode?: string): string[] {
     if (typeCode === 'H') return [...HULL_SECTION_ORDER]
     if (typeCode === 'P') return [...PI_SECTION_ORDER]
     if (typeCode === 'W') return [...WAR_SECTION_ORDER]
+    if (typeCode === 'C') return [...CARGO_SECTION_ORDER]
     return [...DEFAULT_SECTION_ORDER]
 }
 
@@ -53,7 +60,13 @@ export const SECTION_LABELS: Record<string, string> = {
     premium: 'Premium',
     ncb: 'No Claims Bonus (NCB)',
     upcc: 'Upfront Continuity (UPCC)',
-    information: 'Information'
+    information: 'Information',
+    insuredValue: 'Insured Value',
+    voyage: 'Voyage / Period',
+    subjectMatter: 'Subject Matter Insured',
+    cargoConditions: 'Conditions (Cargo)',
+    cargoSpecial: 'Special Conditions (Cargo)',
+    cargoLaw: 'Law and Jurisdiction (Cargo)'
 }
 
 export const DEFAULT_SECTION_TEXTS: PISectionTexts = {

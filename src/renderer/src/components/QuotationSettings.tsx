@@ -9,15 +9,16 @@ import RichTextEditor from './RichTextEditor'
 
 import { StickyNote } from 'lucide-react'
 
-type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'premiumTexts' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings' | 'surveyWarrantyTemplates' | 'tradingCustomTexts'
+type SettingsTab = 'quotationTypes' | 'clauses' | 'warranties' | 'deductibles' | 'exclusions' | 'subLimits' | 'additionalClauses' | 'subjectivities' | 'tradingCountries' | 'tradingWarranty' | 'tradingWarrantyTemplates' | 'sanctionsVersions' | 'standardTexts' | 'instalmentDefaults' | 'sectionOrder' | 'workflow' | 'premiumTexts' | 'hullAgreedValueTexts' | 'hullClauses' | 'hullAdditionalConditions' | 'warConditions' | 'warSettings' | 'surveyWarrantyTemplates' | 'tradingCustomTexts' | 'cargoConditions' | 'cargoSpecial' | 'cargoLaw'
 
-type SettingsCategory = 'general' | 'pi' | 'hull' | 'war'
+type SettingsCategory = 'general' | 'pi' | 'hull' | 'war' | 'cargo'
 
 const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
     { id: 'general', label: 'General', color: 'var(--accent-primary)' },
     { id: 'pi', label: 'P&I', color: '#6464ff' },
     { id: 'hull', label: 'H&M', color: '#ff64c8' },
     { id: 'war', label: 'War', color: '#ff8c32' },
+    { id: 'cargo', label: 'Cargo', color: '#32b886' },
 ]
 
 const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; icon: any }[]> = {
@@ -52,6 +53,11 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
     war: [
         { id: 'warConditions', label: 'Conditions', icon: <BookOpen size={15} /> },
         { id: 'warSettings', label: 'Settings', icon: <Shield size={15} /> },
+    ],
+    cargo: [
+        { id: 'cargoConditions', label: 'Conditions', icon: <BookOpen size={15} /> },
+        { id: 'cargoSpecial', label: 'Special Conditions', icon: <FileText size={15} /> },
+        { id: 'cargoLaw', label: 'Law & Jurisdiction', icon: <Scale size={15} /> },
     ],
 }
 
@@ -164,6 +170,9 @@ export default function QuotationSettings() {
             {activeTab === 'hullAdditionalConditions' && <HullAdditionalConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'warConditions' && <WarConditionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             {activeTab === 'warSettings' && <WarSettingsTab showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'cargoConditions' && <CargoClausesTab section="conditions" sectionLabel="Conditions" showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'cargoSpecial' && <CargoClausesTab section="special" sectionLabel="Special Conditions" showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
+            {activeTab === 'cargoLaw' && <CargoClausesTab section="law" sectionLabel="Law & Jurisdiction" showSuccess={showSuccess} showError={showError} isLight={isLight} readOnly={!canSettings} />}
             </fieldset>
         </div>
     )
@@ -2917,7 +2926,10 @@ const SECTION_TEXT_FIELDS: { key: keyof PISectionTexts; label: string; section: 
     { key: 'premiumCondition', label: 'Payment Condition Precedent', section: 'Premium', rows: 4 },
     { key: 'premiumEarned', label: 'Premium Earned Clause', section: 'Premium', rows: 3 },
     { key: 'informationNote', label: 'Information Note', section: 'Information', rows: 2 },
-    { key: 'importantNotice', label: 'Important Notice', section: 'Important Notice', rows: 5 }
+    { key: 'importantNotice', label: 'Important Notice (Default)', section: 'Important Notice', rows: 5 },
+    { key: 'importantNoticePI', label: 'Important Notice (P&I)', section: 'Important Notice', rows: 5 },
+    { key: 'importantNoticeHull', label: 'Important Notice (Hull)', section: 'Important Notice', rows: 5 },
+    { key: 'importantNoticeWar', label: 'Important Notice (War)', section: 'Important Notice', rows: 5 }
 ]
 
 const STANDARD_TEXT_SECTIONS = ['Document Header & Footer', ...Array.from(new Set(SECTION_TEXT_FIELDS.map(f => f.section)))]
@@ -4797,5 +4809,355 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                 </div>
             )}
         </div>
+    )
+}
+
+// ==================== Cargo Clauses Tab ====================
+
+function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabProps & { section: string; sectionLabel: string }) {
+    const [clauses, setClauses] = useState<any[]>([])
+    const [newTitle, setNewTitle] = useState('')
+    const [newCode, setNewCode] = useState('')
+    const [newText, setNewText] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editTitle, setEditTitle] = useState('')
+    const [editCode, setEditCode] = useState('')
+    const [editText, setEditText] = useState('')
+    const [showBulkImport, setShowBulkImport] = useState(false)
+    const [bulkText, setBulkText] = useState('')
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
+
+    // Institute Clauses state (only used when section === 'conditions')
+    const [instituteClauses, setInstituteClauses] = useState<any[]>([])
+    const [icNewName, setIcNewName] = useState('')
+    const [icNewCode, setIcNewCode] = useState('')
+    const [icNewDesc, setIcNewDesc] = useState('')
+    const [icEditingId, setIcEditingId] = useState<string | null>(null)
+    const [icEditName, setIcEditName] = useState('')
+    const [icEditCode, setIcEditCode] = useState('')
+    const [icEditDesc, setIcEditDesc] = useState('')
+
+    const loadInstituteClauses = async () => {
+        if (section !== 'conditions') return
+        try {
+            const result = await window.api.cargoGetInstituteClauses()
+            setInstituteClauses(Array.isArray(result) ? result : [])
+        } catch { setInstituteClauses([]) }
+    }
+
+    useEffect(() => { loadInstituteClauses() }, [section])
+
+    const handleIcAdd = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!icNewName.trim()) return
+        try {
+            const result = await window.api.cargoAddInstituteClause(icNewName.trim(), icNewCode.trim() || undefined, icNewDesc.trim() || undefined)
+            if (result && !(result as any).error) {
+                setIcNewName(''); setIcNewCode(''); setIcNewDesc('')
+                showSuccess('Institute clause added')
+                loadInstituteClauses()
+            } else { showError('Failed to add institute clause') }
+        } catch { showError('Failed to add institute clause') }
+    }
+
+    const handleIcSaveEdit = async (id: string) => {
+        try {
+            await window.api.cargoUpdateInstituteClause(id, { name: icEditName.trim(), code: icEditCode.trim(), description: icEditDesc.trim() })
+            setIcEditingId(null)
+            showSuccess('Institute clause updated')
+            loadInstituteClauses()
+        } catch { showError('Failed to update institute clause') }
+    }
+
+    const handleIcToggleActive = async (id: string, currentActive: boolean) => {
+        try {
+            await window.api.cargoUpdateInstituteClause(id, { active: !currentActive })
+            loadInstituteClauses()
+        } catch { showError('Failed to toggle clause') }
+    }
+
+    const handleIcDelete = async (id: string) => {
+        try {
+            await window.api.cargoDeleteInstituteClause(id)
+            showSuccess('Institute clause deleted')
+            loadInstituteClauses()
+        } catch { showError('Failed to delete clause') }
+    }
+
+    const handleIcMove = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...instituteClauses]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setInstituteClauses(newOrder)
+        await window.api.cargoReorderInstituteClauses(newOrder.map(c => c.id))
+    }
+
+    const parseBulkLines = (raw: string) => {
+        return raw.split('\n')
+            .map(line => line.replace(/^[-–—•*]\s*/, '').trim())
+            .filter(Boolean)
+            .map(line => {
+                // Try to parse "CODE - Title" or "CODE Title" patterns
+                const codeMatch = line.match(/^([A-Z]{2,}[\s.]?\d{2,}[\w/]*)\s+[-–—]\s+(.+)$/i)
+                    || line.match(/^(CL\.\s*\d+)\s+(.+)$/i)
+                    || line.match(/^(JC[\s]?\d{4}\/\d+[\s\d/]*)\s+(.+)$/i)
+                if (codeMatch) return { code: codeMatch[1].trim(), title: codeMatch[2].trim() }
+                return { code: '', title: line }
+            })
+    }
+
+    const handleBulkImport = async () => {
+        const items = parseBulkLines(bulkText)
+        if (items.length === 0) return
+        let added = 0
+        for (const item of items) {
+            try {
+                const result = await window.api.cargoAddClause(section, item.title, undefined, item.code || undefined)
+                if (result && !(result as any).error) added++
+            } catch {}
+        }
+        showSuccess(`Imported ${added} clause${added !== 1 ? 's' : ''}`)
+        setBulkText('')
+        setShowBulkImport(false)
+        loadData()
+    }
+
+    useEffect(() => { loadData() }, [section])
+    const loadData = async () => {
+        try {
+            const result = await window.api.cargoGetClauses(section)
+            setClauses(Array.isArray(result) ? result : [])
+        } catch { setClauses([]) }
+    }
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newTitle.trim()) return
+        try {
+            const result = await window.api.cargoAddClause(section, newTitle.trim(), newText.trim() || undefined, newCode.trim() || undefined)
+            if (result && !(result as any).error) {
+                setNewTitle(''); setNewCode(''); setNewText('')
+                showSuccess('Clause added')
+                loadData()
+            } else {
+                showError('Failed to add clause')
+            }
+        } catch { showError('Failed to add clause') }
+    }
+
+    const handleSaveEdit = async (id: string) => {
+        try {
+            await window.api.cargoUpdateClause(id, { title: editTitle.trim(), code: editCode.trim(), text: editText.trim() })
+            setEditingId(null)
+            showSuccess('Clause updated')
+            loadData()
+        } catch { showError('Failed to update clause') }
+    }
+
+    const handleToggleActive = async (id: string, currentActive: boolean) => {
+        try {
+            await window.api.cargoUpdateClause(id, { active: !currentActive })
+            loadData()
+        } catch { showError('Failed to toggle clause') }
+    }
+
+    const handleDelete = async (id: string) => {
+        try {
+            await window.api.cargoDeleteClause(id)
+            showSuccess('Clause deleted')
+            loadData()
+        } catch { showError('Failed to delete clause') }
+    }
+
+    const handleMove = async (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...clauses]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        setClauses(newOrder)
+        await window.api.cargoReorderClauses(newOrder.map(c => c.id))
+    }
+
+    return (
+        <>
+        {section === 'conditions' && (
+            <section className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Institute Cargo Clauses</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                    Main clause selections (e.g. ICC A, ICC B, ICC C). Users pick one per quotation.
+                </p>
+
+                <form onSubmit={handleIcAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '300px' }}>
+                        <input value={icNewCode} onChange={e => setIcNewCode(e.target.value)} placeholder="Code (e.g. CL. 382)" style={{ width: '130px', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                        <input value={icNewName} onChange={e => setIcNewName(e.target.value)} placeholder="Name (e.g. Institute Cargo Clauses (A))" style={{ flex: 1, padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                    </div>
+                    <textarea value={icNewDesc} onChange={e => setIcNewDesc(e.target.value)} placeholder="Description (optional)" rows={1} style={{ flex: '1 1 100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                    <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                </form>
+
+                {instituteClauses.map((c, i) => (
+                    <div key={c.id} style={{
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--table-border)',
+                        marginBottom: '8px',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        opacity: c.active === false ? 0.5 : 1,
+                        background: c.active === false ? 'rgba(255,0,0,0.03)' : 'transparent'
+                    }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <button onClick={() => handleIcMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                            <button onClick={() => handleIcMove(i, 'down')} disabled={i === instituteClauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === instituteClauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            {icEditingId === c.id ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input value={icEditCode} onChange={e => setIcEditCode(e.target.value)} placeholder="Code" style={{ width: '130px', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                                        <input value={icEditName} onChange={e => setIcEditName(e.target.value)} placeholder="Name" style={{ flex: 1, padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                                    </div>
+                                    <textarea value={icEditDesc} onChange={e => setIcEditDesc(e.target.value)} placeholder="Description" rows={2} style={{ width: '100%', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button onClick={() => handleIcSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /> Save</button>
+                                        <button onClick={() => setIcEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: c.description ? '4px' : 0 }}>
+                                        {c.code && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#32b886', background: 'rgba(50,184,134,0.1)', padding: '1px 6px', borderRadius: '4px' }}>{c.code}</span>}
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{c.name}</span>
+                                    </div>
+                                    {c.description && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>{c.description}</p>}
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => handleIcToggleActive(c.id, c.active !== false)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', fontSize: '0.72rem', fontWeight: 600, color: c.active === false ? 'var(--danger)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}
+                            title={c.active === false ? 'Enable clause' : 'Disable clause'}
+                        >
+                            {c.active === false ? 'OFF' : 'ON'}
+                        </button>
+                        <button onClick={() => { setIcEditingId(c.id); setIcEditName(c.name || ''); setIcEditCode(c.code || ''); setIcEditDesc(c.description || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
+                        <button onClick={() => handleIcDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                    </div>
+                ))}
+                {instituteClauses.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No institute clauses yet. Add ICC A, ICC B, or ICC C above.</p>}
+            </section>
+        )}
+
+        <section className="glass-card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>{section === 'conditions' ? 'Additional Conditions' : `Cargo ${sectionLabel}`}</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                {section === 'conditions' ? 'Additional conditions toggled per quotation (e.g. ISM, ISPS, Classification).' : `Manage ${sectionLabel.toLowerCase()} clauses for Cargo quotations.`}
+            </p>
+
+            <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '300px' }}>
+                    <input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (optional)" style={{ width: '100px', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                    <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Clause title" style={{ flex: 1, padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                </div>
+                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Clause text (optional)" rows={2} style={{ flex: '1 1 100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                    <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                    <button type="button" onClick={() => setShowBulkImport(true)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}><Upload size={14} /> Bulk Import</button>
+                </div>
+            </form>
+
+            {showBulkImport && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowBulkImport(false)}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', width: '600px', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Bulk Import — {sectionLabel}</h3>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                            Paste one clause per line. Bullets/dashes are stripped automatically.
+                        </p>
+                        <textarea value={bulkText} onChange={e => setBulkText(e.target.value)}
+                            placeholder={"- Institute Cargo Clauses (B) CL. 383 1/1/2009\n- Cargo ISM Endorsement JC 98/019\n- Custom clause text here"}
+                            rows={12}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical', fontFamily: 'monospace' }} />
+                        {bulkText.trim() && (() => {
+                            const parsed = parseBulkLines(bulkText)
+                            return (
+                                <div style={{ marginTop: '12px', padding: '10px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Preview: {parsed.length} clause(s)</p>
+                                    {parsed.slice(0, 8).map((item, i) => (
+                                        <div key={i} style={{ fontSize: '0.78rem', marginBottom: '3px', display: 'flex', gap: '6px' }}>
+                                            {item.code && <span style={{ color: '#32b886', fontWeight: 600 }}>{item.code}</span>}
+                                            <span>{item.title}</span>
+                                        </div>
+                                    ))}
+                                    {parsed.length > 8 && <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>...and {parsed.length - 8} more</p>}
+                                </div>
+                            )
+                        })()}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                            <button onClick={() => { setShowBulkImport(false); setBulkText('') }} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>Cancel</button>
+                            <button onClick={handleBulkImport} disabled={!bulkText.trim()} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
+                                Import {parseBulkLines(bulkText).length} Clause{parseBulkLines(bulkText).length !== 1 ? 's' : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {clauses.map((c, i) => (
+                <div key={c.id} style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--table-border)',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    opacity: c.active === false ? 0.5 : 1,
+                    background: c.active === false ? 'rgba(255,0,0,0.03)' : 'transparent'
+                }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                        <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        {editingId === c.id ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input value={editCode} onChange={e => setEditCode(e.target.value)} placeholder="Code" style={{ width: '100px', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                                    <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ flex: 1, padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                                </div>
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="Clause text" rows={3} style={{ width: '100%', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /> Save</button>
+                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: c.text ? '4px' : 0 }}>
+                                    {c.code && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#32b886', background: 'rgba(50,184,134,0.1)', padding: '1px 6px', borderRadius: '4px' }}>{c.code}</span>}
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{c.title}</span>
+                                </div>
+                                {c.text && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-wrap' }}>{c.text}</p>}
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => handleToggleActive(c.id, c.active !== false)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', fontSize: '0.72rem', fontWeight: 600, color: c.active === false ? 'var(--danger)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}
+                        title={c.active === false ? 'Enable clause' : 'Disable clause'}
+                    >
+                        {c.active === false ? 'OFF' : 'ON'}
+                    </button>
+                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
+                    <button onClick={() => handleDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                </div>
+            ))}
+            {clauses.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No {section === 'conditions' ? 'additional conditions' : sectionLabel.toLowerCase() + ' clauses'} yet. Click &quot;Add&quot; to create one.</p>}
+        </section>
+        </>
     )
 }

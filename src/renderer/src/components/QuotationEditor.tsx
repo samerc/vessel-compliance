@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Users, Ship, Shield, FileText, Globe, AlertTriangle, DollarSign, Info, StickyNote, Scale, Anchor, Clock, CheckSquare, Ban, Download, Layers, LayoutList, ClipboardCheck, ExternalLink } from 'lucide-react'
-import { Quotation, Vessel, PISectionTexts, PISanctionsVersion, QuotationPIAlternative } from '../../../shared/types'
+import { Quotation, Vessel, QuotationVessel, PISectionTexts, PISanctionsVersion, QuotationPIAlternative } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -30,6 +30,10 @@ import SumInsuredTab from './quotation-tabs/SumInsuredTab'
 import WarConditionsTab from './quotation-tabs/WarConditionsTab'
 import WarTradingTab from './quotation-tabs/WarTradingTab'
 import HullConditionsTab from './quotation-tabs/HullConditionsTab'
+import InsuredValueTab from './quotation-tabs/InsuredValueTab'
+import VoyageTab from './quotation-tabs/VoyageTab'
+import SubjectMatterTab from './quotation-tabs/SubjectMatterTab'
+import CargoClausesTab from './quotation-tabs/CargoClausesTab'
 
 const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
@@ -39,7 +43,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
 }
 
-type EditorTab = 'insured' | 'vessel' | 'liability' | 'conditions' | 'agreedValue' | 'hullConditions' | 'sumInsured' | 'warConditions' | 'warTrading' | 'period' | 'trading' | 'warranties' | 'surveyWarranties' | 'deductibles' | 'exclusions' | 'sanctions' | 'subjectivities' | 'premium' | 'information' | 'customSections' | 'notes'
+type EditorTab = 'insured' | 'vessel' | 'liability' | 'conditions' | 'agreedValue' | 'hullConditions' | 'sumInsured' | 'warConditions' | 'warTrading' | 'period' | 'trading' | 'warranties' | 'surveyWarranties' | 'deductibles' | 'exclusions' | 'sanctions' | 'subjectivities' | 'premium' | 'information' | 'customSections' | 'notes' | 'insuredValue' | 'voyage' | 'subjectMatter' | 'cargoConditions' | 'cargoSpecial' | 'cargoLaw'
 
 type TabDef = { key: EditorTab; label: string; icon: any; types?: string[] }
 
@@ -48,19 +52,25 @@ const allTabs: TabDef[] = [
     { key: 'insured', label: 'Insured', icon: Users },
     { key: 'agreedValue', label: 'Agreed Value', icon: Shield, types: ['H'] },
     { key: 'sumInsured', label: 'Sum Insured', icon: Shield, types: ['W'] },
+    { key: 'insuredValue', label: 'Insured Value', icon: Shield, types: ['C'] },
     { key: 'liability', label: 'Limit of Liability', icon: Shield, types: ['P'] },
     { key: 'hullConditions', label: 'Conditions', icon: FileText, types: ['H'] },
     { key: 'warConditions', label: 'Conditions', icon: FileText, types: ['W'] },
     { key: 'conditions', label: 'Conditions', icon: FileText, types: ['P'] },
-    { key: 'period', label: 'Period', icon: Clock },
+    { key: 'cargoConditions', label: 'Conditions', icon: FileText, types: ['C'] },
+    { key: 'subjectMatter', label: 'Subject Matter', icon: FileText, types: ['C'] },
+    { key: 'voyage', label: 'Voyage', icon: Globe, types: ['C'] },
+    { key: 'period', label: 'Period', icon: Clock, types: ['P', 'H', 'W', 'F', 'L'] },
     { key: 'trading', label: 'Trading', icon: Globe, types: ['P', 'H'] },
     { key: 'warTrading', label: 'Trading Warranty', icon: Globe, types: ['W'] },
-    { key: 'warranties', label: 'Warranties', icon: CheckSquare },
-    { key: 'surveyWarranties', label: 'Survey Warranties', icon: ClipboardCheck },
+    { key: 'warranties', label: 'Warranties', icon: CheckSquare, types: ['P', 'H', 'W', 'F', 'L'] },
+    { key: 'surveyWarranties', label: 'Survey Warranties', icon: ClipboardCheck, types: ['P', 'H', 'W', 'F', 'L'] },
     { key: 'deductibles', label: 'Deductibles', icon: Scale, types: ['P'] },
     { key: 'exclusions', label: 'Exclusions', icon: Ban, types: ['P'] },
-    { key: 'sanctions', label: 'Sanctions', icon: AlertTriangle },
+    { key: 'cargoSpecial', label: 'Special Conditions', icon: FileText, types: ['C'] },
+    { key: 'sanctions', label: 'Sanctions', icon: AlertTriangle, types: ['P', 'H', 'W', 'F', 'L'] },
     { key: 'subjectivities', label: 'Subjectivities', icon: Anchor },
+    { key: 'cargoLaw', label: 'Law & Jurisdiction', icon: Scale, types: ['C'] },
     { key: 'premium', label: 'Premium', icon: DollarSign },
     { key: 'information', label: 'Information', icon: Info },
     { key: 'customSections', label: 'Custom Sections', icon: Layers },
@@ -87,6 +97,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [q, setQ] = useState<Quotation>(quotation)
     // policyTypes removed — type shown as badge, not editable
     const [vessels, setVessels] = useState<Vessel[]>([])
+    const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [vesselVersion, setVesselVersion] = useState(0)
     const [globalTexts, setGlobalTexts] = useState<PISectionTexts>(DEFAULT_SECTION_TEXTS)
     const [sanctionsVersions, setSanctionsVersions] = useState<PISanctionsVersion[]>([])
@@ -120,6 +131,14 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         loadMasterData()
     }, [])
 
+    // Reload quotation vessels when vessel list changes
+    useEffect(() => {
+        if (vesselVersion === 0) return
+        window.api.getQuotationVessels(quotation.id).then(qv => {
+            setQVessels(Array.isArray(qv) ? qv : [])
+        }).catch(() => {})
+    }, [vesselVersion])
+
     // Track recent item view
     useEffect(() => {
         const label = quotation.referenceNumber || 'Quotation'
@@ -130,12 +149,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     }, [quotation.id])
 
     const loadMasterData = async () => {
-        const [fullQ, , v, gt, sv] = await Promise.all([
+        const [fullQ, , v, gt, sv, qv] = await Promise.all([
             window.api.getQuotation(quotation.id),
             window.api.getPolicyTypes(),
             window.api.getVessels(),
             window.api.piGetSectionTexts(),
-            window.api.piGetSanctionsVersions()
+            window.api.piGetSanctionsVersions(),
+            window.api.getQuotationVessels(quotation.id)
         ])
         if (fullQ) {
             // Set war defaults on first load (non-refundable 25%)
@@ -169,6 +189,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         }
         // policyTypes removed
         setVessels(Array.isArray(v) ? v : [])
+        setQVessels(Array.isArray(qv) ? qv : [])
         if (gt && Object.keys(gt).length > 0) setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
         setSanctionsVersions(sv)
     }
@@ -907,12 +928,29 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             )}
 
             {/* Tab Content */}
-            <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
+            {activeTab !== 'hullConditions' && <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
+                {qVessels.length >= 2 && (
+                    <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '6px 12px',
+                        padding: '8px 14px',
+                        marginBottom: '2px',
+                        fontSize: '0.72rem',
+                        color: 'var(--text-secondary)'
+                    }}>
+                        {qVessels.map(v => (
+                            <span key={v.id}>
+                                <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
+                                {' '}{(v.name || v.vesselLabel).toUpperCase()}
+                            </span>
+                        ))}
+                    </div>
+                )}
                 {activeTab === 'insured' && <InsuredTab key={vesselVersion} quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
                 {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} isLight={isLight} onVesselsChanged={() => setVesselVersion(v => v + 1)} />}
                 {activeTab === 'agreedValue' && <AgreedValueTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} getEffectiveText={getEffectiveText} />}
-                {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'sumInsured' && <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'warConditions' && <WarConditionsTab quotation={q} showError={showError} />}
                 {activeTab === 'conditions' && <ConditionsTab quotation={q} showSuccess={showSuccess} showError={showError} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
@@ -927,9 +965,17 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 {activeTab === 'subjectivities' && <SubjectivitiesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
                 {activeTab === 'premium' && <PremiumTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} isLight={isLight} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'information' && <InformationTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+                {activeTab === 'insuredValue' && <InsuredValueTab quotation={q} updateField={updateField} setQ={setQ} />}
+                {activeTab === 'voyage' && <VoyageTab quotation={q} updateField={updateField} setQ={setQ} />}
+                {activeTab === 'subjectMatter' && <SubjectMatterTab quotation={q} updateField={updateField} setQ={setQ} />}
+                {activeTab === 'cargoConditions' && <CargoClausesTab quotation={q} section="conditions" updateField={updateField} showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'cargoSpecial' && <CargoClausesTab quotation={q} section="special" showSuccess={showSuccess} showError={showError} />}
+                {activeTab === 'cargoLaw' && <CargoClausesTab quotation={q} section="law" showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'customSections' && <CustomSectionsTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
                 {activeTab === 'notes' && <NotesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
-            </div>
+            </div>}
+
+            {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />}
 
             {showSectionOrder && (
                 <SectionOrderModal

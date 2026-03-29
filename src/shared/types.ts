@@ -594,7 +594,7 @@ export interface PIWarrantyTag {
   order: number
 }
 
-export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'all'
+export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'cargo' | 'all'
 
 export interface PIWarranty {
   id: string
@@ -893,6 +893,47 @@ export interface WarSettings {
   defaultRate?: number
 }
 
+// ==================== Cargo ====================
+
+export interface CargoClause {
+  id: string
+  section: 'conditions' | 'special' | 'law'
+  title: string
+  text?: string
+  code?: string
+  order: number
+  active: boolean
+}
+
+export interface CargoInstituteClause {
+  id: string
+  name: string
+  code?: string
+  description?: string
+  order: number
+  active: boolean
+}
+
+export interface QuotationCargoClause {
+  id: string
+  quotationId: string
+  cargoClauseId: string
+  textOverride?: string
+  order: number
+  section: 'conditions' | 'special' | 'law'
+  title?: string
+  text?: string
+  code?: string
+}
+
+export interface QuotationCargoCustomClause {
+  id: string
+  quotationId: string
+  text: string
+  section: 'conditions' | 'special' | 'law'
+  order: number
+}
+
 // ==================== Quotation ====================
 
 export interface QuotationType {
@@ -957,6 +998,7 @@ export interface Quotation {
   limitOfLiabilityAmount?: number
   limitOfLiabilityCurrency?: string
   limitOfLiabilityText?: string
+  limitOfLiabilityVesselAmounts?: Record<string, number> | null
   premiumAmount?: number
   premiumCurrency?: string
   numInstalments?: number
@@ -1007,6 +1049,19 @@ export interface Quotation {
   workflowStepColor?: string
   renewedFromPolicyId?: string | null
   renewedFromPolicyNumber?: string | null
+  // Cargo fields
+  insuredValueAmount?: number
+  insuredValueCurrency?: string
+  insuredValueText?: string
+  portOfLoading?: string
+  portOfDestination?: string
+  estimatedDeparture?: string
+  subjectMatter?: string
+  anyOtherVessel?: boolean
+  premiumRate?: number
+  premiumType?: 'amount' | 'rate'
+  voyageText?: string
+  cargoClauseId?: string
   createdAt?: string
   updatedAt?: string
   createdBy?: string
@@ -1212,6 +1267,9 @@ export interface PISectionTexts {
   nonRefundablePercentText?: string
   informationNote?: string
   importantNotice?: string
+  importantNoticePI?: string
+  importantNoticeHull?: string
+  importantNoticeWar?: string
 }
 
 export interface PISanctionsVersion {

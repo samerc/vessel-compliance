@@ -2484,6 +2484,21 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: make hull_clause_id nullable on quotation_hull_alternatives
+            try {
+                const [hciCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'hull_clause_id'") as any[]
+                const colInfo = (hciCol as any[])[0]
+                if (colInfo && (colInfo.Null === 'NO' || colInfo.NULL === 'NO' || colInfo.null === 'NO')) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    try {
+                        await this.pool.query("ALTER TABLE quotation_hull_alternatives MODIFY COLUMN hull_clause_id VARCHAR(36) DEFAULT NULL")
+                    } finally {
+                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    }
+                }
+            } catch {}
+
+
             // Migrate email_templates rows into document_templates (email category)
             try {
                 const [etRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM email_templates') as any[]
@@ -2594,6 +2609,56 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotation_deductibles ADD COLUMN vessel_amounts TEXT DEFAULT NULL")
                 }
             }
+
+            // Migration: Per-vessel LOL amounts
+            {
+                const [lolVaCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'limit_of_liability_vessel_amounts'") as any[]
+                if ((lolVaCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN limit_of_liability_vessel_amounts TEXT DEFAULT NULL")
+                }
+            }
+
+            // Migration: Cargo quotation fields on quotations table
+            try {
+                const cargoFields = [
+                    "insured_value_amount DECIMAL(15,2) DEFAULT NULL",
+                    "insured_value_currency VARCHAR(10) DEFAULT 'USD'",
+                    "insured_value_text TEXT DEFAULT NULL",
+                    "port_of_loading TEXT DEFAULT NULL",
+                    "port_of_destination TEXT DEFAULT NULL",
+                    "estimated_departure TEXT DEFAULT NULL",
+                    "subject_matter TEXT DEFAULT NULL",
+                    "any_other_vessel BOOLEAN DEFAULT FALSE",
+                    "premium_rate DECIMAL(8,4) DEFAULT NULL",
+                    "premium_type VARCHAR(10) DEFAULT 'amount'",
+                    "voyage_text TEXT DEFAULT NULL"
+                ]
+                for (const field of cargoFields) {
+                    const colName = field.split(' ')[0]
+                    try {
+                        const [cargoCols] = await this.pool.query(`SHOW COLUMNS FROM quotations LIKE '${colName}'`) as any[]
+                        if ((cargoCols as any[]).length === 0) {
+                            await this.pool.query(`ALTER TABLE quotations ADD COLUMN ${field}`)
+                        }
+                    } catch {}
+                }
+            } catch {}
+
+            // Migration: cargo_clause_id on quotations
+            try {
+                const [cciCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'cargo_clause_id'") as any[]
+                if ((cciCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN cargo_clause_id VARCHAR(36) DEFAULT NULL")
+                }
+            } catch {}
+
+            // Seed Cargo quotation type if not exists
+            try {
+                const [existingCargo] = await this.pool.query("SELECT id FROM quotation_types WHERE code = 'C'") as any[]
+                if ((existingCargo as any[]).length === 0) {
+                    await this.pool.query("INSERT INTO quotation_types (id, name, code, order_index) VALUES (UUID(), 'Cargo', 'C', 5)")
+                }
+            } catch {}
 
         } catch (error) {
             console.error('Schema initialization failed:', error)
@@ -6513,6 +6578,7 @@ export class MySQLAdapter {
                 q.limit_of_liability_amount as limitOfLiabilityAmount,
                 q.limit_of_liability_currency as limitOfLiabilityCurrency,
                 q.limit_of_liability_text as limitOfLiabilityText,
+                q.limit_of_liability_vessel_amounts as limitOfLiabilityVesselAmountsRaw,
                 q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
                 q.num_instalments as numInstalments,
                 q.trading_warranty_intro as tradingWarrantyIntro,
@@ -6539,6 +6605,10 @@ export class MySQLAdapter {
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked, q.export_snapshot as exportSnapshotRaw,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor,
                 q.renewed_from_policy_id as renewedFromPolicyId, q.renewed_from_policy_number as renewedFromPolicyNumber,
+                q.insured_value_amount, q.insured_value_currency, q.insured_value_text,
+                q.port_of_loading, q.port_of_destination, q.estimated_departure,
+                q.subject_matter, q.any_other_vessel, q.premium_rate, q.premium_type, q.voyage_text,
+                q.cargo_clause_id as cargoClauseId,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
@@ -6560,6 +6630,8 @@ export class MySQLAdapter {
             tradingShowIsrael: r.tradingShowIsrael == null ? true : Boolean(r.tradingShowIsrael),
             tradingCustomMode: Boolean(r.tradingCustomMode),
             limitOfLiabilityAmount: r.limitOfLiabilityAmount ? Number(r.limitOfLiabilityAmount) : undefined,
+            limitOfLiabilityVesselAmounts: r.limitOfLiabilityVesselAmountsRaw ? (() => { try { return JSON.parse(r.limitOfLiabilityVesselAmountsRaw) } catch { return null } })() : null,
+            limitOfLiabilityVesselAmountsRaw: undefined,
             premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
             ncbDiscountType: r.ncbDiscountType || 'percentage',
             ncbDiscountPercent: r.ncbDiscountPercent ? Number(r.ncbDiscountPercent) : undefined,
@@ -6582,20 +6654,44 @@ export class MySQLAdapter {
             revisionGroupId: r.revisionGroupId || r.id,
             isLocked: Boolean(r.isLocked),
             exportSnapshot: r.exportSnapshotRaw || undefined,
-            exportSnapshotRaw: undefined
+            exportSnapshotRaw: undefined,
+            insuredValueAmount: r.insured_value_amount != null ? Number(r.insured_value_amount) : null,
+            insuredValueCurrency: r.insured_value_currency || 'USD',
+            insuredValueText: r.insured_value_text || null,
+            portOfLoading: r.port_of_loading || null,
+            portOfDestination: r.port_of_destination || null,
+            estimatedDeparture: r.estimated_departure || null,
+            subjectMatter: r.subject_matter || null,
+            anyOtherVessel: Boolean(r.any_other_vessel),
+            premiumRate: r.premium_rate != null ? Number(r.premium_rate) : null,
+            premiumType: r.premium_type || 'amount',
+            voyageText: r.voyage_text || null,
+            cargoClauseId: r.cargoClauseId || null,
         } as Quotation
+    }
+
+    /** Find the lowest available DRAFT-XXXX number (fills gaps from deleted drafts) */
+    private async nextDraftRef(): Promise<string> {
+        if (!this.pool) return 'DRAFT-0001'
+        const [draftRows] = await this.pool.query(
+            "SELECT reference_number FROM quotations WHERE reference_number LIKE 'DRAFT-%' ORDER BY reference_number ASC"
+        )
+        const usedNums = new Set((draftRows as any[]).map(r => {
+            const m = String(r.reference_number).match(/^DRAFT-(\d+)$/)
+            return m ? parseInt(m[1], 10) : 0
+        }))
+        let seq = 1
+        while (usedNums.has(seq)) seq++
+        return `DRAFT-${String(seq).padStart(4, '0')}`
     }
 
     async addQuotation(q: Partial<Quotation>): Promise<Quotation> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        // Auto-generate draft reference: DRAFT-XXXX
+        // Auto-generate draft reference: DRAFT-XXXX (reuse gaps from deleted drafts)
         let referenceNumber = q.referenceNumber || null
         if (!referenceNumber) {
-            const curSeq = await this.getSetting('draft_quotation_seq')
-            const nextSeq = (parseInt(curSeq || '0', 10) || 0) + 1
-            await this.setSetting('draft_quotation_seq', String(nextSeq))
-            referenceNumber = `DRAFT-${String(nextSeq).padStart(4, '0')}`
+            referenceNumber = await this.nextDraftRef()
         }
         await this.pool.execute(`
             INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number)
@@ -6629,7 +6725,19 @@ export class MySQLAdapter {
             ivEnabled: 'iv_enabled', ivValue: 'iv_value', ivCurrency: 'iv_currency', ivPremiumAmount: 'iv_premium_amount',
             hullClauseId: 'hull_clause_id', ivClauseId: 'iv_clause_id',
             coName: 'co_name', title: 'title',
-            sanctionsTextOverride: 'sanctions_text_override'
+            sanctionsTextOverride: 'sanctions_text_override',
+            insuredValueAmount: 'insured_value_amount',
+            insuredValueCurrency: 'insured_value_currency',
+            insuredValueText: 'insured_value_text',
+            portOfLoading: 'port_of_loading',
+            portOfDestination: 'port_of_destination',
+            estimatedDeparture: 'estimated_departure',
+            subjectMatter: 'subject_matter',
+            anyOtherVessel: 'any_other_vessel',
+            premiumRate: 'premium_rate',
+            premiumType: 'premium_type',
+            voyageText: 'voyage_text',
+            cargoClauseId: 'cargo_clause_id',
         }
         const fields: string[] = []
         const values: any[] = []
@@ -6648,6 +6756,11 @@ export class MySQLAdapter {
         if (updates.sectionOrder !== undefined) {
             fields.push('section_order = ?')
             values.push(updates.sectionOrder ? JSON.stringify(updates.sectionOrder) : null)
+        }
+        // Handle JSON-serialized limitOfLiabilityVesselAmounts
+        if (updates.limitOfLiabilityVesselAmounts !== undefined) {
+            fields.push('limit_of_liability_vessel_amounts = ?')
+            values.push(updates.limitOfLiabilityVesselAmounts ? JSON.stringify(updates.limitOfLiabilityVesselAmounts) : null)
         }
         if (fields.length === 0) return
         values.push(id)
@@ -6708,10 +6821,7 @@ export class MySQLAdapter {
         const refSeq = parseInt(parts[2], 10)
         if (isNaN(refSeq)) {
             // Can't parse — just set to draft
-            const draftSeqVal = await this.getSetting('draft_quotation_seq')
-            const draftSeq = (parseInt(draftSeqVal || '0', 10) || 0) + 1
-            await this.setSetting('draft_quotation_seq', String(draftSeq))
-            const newDraftRef = `DRAFT-${String(draftSeq).padStart(4, '0')}`
+            const newDraftRef = await this.nextDraftRef()
             await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [newDraftRef, quotationId])
             return
         }
@@ -6725,10 +6835,7 @@ export class MySQLAdapter {
             await this.setSetting('real_quotation_seq', String(currentMax - 1))
         }
         // In all cases, revert to a new draft number
-        const draftSeqVal = await this.getSetting('draft_quotation_seq')
-        const draftSeq = (parseInt(draftSeqVal || '0', 10) || 0) + 1
-        await this.setSetting('draft_quotation_seq', String(draftSeq))
-        const newDraftRef = `DRAFT-${String(draftSeq).padStart(4, '0')}`
+        const newDraftRef = await this.nextDraftRef()
         await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [newDraftRef, quotationId])
     }
 
@@ -6917,6 +7024,8 @@ export class MySQLAdapter {
             { table: 'quotation_instalments', cols: 'quotation_id, instalment_number, days_from_inception, description, non_refundable, non_refundable_percent' },
             { table: 'quotation_information', cols: 'quotation_id, text, order_index' },
             { table: 'quotation_notes', cols: 'quotation_id, title, content, order_index' },
+            { table: 'quotation_cargo_clauses', cols: 'quotation_id, cargo_clause_id, text_override, order_index, section' },
+            { table: 'quotation_cargo_custom_clauses', cols: 'quotation_id, text, section, order_index' },
         ]
 
         for (const { table, cols } of simpleTables) {
@@ -6949,10 +7058,7 @@ export class MySQLAdapter {
         let newRef: string
         const sourceRef = source.referenceNumber || ''
         if (sourceRef.startsWith('DRAFT-')) {
-            const revDraftSeqVal = await this.getSetting('draft_quotation_seq')
-            const revDraftSeq = (parseInt(revDraftSeqVal || '0', 10) || 0) + 1
-            await this.setSetting('draft_quotation_seq', String(revDraftSeq))
-            newRef = `DRAFT-${String(revDraftSeq).padStart(4, '0')}`
+            newRef = await this.nextDraftRef()
         } else {
             const baseRef = sourceRef.replace(/-R\d+$/, '')
             newRef = `${baseRef}-R${newRevisionNumber}`
@@ -6978,7 +7084,11 @@ export class MySQLAdapter {
                     agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
                     hull_clause_id, iv_clause_id, co_name, title,
                     section_texts_override, sanctions_text_override, section_order,
-                    revision_number, revision_group_id, is_locked, export_snapshot, created_by
+                    revision_number, revision_group_id, is_locked, export_snapshot, created_by,
+                    insured_value_amount, insured_value_currency, insured_value_text,
+                    port_of_loading, port_of_destination, estimated_departure,
+                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
+                    cargo_clause_id
                 )
                 SELECT
                     ?, ?, quotation_type_id, quotation_date, policy_type_id, vessel_id,
@@ -6993,7 +7103,11 @@ export class MySQLAdapter {
                     agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
                     hull_clause_id, iv_clause_id, co_name, title,
                     section_texts_override, sanctions_text_override, section_order,
-                    ?, ?, FALSE, NULL, created_by
+                    ?, ?, FALSE, NULL, created_by,
+                    insured_value_amount, insured_value_currency, insured_value_text,
+                    port_of_loading, port_of_destination, estimated_departure,
+                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
+                    cargo_clause_id
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newRevisionNumber, revisionGroupId, sourceId])
 
@@ -7052,11 +7166,8 @@ export class MySQLAdapter {
 
         const newId = uuidv4()
 
-        // Auto-generate new draft reference number
-        const dupDraftSeqVal = await this.getSetting('draft_quotation_seq')
-        const dupDraftSeq = (parseInt(dupDraftSeqVal || '0', 10) || 0) + 1
-        await this.setSetting('draft_quotation_seq', String(dupDraftSeq))
-        const newRef = `DRAFT-${String(dupDraftSeq).padStart(4, '0')}`
+        // Auto-generate new draft reference number (fills gaps from deleted drafts)
+        const newRef = await this.nextDraftRef()
 
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -7075,7 +7186,11 @@ export class MySQLAdapter {
                     agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
                     hull_clause_id, iv_clause_id, co_name, title,
                     section_texts_override, sanctions_text_override, section_order,
-                    revision_number, revision_group_id, is_locked, export_snapshot, created_by
+                    revision_number, revision_group_id, is_locked, export_snapshot, created_by,
+                    insured_value_amount, insured_value_currency, insured_value_text,
+                    port_of_loading, port_of_destination, estimated_departure,
+                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
+                    cargo_clause_id
                 )
                 SELECT
                     ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
@@ -7090,7 +7205,11 @@ export class MySQLAdapter {
                     agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
                     hull_clause_id, iv_clause_id, co_name, NULL,
                     section_texts_override, sanctions_text_override, section_order,
-                    0, ?, FALSE, NULL, created_by
+                    0, ?, FALSE, NULL, created_by,
+                    insured_value_amount, insured_value_currency, insured_value_text,
+                    port_of_loading, port_of_destination, estimated_departure,
+                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
+                    cargo_clause_id
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newId, sourceId])
 
@@ -7115,11 +7234,8 @@ export class MySQLAdapter {
 
         const newId = uuidv4()
 
-        // Auto-generate new draft reference number
-        const renewDraftSeqVal = await this.getSetting('draft_quotation_seq')
-        const renewDraftSeq = (parseInt(renewDraftSeqVal || '0', 10) || 0) + 1
-        await this.setSetting('draft_quotation_seq', String(renewDraftSeq))
-        const newRef = `DRAFT-${String(renewDraftSeq).padStart(4, '0')}`
+        // Auto-generate new draft reference number (fills gaps from deleted drafts)
+        const newRef = await this.nextDraftRef()
 
         // Calculate new period: add 1 year to inception/expiry
         const addOneYear = (dateStr: string): string => {
@@ -7154,7 +7270,11 @@ export class MySQLAdapter {
                     section_texts_override, sanctions_text_override, section_order,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
                     renewed_from_policy_id, renewed_from_policy_number,
-                    trading_custom_mode, trading_custom_wording
+                    trading_custom_mode, trading_custom_wording,
+                    insured_value_amount, insured_value_currency, insured_value_text,
+                    port_of_loading, port_of_destination, estimated_departure,
+                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
+                    cargo_clause_id
                 )
                 SELECT
                     ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
@@ -7171,7 +7291,11 @@ export class MySQLAdapter {
                     section_texts_override, sanctions_text_override, section_order,
                     0, ?, FALSE, NULL, ?,
                     ?, ?,
-                    trading_custom_mode, trading_custom_wording
+                    trading_custom_mode, trading_custom_wording,
+                    insured_value_amount, insured_value_currency, insured_value_text,
+                    port_of_loading, port_of_destination, estimated_departure,
+                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
+                    cargo_clause_id
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newPeriodText, newId, createdBy, policyId, policy.policyNumber || null, source.id])
 
@@ -9583,7 +9707,7 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined }))
     }
 
-    async addQuotationHullAlternative(quotationId: string, hullClauseId: string, label?: string, vesselScopeId?: string | null): Promise<any> {
+    async addQuotationHullAlternative(quotationId: string, hullClauseId?: string | null, label?: string, vesselScopeId?: string | null): Promise<any> {
         if (!this.pool) return null
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_hull_alternatives WHERE quotation_id = ?', [quotationId])
@@ -9592,12 +9716,12 @@ export class MySQLAdapter {
         try {
             await this.pool.execute(
                 'INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, label, order_index, vessel_scope_id) VALUES (?, ?, ?, ?, ?, ?)',
-                [id, quotationId, hullClauseId, label || null, order, vesselScopeId || null]
+                [id, quotationId, hullClauseId || null, label || null, order, vesselScopeId || null]
             )
         } finally {
             await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
         }
-        return { id, quotationId, hullClauseId, label: label || undefined, premiumAmount: undefined, order, vesselScopeId: vesselScopeId || null }
+        return { id, quotationId, hullClauseId: hullClauseId || null, label: label || undefined, premiumAmount: undefined, order, vesselScopeId: vesselScopeId || null }
     }
 
     async updateQuotationHullAlternative(id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null; vesselScopeId?: string | null }): Promise<void> {
@@ -11649,6 +11773,182 @@ export class MySQLAdapter {
              ORDER BY u.username`
         )
         return rows as any[]
+    }
+
+    // ==================== Cargo Clauses ====================
+
+    async getCargoClausesBySection(section: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, section, title, text, code, order_index as `order`, active FROM cargo_clauses WHERE section = ? ORDER BY order_index ASC',
+            [section]
+        )
+        return rows as any[]
+    }
+
+    async getAllCargoClauses(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, section, title, text, code, order_index as `order`, active FROM cargo_clauses WHERE active = TRUE ORDER BY section, order_index ASC'
+        )
+        return rows as any[]
+    }
+
+    async addCargoClause(section: string, title: string, text?: string, code?: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM cargo_clauses WHERE section = ?', [section])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute(
+            'INSERT INTO cargo_clauses (id, section, title, text, code, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, section, title, text || null, code || null, order]
+        )
+        return { id, section, title, text: text || null, code: code || null, order, active: true }
+    }
+
+    async updateCargoClause(id: string, updates: { title?: string; text?: string; code?: string; active?: boolean }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text || null) }
+        if (updates.code !== undefined) { fields.push('code = ?'); values.push(updates.code || null) }
+        if (updates.active !== undefined) { fields.push('active = ?'); values.push(updates.active) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE cargo_clauses SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteCargoClause(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM cargo_clauses WHERE id = ?', [id])
+    }
+
+    async reorderCargoClauses(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE cargo_clauses SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
+    // Per-quotation cargo clauses
+    async getQuotationCargoClauses(quotationId: string, section: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT qcc.id, qcc.quotation_id as quotationId, qcc.cargo_clause_id as cargoClauseId,
+                    qcc.text_override as textOverride, qcc.order_index as \`order\`, qcc.section,
+                    cc.title, cc.text, cc.code
+             FROM quotation_cargo_clauses qcc
+             JOIN cargo_clauses cc ON cc.id = qcc.cargo_clause_id
+             WHERE qcc.quotation_id = ? AND qcc.section = ?
+             ORDER BY qcc.order_index ASC`,
+            [quotationId, section]
+        )
+        return rows as any[]
+    }
+
+    async setQuotationCargoClauses(quotationId: string, section: string, items: { cargoClauseId: string; textOverride?: string }[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_cargo_clauses WHERE quotation_id = ? AND section = ?', [quotationId, section])
+        for (let i = 0; i < items.length; i++) {
+            const id = uuidv4()
+            await this.pool.execute(
+                'INSERT INTO quotation_cargo_clauses (id, quotation_id, cargo_clause_id, text_override, order_index, section) VALUES (?, ?, ?, ?, ?, ?)',
+                [id, quotationId, items[i].cargoClauseId, items[i].textOverride || null, i, section]
+            )
+        }
+    }
+
+    async getQuotationCargoCustomClauses(quotationId: string, section: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, quotation_id as quotationId, text, section, order_index as \`order\`
+             FROM quotation_cargo_custom_clauses
+             WHERE quotation_id = ? AND section = ?
+             ORDER BY order_index ASC`,
+            [quotationId, section]
+        )
+        return rows as any[]
+    }
+
+    async addQuotationCargoCustomClause(quotationId: string, section: string, text: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query(
+            'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_cargo_custom_clauses WHERE quotation_id = ? AND section = ?',
+            [quotationId, section]
+        )
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute(
+            'INSERT INTO quotation_cargo_custom_clauses (id, quotation_id, text, section, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, quotationId, text, section, order]
+        )
+        return { id, quotationId, text, section, order }
+    }
+
+    async updateQuotationCargoCustomClause(id: string, updates: { text?: string }): Promise<void> {
+        if (!this.pool) return
+        if (updates.text !== undefined) {
+            await this.pool.execute('UPDATE quotation_cargo_custom_clauses SET text = ? WHERE id = ?', [updates.text, id])
+        }
+    }
+
+    async deleteQuotationCargoCustomClause(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_cargo_custom_clauses WHERE id = ?', [id])
+    }
+
+    async reorderQuotationCargoCustomClauses(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE quotation_cargo_custom_clauses SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
+    }
+
+    // Cargo Institute Clauses (ICC A/B/C)
+    async getCargoInstituteClauses(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, name, code, description, order_index as `order`, active FROM cargo_institute_clauses ORDER BY order_index ASC'
+        )
+        return rows as any[]
+    }
+
+    async addCargoInstituteClause(name: string, code?: string, description?: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM cargo_institute_clauses')
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute(
+            'INSERT INTO cargo_institute_clauses (id, name, code, description, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, name, code || null, description || null, order]
+        )
+        return { id, name, code: code || null, description: description || null, order, active: true }
+    }
+
+    async updateCargoInstituteClause(id: string, updates: { name?: string; code?: string; description?: string; active?: boolean }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.code !== undefined) { fields.push('code = ?'); values.push(updates.code || null) }
+        if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description || null) }
+        if (updates.active !== undefined) { fields.push('active = ?'); values.push(updates.active) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE cargo_institute_clauses SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteCargoInstituteClause(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM cargo_institute_clauses WHERE id = ?', [id])
+    }
+
+    async reorderCargoInstituteClauses(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE cargo_institute_clauses SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
     }
 }
 

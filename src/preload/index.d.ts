@@ -1,4 +1,4 @@
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText, FlagStatePort, Notification, NotificationGroup, RecentItem, DocumentTemplate, SavedReport, ReportConfig, CustomValidationRule, PolicyTcTemplate } from '../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, SanctionsMatch, FileTypeSettings, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, ComplianceScheduleSettings, ComplianceCheckLog, ComplianceCheckResult, PaginatedResult, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, QuotationNewVessel, QuotationAssured, QuotationSubLimit, QuotationVessel, QuotationDeductible, QuotationTextDeductible, QuotationExcludedCountry, QuotationCustomWarranty, QuotationInstalment, QuotationNote, PISectionTexts, PISanctionsVersion, InstalmentDefaults, VesselInsurancePolicy, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, ReportSettings, SurveyWarranty, SurveyWarrantyReminder, PISubjectivity, QuotationSubjectivity, QuotationCustomExclusion, QuotationCustomSection, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, CargoClause, CargoInstituteClause, QuotationCargoClause, QuotationCargoCustomClause, EntityAddress, UserGroup, WorkflowStep, WorkflowTransition, QuotationWorkflowLog, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, TradingCustomText, FlagStatePort, Notification, NotificationGroup, RecentItem, DocumentTemplate, SavedReport, ReportConfig, CustomValidationRule, PolicyTcTemplate } from '../shared/types'
 
 export interface Api {
   login: (username: string, password: string) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
@@ -295,7 +295,7 @@ export interface Api {
   updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => Promise<void>
   // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => Promise<QuotationHullAlternative[]>
-  hullAddQuotationAlternative: (qId: string, hullClauseId: string, label?: string, vesselScopeId?: string | null) => Promise<QuotationHullAlternative>
+  hullAddQuotationAlternative: (qId: string, hullClauseId?: string | null, label?: string, vesselScopeId?: string | null) => Promise<QuotationHullAlternative>
   hullUpdateQuotationAlternative: (id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null; vesselScopeId?: string | null }) => Promise<void>
   hullDeleteQuotationAlternative: (id: string) => Promise<void>
   hullReorderQuotationAlternatives: (ids: string[]) => Promise<void>
@@ -313,6 +313,26 @@ export interface Api {
   warSetQuotationWarConditions: (qId: string, items: { warConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]) => Promise<void>
   warGetSettings: () => Promise<WarSettings>
   warSetSettings: (settings: WarSettings) => Promise<void>
+
+  // Cargo
+  cargoGetInstituteClauses: () => Promise<CargoInstituteClause[]>
+  cargoAddInstituteClause: (name: string, code?: string, description?: string) => Promise<CargoInstituteClause>
+  cargoUpdateInstituteClause: (id: string, updates: { name?: string; code?: string; description?: string; active?: boolean }) => Promise<void>
+  cargoDeleteInstituteClause: (id: string) => Promise<void>
+  cargoReorderInstituteClauses: (ids: string[]) => Promise<void>
+  cargoGetClauses: (section: string) => Promise<CargoClause[]>
+  cargoGetAllClauses: () => Promise<CargoClause[]>
+  cargoAddClause: (section: string, title: string, text?: string, code?: string) => Promise<CargoClause>
+  cargoUpdateClause: (id: string, updates: { title?: string; text?: string; code?: string; active?: boolean }) => Promise<void>
+  cargoDeleteClause: (id: string) => Promise<void>
+  cargoReorderClauses: (ids: string[]) => Promise<void>
+  cargoGetQuotationClauses: (qId: string, section: string) => Promise<QuotationCargoClause[]>
+  cargoSetQuotationClauses: (qId: string, section: string, items: { cargoClauseId: string; textOverride?: string }[]) => Promise<void>
+  cargoGetQuotationCustomClauses: (qId: string, section: string) => Promise<QuotationCargoCustomClause[]>
+  cargoAddQuotationCustomClause: (qId: string, section: string, text: string) => Promise<QuotationCargoCustomClause>
+  cargoUpdateQuotationCustomClause: (id: string, updates: { text?: string }) => Promise<void>
+  cargoDeleteQuotationCustomClause: (id: string) => Promise<void>
+  cargoReorderQuotationCustomClauses: (ids: string[]) => Promise<void>
 
   piGetWarrantyTags: () => Promise<PIWarrantyTag[]>
   piAddWarrantyTag: (name: string) => Promise<PIWarrantyTag>
