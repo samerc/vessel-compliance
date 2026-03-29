@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Pencil } from 'lucide-react'
-import { Quotation, QuotationSubLimit, PISectionTexts } from '../../../../shared/types'
+import { Quotation, QuotationSubLimit, QuotationVessel, PISectionTexts } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 
 export default function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveText }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [subLimits, setSubLimits] = useState<QuotationSubLimit[]>([])
     const [templates, setTemplates] = useState<import('../../../../shared/types').PISubLimitTemplate[]>([])
+    const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [newText, setNewText] = useState('')
     const [newAmount, setNewAmount] = useState('')
     const [newCurrency, setNewCurrency] = useState('USD')
@@ -13,12 +14,14 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
-        const [sl, tmpl] = await Promise.all([
+        const [sl, tmpl, qv] = await Promise.all([
             window.api.getQuotationSubLimits(quotation.id),
-            window.api.piGetSubLimitTemplates()
+            window.api.piGetSubLimitTemplates(),
+            window.api.getQuotationVessels(quotation.id)
         ])
         setSubLimits(sl)
         setTemplates(Array.isArray(tmpl) ? tmpl : [])
+        setQVessels(Array.isArray(qv) ? qv : [])
     }
 
     const handleAddSubLimit = async () => {
@@ -58,6 +61,39 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                     <input type="number" value={quotation.limitOfLiabilityAmount || ''} onChange={e => { setQ(p => ({ ...p, limitOfLiabilityAmount: parseFloat(e.target.value) || undefined })) }} onBlur={e => updateField('limitOfLiabilityAmount', parseFloat(e.target.value) || null)} style={{ width: '180px' }} />
                 </div>
             </div>
+
+            {qVessels.length >= 2 && (
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+                        Per-Vessel Override (leave blank to use the amount above)
+                    </label>
+                    {qVessels.map(v => {
+                        const va = quotation.limitOfLiabilityVesselAmounts || {}
+                        const vesselAmount = va[v.id]
+                        return (
+                            <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                                <input
+                                    type="number"
+                                    value={vesselAmount ?? ''}
+                                    placeholder={quotation.limitOfLiabilityAmount?.toLocaleString() || '0'}
+                                    onChange={e => {
+                                        const val = e.target.value ? parseFloat(e.target.value) : undefined
+                                        const updated = { ...(quotation.limitOfLiabilityVesselAmounts || {}) }
+                                        if (val !== undefined) updated[v.id] = val
+                                        else delete updated[v.id]
+                                        const newVal = Object.keys(updated).length > 0 ? updated : null
+                                        setQ(p => ({ ...p, limitOfLiabilityVesselAmounts: newVal }))
+                                        updateField('limitOfLiabilityVesselAmounts', newVal)
+                                    }}
+                                    style={{ width: '160px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
+                                />
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
 
             {/* Standard text preview + override */}
             <div style={{ marginBottom: '14px' }}>
