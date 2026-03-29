@@ -549,16 +549,8 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
 
     // Alternative management
     const addAlternative = async (vesselScopeId?: string | null) => {
-        const hmClauses = hullClauses.filter(c => c.conditionSection !== 'iv')
-        if (hmClauses.length === 0) return
-        // Pick first clause not already used by an alternative in the same scope
-        const scopeAlts = vesselScopeId
-            ? alternatives.filter(a => a.vesselScopeId === vesselScopeId)
-            : alternatives.filter(a => !a.vesselScopeId)
-        const usedIds = new Set(scopeAlts.map(a => a.hullClauseId))
-        const available = hmClauses.find(c => !usedIds.has(c.id)) || hmClauses[0]
         try {
-            const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, available.id, undefined, vesselScopeId)
+            const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, null, undefined, vesselScopeId)
             if (newAlt && !(newAlt as any).error) {
                 const updated = [...alternatives, newAlt]
                 setAlternatives(updated)
@@ -894,7 +886,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 {alts.map((alt, idx) => {
                     const clause = hullClauses.find(c => c.id === alt.hullClauseId)
                     const clauseConditions = allConditions.filter(c => c.hullClauseId === alt.hullClauseId)
-                    const altLabel = isMulti ? `Alternative ${idx + 1}` : (quotation.ivEnabled ? 'Section A — Hull and Machinery' : 'Hull Clause')
+                    const altLabel = isMulti ? `Alternative ${idx + 1}` : (quotation.ivEnabled ? 'Section A — Hull and Machinery' : '')
                     const accentColor = isMulti ? ALT_COLORS[idx % ALT_COLORS.length] : 'transparent'
 
                     return (
@@ -931,6 +923,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                 selectedId={alt.hullClauseId}
                                 onChange={(clauseId) => changeAlternativeClause(alt.id, clauseId)}
                                 description={clause?.description}
+                                hideLabel={isMulti}
                             />
 
                             {alt.hullClauseId && (
@@ -969,7 +962,26 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     const isSharedEmptyState = selectedVesselScope === null && visibleAlternatives.length === 0
 
     return (
-        <div>
+        <>
+        <div className="glass-card" style={{ padding: '24px', minHeight: '300px', position: 'relative', zIndex: 2 }}>
+            {qVessels.length >= 2 && (
+                <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px 12px',
+                    padding: '8px 14px',
+                    marginBottom: '2px',
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)'
+                }}>
+                    {qVessels.map(v => (
+                        <span key={v.id}>
+                            <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
+                            {' '}{(v.name || v.vesselLabel).toUpperCase()}
+                        </span>
+                    ))}
+                </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Hull Conditions</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1274,35 +1286,6 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 </>
             )}
 
-            {/* Divider before additional conditions (only when viewing shared scope) */}
-            {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
-                <>
-                    <div className="glass-card" style={{ padding: '20px', marginTop: '20px' }}>
-                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            Additional Conditions
-                        </h4>
-
-                    {/* Additional Conditions */}
-                    <HullConditionPicker
-                        label=""
-                        items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
-                        selectedIds={selectedAddIds}
-                        onToggle={toggleAdditional}
-                        overrides={additionalOverrides}
-                        onOverrideChange={updateAdditionalOverride}
-                        onOverrideBlur={saveAdditionalOverrides}
-                        scopes={additionalScopes}
-                        onScopeChange={updateAdditionalScope}
-                        vessels={qVessels}
-                        emptyText="No additional conditions for the selected clause. Add them in Quotation Settings → Hull Additional Conditions."
-                        amounts={additionalAmounts}
-                        onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
-                        onAmountBlur={saveAdditionalOverrides}
-                    />
-                    </div>
-                </>
-            )}
-
             {/* Shared section at bottom (always visible when viewing a vessel override) */}
             {selectedVesselScope !== null && !isVesselEmptyState && !isSharedEmptyState && sharedAlternatives.length > 0 && (
                 <>
@@ -1384,5 +1367,31 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 </>
             )}
         </div>
+
+        {/* Additional Conditions — separate card */}
+        {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
+            <div className="glass-card" style={{ padding: '24px', marginTop: '16px' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
+                    Additional Conditions
+                </h4>
+                <HullConditionPicker
+                    label=""
+                    items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
+                    selectedIds={selectedAddIds}
+                    onToggle={toggleAdditional}
+                    overrides={additionalOverrides}
+                    onOverrideChange={updateAdditionalOverride}
+                    onOverrideBlur={saveAdditionalOverrides}
+                    scopes={additionalScopes}
+                    onScopeChange={updateAdditionalScope}
+                    vessels={qVessels}
+                    emptyText="No additional conditions for the selected clause. Add them in Quotation Settings → Hull Additional Conditions."
+                    amounts={additionalAmounts}
+                    onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
+                    onAmountBlur={saveAdditionalOverrides}
+                />
+            </div>
+        )}
+        </>
     )
 }
