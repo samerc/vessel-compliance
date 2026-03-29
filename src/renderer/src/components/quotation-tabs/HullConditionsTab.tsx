@@ -5,11 +5,12 @@ import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { ALT_COLORS } from './shared'
 
-function HullClauseDropdown({ clauses, selectedId, onChange, description }: {
+function HullClauseDropdown({ clauses, selectedId, onChange, description, hideLabel }: {
     clauses: HullClause[]
     selectedId: string
     onChange: (id: string) => void
     description?: string
+    hideLabel?: boolean
 }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
@@ -27,7 +28,7 @@ function HullClauseDropdown({ clauses, selectedId, onChange, description }: {
 
     return (
         <div style={{ marginBottom: '20px' }} ref={ref}>
-            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Hull Clause</label>
+            {!hideLabel && <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Hull Clause</label>}
             <div style={{ position: 'relative' }}>
                 <button
                     type="button"
@@ -886,7 +887,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     }
 
     // Render a set of alternatives (used both in shared and per-vessel views)
-    const renderAlternatives = (alts: QuotationHullAlternative[], vesselScopeId?: string | null) => {
+    const renderAlternatives = (alts: QuotationHullAlternative[], _vesselScopeId?: string | null) => {
         const isMulti = alts.length > 1
         return (
             <>
@@ -958,18 +959,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     )
                 })}
 
-                {/* Add Alternative button */}
-                <button
-                    onClick={() => addAlternative(vesselScopeId)}
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        background: 'none', border: '1px dashed var(--input-border)',
-                        borderRadius: '6px', padding: '6px 12px', cursor: 'pointer',
-                        color: 'var(--accent)', fontSize: '0.8rem', marginBottom: '16px'
-                    }}
-                >
-                    <Plus size={14} /> Add Alternative
-                </button>
+                {/* Add Alternative button moved to top toolbar */}
             </>
         )
     }
@@ -991,6 +981,16 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     >
                         <RefreshCw size={12} /> Sync from Settings
                     </button>
+                    {!isSharedEmptyState && visibleAlternatives.length > 0 && (
+                        <button
+                            onClick={() => addAlternative(selectedVesselScope)}
+                            className="btn-primary"
+                            style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Add another hull clause alternative"
+                        >
+                            <Plus size={12} /> Add Alternative
+                        </button>
+                    )}
                 </div>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
@@ -1189,7 +1189,6 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             {isSharedEmptyState && (
                 <div style={{
                     padding: '32px 24px',
-                    textAlign: 'center',
                     borderRadius: '10px',
                     border: '1px dashed var(--input-border)',
                     background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
@@ -1200,12 +1199,28 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     <HullClauseDropdown
                         clauses={quotation.ivEnabled ? hmClauses : hullClauses}
                         selectedId=""
+                        hideLabel
                         onChange={async (clauseId) => {
                             try {
                                 const newAlt = await window.api.hullAddQuotationAlternative(quotation.id, clauseId)
                                 if (newAlt && !(newAlt as any).error) {
                                     setAlternatives([newAlt])
                                     try { updateField('hullClauseId', clauseId) } catch {}
+                                    // Auto-select default conditions
+                                    const clauseConds = allConditions.filter(c => c.hullClauseId === clauseId && c.defaultSelected)
+                                    if (clauseConds.length > 0) {
+                                        const newConds = clauseConds.map(c => ({
+                                            hullConditionId: c.id,
+                                            alternativeId: newAlt.id,
+                                            textOverride: null,
+                                            amount: null,
+                                            vesselScope: null,
+                                            vesselAmounts: null
+                                        }))
+                                        const updated = [...qConditions, ...newConds.map(c => ({ ...c, id: '', quotationId: quotation.id } as any))]
+                                        await window.api.hullSetQuotationHullConditions(quotation.id, updated)
+                                        setQConditions(updated)
+                                    }
                                 }
                             } catch {}
                         }}
@@ -1262,11 +1277,14 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             {/* Divider before additional conditions (only when viewing shared scope) */}
             {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
                 <>
-                    <div style={{ borderTop: '1px solid var(--table-border)', margin: '8px 0 16px' }} />
+                    <div className="glass-card" style={{ padding: '20px', marginTop: '20px' }}>
+                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            Additional Conditions
+                        </h4>
 
                     {/* Additional Conditions */}
                     <HullConditionPicker
-                        label="Additional Conditions"
+                        label=""
                         items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
                         selectedIds={selectedAddIds}
                         onToggle={toggleAdditional}
@@ -1281,6 +1299,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                         onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
                         onAmountBlur={saveAdditionalOverrides}
                     />
+                    </div>
                 </>
             )}
 
