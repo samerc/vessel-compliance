@@ -1160,7 +1160,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
         const hmClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
-        const hmConds = hc.filter(qc => hmClauseId && getCondClauseId(qc) === hmClauseId)
+        const hmConds = hc.filter(qc => hmClauseId && getCondClauseId(qc) === hmClauseId && !(ivClauseId && getCondClauseId(qc) === ivClauseId))
         hcBlocks.push({ title: 'Hull and Machinery', underline: true, desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hmConds), addl: renderAddlForSection(b => b.type === 'alt' || b.type === 'allAlts') })
         hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         const bothAddl = renderAddlForSection(b => b.type === 'both')
@@ -2825,7 +2825,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const singleAlt = dAlts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
         const dHmClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
-        const dHmConds = hc.filter(qc => dHmClauseId && dGetCondClauseId(qc) === dHmClauseId)
+        const dHmConds = hc.filter(qc => dHmClauseId && dGetCondClauseId(qc) === dHmClauseId && !(dIvClauseId && dGetCondClauseId(qc) === dIvClauseId))
 
         if (selectedClause) {
           hcContent.push(bup('Hull and Machinery'))
