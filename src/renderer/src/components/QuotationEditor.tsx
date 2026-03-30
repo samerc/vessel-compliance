@@ -64,7 +64,7 @@ const allTabs: TabDef[] = [
     { key: 'trading', label: 'Trading', icon: Globe, types: ['P', 'H'] },
     { key: 'warTrading', label: 'Trading Warranty', icon: Globe, types: ['W'] },
     { key: 'warranties', label: 'Warranties', icon: CheckSquare, types: ['P', 'H', 'W', 'F', 'L'] },
-    { key: 'surveyWarranties', label: 'Survey Warranties', icon: ClipboardCheck, types: ['P', 'H', 'W', 'F', 'L'] },
+    { key: 'surveyWarranties', label: 'Survey Warranties', icon: ClipboardCheck, types: ['P', 'H', 'F', 'L'] },
     { key: 'deductibles', label: 'Deductibles', icon: Scale, types: ['P'] },
     { key: 'exclusions', label: 'Exclusions', icon: Ban, types: ['P'] },
     { key: 'cargoSpecial', label: 'Special Conditions', icon: FileText, types: ['C'] },
@@ -267,10 +267,15 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             if (q.exportSnapshot) {
                 await window.api.clearExportSnapshot(q.id)
             }
-            // Always reload excluded/DDQ countries from master list
+            // Always reload excluded/DDQ countries from master list, filtered by quotation type
             const masterCountries = await window.api.piGetTradingExcludedCountries()
             if (Array.isArray(masterCountries) && masterCountries.length > 0) {
-                await window.api.setQuotationExcludedCountries(q.id, masterCountries.map((c: any) => ({
+                const typeCode = q.quotationTypeCode || 'P'
+                const filtered = masterCountries.filter((c: any) => {
+                    if (!c.excludeTypes) return true // null = all types
+                    return c.excludeTypes.split(',').includes(typeCode)
+                })
+                await window.api.setQuotationExcludedCountries(q.id, filtered.map((c: any) => ({
                     name: c.name,
                     listType: c.listType
                 })))

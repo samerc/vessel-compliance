@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS trading_excluded_countries (
   name VARCHAR(255) NOT NULL,
   iso3_code VARCHAR(3) NOT NULL,
   list_type VARCHAR(20) NOT NULL DEFAULT 'excluded',
+  exclude_types VARCHAR(50) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

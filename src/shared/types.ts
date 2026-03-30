@@ -724,6 +724,7 @@ export interface TradingExcludedCountry {
   name: string
   iso3Code: string
   listType: 'excluded' | 'ddq'
+  excludeTypes?: string | null // comma-separated type codes e.g. "P,H" or null (all types)
 }
 
 export interface TradingWarrantyTemplate {

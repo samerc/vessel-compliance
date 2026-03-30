@@ -2677,6 +2677,14 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: exclude_types on trading_excluded_countries
+            try {
+                const [etCol] = await this.pool.query("SHOW COLUMNS FROM trading_excluded_countries LIKE 'exclude_types'") as any[]
+                if ((etCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE trading_excluded_countries ADD COLUMN exclude_types VARCHAR(50) DEFAULT NULL")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -6312,7 +6320,7 @@ export class MySQLAdapter {
 
     async getTradingExcludedCountries(): Promise<TradingExcludedCountry[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, iso3_code as iso3Code, list_type as listType FROM trading_excluded_countries ORDER BY name ASC')
+        const [rows] = await this.pool.query('SELECT id, name, iso3_code as iso3Code, list_type as listType, exclude_types as excludeTypes FROM trading_excluded_countries ORDER BY name ASC')
         return rows as TradingExcludedCountry[]
     }
 
@@ -6320,8 +6328,8 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO trading_excluded_countries (id, name, iso3_code, list_type) VALUES (?, ?, ?, ?)',
-            [id, country.name, country.iso3Code, country.listType]
+            'INSERT INTO trading_excluded_countries (id, name, iso3_code, list_type, exclude_types) VALUES (?, ?, ?, ?, ?)',
+            [id, country.name, country.iso3Code, country.listType, country.excludeTypes || null]
         )
         return { ...country, id }
     }
@@ -6333,6 +6341,7 @@ export class MySQLAdapter {
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.iso3Code !== undefined) { fields.push('iso3_code = ?'); values.push(updates.iso3Code) }
         if (updates.listType !== undefined) { fields.push('list_type = ?'); values.push(updates.listType) }
+        if (updates.excludeTypes !== undefined) { fields.push('exclude_types = ?'); values.push(updates.excludeTypes) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE trading_excluded_countries SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -6720,9 +6729,9 @@ export class MySQLAdapter {
         `, [
             id, referenceNumber, q.quotationTypeId || null, q.quotationDate || null, q.policyTypeId || null, q.vesselId || null,
             q.isRenewal || false, q.status || 'draft', q.periodText || null, q.validityDays || 14,
-            q.sanctionsClauseVersion || 'standard', q.vdrDeductibleEnabled !== false, q.createdBy || null, id
+            q.sanctionsClauseVersion || null, q.vdrDeductibleEnabled !== false, q.createdBy || null, id
         ])
-        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || 'standard', vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: referenceNumber || '' } as Quotation
+        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || null, vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: referenceNumber || '' } as Quotation
     }
 
     async updateQuotation(id: string, updates: Partial<Quotation>): Promise<void> {

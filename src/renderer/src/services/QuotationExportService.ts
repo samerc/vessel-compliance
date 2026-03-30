@@ -1641,9 +1641,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
       if (data.instalments.length > 0) premText += '\n'
     }
+    if (q.premiumAdditionalText) premText += stripHtml(q.premiumAdditionalText) + '\n\n'
     if (st(data, 'premiumCondition')) premText += stripHtml(st(data, 'premiumCondition')) + '\n\n'
     if (st(data, 'premiumEarned')) premText += stripHtml(st(data, 'premiumEarned')) + '\n\n'
-    if (q.premiumAdditionalText) premText += stripHtml(q.premiumAdditionalText)
     sectionMap.set('premium', ['Premium Payment\nCondition Precedent', premText.trim()])
 
     // NCB as separate section
@@ -3454,9 +3454,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         premContent.push(emptyP())
       }
     }
+    if (wq.premiumAdditionalText) { premContent.push(...mp(wq.premiumAdditionalText)); premContent.push(emptyP()) }
     if (st(data, 'premiumCondition')) { premContent.push(...mp(st(data, 'premiumCondition'))); premContent.push(emptyP()) }
     if (st(data, 'premiumEarned')) { premContent.push(...mp(st(data, 'premiumEarned'))); premContent.push(emptyP()) }
-    if (wq.premiumAdditionalText) premContent.push(...mp(wq.premiumAdditionalText))
     rowMap.set('premium', makeRow('Premium Payment Condition Precedent', premContent.length > 0 ? premContent : [emptyP()]))
 
     // NCB as separate section

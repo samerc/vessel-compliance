@@ -40,9 +40,14 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
         setCountries(qc)
         if (qc.length === 0 && masterCountries.length > 0 && !initRef.current) {
             initRef.current = true
-            // Check for type-specific default excluded countries
             const typeCode = quotation.quotationTypeCode || 'P'
-            let countriesToSet: { name: string; listType: string }[] = masterCountries
+            // Filter master countries by exclude_types: null = all types, otherwise check type code
+            const typeFiltered = masterCountries.filter((c: any) => {
+                if (!c.excludeTypes) return true // null = applies to all types
+                return c.excludeTypes.split(',').includes(typeCode)
+            })
+            // Check for type-specific default excluded countries (legacy app_settings override)
+            let countriesToSet: { name: string; listType: string }[] = typeFiltered
             try {
                 const typeDefaultsRaw = await window.api.getSetting(`default_excluded_countries_${typeCode}`)
                 if (typeDefaultsRaw) {
@@ -53,8 +58,8 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
                 }
             } catch {}
             // Fallback: For Hull type with no type-specific defaults, use Israel + DDQ only
-            if (countriesToSet === masterCountries && typeCode === 'H') {
-                countriesToSet = masterCountries.filter(c => c.listType === 'ddq' || c.name.toLowerCase() === 'israel')
+            if (countriesToSet === typeFiltered && typeCode === 'H') {
+                countriesToSet = typeFiltered.filter(c => c.listType === 'ddq' || c.name.toLowerCase() === 'israel')
             }
             await window.api.setQuotationExcludedCountries(quotation.id, countriesToSet.map(c => ({ name: c.name, listType: c.listType })))
             const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)

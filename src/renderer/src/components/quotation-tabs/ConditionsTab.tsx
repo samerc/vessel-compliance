@@ -17,6 +17,7 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
     const [additionalClauseSets, setAdditionalClauseSets] = useState<PIAdditionalClauseSet[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const additionalDefaultsApplied = useRef(false)
+    const clauseDefaultsApplied = useRef(false)
 
     useEffect(() => { loadData() }, [])
 
@@ -45,6 +46,24 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
         setAllAdditional(safeAllAdd)
         setAdditionalClauseSets(Array.isArray(addSets) ? addSets : [])
         setQVessels(Array.isArray(qv) ? qv : [])
+
+        // Auto-select all active clauses on first load if none are selected
+        const safeClauses = Array.isArray(clauses) ? clauses : []
+        if (!clauseDefaultsApplied.current && safeSelected.length === 0 && safeClauses.length > 0) {
+            clauseDefaultsApplied.current = true
+            const allClauseIds = safeClauses.map((c: PIClause) => c.id)
+            try {
+                await window.api.setQuotationClauses(quotation.id, allClauseIds, {})
+                const freshSelected = await window.api.getQuotationClauses(quotation.id)
+                const safeFresh = Array.isArray(freshSelected) ? freshSelected : []
+                setSelectedIds(new Set(safeFresh.map((r: any) => r.piClauseId)))
+                setClauseRows(safeFresh.map((r: any) => ({ id: r.id, piClauseId: r.piClauseId, alternativeId: r.alternativeId || null })))
+            } catch (err) {
+                // Silently fail — user can manually select
+            }
+        } else {
+            clauseDefaultsApplied.current = true
+        }
 
         // Auto-add default additional clauses on first load if none exist
         if (!additionalDefaultsApplied.current && safeAddCl.length === 0 && safeAllAdd.length > 0) {

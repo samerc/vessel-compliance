@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck, GripVertical } from 'lucide-react'
 import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, QuotationTypeScope, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -1810,6 +1810,41 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
         loadData()
     }
 
+    const TYPE_CODES_SHORT = [
+        { code: 'P', label: 'P&I', color: '#6464ff' },
+        { code: 'H', label: 'H&M', color: '#ff64c8' },
+        { code: 'W', label: 'War', color: '#ff8c32' },
+    ]
+
+    const getExcludeTypesArr = (c: TradingExcludedCountry): string[] => {
+        if (!c.excludeTypes) return [] // null = all types (legacy)
+        return c.excludeTypes.split(',').filter(Boolean)
+    }
+
+    const isExcludedForType = (c: TradingExcludedCountry, code: string): boolean => {
+        if (!c.excludeTypes) return true // null = excluded for all types
+        return c.excludeTypes.split(',').includes(code)
+    }
+
+    const handleToggleExcludeType = async (c: TradingExcludedCountry, code: string) => {
+        const current = getExcludeTypesArr(c)
+        const isAll = !c.excludeTypes // null means all
+        let next: string[]
+        if (isAll) {
+            // Currently all — uncheck this code means keep all except this one
+            next = TYPE_CODES_SHORT.map(t => t.code).filter(tc => tc !== code)
+        } else if (current.includes(code)) {
+            next = current.filter(tc => tc !== code)
+        } else {
+            next = [...current, code]
+        }
+        // If all types selected, store null (meaning all)
+        const allSelected = TYPE_CODES_SHORT.every(t => next.includes(t.code))
+        const excludeTypes = allSelected ? null : (next.length > 0 ? next.join(',') : '')
+        await window.api.piUpdateTradingExcludedCountry(c.id, { excludeTypes })
+        loadData()
+    }
+
     const excluded = countries.filter(c => c.listType === 'excluded')
     const ddq = countries.filter(c => c.listType === 'ddq')
 
@@ -1851,13 +1886,21 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <section className="glass-card" style={{ padding: '20px' }}>
                     <h3 style={{ fontSize: '1rem', marginBottom: '14px', color: 'var(--danger)' }}>Excluded Countries</h3>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade with these countries is prohibited.</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade with these countries is prohibited. Use type checkboxes to limit exclusion to specific quotation types.</p>
                     {excluded.length === 0 ? (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No excluded countries</div>
                     ) : excluded.map(c => (
                         <div key={c.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{c.iso3Code}</span>
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                {TYPE_CODES_SHORT.map(tc => (
+                                    <label key={tc.code} title={`Exclude for ${tc.label}`} style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.7rem', cursor: 'pointer', padding: '2px 5px', borderRadius: '4px', border: isExcludedForType(c, tc.code) ? `1px solid ${tc.color}` : '1px solid var(--table-border)', background: isExcludedForType(c, tc.code) ? `${tc.color}1a` : 'transparent', color: isExcludedForType(c, tc.code) ? tc.color : 'var(--text-secondary)' }}>
+                                        <input type="checkbox" checked={isExcludedForType(c, tc.code)} onChange={() => handleToggleExcludeType(c, tc.code)} style={{ width: '12px', height: '12px', accentColor: tc.color }} />
+                                        {tc.label}
+                                    </label>
+                                ))}
+                            </div>
                             <button onClick={() => handleToggleType(c.id, c.listType)} className="btn-secondary" title="Move to DDQ list" style={{ padding: '3px 6px', fontSize: '0.68rem' }}>DDQ</button>
                             <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                         </div>
@@ -1866,13 +1909,21 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
 
                 <section className="glass-card" style={{ padding: '20px' }}>
                     <h3 style={{ fontSize: '1rem', marginBottom: '14px', color: isLight ? '#8a6d00' : '#ffc107' }}>DDQ Required Countries</h3>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade requires Due Diligence Questionnaire.</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Trade requires Due Diligence Questionnaire. Use type checkboxes to limit to specific quotation types.</p>
                     {ddq.length === 0 ? (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No DDQ countries</div>
                     ) : ddq.map(c => (
                         <div key={c.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{c.iso3Code}</span>
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                {TYPE_CODES_SHORT.map(tc => (
+                                    <label key={tc.code} title={`DDQ for ${tc.label}`} style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.7rem', cursor: 'pointer', padding: '2px 5px', borderRadius: '4px', border: isExcludedForType(c, tc.code) ? `1px solid ${tc.color}` : '1px solid var(--table-border)', background: isExcludedForType(c, tc.code) ? `${tc.color}1a` : 'transparent', color: isExcludedForType(c, tc.code) ? tc.color : 'var(--text-secondary)' }}>
+                                        <input type="checkbox" checked={isExcludedForType(c, tc.code)} onChange={() => handleToggleExcludeType(c, tc.code)} style={{ width: '12px', height: '12px', accentColor: tc.color }} />
+                                        {tc.label}
+                                    </label>
+                                ))}
+                            </div>
                             <button onClick={() => handleToggleType(c.id, c.listType)} className="btn-secondary" title="Move to Excluded list" style={{ padding: '3px 6px', fontSize: '0.68rem' }}>Excl.</button>
                             <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                         </div>
@@ -3671,13 +3722,37 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
         loadData()
     }
 
-    const handleMove = async (index: number, direction: 'up' | 'down') => {
+    const [dragIndex, setDragIndex] = useState<number | null>(null)
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+    const handleDragStart = (index: number) => {
+        setDragIndex(index)
+    }
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault()
+        if (dragIndex === null || dragIndex === index) return
+        setDragOverIndex(index)
+    }
+
+    const handleDrop = async (index: number) => {
+        if (dragIndex === null || dragIndex === index) {
+            setDragIndex(null)
+            setDragOverIndex(null)
+            return
+        }
         const newOrder = [...conditions]
-        const swapIndex = direction === 'up' ? index - 1 : index + 1
-        if (swapIndex < 0 || swapIndex >= newOrder.length) return
-        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        const [moved] = newOrder.splice(dragIndex, 1)
+        newOrder.splice(index, 0, moved)
         setConditions(newOrder)
+        setDragIndex(null)
+        setDragOverIndex(null)
         await window.api.hullReorderAdditionalConditions(newOrder.map(c => c.id))
+    }
+
+    const handleDragEnd = () => {
+        setDragIndex(null)
+        setDragOverIndex(null)
     }
 
     return (
@@ -3717,12 +3792,11 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
             </form>
 
             {conditions.map((c, i) => (
-                <div key={c.id} style={{ borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', marginBottom: '10px', overflow: 'hidden' }}>
+                <div key={c.id} draggable onDragStart={() => handleDragStart(i)} onDragOver={e => handleDragOver(e, i)} onDrop={() => handleDrop(i)} onDragEnd={handleDragEnd} style={{ borderRadius: '10px', border: dragOverIndex === i ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)', marginBottom: '10px', overflow: 'hidden', opacity: dragIndex === i ? 0.5 : 1, transition: 'border-color 0.15s, opacity 0.15s' }}>
                     {/* Header: title + actions */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div style={{ display: 'flex', gap: '2px', marginRight: '2px' }}>
-                            <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                            <button onClick={() => handleMove(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                        <div style={{ cursor: 'grab', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', marginRight: '2px' }}>
+                            <GripVertical size={16} />
                         </div>
                         <span style={{ flex: 1, fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)' }}>{c.title || 'Untitled Condition'}</span>
                         {c.hasAmount && <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', background: '#f59e0b22', color: '#f59e0b', border: '1px solid #f59e0b44' }}>{c.amountPlaceholder || 'AMT'}</span>}
