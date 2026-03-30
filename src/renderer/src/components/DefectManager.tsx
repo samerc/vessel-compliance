@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, ChevronDown, ChevronUp, FileText, Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'

@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import DefectManager from './DefectManager'
 import ConfirmationModal from './ConfirmationModal'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 
 interface ConditionSurveyManagerProps {
   vessel: Vessel

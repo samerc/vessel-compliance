@@ -1,4 +1,4 @@
-import XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 import { db } from './mysql/adapter'
 
 export class ExcelImporter {

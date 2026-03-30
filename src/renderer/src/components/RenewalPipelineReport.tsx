@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 
 interface RenewalItem {
   id: string

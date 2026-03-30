@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy, ConditionSurvey, SurveyDefect, Surveyor } from '../../../shared/types'

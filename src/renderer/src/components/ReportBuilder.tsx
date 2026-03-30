@@ -785,7 +785,7 @@ export default function ReportBuilder() {
   const exportExcel = async () => {
     if (!results.length) return
     try {
-      const XLSX = await import('xlsx')
+      const XLSX = await import('xlsx-js-style')
       const cols = Array.from(selectedColumns)
       const headers = cols.map((c) => sourceDef.columns.find((d) => d.key === c)?.label || c)
       const data = results.map((row) => cols.map((c) => formatCellValue(row[c], c)))

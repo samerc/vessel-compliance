@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 import { Download, FileText, Users, AlertCircle, CheckCircle, Briefcase } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'

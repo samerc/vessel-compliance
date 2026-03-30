@@ -9,7 +9,7 @@ import { formatDate, formatDateTime, formatDateShort, formatDateLong } from '../
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import 'flag-icons/css/flag-icons.min.css'
 
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 import { ReportService } from '../services/ReportService'
 import { ReportServiceV2 } from '../services/ReportServiceV2'
 import VesselDocumentsView from './VesselDocumentsView'

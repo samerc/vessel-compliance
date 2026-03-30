@@ -3,7 +3,7 @@ import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronD
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateTime } from '../utils/dateUtils'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 interface PolicyRenewalsProps {

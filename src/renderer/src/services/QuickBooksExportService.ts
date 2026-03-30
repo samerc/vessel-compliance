@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 
 // ── Column descriptions (Row 1) ─────────────────────────────────────────────
 const HEADER_DESCRIPTIONS = [
