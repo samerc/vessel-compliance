@@ -7,7 +7,8 @@
       "Bash(cmd /c \"grep -n \"\"Policy Renewals\\\\|### Dashboard\"\" c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\")",
       "Bash(cmd /c \"findstr /n \"\"Policy Renewals\"\" c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\")",
       "Bash(cmd /c \"findstr /n /i \"\"renewals\\\\|dashboard\"\" \"\"c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\"\"\")",
-      "Bash(findstr /n \"Renewals Dashboard\")"
+      "Bash(findstr /n \"Renewals Dashboard\")",
+      "Bash(npm audit:*)"
     ]
   }
 }
