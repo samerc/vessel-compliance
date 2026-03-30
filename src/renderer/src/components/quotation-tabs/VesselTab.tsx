@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, Layers } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, Layers, RefreshCw } from 'lucide-react'
 import { Quotation, Vessel, QuotationVessel } from '../../../../shared/types'
 
 const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
@@ -270,11 +270,16 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             </p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Vessels ({qVessels.length})</h3>
-                {!showAddForm && (
-                    <button onClick={() => setShowAddForm(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
-                        <Plus size={14} /> Add Vessel
+                <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => { loadData(); showSuccess('Vessel details refreshed') }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 10px' }} title="Refresh vessel details from registry">
+                        <RefreshCw size={13} /> Refresh
                     </button>
-                )}
+                    {!showAddForm && (
+                        <button onClick={() => setShowAddForm(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                            <Plus size={14} /> Add Vessel
+                        </button>
+                    )}
+                </div>
             </div>
 
             {showAddForm && (

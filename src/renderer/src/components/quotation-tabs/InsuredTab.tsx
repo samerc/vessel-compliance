@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, X, RefreshCw } from 'lucide-react'
 import { Quotation, AssuredRole, Entity, QuotationAssured, QuotationVessel, Vessel } from '../../../../shared/types'
 
 export default function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateField }: { quotation: Quotation; vessels?: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
@@ -120,7 +120,12 @@ export default function InsuredTab({ quotation, vessels = [], showSuccess, showE
                 )}
             </div>
 
-            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Assureds</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '1rem', margin: 0 }}>Assureds</h3>
+                <button onClick={() => { loadData(); showSuccess('Assured details refreshed') }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 10px' }} title="Refresh assured details">
+                    <RefreshCw size={13} /> Refresh
+                </button>
+            </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <select
                     value={newEntityId}
