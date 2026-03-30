@@ -67,11 +67,14 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         // Apply default-selected sets on first load if quotation has no warranties yet
         if (!defaultsApplied.current && safeSelected.length === 0 && safeSets.length > 0) {
             defaultsApplied.current = true
+            // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations
+            const tc = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
+            const scopeValid = new Set(safeAll.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === tc).map(w => w.id))
             const defaultIds: string[] = []
             for (const ws of safeSets) {
                 if (ws.defaultSelected && ws.warrantyIds) {
                     for (const wid of ws.warrantyIds) {
-                        if (!defaultIds.includes(wid)) defaultIds.push(wid)
+                        if (!defaultIds.includes(wid) && scopeValid.has(wid)) defaultIds.push(wid)
                     }
                 }
             }

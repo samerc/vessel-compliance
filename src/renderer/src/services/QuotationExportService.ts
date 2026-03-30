@@ -1280,7 +1280,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
   // Warranties
   {
-    const orderedWarranties = data.selectedWarrantyIds.map(id => data.allWarranties.find(w => w.id === id)).filter(Boolean)
+    const wTypeCode = data.quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : data.quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
+    const orderedWarranties = data.selectedWarrantyIds.map(id => data.allWarranties.find(w => w.id === id)).filter((w): w is NonNullable<typeof w> => !!w)
+        .filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === wTypeCode)
     const sortedCustom = [...data.customWarranties].sort((a, b) => a.order - b.order)
     if (orderedWarranties.length > 0 || sortedCustom.length > 0) {
       let warText = ''
@@ -2930,11 +2932,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const warContent: (Paragraph | Table)[] = []
     const dPiMultiAltW = data.piAlternatives.length > 1
 
+    const dWTypeCode = data.quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : data.quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
     const renderWarBullets = (warIds: string[], customs: QuotationCustomWarranty[]) => {
       const paras: Paragraph[] = []
       for (const wid of warIds) {
         const w = data.allWarranties.find(ww => ww.id === wid)
         if (!w) continue
+        if (w.typeScope && w.typeScope !== 'all' && w.typeScope !== dWTypeCode) continue
         const isNewWar = origData && !origWarrantyIds.has(wid)
         const warColor = isNewWar ? RED : undefined
         const wVesselScope = data.warrantyVesselScopes[wid]
