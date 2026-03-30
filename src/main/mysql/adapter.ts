@@ -2704,6 +2704,22 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } catch {}
 
+            // Migration: quotation_assured_groups table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_assured_groups (
+                    id VARCHAR(36) PRIMARY KEY, quotation_id VARCHAR(36) NOT NULL, name VARCHAR(100) NOT NULL,
+                    order_index INT DEFAULT 0, INDEX idx_qag_quotation (quotation_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
+            // Migration: group_id on quotation_assureds
+            try {
+                const [gidCol] = await this.pool.query("SHOW COLUMNS FROM quotation_assureds LIKE 'group_id'") as any[]
+                if ((gidCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE quotation_assureds ADD COLUMN group_id VARCHAR(36) DEFAULT NULL')
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7064,12 +7080,26 @@ export class MySQLAdapter {
         for (const section of sections) {
             switch (section) {
                 case 'insured': {
+                    // Clone assured groups with ID mapping
+                    await this.pool.execute('DELETE FROM quotation_assured_groups WHERE quotation_id = ?', [targetQuotationId])
+                    const [srcGroups] = await this.pool.query('SELECT * FROM quotation_assured_groups WHERE quotation_id = ?', [sourceQuotationId])
+                    const groupIdMap = new Map<string, string>()
+                    for (const g of srcGroups as any[]) {
+                        const newGroupId = uuidv4()
+                        groupIdMap.set(g.id, newGroupId)
+                        await this.pool.execute(
+                            'INSERT INTO quotation_assured_groups (id, quotation_id, name, order_index) VALUES (?, ?, ?, ?)',
+                            [newGroupId, targetQuotationId, g.name, g.order_index]
+                        )
+                    }
+                    // Clone assureds with group_id remapping
                     await this.pool.execute('DELETE FROM quotation_assureds WHERE quotation_id = ?', [targetQuotationId])
                     const [rows] = await this.pool.query('SELECT * FROM quotation_assureds WHERE quotation_id = ?', [sourceQuotationId])
                     for (const r of rows as any[]) {
+                        const newGroupId = r.group_id ? (groupIdMap.get(r.group_id) || null) : null
                         await this.pool.execute(
-                            'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                            [uuidv4(), targetQuotationId, r.entity_id, r.name, r.role, r.vessel_label, r.order_index]
+                            'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, group_id, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.entity_id, r.name, r.role, r.vessel_label, newGroupId, r.order_index]
                         )
                     }
                     await this.pool.execute('UPDATE quotations SET co_name = ? WHERE id = ?', [source.co_name, targetQuotationId])
@@ -7417,9 +7447,31 @@ export class MySQLAdapter {
             }
         }
 
+        // Clone assured groups with ID mapping
+        const assuredGroupIdMap: Record<string, string> = {}
+        const [srcAssuredGroups] = await this.pool.query('SELECT * FROM quotation_assured_groups WHERE quotation_id = ?', [sourceId])
+        for (const g of srcAssuredGroups as any[]) {
+            const newGroupId = uuidv4()
+            assuredGroupIdMap[g.id] = newGroupId
+            await this.pool.execute(
+                'INSERT INTO quotation_assured_groups (id, quotation_id, name, order_index) VALUES (?, ?, ?, ?)',
+                [newGroupId, newId, g.name, g.order_index]
+            )
+        }
+
+        // Clone assureds with group_id remapping
+        const [srcAssureds] = await this.pool.query('SELECT * FROM quotation_assureds WHERE quotation_id = ?', [sourceId])
+        for (const row of srcAssureds as any[]) {
+            const newRowId = uuidv4()
+            const newGroupId = row.group_id ? (assuredGroupIdMap[row.group_id] || null) : null
+            await this.pool.execute(
+                'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, group_id, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [newRowId, newId, row.entity_id, row.name, row.role, row.vessel_label, newGroupId, row.order_index]
+            )
+        }
+
         // Simple tables (no vessel_scope, no alternative_id)
         const simpleTables = [
-            { table: 'quotation_assureds', cols: 'quotation_id, entity_id, name, role, vessel_label, order_index' },
             { table: 'quotation_sub_limits', cols: 'quotation_id, text, amount, currency' },
             { table: 'quotation_custom_sections', cols: 'quotation_id, title, text, order_index' },
             { table: 'quotation_excluded_countries', cols: 'quotation_id, name, list_type' },
@@ -7796,27 +7848,28 @@ export class MySQLAdapter {
     async getQuotationAssureds(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT qa.id, qa.quotation_id as quotationId, qa.entity_id as entityId, qa.name, qa.role, qa.vessel_label as vesselLabel, qa.order_index as 'order'
+            `SELECT qa.id, qa.quotation_id as quotationId, qa.entity_id as entityId, qa.name, qa.role, qa.vessel_label as vesselLabel, qa.group_id as groupId, qa.order_index as 'order'
              FROM quotation_assureds qa WHERE qa.quotation_id = ? ORDER BY qa.order_index`, [quotationId])
         return rows as any[]
     }
 
-    async addQuotationAssured(data: { quotationId: string; entityId?: string; name: string; role?: string; vesselLabel?: string; order?: number }): Promise<any> {
+    async addQuotationAssured(data: { quotationId: string; entityId?: string; name: string; role?: string; vesselLabel?: string; groupId?: string; order?: number }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute(
-            'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [id, data.quotationId, data.entityId || null, data.name, data.role || null, data.vesselLabel || null, data.order || 0])
+            'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, group_id, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.entityId || null, data.name, data.role || null, data.vesselLabel || null, data.groupId || null, data.order || 0])
         return { id, ...data }
     }
 
-    async updateQuotationAssured(id: string, updates: { name?: string; role?: string; vesselLabel?: string; order?: number }): Promise<void> {
+    async updateQuotationAssured(id: string, updates: { name?: string; role?: string; vesselLabel?: string; groupId?: string | null; order?: number }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
         if (updates.role !== undefined) { fields.push('role = ?'); values.push(updates.role) }
         if (updates.vesselLabel !== undefined) { fields.push('vessel_label = ?'); values.push(updates.vesselLabel || null) }
+        if (updates.groupId !== undefined) { fields.push('group_id = ?'); values.push(updates.groupId) }
         if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
         if (fields.length === 0) return
         values.push(id)
@@ -7832,6 +7885,52 @@ export class MySQLAdapter {
         if (!this.pool) return
         for (let i = 0; i < orderedIds.length; i++) {
             await this.pool.execute('UPDATE quotation_assureds SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // -- Quotation Assured Groups --
+    async getQuotationAssuredGroups(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            "SELECT id, quotation_id as quotationId, name, order_index as `order` FROM quotation_assured_groups WHERE quotation_id = ? ORDER BY order_index ASC",
+            [quotationId]
+        )
+        return rows as any[]
+    }
+
+    async addQuotationAssuredGroup(quotationId: string, name: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query(
+            'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_assured_groups WHERE quotation_id = ?',
+            [quotationId]
+        )
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute(
+            'INSERT INTO quotation_assured_groups (id, quotation_id, name, order_index) VALUES (?, ?, ?, ?)',
+            [id, quotationId, name, order]
+        )
+        return { id, quotationId, name, order }
+    }
+
+    async updateQuotationAssuredGroup(id: string, updates: { name?: string }): Promise<void> {
+        if (!this.pool) return
+        if (updates.name !== undefined) {
+            await this.pool.execute('UPDATE quotation_assured_groups SET name = ? WHERE id = ?', [updates.name, id])
+        }
+    }
+
+    async deleteQuotationAssuredGroup(id: string): Promise<void> {
+        if (!this.pool) return
+        // Ungroup assureds in this group (set group_id = null)
+        await this.pool.execute('UPDATE quotation_assureds SET group_id = NULL WHERE group_id = ?', [id])
+        await this.pool.execute('DELETE FROM quotation_assured_groups WHERE id = ?', [id])
+    }
+
+    async reorderQuotationAssuredGroups(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE quotation_assured_groups SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
     }
 

@@ -1,34 +1,40 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, X, RefreshCw } from 'lucide-react'
-import { Quotation, AssuredRole, Entity, QuotationAssured, QuotationVessel, Vessel } from '../../../../shared/types'
+import { Quotation, AssuredRole, Entity, QuotationAssured, QuotationAssuredGroup, QuotationVessel, Vessel } from '../../../../shared/types'
 
-export default function InsuredTab({ quotation, vessels = [], showSuccess, showError, updateField }: { quotation: Quotation; vessels?: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
+export default function InsuredTab({ quotation, vessels: _vessels = [], showSuccess, showError, updateField }: { quotation: Quotation; vessels?: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
+    void _vessels
     const [assureds, setAssureds] = useState<QuotationAssured[]>([])
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [groups, setGroups] = useState<QuotationAssuredGroup[]>([])
     const [newName, setNewName] = useState('')
     const [newRole, setNewRole] = useState('')
     const [newEntityId, setNewEntityId] = useState('')
     const [newVesselLabel, setNewVesselLabel] = useState('')
+    const [newGroupId, setNewGroupId] = useState('')
     const [showNewRoleInput, setShowNewRoleInput] = useState(false)
     const [newRoleName, setNewRoleName] = useState('')
+    const [newGroupName, setNewGroupName] = useState('')
     const [coInputValue, setCoInputValue] = useState(quotation.coName || '')
     const [showCoDropdown, setShowCoDropdown] = useState(false)
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [a, r, e, qv] = await Promise.all([
+        const [a, r, e, qv, g] = await Promise.all([
             window.api.getQuotationAssureds(quotation.id),
             window.api.getAssuredRoles(),
             window.api.getEntities(),
-            window.api.getQuotationVessels(quotation.id)
+            window.api.getQuotationVessels(quotation.id),
+            window.api.getQuotationAssuredGroups(quotation.id)
         ])
         setAssureds(Array.isArray(a) ? a : [])
         setRoles(Array.isArray(r) ? r : [])
         setEntities(Array.isArray(e) ? e : [])
         setQVessels(Array.isArray(qv) ? qv : [])
+        setGroups(Array.isArray(g) ? g : [])
     }
 
     const handleAddAssured = async () => {
@@ -40,9 +46,10 @@ export default function InsuredTab({ quotation, vessels = [], showSuccess, showE
                 name: newName,
                 role: newRole || undefined,
                 vesselLabel: newVesselLabel || undefined,
+                groupId: newGroupId || undefined,
                 order: assureds.length
             })
-            setNewName(''); setNewRole(''); setNewEntityId(''); setNewVesselLabel('')
+            setNewName(''); setNewRole(''); setNewEntityId(''); setNewVesselLabel(''); setNewGroupId('')
             showSuccess('Assured added')
             loadData()
         } catch (err: any) { showError(err.message || 'Failed to add assured') }
@@ -80,11 +87,58 @@ export default function InsuredTab({ quotation, vessels = [], showSuccess, showE
         await window.api.reorderQuotationAssureds(newOrder.map(a => a.id))
     }
 
+    const handleAddGroup = async () => {
+        if (!newGroupName.trim()) return
+        try {
+            await window.api.addQuotationAssuredGroup(quotation.id, newGroupName.trim())
+            setNewGroupName('')
+            showSuccess('Group added')
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to add group') }
+    }
+
+    const handleChangeGroup = async (assuredId: string, groupId: string | null) => {
+        await window.api.updateQuotationAssured(assuredId, { groupId: groupId || undefined })
+        loadData()
+    }
+
     const saveCoName = (val: string) => updateField('coName', val || null)
 
     const coFiltered = entities.filter(e =>
         coInputValue.length > 0 && e.name.toLowerCase().includes(coInputValue.toLowerCase())
     ).slice(0, 8)
+
+    const renderAssuredRow = (a: QuotationAssured, _idx: number) => {
+        const i = assureds.indexOf(a)
+        return (
+            <div key={a.id} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {groups.length > 0 && (
+                    <select value={a.groupId || ''} onChange={e => handleChangeGroup(a.id, e.target.value || null)}
+                        style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.72rem', background: 'rgba(0,210,255,0.08)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.2)', maxWidth: '100px' }}>
+                        <option value="">—</option>
+                        {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                )}
+                {qVessels.length > 1 && quotation.quotationTypeCode !== 'C' && (
+                    <select
+                        value={a.vesselLabel || ''}
+                        onChange={e => handleUpdateVesselLabel(a.id, e.target.value)}
+                        style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.3)', minWidth: '52px' }}
+                    >
+                        <option value="">—</option>
+                        {qVessels.map(v => <option key={v.id} value={v.vesselLabel}>{v.vesselLabel}</option>)}
+                    </select>
+                )}
+                <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
+                {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
+                <div style={{ display: 'flex', gap: '2px' }}>
+                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                    <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                    <button onClick={() => handleDeleteAssured(a.id)} className="btn-secondary" style={{ padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div>
@@ -118,6 +172,33 @@ export default function InsuredTab({ quotation, vessels = [], showSuccess, showE
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* Assured Groups */}
+            <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <h4 style={{ fontSize: '0.88rem', margin: 0 }}>Assured Groups</h4>
+                </div>
+                {groups.map((g, i) => (
+                    <div key={g.id} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '18px' }}>{i + 1}.</span>
+                        <input value={g.name} onChange={e => setGroups(prev => prev.map(gg => gg.id === g.id ? { ...gg, name: e.target.value } : gg))}
+                            onBlur={e => window.api.updateQuotationAssuredGroup(g.id, { name: e.target.value })}
+                            style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }} />
+                        <button onClick={async () => { await window.api.deleteQuotationAssuredGroup(g.id); showSuccess('Group deleted'); loadData() }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                    </div>
+                ))}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+                    <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && newGroupName.trim()) { handleAddGroup() } }}
+                        placeholder="New group name (e.g. CO-ASSURED)"
+                        style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px dashed var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
+                    <button onClick={handleAddGroup} disabled={!newGroupName.trim()} className="btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Plus size={12} /> Add Group
+                    </button>
+                </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
@@ -181,63 +262,46 @@ export default function InsuredTab({ quotation, vessels = [], showSuccess, showE
                         {qVessels.map(v => <option key={v.id} value={v.vesselLabel}>{v.vesselLabel}</option>)}
                     </select>
                 )}
+                {groups.length > 0 && (
+                    <select value={newGroupId} onChange={e => setNewGroupId(e.target.value)}
+                        style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}>
+                        <option value="">No group</option>
+                        {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                )}
                 <button onClick={handleAddAssured} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Add</button>
             </div>
 
             <div style={{ marginTop: '14px' }}>
-                {qVessels.length > 1 ? (
-                    // Grouped view: one section per vessel + unassigned
+                {groups.length > 0 ? (
                     <>
-                        {[...qVessels, null].map(qv => {
-                            const label = qv?.vesselLabel || null
-                            const group = label
-                                ? assureds.filter(a => a.vesselLabel === label)
-                                : assureds.filter(a => !a.vesselLabel)
-                            if (group.length === 0 && label) return null
+                        {groups.map(g => {
+                            const groupAssureds = assureds.filter(a => a.groupId === g.id)
                             return (
-                                <div key={label || 'unassigned'} style={{ marginBottom: '16px' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--table-border)' }}>
-                                        {label ? `${label} — ${qv && vessels.find(v => v.id === qv.vesselId)?.name || qv?.name || label}` : 'All Vessels / Unassigned'}
+                                <div key={g.id} style={{ marginBottom: '16px' }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-primary)', letterSpacing: '0.05em', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--table-border)' }}>
+                                        {g.name}
                                     </div>
-                                    {group.map(a => {
-                                        const i = assureds.indexOf(a)
-                                        return (
-                                            <div key={a.id} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                <select
-                                                    value={a.vesselLabel || ''}
-                                                    onChange={e => handleUpdateVesselLabel(a.id, e.target.value)}
-                                                    style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.3)', minWidth: '52px' }}
-                                                >
-                                                    <option value="">—</option>
-                                                    {qVessels.map(v => <option key={v.id} value={v.vesselLabel}>{v.vesselLabel}</option>)}
-                                                </select>
-                                                <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
-                                                {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
-                                                <div style={{ display: 'flex', gap: '2px' }}>
-                                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                                    <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                                    <button onClick={() => handleDeleteAssured(a.id)} className="btn-secondary" style={{ padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
+                                    {groupAssureds.map((a, i) => renderAssuredRow(a, i))}
+                                    {groupAssureds.length === 0 && (
+                                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '4px 0' }}>No assureds in this group. Drag or assign assureds here.</p>
+                                    )}
                                 </div>
                             )
                         })}
+                        {/* Ungrouped */}
+                        {assureds.filter(a => !a.groupId).length > 0 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--table-border)' }}>
+                                    Ungrouped
+                                </div>
+                                {assureds.filter(a => !a.groupId).map((a, i) => renderAssuredRow(a, i))}
+                            </div>
+                        )}
                     </>
                 ) : (
-                    // Flat view for single vessel
-                    assureds.map((a, i) => (
-                        <div key={a.id} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
-                            {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
-                            <div style={{ display: 'flex', gap: '2px' }}>
-                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => handleDeleteAssured(a.id)} className="btn-secondary" style={{ padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
-                            </div>
-                        </div>
-                    ))
+                    // No groups — flat list as before
+                    assureds.map((a, i) => renderAssuredRow(a, i))
                 )}
                 {assureds.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No assureds added yet. Add manually or go to the Vessel tab to import from a vessel.</p>}
             </div>

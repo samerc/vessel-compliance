@@ -547,6 +547,13 @@ const api = {
   deleteQuotationAssured: (id: string) => ipcRenderer.invoke('db:deleteQuotationAssured', id),
   reorderQuotationAssureds: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationAssureds', ids),
 
+  // Quotation Assured Groups
+  getQuotationAssuredGroups: (qId: string) => ipcRenderer.invoke('db:getQuotationAssuredGroups', qId),
+  addQuotationAssuredGroup: (qId: string, name: string) => ipcRenderer.invoke('db:addQuotationAssuredGroup', qId, name),
+  updateQuotationAssuredGroup: (id: string, updates: { name?: string }) => ipcRenderer.invoke('db:updateQuotationAssuredGroup', id, updates),
+  deleteQuotationAssuredGroup: (id: string) => ipcRenderer.invoke('db:deleteQuotationAssuredGroup', id),
+  reorderQuotationAssuredGroups: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationAssuredGroups', ids),
+
   getQuotationVessels: (qId: string) => ipcRenderer.invoke('db:getQuotationVessels', qId),
   addQuotationVessel: (data: any) => ipcRenderer.invoke('db:addQuotationVessel', data),
   updateQuotationVessel: (id: string, data: any) => ipcRenderer.invoke('db:updateQuotationVessel', id, data),

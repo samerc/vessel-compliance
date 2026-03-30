@@ -1087,6 +1087,13 @@ export interface QuotationNewVessel {
   callSign?: string
 }
 
+export interface QuotationAssuredGroup {
+  id: string
+  quotationId: string
+  name: string
+  order: number
+}
+
 export interface QuotationAssured {
   id: string
   quotationId: string
@@ -1094,6 +1101,7 @@ export interface QuotationAssured {
   name: string
   role: string
   vesselLabel?: string
+  groupId?: string
   order: number
 }
 

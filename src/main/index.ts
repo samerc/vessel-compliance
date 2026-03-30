@@ -2909,6 +2909,13 @@ app.whenReady().then(() => {
   safeHandle('db:deleteQuotationAssured', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationAssured(id) })
   safeHandle('db:reorderQuotationAssureds', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationAssureds(ids) })
 
+  // Quotation Assured Groups
+  safeHandle('db:getQuotationAssuredGroups', (event, qId) => { requireSession(event); return db.getQuotationAssuredGroups(qId) })
+  safeHandle('db:addQuotationAssuredGroup', async (event, qId, name) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationAssuredGroup(qId, name) })
+  safeHandle('db:updateQuotationAssuredGroup', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationAssuredGroup(id, updates) })
+  safeHandle('db:deleteQuotationAssuredGroup', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationAssuredGroup(id) })
+  safeHandle('db:reorderQuotationAssuredGroups', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationAssuredGroups(ids) })
+
   safeHandle('db:getQuotationVessels', (event, qId) => { requireSession(event); return db.getQuotationVessels(qId) })
   safeHandle('db:addQuotationVessel', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationVessel(data) })
   safeHandle('db:updateQuotationVessel', async (event, id, data) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationVessel(id, data) })

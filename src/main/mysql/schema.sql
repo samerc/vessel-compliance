@@ -394,12 +394,22 @@ CREATE TABLE IF NOT EXISTS quotation_new_vessels (
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS quotation_assured_groups (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  INDEX idx_qag_quotation (quotation_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS quotation_assureds (
   id VARCHAR(36) PRIMARY KEY,
   quotation_id VARCHAR(36) NOT NULL,
   entity_id VARCHAR(36),
   name VARCHAR(255) NOT NULL,
   role VARCHAR(100),
+  group_id VARCHAR(36) DEFAULT NULL,
   order_index INT DEFAULT 0,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE SET NULL
