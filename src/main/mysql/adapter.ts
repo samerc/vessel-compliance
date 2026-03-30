@@ -6797,6 +6797,121 @@ export class MySQLAdapter {
         await this.pool.execute(`UPDATE quotations SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
+    async copyQuotationSections(targetQuotationId: string, sourceQuotationId: string, sections: string[]): Promise<void> {
+        if (!this.pool) return
+
+        const [srcRows] = await this.pool.query('SELECT * FROM quotations WHERE id = ?', [sourceQuotationId])
+        const source = (srcRows as any[])[0]
+        if (!source) throw new Error('Source quotation not found')
+
+        for (const section of sections) {
+            switch (section) {
+                case 'insured': {
+                    await this.pool.execute('DELETE FROM quotation_assureds WHERE quotation_id = ?', [targetQuotationId])
+                    const [rows] = await this.pool.query('SELECT * FROM quotation_assureds WHERE quotation_id = ?', [sourceQuotationId])
+                    for (const r of rows as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.entity_id, r.name, r.role, r.vessel_label, r.order_index]
+                        )
+                    }
+                    await this.pool.execute('UPDATE quotations SET co_name = ? WHERE id = ?', [source.co_name, targetQuotationId])
+                    break
+                }
+                case 'vessels': {
+                    await this.pool.execute('DELETE FROM quotation_vessels WHERE quotation_id = ?', [targetQuotationId])
+                    const [rows] = await this.pool.query('SELECT * FROM quotation_vessels WHERE quotation_id = ?', [sourceQuotationId])
+                    for (const r of rows as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.vessel_id, r.vessel_label, r.order_index, r.name, r.imo_number, r.built_year, r.rebuilt_year, r.gross_tonnage, r.flag, r.vessel_type, r.classification, r.call_sign]
+                        )
+                    }
+                    break
+                }
+                case 'trading': {
+                    await this.pool.execute('DELETE FROM quotation_excluded_countries WHERE quotation_id = ?', [targetQuotationId])
+                    const [rows] = await this.pool.query('SELECT * FROM quotation_excluded_countries WHERE quotation_id = ?', [sourceQuotationId])
+                    for (const r of rows as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_excluded_countries (id, quotation_id, name, list_type) VALUES (?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.name, r.list_type]
+                        )
+                    }
+                    await this.pool.execute(
+                        'UPDATE quotations SET trading_warranty_intro = ?, trading_show_ddq_list = ?, trading_show_ddq_warranties = ?, trading_show_israel = ?, trading_custom_text = ?, trading_custom_mode = ?, trading_custom_wording = ? WHERE id = ?',
+                        [source.trading_warranty_intro, source.trading_show_ddq_list, source.trading_show_ddq_warranties, source.trading_show_israel, source.trading_custom_text, source.trading_custom_mode, source.trading_custom_wording, targetQuotationId]
+                    )
+                    break
+                }
+                case 'warranties': {
+                    await this.pool.execute('DELETE FROM quotation_warranties WHERE quotation_id = ?', [targetQuotationId])
+                    await this.pool.execute('DELETE FROM quotation_custom_warranties WHERE quotation_id = ?', [targetQuotationId])
+                    const [wRows] = await this.pool.query('SELECT * FROM quotation_warranties WHERE quotation_id = ?', [sourceQuotationId])
+                    for (const r of wRows as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.pi_warranty_id, r.order_index, r.vessel_scope]
+                        )
+                    }
+                    const [cwRows] = await this.pool.query('SELECT * FROM quotation_custom_warranties WHERE quotation_id = ?', [sourceQuotationId])
+                    for (const r of cwRows as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.text, r.order_index, r.vessel_scope]
+                        )
+                    }
+                    break
+                }
+                case 'subjectivities': {
+                    await this.pool.execute('DELETE FROM quotation_subjectivities WHERE quotation_id = ?', [targetQuotationId])
+                    const [rows] = await this.pool.query('SELECT * FROM quotation_subjectivities WHERE quotation_id = ?', [sourceQuotationId])
+                    for (const r of rows as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_subjectivities (id, quotation_id, pi_subjectivity_id, text, is_custom, is_auto_populated, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.pi_subjectivity_id, r.text, r.is_custom, r.is_auto_populated, r.order_index, r.vessel_scope]
+                        )
+                    }
+                    break
+                }
+                case 'premium': {
+                    await this.pool.execute('DELETE FROM quotation_instalments WHERE quotation_id = ?', [targetQuotationId])
+                    const [iRows] = await this.pool.query('SELECT * FROM quotation_instalments WHERE quotation_id = ?', [sourceQuotationId])
+                    for (const r of iRows as any[]) {
+                        await this.pool.execute(
+                            'INSERT INTO quotation_instalments (id, quotation_id, instalment_number, days_from_inception) VALUES (?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.instalment_number, r.days_from_inception]
+                        )
+                    }
+                    await this.pool.execute(
+                        `UPDATE quotations SET premium_amount = ?, premium_currency = ?, num_instalments = ?,
+                         ncb_enabled = ?, ncb_discount_type = ?, ncb_discount_percent = ?, ncb_discount_amount = ?, ncb_text = ?,
+                         cpc_enabled = ?, cpc_discount_type = ?, cpc_discount_percent = ?, cpc_discount_amount = ?, cpc_text = ?,
+                         non_refundable_type = ?, non_refundable_percent = ?,
+                         premium_additional_text = ?
+                         WHERE id = ?`,
+                        [source.premium_amount, source.premium_currency, source.num_instalments,
+                         source.ncb_enabled, source.ncb_discount_type, source.ncb_discount_percent, source.ncb_discount_amount, source.ncb_text,
+                         source.cpc_enabled, source.cpc_discount_type, source.cpc_discount_percent, source.cpc_discount_amount, source.cpc_text,
+                         source.non_refundable_type, source.non_refundable_percent,
+                         source.premium_additional_text,
+                         targetQuotationId]
+                    )
+                    break
+                }
+                case 'period': {
+                    await this.pool.execute('UPDATE quotations SET period_text = ? WHERE id = ?', [source.period_text, targetQuotationId])
+                    break
+                }
+                case 'sanctions': {
+                    await this.pool.execute('UPDATE quotations SET sanctions_clause_version = ?, sanctions_text_override = ? WHERE id = ?',
+                        [source.sanctions_clause_version, source.sanctions_text_override, targetQuotationId])
+                    break
+                }
+            }
+        }
+    }
+
     async deleteQuotation(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotations WHERE id = ?', [id])

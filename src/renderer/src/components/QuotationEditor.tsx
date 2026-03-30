@@ -5,7 +5,7 @@ import { Quotation, Vessel, QuotationVessel, PISectionTexts, PISanctionsVersion,
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Plus, Trash2, ChevronDown, GitBranch, RefreshCw, Lock, MoreHorizontal } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, GitBranch, RefreshCw, Lock, MoreHorizontal, Copy, Search, X } from 'lucide-react'
 import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
 import InsuredTab from './quotation-tabs/InsuredTab'
@@ -115,6 +115,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
     const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
     const [showDraftExportModal, setShowDraftExportModal] = useState<'pdf' | 'word' | null>(null)
+    const [showCopyFromQuotation, setShowCopyFromQuotation] = useState(false)
     const [deleteModal, setDeleteModal] = useState<{
         show: boolean
         revisionCount: number
@@ -658,6 +659,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('pdf') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
                                     {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('word') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
                                     <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
+                                    {!isLocked && canEdit && <button onClick={() => { setShowActionsMenu(false); setShowCopyFromQuotation(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Copy size={15} /> Copy from Quotation</button>}
                                     {!isLocked && canEdit && <button onClick={async () => { setShowActionsMenu(false); await handleReloadFromSettings() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Reload from Settings</button>}
                                     {!policyContext && !isLocked && canEdit && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
                                     {!policyContext && canEdit && q.workflowStepName?.toLowerCase() !== 'converted' && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); if (onNavigateToPolicySetup) onNavigateToPolicySetup(q.id) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#008c46' : '#00c864', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><FileText size={15} /> Convert to Policy</button></>}
@@ -993,6 +995,233 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 />
             )}
 
+            {showCopyFromQuotation && (
+                <CopyFromQuotationModal
+                    quotation={q}
+                    onClose={() => setShowCopyFromQuotation(false)}
+                    onCopied={async () => {
+                        setShowCopyFromQuotation(false)
+                        await loadMasterData()
+                        showSuccess('Sections copied successfully')
+                    }}
+                    showError={showError}
+                    isLight={isLight}
+                />
+            )}
+
+        </div>
+    )
+}
+
+function CopyFromQuotationModal({ quotation, onClose, onCopied, showError, isLight }: {
+    quotation: Quotation
+    onClose: () => void
+    onCopied: () => void
+    showError: (msg: string) => void
+    isLight: boolean
+}) {
+    const [allQuotations, setAllQuotations] = useState<Quotation[]>([])
+    const [searchText, setSearchText] = useState('')
+    const [sourceId, setSourceId] = useState<string | null>(null)
+    const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set())
+    const [loading, setLoading] = useState(false)
+    const [showDropdown, setShowDropdown] = useState(false)
+    const dropdownRef = useRef<HTMLDivElement>(null)
+
+    const sectionOptions = [
+        { key: 'insured', label: 'Insured (assureds + c/o broker)' },
+        { key: 'vessels', label: 'Vessels' },
+        { key: 'trading', label: 'Trading Warranty' },
+        { key: 'warranties', label: 'Warranties' },
+        { key: 'subjectivities', label: 'Subjectivities' },
+        { key: 'premium', label: 'Premium & Instalments' },
+        { key: 'period', label: 'Period' },
+        { key: 'sanctions', label: 'Sanctions' },
+    ]
+
+    useEffect(() => {
+        window.api.getQuotations().then(rows => {
+            if (Array.isArray(rows)) {
+                setAllQuotations(rows.filter(r => r.id !== quotation.id))
+            }
+        }).catch(() => {})
+    }, [quotation.id])
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setShowDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    const filtered = allQuotations.filter(q => {
+        if (!searchText) return true
+        const s = searchText.toLowerCase()
+        return (q.referenceNumber || '').toLowerCase().includes(s)
+            || (q.vesselName || '').toLowerCase().includes(s)
+            || (q.quotationTypeName || '').toLowerCase().includes(s)
+    })
+
+    const selectedQuotation = allQuotations.find(q => q.id === sourceId)
+
+    const toggleSection = (key: string) => {
+        setSelectedSections(prev => {
+            const next = new Set(prev)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+        })
+    }
+
+    const handleCopy = async () => {
+        if (!sourceId || selectedSections.size === 0) return
+        setLoading(true)
+        try {
+            await window.api.copyQuotationSections(quotation.id, sourceId, Array.from(selectedSections))
+            onCopied()
+        } catch (err: any) {
+            showError(err.message || 'Failed to copy sections')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const typeColor = (code?: string) => {
+        switch (code) {
+            case 'P': return '#00aac8'
+            case 'H': return '#6464ff'
+            case 'W': return '#ff64c8'
+            case 'F': return '#ffb020'
+            case 'L': return '#44cc88'
+            case 'C': return '#ff8c00'
+            default: return '#888'
+        }
+    }
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
+            <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '520px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Copy from Quotation</h3>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
+                </div>
+
+                {/* Source quotation selector */}
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Source Quotation</label>
+                    <div ref={dropdownRef} style={{ position: 'relative' }}>
+                        <div
+                            onClick={() => setShowDropdown(!showDropdown)}
+                            style={{
+                                padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--input-border)',
+                                background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                                fontSize: '0.85rem', color: selectedQuotation ? 'var(--text-primary)' : 'var(--text-secondary)'
+                            }}
+                        >
+                            {selectedQuotation ? (
+                                <>
+                                    <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, background: typeColor(selectedQuotation.quotationTypeCode) + '22', color: typeColor(selectedQuotation.quotationTypeCode) }}>{selectedQuotation.quotationTypeCode}</span>
+                                    <span>{selectedQuotation.referenceNumber}</span>
+                                    {selectedQuotation.vesselName && <span style={{ color: 'var(--text-secondary)' }}>- {selectedQuotation.vesselName}</span>}
+                                </>
+                            ) : 'Select a quotation...'}
+                            <ChevronDown size={14} style={{ marginLeft: 'auto' }} />
+                        </div>
+                        {showDropdown && (
+                            <div style={{
+                                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 10,
+                                background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                                borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', maxHeight: '280px', overflowY: 'auto'
+                            }}>
+                                <div style={{ padding: '8px', position: 'sticky', top: 0, background: isLight ? '#ffffff' : '#1a1d28', zIndex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-card)' }}>
+                                        <Search size={14} style={{ color: 'var(--text-secondary)' }} />
+                                        <input
+                                            type="text"
+                                            value={searchText}
+                                            onChange={e => setSearchText(e.target.value)}
+                                            placeholder="Search quotations..."
+                                            autoFocus
+                                            style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '0.82rem', color: 'var(--text-primary)' }}
+                                        />
+                                    </div>
+                                </div>
+                                {filtered.length === 0 && (
+                                    <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No quotations found</div>
+                                )}
+                                {filtered.map(fq => (
+                                    <div
+                                        key={fq.id}
+                                        onClick={() => { setSourceId(fq.id); setShowDropdown(false); setSearchText('') }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', cursor: 'pointer',
+                                            background: fq.id === sourceId ? 'rgba(0,210,255,0.06)' : 'transparent',
+                                            fontSize: '0.83rem'
+                                        }}
+                                        className="hover-effect"
+                                    >
+                                        <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600, background: typeColor(fq.quotationTypeCode) + '22', color: typeColor(fq.quotationTypeCode), flexShrink: 0 }}>{fq.quotationTypeCode}</span>
+                                        <span style={{ fontWeight: 500 }}>{fq.referenceNumber}</span>
+                                        {fq.vesselName && <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>- {fq.vesselName}{((fq as any).vesselCount || 0) > 1 ? ` +${(fq as any).vesselCount - 1}` : ''}</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Section checkboxes */}
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>Sections to Copy</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                        {sectionOptions.map(opt => (
+                            <label key={opt.key} style={{
+                                display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px',
+                                border: `1px solid ${selectedSections.has(opt.key) ? 'var(--accent)' : 'var(--input-border)'}`,
+                                background: selectedSections.has(opt.key) ? 'rgba(0,170,200,0.06)' : 'transparent',
+                                cursor: 'pointer', fontSize: '0.82rem', transition: 'all 0.15s'
+                            }}>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedSections.has(opt.key)}
+                                    onChange={() => toggleSection(opt.key)}
+                                    style={{ accentColor: 'var(--accent)' }}
+                                />
+                                {opt.label}
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Warning */}
+                {selectedSections.size > 0 && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px',
+                        background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.2)',
+                        marginBottom: '16px', fontSize: '0.8rem', color: isLight ? '#9a6700' : '#ffb020'
+                    }}>
+                        <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+                        This will replace existing data in the selected sections.
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button className="btn-secondary" onClick={onClose} style={{ fontSize: '0.85rem' }}>Cancel</button>
+                    <button
+                        className="btn-primary"
+                        onClick={handleCopy}
+                        disabled={!sourceId || selectedSections.size === 0 || loading}
+                        style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        <Copy size={14} />
+                        {loading ? 'Copying...' : `Copy ${selectedSections.size} Section${selectedSections.size !== 1 ? 's' : ''}`}
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }

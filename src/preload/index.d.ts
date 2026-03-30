@@ -530,6 +530,7 @@ export interface Api {
   createQuotationRevision: (sourceId: string) => Promise<Quotation>
   stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) => Promise<void>
   duplicateQuotation: (sourceId: string) => Promise<Quotation>
+  copyQuotationSections: (targetId: string, sourceId: string, sections: string[]) => Promise<void>
   getQuotationRevisions: (revisionGroupId: string) => Promise<Quotation[]>
   saveExportSnapshot: (quotationId: string, snapshot: string) => Promise<void>
   clearExportSnapshot: (quotationId: string) => Promise<void>

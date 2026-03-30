@@ -2023,6 +2023,7 @@ app.whenReady().then(() => {
   safeHandle('pi:deleteQuotationAlternative', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationPIAlternative(id) })
   safeHandle('pi:reorderQuotationAlternatives', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationPIAlternatives(ids) })
   safeHandle('quotation:updateItemAlternativeId', async (event, table, id, alternativeId) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationItemAlternativeId(table, id, alternativeId) })
+  safeHandle('quotation:copySections', async (event, targetId, sourceId, sections) => { await requirePermission(event, 'quotations:edit'); return db.copyQuotationSections(targetId, sourceId, sections) })
 
   // Hull Alternatives
   safeHandle('hull:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationHullAlternatives(qId) })

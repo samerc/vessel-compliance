@@ -528,6 +528,7 @@ const api = {
   createQuotationRevision: (sourceId: string) => ipcRenderer.invoke('db:createQuotationRevision', sourceId),
   stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) => ipcRenderer.invoke('db:stripNonSelectedAlternative', quotationId, keepAlternativeId),
   duplicateQuotation: (sourceId: string) => ipcRenderer.invoke('db:duplicateQuotation', sourceId),
+  copyQuotationSections: (targetId: string, sourceId: string, sections: string[]) => ipcRenderer.invoke('quotation:copySections', targetId, sourceId, sections),
   getQuotationRevisions: (revisionGroupId: string) => ipcRenderer.invoke('db:getQuotationRevisions', revisionGroupId),
   saveExportSnapshot: (quotationId: string, snapshot: string) => ipcRenderer.invoke('db:saveExportSnapshot', quotationId, snapshot),
   clearExportSnapshot: (quotationId: string) => ipcRenderer.invoke('db:clearExportSnapshot', quotationId),
