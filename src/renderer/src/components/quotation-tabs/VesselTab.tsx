@@ -494,8 +494,10 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 const built = reg?.builtYear || qv.builtYear
                 const rebuilt = reg?.rebuiltYear || qv.rebuiltYear
                 const gt = reg?.grossTonnage || qv.grossTonnage
+                const flag = qv.flag
                 const vtype = reg?.vesselType || qv.vesselType
                 const classif = reg?.classificationSociety || qv.classification
+                const callSign = reg?.callSign || qv.callSign
                 return (
                     <div key={qv.id} style={{ padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--table-border)', marginBottom: '10px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                         {qVessels.length > 1 && (
@@ -513,8 +515,10 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                 {imo && <span>IMO: {imo}</span>}
                                 {built && <span>Built: {rebuilt ? `${built}/${rebuilt}` : built}</span>}
                                 {gt && <span>GT: {Number(gt).toLocaleString()}</span>}
+                                {flag && <span>Flag: {flag}</span>}
                                 {vtype && <span>Type: {vtype}</span>}
                                 {classif && <span>Class: {classif}</span>}
+                                {callSign && <span>Call Sign: {callSign}</span>}
                                 {reg && <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem' }}>● From registry</span>}
                             </div>
                         </div>

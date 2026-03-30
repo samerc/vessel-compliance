@@ -6248,11 +6248,15 @@ export class MySQLAdapter {
                     COALESCE(v.built_year, qv.built_year) as builtYear,
                     COALESCE(v.rebuilt_year, qv.rebuilt_year) as rebuiltYear,
                     COALESCE(v.gross_tonnage, qv.gross_tonnage) as grossTonnage,
-                    qv.flag, qv.vessel_type as vesselType, qv.classification, qv.call_sign as callSign,
+                    COALESCE(fs.name, qv.flag) as flag,
+                    COALESCE(v.vessel_type, qv.vessel_type) as vesselType,
+                    COALESCE(v.classification_society, qv.classification) as classification,
+                    COALESCE(v.call_sign, qv.call_sign) as callSign,
                     qv.premium_amount as premiumAmount,
                     qv.agreed_value as agreedValue, qv.iv_value as ivValue
              FROM quotation_vessels qv
              LEFT JOIN vessels v ON qv.vessel_id = v.id
+             LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
              WHERE qv.quotation_id = ?
              ORDER BY qv.order_index ASC`,
             [quotationId]
