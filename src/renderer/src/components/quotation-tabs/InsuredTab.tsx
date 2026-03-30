@@ -87,10 +87,11 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
         await window.api.reorderQuotationAssureds(newOrder.map(a => a.id))
     }
 
-    const handleAddGroup = async () => {
-        if (!newGroupName.trim()) return
+    const handleAddGroup = async (defaultName?: string) => {
+        const name = defaultName || newGroupName.trim()
+        if (!name) return
         try {
-            await window.api.addQuotationAssuredGroup(quotation.id, newGroupName.trim())
+            await window.api.addQuotationAssuredGroup(quotation.id, name)
             setNewGroupName('')
             showSuccess('Group added')
             loadData()
@@ -174,32 +175,39 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                 )}
             </div>
 
-            {/* Assured Groups */}
-            <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <h4 style={{ fontSize: '0.88rem', margin: 0 }}>Assured Groups</h4>
-                </div>
-                {groups.map((g, i) => (
-                    <div key={g.id} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '18px' }}>{i + 1}.</span>
-                        <input value={g.name} onChange={e => setGroups(prev => prev.map(gg => gg.id === g.id ? { ...gg, name: e.target.value } : gg))}
-                            onBlur={e => window.api.updateQuotationAssuredGroup(g.id, { name: e.target.value })}
-                            style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }} />
-                        <button onClick={async () => { await window.api.deleteQuotationAssuredGroup(g.id); showSuccess('Group deleted'); loadData() }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+            {/* Assured Groups — collapsed by default, auto-expands when groups exist */}
+            {groups.length > 0 ? (
+                <div style={{ marginBottom: '20px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Groups</span>
                     </div>
-                ))}
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
-                    <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && newGroupName.trim()) { handleAddGroup() } }}
-                        placeholder="New group name (e.g. CO-ASSURED)"
-                        style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px dashed var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
-                    <button onClick={handleAddGroup} disabled={!newGroupName.trim()} className="btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Plus size={12} /> Add Group
-                    </button>
+                    {groups.map((g, i) => (
+                        <div key={g.id} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '18px' }}>{i + 1}.</span>
+                            <input value={g.name} onChange={e => setGroups(prev => prev.map(gg => gg.id === g.id ? { ...gg, name: e.target.value } : gg))}
+                                onBlur={e => window.api.updateQuotationAssuredGroup(g.id, { name: e.target.value })}
+                                style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }} />
+                            <button onClick={async () => { await window.api.deleteQuotationAssuredGroup(g.id); showSuccess('Group deleted'); loadData() }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                        </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+                        <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && newGroupName.trim()) { handleAddGroup() } }}
+                            placeholder="Add group..."
+                            style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px dashed var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
+                        <button onClick={() => handleAddGroup()} disabled={!newGroupName.trim()} className="btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Plus size={12} />
+                        </button>
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <button onClick={() => handleAddGroup('ASSURED')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Plus size={12} /> Organize into groups (e.g. Assured / Co-Assured)
+                </button>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                 <h3 style={{ fontSize: '1rem', margin: 0 }}>Assureds</h3>
