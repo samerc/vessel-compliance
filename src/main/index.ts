@@ -2797,6 +2797,13 @@ app.whenReady().then(() => {
 
   // Quotations
   safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })
+  safeHandle('quotation:getPaginated', (event, params) => { requireSession(event); return db.getQuotationsPaginated(params) })
+  safeHandle('quotation:getCreators', (event) => { requireSession(event); return db.getQuotationCreators() })
+  safeHandle('quotation:getSavedFilters', (event) => { const user = requireSession(event); return db.getQuotationSavedFilters(user.id) })
+  safeHandle('quotation:saveFilter', (event, name: string, filters: any) => { const user = requireSession(event); return db.saveQuotationFilter(user.id, name, filters) })
+  safeHandle('quotation:deleteFilter', (event, id: string) => { requireSession(event); return db.deleteQuotationSavedFilter(id) })
+  safeHandle('quotation:getFavorites', (event) => { const user = requireSession(event); return db.getQuotationFavorites(user.id) })
+  safeHandle('quotation:toggleFavorite', (event, quotationId: string) => { const user = requireSession(event); return db.toggleQuotationFavorite(user.id, quotationId) })
   safeHandle('db:getQuotation', (event, id) => { requireSession(event); return db.getQuotation(id) })
   safeHandle('db:addQuotation', async (event, q) => {
     const user = await requirePermission(event, 'quotations:create')

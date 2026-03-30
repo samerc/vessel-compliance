@@ -2685,6 +2685,25 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: quotation_saved_filters table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_saved_filters (
+                    id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36) NOT NULL, name VARCHAR(100) NOT NULL,
+                    filters TEXT NOT NULL, order_index INT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_qsf_user (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
+            // Migration: quotation_favorites table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_favorites (
+                    id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36) NOT NULL, quotation_id VARCHAR(36) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_user_quotation (user_id, quotation_id),
+                    INDEX idx_qf_user (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -6593,6 +6612,244 @@ export class MySQLAdapter {
             premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
             revisionNumber: Number(r.revisionNumber || 0)
         }))
+    }
+
+    async getQuotationsPaginated(params: {
+        page?: number
+        pageSize?: number
+        search?: string
+        status?: string
+        typeCode?: string
+        createdBy?: string
+        dateFrom?: string
+        dateTo?: string
+        renewalFilter?: string
+        registryOnly?: boolean
+        favoriteIds?: string[]
+        sortField?: string
+        sortDir?: 'asc' | 'desc'
+    }): Promise<{ rows: any[]; total: number; stats: any }> {
+        if (!this.pool) return { rows: [], total: 0, stats: {} }
+
+        const pg = params.page || 0
+        const pageSize = params.pageSize || 25
+        const sortDir = params.sortDir === 'asc' ? 'ASC' : 'DESC'
+
+        // Map frontend sort fields to SQL columns
+        const sortMap: Record<string, string> = {
+            referenceNumber: 'q.reference_number',
+            quotationTypeName: 'qt.name',
+            quotationDate: 'q.quotation_date',
+            vesselName: 'qv_agg.vessel_name',
+            coName: 'q.co_name',
+            premiumAmount: 'q.premium_amount',
+            status: 'q.status',
+            updatedAt: 'q.updated_at',
+            createdAt: 'q.created_at',
+            createdBy: 'q.created_by',
+        }
+        const orderCol = sortMap[params.sortField || 'updatedAt'] || 'q.updated_at'
+
+        // Build WHERE conditions
+        const conditions: string[] = []
+        const values: any[] = []
+
+        if (params.search) {
+            conditions.push(
+                `(q.reference_number LIKE ? OR q.co_name LIKE ? OR q.title LIKE ? OR q.created_by LIKE ? OR qv_agg.vessel_name LIKE ?)`
+            )
+            const s = `%${params.search}%`
+            values.push(s, s, s, s, s)
+        }
+        if (params.status && params.status !== 'all') {
+            conditions.push('q.status = ?')
+            values.push(params.status)
+        }
+        if (params.typeCode && params.typeCode !== 'all') {
+            conditions.push('qt.code = ?')
+            values.push(params.typeCode)
+        }
+        if (params.createdBy && params.createdBy !== 'all') {
+            conditions.push('q.created_by = ?')
+            values.push(params.createdBy)
+        }
+        if (params.dateFrom) {
+            conditions.push('q.quotation_date >= ?')
+            values.push(params.dateFrom)
+        }
+        if (params.dateTo) {
+            conditions.push('q.quotation_date <= ?')
+            values.push(params.dateTo)
+        }
+        if (params.renewalFilter === 'renewal') {
+            conditions.push('q.is_renewal = TRUE')
+        } else if (params.renewalFilter === 'new') {
+            conditions.push('(q.is_renewal = FALSE OR q.is_renewal IS NULL)')
+        }
+        if (params.registryOnly) {
+            conditions.push("q.reference_number NOT LIKE 'DRAFT-%'")
+        }
+        if (params.favoriteIds && params.favoriteIds.length > 0) {
+            conditions.push(`q.id IN (${params.favoriteIds.map(() => '?').join(',')})`)
+            values.push(...params.favoriteIds)
+        }
+
+        const whereClause = conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
+
+        // Get latest revision IDs (same logic as getQuotations)
+        const [latestRows] = await this.pool.query(`
+            SELECT q.id FROM quotations q
+            INNER JOIN (
+                SELECT revision_group_id, MAX(revision_number) as max_rev
+                FROM quotations GROUP BY revision_group_id
+            ) latest ON q.revision_group_id = latest.revision_group_id AND q.revision_number = latest.max_rev
+        `)
+        const latestIds = new Set((latestRows as any[]).map((r: any) => r.id))
+        const latestIdList = [...latestIds].map((id) => `'${id}'`).join(',')
+        if (latestIdList.length === 0) return { rows: [], total: 0, stats: {} }
+
+        // Main query with vessel name subquery
+        const baseQuery = `
+            FROM quotations q
+            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
+            LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
+            LEFT JOIN (
+                SELECT qv2.quotation_id,
+                       MIN(COALESCE(v2.name, qv2.name)) as vessel_name,
+                       COUNT(*) as vessel_count
+                FROM quotation_vessels qv2
+                LEFT JOIN vessels v2 ON qv2.vessel_id = v2.id
+                GROUP BY qv2.quotation_id
+            ) qv_agg ON qv_agg.quotation_id = q.id
+            WHERE q.id IN (${latestIdList}) ${whereClause}
+        `
+
+        // Count total
+        const [countRows] = await this.pool.query(
+            `SELECT COUNT(*) as total ${baseQuery}`,
+            values
+        )
+        const total = (countRows as any[])[0].total
+
+        // Stats (always from full filtered set)
+        const [statsRows] = await this.pool.query(
+            `SELECT q.status, COUNT(*) as cnt ${baseQuery} GROUP BY q.status`,
+            values
+        )
+        const statsByStatus: Record<string, number> = {}
+        for (const r of statsRows as any[]) statsByStatus[r.status] = r.cnt
+
+        const [typeStatsRows] = await this.pool.query(
+            `SELECT qt.code, qt.name, COUNT(*) as cnt ${baseQuery} GROUP BY qt.code, qt.name`,
+            values
+        )
+        const statsByType: { code: string; name: string; count: number }[] = (
+            typeStatsRows as any[]
+        ).map((r: any) => ({ code: r.code, name: r.name, count: r.cnt }))
+
+        // Paginated results
+        const [rows] = await this.pool.query(
+            `
+            SELECT q.id, q.reference_number as referenceNumber,
+                q.quotation_type_id as quotationTypeId, qt.name as quotationTypeName, qt.code as quotationTypeCode,
+                q.quotation_date as quotationDate,
+                q.policy_type_id as policyTypeId, pt.name as policyTypeName,
+                q.is_renewal as isRenewal, q.status,
+                q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
+                q.co_name as coName, q.title as title,
+                q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
+                q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy,
+                q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor,
+                qv_agg.vessel_name as vesselName, qv_agg.vessel_count as vesselCount
+            ${baseQuery}
+            ORDER BY ${orderCol} ${sortDir}
+            LIMIT ? OFFSET ?
+        `,
+            [...values, pageSize, pg * pageSize]
+        )
+
+        return {
+            rows: (rows as any[]).map((r: any) => ({
+                ...r,
+                isRenewal: Boolean(r.isRenewal),
+                isLocked: Boolean(r.isLocked),
+                premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null,
+                revisionNumber: Number(r.revisionNumber || 0),
+                vesselCount: Number(r.vesselCount || 0),
+            })),
+            total,
+            stats: { byStatus: statsByStatus, byType: statsByType, total },
+        }
+    }
+
+    async getQuotationCreators(): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT DISTINCT created_by FROM quotations WHERE created_by IS NOT NULL ORDER BY created_by'
+        )
+        return (rows as any[]).map((r: any) => r.created_by)
+    }
+
+    async getQuotationSavedFilters(userId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, name, filters, order_index as `order` FROM quotation_saved_filters WHERE user_id = ? ORDER BY order_index',
+            [userId]
+        )
+        return (rows as any[]).map((r: any) => ({ ...r, filters: JSON.parse(r.filters) }))
+    }
+
+    async saveQuotationFilter(
+        userId: string,
+        name: string,
+        filters: any
+    ): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO quotation_saved_filters (id, user_id, name, filters) VALUES (?, ?, ?, ?)',
+            [id, userId, name, JSON.stringify(filters)]
+        )
+        return { id, name, filters }
+    }
+
+    async deleteQuotationSavedFilter(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_saved_filters WHERE id = ?', [id])
+    }
+
+    async getQuotationFavorites(userId: string): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT quotation_id FROM quotation_favorites WHERE user_id = ?',
+            [userId]
+        )
+        return (rows as any[]).map((r: any) => r.quotation_id)
+    }
+
+    async toggleQuotationFavorite(
+        userId: string,
+        quotationId: string
+    ): Promise<boolean> {
+        if (!this.pool) return false
+        const [existing] = await this.pool.query(
+            'SELECT id FROM quotation_favorites WHERE user_id = ? AND quotation_id = ?',
+            [userId, quotationId]
+        )
+        if ((existing as any[]).length > 0) {
+            await this.pool.execute(
+                'DELETE FROM quotation_favorites WHERE user_id = ? AND quotation_id = ?',
+                [userId, quotationId]
+            )
+            return false
+        } else {
+            await this.pool.execute(
+                'INSERT INTO quotation_favorites (id, user_id, quotation_id) VALUES (?, ?, ?)',
+                [uuidv4(), userId, quotationId]
+            )
+            return true
+        }
     }
 
     async getQuotation(id: string): Promise<Quotation | null> {

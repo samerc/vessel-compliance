@@ -519,6 +519,13 @@ const api = {
 
   // Quotations
   getQuotations: () => ipcRenderer.invoke('db:getQuotations'),
+  quotationGetPaginated: (params: any) => ipcRenderer.invoke('quotation:getPaginated', params),
+  quotationGetCreators: () => ipcRenderer.invoke('quotation:getCreators'),
+  quotationGetSavedFilters: () => ipcRenderer.invoke('quotation:getSavedFilters'),
+  quotationSaveFilter: (name: string, filters: any) => ipcRenderer.invoke('quotation:saveFilter', name, filters),
+  quotationDeleteFilter: (id: string) => ipcRenderer.invoke('quotation:deleteFilter', id),
+  quotationGetFavorites: () => ipcRenderer.invoke('quotation:getFavorites'),
+  quotationToggleFavorite: (quotationId: string) => ipcRenderer.invoke('quotation:toggleFavorite', quotationId),
   getQuotation: (id: string) => ipcRenderer.invoke('db:getQuotation', id),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
   updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),

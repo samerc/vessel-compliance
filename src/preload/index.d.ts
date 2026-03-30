@@ -521,6 +521,27 @@ export interface Api {
 
   // Quotations
   getQuotations: () => Promise<Quotation[]>
+  quotationGetPaginated: (params: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: string
+    typeCode?: string
+    createdBy?: string
+    dateFrom?: string
+    dateTo?: string
+    renewalFilter?: string
+    registryOnly?: boolean
+    favoriteIds?: string[]
+    sortField?: string
+    sortDir?: 'asc' | 'desc'
+  }) => Promise<{ rows: any[]; total: number; stats: { byStatus: Record<string, number>; byType: { code: string; name: string; count: number }[]; total: number } }>
+  quotationGetCreators: () => Promise<string[]>
+  quotationGetSavedFilters: () => Promise<{ id: string; name: string; filters: any; order: number }[]>
+  quotationSaveFilter: (name: string, filters: any) => Promise<{ id: string; name: string; filters: any }>
+  quotationDeleteFilter: (id: string) => Promise<void>
+  quotationGetFavorites: () => Promise<string[]>
+  quotationToggleFavorite: (quotationId: string) => Promise<boolean>
   getQuotation: (id: string) => Promise<Quotation | null>
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>
