@@ -17,12 +17,43 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         })()
     }, [])
 
-    const autoCalcPremium = (sumInsured: number | undefined) => {
-        if (!sumInsured || !warSettings?.defaultRate) return
-        const premium = Math.round(sumInsured * warSettings.defaultRate / 1000 * 100) / 100
-        if (!quotation.premiumAmount) {
+    const getEffectiveRate = (): number | undefined => {
+        if (quotation.premiumRate != null) return quotation.premiumRate
+        return warSettings?.defaultRate ?? undefined
+    }
+
+    const handleRateChange = (rate: number | undefined) => {
+        setQ(q => ({ ...q, premiumRate: rate }))
+        updateField('premiumRate', rate ?? null)
+        if (rate && quotation.agreedValue) {
+            const premium = Math.round(quotation.agreedValue * rate / 1000 * 100) / 100
             setQ(q => ({ ...q, premiumAmount: premium }))
             updateField('premiumAmount', premium)
+        }
+    }
+
+    const handlePremiumChange = (premium: number | undefined) => {
+        setQ(q => ({ ...q, premiumAmount: premium }))
+        updateField('premiumAmount', premium ?? null)
+        if (premium && quotation.agreedValue) {
+            const rate = Math.round(premium / quotation.agreedValue * 1000 * 10000) / 10000
+            setQ(q => ({ ...q, premiumRate: rate }))
+            updateField('premiumRate', rate)
+        }
+    }
+
+    const handleSumInsuredChange = (val: number | undefined) => {
+        setQ(q => ({ ...q, agreedValue: val }))
+        updateField('agreedValue', val ?? null)
+        const rate = getEffectiveRate()
+        if (val && rate) {
+            const premium = Math.round(val * rate / 1000 * 100) / 100
+            setQ(q => ({ ...q, premiumAmount: premium }))
+            updateField('premiumAmount', premium)
+            if (quotation.premiumRate == null) {
+                setQ(q => ({ ...q, premiumRate: rate }))
+                updateField('premiumRate', rate)
+            }
         }
     }
 
@@ -40,9 +71,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                         value={quotation.agreedValue || ''}
                         onChange={e => {
                             const val = e.target.value ? parseFloat(e.target.value) : undefined
-                            setQ(q => ({ ...q, agreedValue: val }))
-                            updateField('agreedValue', val ?? null)
-                            autoCalcPremium(val)
+                            handleSumInsuredChange(val)
                         }}
                         placeholder="e.g., 800000"
                         style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
@@ -61,12 +90,63 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                     />
                 </div>
             </div>
-            {warSettings?.defaultRate && (
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
-                    Default rate: {warSettings.defaultRate}‰
-                    {quotation.agreedValue ? ` — Calculated premium: ${(Math.round(quotation.agreedValue * warSettings.defaultRate / 1000 * 100) / 100).toLocaleString()} ${quotation.agreedValueCurrency || 'USD'}` : ''}
-                </p>
-            )}
+
+            <h3 style={{ marginTop: '28px', marginBottom: '14px', fontSize: '1rem' }}>Rate & Premium</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
+                Editing either field will automatically recalculate the other based on the sum insured.
+                {warSettings?.defaultRate && quotation.premiumRate == null
+                    ? ` Default rate: ${warSettings.defaultRate}‰`
+                    : ''}
+            </p>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                <div style={{ flex: 1, maxWidth: '180px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Rate (‰)</label>
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            type="number"
+                            step="0.0001"
+                            value={getEffectiveRate() ?? ''}
+                            onChange={e => {
+                                const val = e.target.value ? parseFloat(e.target.value) : undefined
+                                handleRateChange(val)
+                            }}
+                            placeholder="e.g., 0.35"
+                            style={{ width: '100%', fontSize: '0.9rem', padding: '8px 32px 8px 10px' }}
+                        />
+                        <span style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.85rem',
+                            pointerEvents: 'none'
+                        }}>‰</span>
+                    </div>
+                </div>
+                <div style={{ flex: 1, maxWidth: '220px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Premium</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        value={quotation.premiumAmount || ''}
+                        onChange={e => {
+                            const val = e.target.value ? parseFloat(e.target.value) : undefined
+                            handlePremiumChange(val)
+                        }}
+                        placeholder="Auto-calculated"
+                        style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
+                    />
+                </div>
+                <div style={{
+                    padding: '8px 0',
+                    fontSize: '0.88rem',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap'
+                }}>
+                    {quotation.premiumCurrency || quotation.agreedValueCurrency || 'USD'}
+                </div>
+            </div>
         </div>
     )
 }
