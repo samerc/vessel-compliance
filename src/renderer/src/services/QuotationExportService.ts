@@ -240,17 +240,21 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const vesselIacsMap: Record<string, boolean> = {}
   const safeQVessels = Array.isArray(quotationVessels) ? quotationVessels : []
   const classSocieties = await window.api.getClassificationSocieties()
-  const iacsIds = new Set((Array.isArray(classSocieties) ? classSocieties : []).filter(cs => cs.isIacs).map(cs => cs.id))
+  const safeCS = Array.isArray(classSocieties) ? classSocieties : []
+  const iacsIds = new Set(safeCS.filter(cs => cs.isIacs).map(cs => cs.id))
+  // Build a set of IACS names/abbreviations for fallback text matching
+  const iacsNames = new Set(safeCS.filter(cs => cs.isIacs).flatMap(cs => [cs.name?.toLowerCase(), cs.abbreviation?.toLowerCase()].filter(Boolean)))
   for (const qv of safeQVessels) {
     if (qv.vesselId) {
       try {
         const vcs = await window.api.getVesselClassifications(qv.vesselId)
         const hasIacs = (Array.isArray(vcs) ? vcs : []).some((vc: any) => iacsIds.has(vc.classificationSocietyId))
-        vesselIacsMap[qv.id] = hasIacs
-      } catch { vesselIacsMap[qv.id] = false }
-    } else {
-      vesselIacsMap[qv.id] = false
+        if (hasIacs) { vesselIacsMap[qv.id] = true; continue }
+      } catch {}
     }
+    // Fallback: check the text classification field on the quotation vessel
+    const classText = (qv.classification || '').toLowerCase().trim()
+    vesselIacsMap[qv.id] = classText ? iacsNames.has(classText) : false
   }
 
   // Save snapshot on first export (if not already saved)
