@@ -923,7 +923,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   // Hull Conditions
   {
     const hc = data.hullConditions
-    const ha = data.hullAdditionalConditions
+    // Sort additional conditions by per-quotation order_index (falls back to settings order)
+    const addlSettingsOrder = new Map(data.allHullAdditionalConditions.map((c, i) => [c.id, c.order ?? i]))
+    const ha = [...data.hullAdditionalConditions].sort((a, b) => {
+        if (a.order != null && b.order != null) return a.order - b.order
+        return (addlSettingsOrder.get(a.hullAdditionalConditionId) ?? 999) - (addlSettingsOrder.get(b.hullAdditionalConditionId) ?? 999)
+    })
     const alts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
       const ivClauseId = data.quotation.ivClauseId
@@ -2455,7 +2460,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Hull Conditions ----
   {
     const hc = data.hullConditions
-    const ha = data.hullAdditionalConditions
+    // Sort additional conditions by per-quotation order_index (falls back to settings order)
+    const dAddlSettingsOrder = new Map(data.allHullAdditionalConditions.map((c, i) => [c.id, c.order ?? i]))
+    const ha = [...data.hullAdditionalConditions].sort((a, b) => {
+        if (a.order != null && b.order != null) return a.order - b.order
+        return (dAddlSettingsOrder.get(a.hullAdditionalConditionId) ?? 999) - (dAddlSettingsOrder.get(b.hullAdditionalConditionId) ?? 999)
+    })
     const dAlts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
       const hcContent: (Paragraph | Table)[] = []

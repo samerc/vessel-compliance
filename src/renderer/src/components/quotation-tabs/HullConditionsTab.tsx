@@ -1390,6 +1390,45 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
                     onAmountBlur={saveAdditionalOverrides}
                 />
+                {/* Reorder selected additional conditions */}
+                {qAdditional.length >= 2 && (() => {
+                    const selectedItems = qAdditional.map(qa => {
+                        const def = allAdditional.find(a => a.id === qa.hullAdditionalConditionId)
+                        return { ...qa, title: def?.title || '', text: def?.text || '' }
+                    })
+                    return (
+                        <div style={{ marginTop: '16px', borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`, paddingTop: '12px' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Export Order (drag to reorder)</label>
+                            {selectedItems.map((item, idx) => (
+                                <div key={item.hullAdditionalConditionId}
+                                    draggable
+                                    onDragStart={e => e.dataTransfer.setData('addl-idx', String(idx))}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={async e => {
+                                        e.preventDefault()
+                                        const fromIdx = parseInt(e.dataTransfer.getData('addl-idx'))
+                                        if (isNaN(fromIdx) || fromIdx === idx) return
+                                        const reordered = [...qAdditional]
+                                        const [moved] = reordered.splice(fromIdx, 1)
+                                        reordered.splice(idx, 0, moved)
+                                        setQAdditional(reordered)
+                                        await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, reordered.map(mapAddForSave))
+                                    }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        padding: '6px 10px', marginBottom: '4px', borderRadius: '6px',
+                                        border: '1px solid var(--table-border)', cursor: 'grab',
+                                        fontSize: '0.8rem', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+                                    }}
+                                >
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', cursor: 'grab' }}>⠿</span>
+                                    <span style={{ fontWeight: 600, minWidth: '18px', color: 'var(--text-secondary)' }}>{idx + 1}.</span>
+                                    <span style={{ flex: 1 }}>{item.title || item.text.substring(0, 80)}{!item.title && item.text.length > 80 ? '...' : ''}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                })()}
             </div>
         )}
         </>
