@@ -203,7 +203,13 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                     </div>
                 </div>
             ) : (
-                <button onClick={() => handleAddGroup('ASSURED')}
+                <button onClick={async () => {
+                    const result = await window.api.addQuotationAssuredGroup(quotation.id, 'ASSURED')
+                    if (result && !(result as any).error) {
+                        setGroups([result])
+                        showSuccess('Group added — assign assureds to groups using the dropdown')
+                    }
+                }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Plus size={12} /> Organize into groups (e.g. Assured / Co-Assured)
                 </button>
@@ -282,6 +288,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
 
             <div style={{ marginTop: '14px' }}>
                 {groups.length > 0 ? (
+                    /* Group-based view */
                     <>
                         {groups.map(g => {
                             const groupAssureds = assureds.filter(a => a.groupId === g.id)
@@ -292,12 +299,11 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                                     </div>
                                     {groupAssureds.map((a, i) => renderAssuredRow(a, i))}
                                     {groupAssureds.length === 0 && (
-                                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '4px 0' }}>No assureds in this group. Drag or assign assureds here.</p>
+                                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '4px 0' }}>No assureds in this group.</p>
                                     )}
                                 </div>
                             )
                         })}
-                        {/* Ungrouped */}
                         {assureds.filter(a => !a.groupId).length > 0 && (
                             <div style={{ marginBottom: '16px' }}>
                                 <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--table-border)' }}>
@@ -307,8 +313,32 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                             </div>
                         )}
                     </>
+                ) : qVessels.length > 1 ? (
+                    /* Vessel-based view (multi-vessel, no groups) */
+                    <>
+                        {qVessels.map(qv => {
+                            const vesselAssureds = assureds.filter(a => a.vesselLabel === qv.vesselLabel)
+                            if (vesselAssureds.length === 0) return null
+                            return (
+                                <div key={qv.id} style={{ marginBottom: '16px' }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-primary)', letterSpacing: '0.05em', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--table-border)' }}>
+                                        {qv.vesselLabel} — {(qv.name || qv.vesselLabel).toUpperCase()}
+                                    </div>
+                                    {vesselAssureds.map((a, i) => renderAssuredRow(a, i))}
+                                </div>
+                            )
+                        })}
+                        {assureds.filter(a => !a.vesselLabel).length > 0 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--table-border)' }}>
+                                    All Vessels
+                                </div>
+                                {assureds.filter(a => !a.vesselLabel).map((a, i) => renderAssuredRow(a, i))}
+                            </div>
+                        )}
+                    </>
                 ) : (
-                    // No groups — flat list as before
+                    /* Flat list (single vessel, no groups) */
                     assureds.map((a, i) => renderAssuredRow(a, i))
                 )}
                 {assureds.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No assureds added yet. Add manually or go to the Vessel tab to import from a vessel.</p>}
