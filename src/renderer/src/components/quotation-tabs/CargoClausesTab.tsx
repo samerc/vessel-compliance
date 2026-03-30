@@ -149,11 +149,11 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
 
     const toggleClause = async (clause: CargoClause) => {
         try {
-            let newItems: { cargoClauseId: string; textOverride?: string }[]
+            let newItems: { cargoClauseId: string; textOverride?: string; amount?: number | null }[]
             if (selectedIds.has(clause.id)) {
-                newItems = selectedClauses.filter(c => c.cargoClauseId !== clause.id).map(c => ({ cargoClauseId: c.cargoClauseId, textOverride: c.textOverride || undefined }))
+                newItems = selectedClauses.filter(c => c.cargoClauseId !== clause.id).map(c => ({ cargoClauseId: c.cargoClauseId, textOverride: c.textOverride || undefined, amount: c.amount ?? null }))
             } else {
-                newItems = [...selectedClauses.map(c => ({ cargoClauseId: c.cargoClauseId, textOverride: c.textOverride || undefined })), { cargoClauseId: clause.id }]
+                newItems = [...selectedClauses.map(c => ({ cargoClauseId: c.cargoClauseId, textOverride: c.textOverride || undefined, amount: c.amount ?? null })), { cargoClauseId: clause.id }]
             }
             await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
             await loadData()
@@ -163,10 +163,21 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
     const updateOverride = async (cargoClauseId: string, textOverride: string) => {
         const newItems = selectedClauses.map(c => ({
             cargoClauseId: c.cargoClauseId,
-            textOverride: c.cargoClauseId === cargoClauseId ? (textOverride || undefined) : (c.textOverride || undefined)
+            textOverride: c.cargoClauseId === cargoClauseId ? (textOverride || undefined) : (c.textOverride || undefined),
+            amount: c.amount ?? null
         }))
         await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
         setSelectedClauses(prev => prev.map(c => c.cargoClauseId === cargoClauseId ? { ...c, textOverride } : c))
+    }
+
+    const updateAmount = async (cargoClauseId: string, amount: number | null) => {
+        const newItems = selectedClauses.map(c => ({
+            cargoClauseId: c.cargoClauseId,
+            textOverride: c.textOverride || undefined,
+            amount: c.cargoClauseId === cargoClauseId ? amount : (c.amount ?? null)
+        }))
+        await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
+        setSelectedClauses(prev => prev.map(c => c.cargoClauseId === cargoClauseId ? { ...c, amount } : c))
     }
 
     const addCustom = async () => {
@@ -244,7 +255,7 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
                         const def = allClauses.find(c => c.id === sc.cargoClauseId)
                         return (
                             <div key={sc.id} style={{ marginBottom: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--input-border)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: sc.textOverride ? '8px' : '0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                                     <span style={{ fontSize: '0.84rem', flex: 1 }}>
                                         {def?.code && <strong style={{ marginRight: '6px' }}>{def.code}</strong>}
                                         {def?.title || sc.title || 'Unknown'}
@@ -254,15 +265,29 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
                                     </button>
                                 </div>
                                 {def?.text && !sc.textOverride && (
-                                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '4px 0 0', fontStyle: 'italic' }}>{def.text.substring(0, 120)}{def.text.length > 120 ? '...' : ''}</p>
+                                    <p style={{ fontSize: '0.82rem', color: 'var(--text-primary)', margin: '0 0 6px', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{def.text}</p>
                                 )}
+                                {sc.hasAmount && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{sc.amountPlaceholder || 'Amount'}:</label>
+                                        <input
+                                            type="number"
+                                            value={sc.amount ?? ''}
+                                            placeholder="0.00"
+                                            onChange={e => setSelectedClauses(prev => prev.map(c => c.id === sc.id ? { ...c, amount: e.target.value ? parseFloat(e.target.value) : null } : c))}
+                                            onBlur={e => updateAmount(sc.cargoClauseId, e.target.value ? parseFloat(e.target.value) : null)}
+                                            style={{ width: '180px', padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+                                        />
+                                    </div>
+                                )}
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Custom wording for this quotation (leave blank to use default)</label>
                                 <textarea
                                     value={sc.textOverride || ''}
-                                    placeholder="Override text (optional)"
+                                    placeholder="Leave blank to use the default wording above"
                                     rows={2}
                                     onChange={e => setSelectedClauses(prev => prev.map(c => c.id === sc.id ? { ...c, textOverride: e.target.value } : c))}
                                     onBlur={e => updateOverride(sc.cargoClauseId, e.target.value)}
-                                    style={{ width: '100%', marginTop: '6px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.8rem', resize: 'vertical', fontFamily: 'inherit' }}
+                                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.8rem', resize: 'vertical', fontFamily: 'inherit' }}
                                 />
                             </div>
                         )

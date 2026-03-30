@@ -2652,6 +2652,23 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: amount fields on cargo_clauses
+            try {
+                const [haCol] = await this.pool.query("SHOW COLUMNS FROM cargo_clauses LIKE 'has_amount'") as any[]
+                if ((haCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE cargo_clauses ADD COLUMN has_amount BOOLEAN DEFAULT FALSE")
+                    await this.pool.query("ALTER TABLE cargo_clauses ADD COLUMN amount_placeholder VARCHAR(100) DEFAULT NULL")
+                }
+            } catch {}
+
+            // Migration: amount on quotation_cargo_clauses
+            try {
+                const [amtCol] = await this.pool.query("SHOW COLUMNS FROM quotation_cargo_clauses LIKE 'amount'") as any[]
+                if ((amtCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_cargo_clauses ADD COLUMN amount DECIMAL(15,2) DEFAULT NULL")
+                }
+            } catch {}
+
             // Seed Cargo quotation type if not exists
             try {
                 const [existingCargo] = await this.pool.query("SELECT id FROM quotation_types WHERE code = 'C'") as any[]
@@ -11780,7 +11797,7 @@ export class MySQLAdapter {
     async getCargoClausesBySection(section: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, section, title, text, code, order_index as `order`, active FROM cargo_clauses WHERE section = ? ORDER BY order_index ASC',
+            'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE section = ? ORDER BY order_index ASC',
             [section]
         )
         return rows as any[]
@@ -11789,24 +11806,24 @@ export class MySQLAdapter {
     async getAllCargoClauses(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, section, title, text, code, order_index as `order`, active FROM cargo_clauses WHERE active = TRUE ORDER BY section, order_index ASC'
+            'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE active = TRUE ORDER BY section, order_index ASC'
         )
         return rows as any[]
     }
 
-    async addCargoClause(section: string, title: string, text?: string, code?: string): Promise<any> {
+    async addCargoClause(section: string, title: string, text?: string, code?: string, hasAmount?: boolean, amountPlaceholder?: string): Promise<any> {
         if (!this.pool) return null
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM cargo_clauses WHERE section = ?', [section])
         const order = (maxRow as any[])[0].nextOrder
         await this.pool.execute(
-            'INSERT INTO cargo_clauses (id, section, title, text, code, order_index) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, section, title, text || null, code || null, order]
+            'INSERT INTO cargo_clauses (id, section, title, text, code, order_index, has_amount, amount_placeholder) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, section, title, text || null, code || null, order, hasAmount ? true : false, amountPlaceholder || null]
         )
-        return { id, section, title, text: text || null, code: code || null, order, active: true }
+        return { id, section, title, text: text || null, code: code || null, order, active: true, hasAmount: hasAmount || false, amountPlaceholder: amountPlaceholder || null }
     }
 
-    async updateCargoClause(id: string, updates: { title?: string; text?: string; code?: string; active?: boolean }): Promise<void> {
+    async updateCargoClause(id: string, updates: { title?: string; text?: string; code?: string; active?: boolean; hasAmount?: boolean; amountPlaceholder?: string }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
@@ -11814,6 +11831,8 @@ export class MySQLAdapter {
         if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text || null) }
         if (updates.code !== undefined) { fields.push('code = ?'); values.push(updates.code || null) }
         if (updates.active !== undefined) { fields.push('active = ?'); values.push(updates.active) }
+        if (updates.hasAmount !== undefined) { fields.push('has_amount = ?'); values.push(updates.hasAmount) }
+        if (updates.amountPlaceholder !== undefined) { fields.push('amount_placeholder = ?'); values.push(updates.amountPlaceholder || null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE cargo_clauses SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -11837,7 +11856,8 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT qcc.id, qcc.quotation_id as quotationId, qcc.cargo_clause_id as cargoClauseId,
                     qcc.text_override as textOverride, qcc.order_index as \`order\`, qcc.section,
-                    cc.title, cc.text, cc.code
+                    qcc.amount, cc.title, cc.text, cc.code,
+                    cc.has_amount as hasAmount, cc.amount_placeholder as amountPlaceholder
              FROM quotation_cargo_clauses qcc
              JOIN cargo_clauses cc ON cc.id = qcc.cargo_clause_id
              WHERE qcc.quotation_id = ? AND qcc.section = ?
@@ -11847,14 +11867,14 @@ export class MySQLAdapter {
         return rows as any[]
     }
 
-    async setQuotationCargoClauses(quotationId: string, section: string, items: { cargoClauseId: string; textOverride?: string }[]): Promise<void> {
+    async setQuotationCargoClauses(quotationId: string, section: string, items: { cargoClauseId: string; textOverride?: string; amount?: number | null }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotation_cargo_clauses WHERE quotation_id = ? AND section = ?', [quotationId, section])
         for (let i = 0; i < items.length; i++) {
             const id = uuidv4()
             await this.pool.execute(
-                'INSERT INTO quotation_cargo_clauses (id, quotation_id, cargo_clause_id, text_override, order_index, section) VALUES (?, ?, ?, ?, ?, ?)',
-                [id, quotationId, items[i].cargoClauseId, items[i].textOverride || null, i, section]
+                'INSERT INTO quotation_cargo_clauses (id, quotation_id, cargo_clause_id, text_override, order_index, section, amount) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [id, quotationId, items[i].cargoClauseId, items[i].textOverride || null, i, section, items[i].amount ?? null]
             )
         }
     }

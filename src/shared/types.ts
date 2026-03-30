@@ -902,6 +902,8 @@ export interface CargoClause {
   text?: string
   code?: string
   order: number
+  hasAmount?: boolean
+  amountPlaceholder?: string
   active: boolean
 }
 
@@ -924,6 +926,9 @@ export interface QuotationCargoClause {
   title?: string
   text?: string
   code?: string
+  amount?: number | null
+  hasAmount?: boolean
+  amountPlaceholder?: string
 }
 
 export interface QuotationCargoCustomClause {

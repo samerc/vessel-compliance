@@ -2051,7 +2051,7 @@ app.whenReady().then(() => {
   // ==================== Cargo ====================
   safeHandle('cargo:getClauses', (event, section) => { requireSession(event); return db.getCargoClausesBySection(section) })
   safeHandle('cargo:getAllClauses', (event) => { requireSession(event); return db.getAllCargoClauses() })
-  safeHandle('cargo:addClause', async (event, section, title, text, code) => { await requirePermission(event, 'quotations:settings'); return db.addCargoClause(section, title, text, code) })
+  safeHandle('cargo:addClause', async (event, section, title, text, code, hasAmount, amountPlaceholder) => { await requirePermission(event, 'quotations:settings'); return db.addCargoClause(section, title, text, code, hasAmount, amountPlaceholder) })
   safeHandle('cargo:updateClause', async (event, id, updates) => { await requirePermission(event, 'quotations:settings'); return db.updateCargoClause(id, updates) })
   safeHandle('cargo:deleteClause', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteCargoClause(id) })
   safeHandle('cargo:reorderClauses', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderCargoClauses(ids) })

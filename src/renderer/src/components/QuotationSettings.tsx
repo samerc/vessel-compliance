@@ -4823,6 +4823,10 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
     const [editTitle, setEditTitle] = useState('')
     const [editCode, setEditCode] = useState('')
     const [editText, setEditText] = useState('')
+    const [newHasAmount, setNewHasAmount] = useState(false)
+    const [newAmountPlaceholder, setNewAmountPlaceholder] = useState('')
+    const [editHasAmount, setEditHasAmount] = useState(false)
+    const [editAmountPlaceholder, setEditAmountPlaceholder] = useState('')
     const [showBulkImport, setShowBulkImport] = useState(false)
     const [bulkText, setBulkText] = useState('')
     const { theme } = useTheme()
@@ -4850,7 +4854,7 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
 
     const handleIcAdd = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!icNewName.trim()) return
+        if (!icNewName.trim() || !icNewDesc.trim()) return
         try {
             const result = await window.api.cargoAddInstituteClause(icNewName.trim(), icNewCode.trim() || undefined, icNewDesc.trim() || undefined)
             if (result && !(result as any).error) {
@@ -4936,9 +4940,9 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
         e.preventDefault()
         if (!newTitle.trim()) return
         try {
-            const result = await window.api.cargoAddClause(section, newTitle.trim(), newText.trim() || undefined, newCode.trim() || undefined)
+            const result = await window.api.cargoAddClause(section, newTitle.trim(), newText.trim() || undefined, newCode.trim() || undefined, newHasAmount || undefined, newAmountPlaceholder.trim() || undefined)
             if (result && !(result as any).error) {
-                setNewTitle(''); setNewCode(''); setNewText('')
+                setNewTitle(''); setNewCode(''); setNewText(''); setNewHasAmount(false); setNewAmountPlaceholder('')
                 showSuccess('Clause added')
                 loadData()
             } else {
@@ -4949,7 +4953,7 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
 
     const handleSaveEdit = async (id: string) => {
         try {
-            await window.api.cargoUpdateClause(id, { title: editTitle.trim(), code: editCode.trim(), text: editText.trim() })
+            await window.api.cargoUpdateClause(id, { title: editTitle.trim(), code: editCode.trim(), text: editText.trim(), hasAmount: editHasAmount, amountPlaceholder: editAmountPlaceholder.trim() })
             setEditingId(null)
             showSuccess('Clause updated')
             loadData()
@@ -4994,8 +4998,8 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                         <input value={icNewCode} onChange={e => setIcNewCode(e.target.value)} placeholder="Code (e.g. CL. 382)" style={{ width: '130px', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                         <input value={icNewName} onChange={e => setIcNewName(e.target.value)} placeholder="Name (e.g. Institute Cargo Clauses (A))" style={{ flex: 1, padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                     </div>
-                    <textarea value={icNewDesc} onChange={e => setIcNewDesc(e.target.value)} placeholder="Description (optional)" rows={1} style={{ flex: '1 1 100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
-                    <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
+                    <textarea value={icNewDesc} onChange={e => setIcNewDesc(e.target.value)} placeholder="Clause wording (required)" rows={1} style={{ flex: '1 1 100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                    <button type="submit" disabled={!icNewDesc.trim()} className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
                 </form>
 
                 {instituteClauses.map((c, i) => (
@@ -5021,7 +5025,7 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                                         <input value={icEditCode} onChange={e => setIcEditCode(e.target.value)} placeholder="Code" style={{ width: '130px', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                                         <input value={icEditName} onChange={e => setIcEditName(e.target.value)} placeholder="Name" style={{ flex: 1, padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                                     </div>
-                                    <textarea value={icEditDesc} onChange={e => setIcEditDesc(e.target.value)} placeholder="Description" rows={2} style={{ width: '100%', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                                    <textarea value={icEditDesc} onChange={e => setIcEditDesc(e.target.value)} placeholder="Clause wording (required)" rows={2} style={{ width: '100%', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
                                     <div style={{ display: 'flex', gap: '6px' }}>
                                         <button onClick={() => handleIcSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /> Save</button>
                                         <button onClick={() => setIcEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
@@ -5063,7 +5067,15 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                     <input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (optional)" style={{ width: '100px', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                     <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Clause title" style={{ flex: 1, padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                 </div>
-                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Clause text (optional)" rows={2} style={{ flex: '1 1 100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Clause wording as it will appear in the quotation" rows={2} style={{ flex: '1 1 100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 100%' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input type="checkbox" checked={newHasAmount} onChange={e => setNewHasAmount(e.target.checked)} /> Has amount
+                    </label>
+                    {newHasAmount && (
+                        <input value={newAmountPlaceholder} onChange={e => setNewAmountPlaceholder(e.target.value)} placeholder="Amount placeholder (e.g. Limit per shipment)" style={{ flex: 1, padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                    )}
+                </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                     <button type="submit" className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add</button>
                     <button type="button" onClick={() => setShowBulkImport(true)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}><Upload size={14} /> Bulk Import</button>
@@ -5129,7 +5141,15 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                                     <input value={editCode} onChange={e => setEditCode(e.target.value)} placeholder="Code" style={{ width: '100px', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                                     <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ flex: 1, padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
                                 </div>
-                                <textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="Clause text" rows={3} style={{ width: '100%', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="Clause wording" rows={3} style={{ width: '100%', padding: '6px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                        <input type="checkbox" checked={editHasAmount} onChange={e => setEditHasAmount(e.target.checked)} /> Has amount
+                                    </label>
+                                    {editHasAmount && (
+                                        <input value={editAmountPlaceholder} onChange={e => setEditAmountPlaceholder(e.target.value)} placeholder="Amount placeholder" style={{ flex: 1, padding: '4px 8px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                                    )}
+                                </div>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                     <button onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /> Save</button>
                                     <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
@@ -5140,6 +5160,7 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: c.text ? '4px' : 0 }}>
                                     {c.code && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#32b886', background: 'rgba(50,184,134,0.1)', padding: '1px 6px', borderRadius: '4px' }}>{c.code}</span>}
                                     <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{c.title}</span>
+                                    {c.hasAmount && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#ff8c32', background: 'rgba(255,140,50,0.1)', padding: '1px 6px', borderRadius: '4px' }}>{c.amountPlaceholder || '$'}</span>}
                                 </div>
                                 {c.text && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-wrap' }}>{c.text}</p>}
                             </div>
@@ -5152,7 +5173,7 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                     >
                         {c.active === false ? 'OFF' : 'ON'}
                     </button>
-                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
+                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text || ''); setEditHasAmount(!!c.hasAmount); setEditAmountPlaceholder(c.amountPlaceholder || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
                     <button onClick={() => handleDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                 </div>
             ))}

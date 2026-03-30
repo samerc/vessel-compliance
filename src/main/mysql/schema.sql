@@ -719,6 +719,8 @@ CREATE TABLE IF NOT EXISTS cargo_clauses (
   text TEXT DEFAULT NULL,
   code VARCHAR(50) DEFAULT NULL,
   order_index INT DEFAULT 0,
+  has_amount BOOLEAN DEFAULT FALSE,
+  amount_placeholder VARCHAR(100) DEFAULT NULL,
   active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -731,6 +733,7 @@ CREATE TABLE IF NOT EXISTS quotation_cargo_clauses (
   text_override TEXT DEFAULT NULL,
   order_index INT DEFAULT 0,
   section ENUM('conditions','special','law') NOT NULL,
+  amount DECIMAL(15,2) DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

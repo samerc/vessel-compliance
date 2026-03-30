@@ -63,37 +63,42 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             })
 
             // Auto-load vessel assureds into the quotation, sorted by role order from settings
-            const [vassureds, allEntities, existingQAssureds, assuredRoles] = await Promise.all([
-                window.api.getVesselAssureds(selectedVesselId),
-                window.api.getEntities(),
-                window.api.getQuotationAssureds(quotation.id),
-                window.api.getAssuredRoles()
-            ])
-            const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
-            const existingEntityIds = new Set(existingQAssureds.map(a => a.entityId).filter(Boolean))
-            const toAdd = vassureds
-                .filter(va => !existingEntityIds.has(va.entityId))
-                .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
-            for (let i = 0; i < toAdd.length; i++) {
-                const va = toAdd[i]
-                const entity = allEntities.find(e => e.id === va.entityId)
-                if (entity) {
-                    await window.api.addQuotationAssured({
-                        quotationId: quotation.id,
-                        entityId: va.entityId,
-                        name: entity.name,
-                        role: va.role || undefined,
-                        vesselLabel: vLabel,
-                        order: existingQAssureds.length + i
-                    })
+            // Skip for cargo quotations — cargo doesn't use vessel-level assureds
+            let assuredsAdded = 0
+            if (quotation.quotationTypeCode !== 'C') {
+                const [vassureds, allEntities, existingQAssureds, assuredRoles] = await Promise.all([
+                    window.api.getVesselAssureds(selectedVesselId),
+                    window.api.getEntities(),
+                    window.api.getQuotationAssureds(quotation.id),
+                    window.api.getAssuredRoles()
+                ])
+                const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
+                const existingEntityIds = new Set(existingQAssureds.map(a => a.entityId).filter(Boolean))
+                const toAdd = vassureds
+                    .filter(va => !existingEntityIds.has(va.entityId))
+                    .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+                for (let i = 0; i < toAdd.length; i++) {
+                    const va = toAdd[i]
+                    const entity = allEntities.find(e => e.id === va.entityId)
+                    if (entity) {
+                        await window.api.addQuotationAssured({
+                            quotationId: quotation.id,
+                            entityId: va.entityId,
+                            name: entity.name,
+                            role: va.role || undefined,
+                            vesselLabel: vLabel,
+                            order: existingQAssureds.length + i
+                        })
+                    }
                 }
+                assuredsAdded = toAdd.length
             }
 
             setSelectedVesselId('')
             setVesselSearch('')
             setNewData(EMPTY_NEW_VESSEL)
             setShowAddForm(false)
-            showSuccess(`Vessel added${toAdd.length > 0 ? ` — ${toAdd.length} assured(s) loaded` : ''}`)
+            showSuccess(`Vessel added${assuredsAdded > 0 ? ` — ${assuredsAdded} assured(s) loaded` : ''}`)
             loadData()
         } catch (err: any) { showError(err.message || 'Failed to add vessel') }
     }
@@ -155,12 +160,19 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             }
 
             const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
-            const [allEntities, existingQAssureds, assuredRoles] = await Promise.all([
-                window.api.getEntities(),
-                window.api.getQuotationAssureds(quotation.id),
-                window.api.getAssuredRoles()
-            ])
-            const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
+            const skipAssureds = quotation.quotationTypeCode === 'C'
+            let allEntities: any[] = []
+            let existingQAssureds: any[] = []
+            let assuredRoles: any[] = []
+            let roleOrder = new Map<string, number>()
+            if (!skipAssureds) {
+                ;[allEntities, existingQAssureds, assuredRoles] = await Promise.all([
+                    window.api.getEntities(),
+                    window.api.getQuotationAssureds(quotation.id),
+                    window.api.getAssuredRoles()
+                ])
+                roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
+            }
 
             let currentCount = qVessels.length
             let totalAssuredsAdded = 0
@@ -186,28 +198,30 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     callSign: v.callSign
                 })
 
-                // Auto-load vessel assureds
-                const vassureds = await window.api.getVesselAssureds(v.id).catch(() => [])
-                const toAdd = (Array.isArray(vassureds) ? vassureds : [])
-                    .filter(va => !existingEntityIds.has(va.entityId))
-                    .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
-                for (let i = 0; i < toAdd.length; i++) {
-                    const va = toAdd[i]
-                    const entity = allEntities.find(e => e.id === va.entityId)
-                    if (entity) {
-                        await window.api.addQuotationAssured({
-                            quotationId: quotation.id,
-                            entityId: va.entityId,
-                            name: entity.name,
-                            role: va.role || undefined,
-                            vesselLabel: vLabel,
-                            order: currentAssuredCount + i
-                        })
-                        existingEntityIds.add(va.entityId)
-                        totalAssuredsAdded++
+                // Auto-load vessel assureds (skip for cargo quotations)
+                if (!skipAssureds) {
+                    const vassureds = await window.api.getVesselAssureds(v.id).catch(() => [])
+                    const toAdd = (Array.isArray(vassureds) ? vassureds : [])
+                        .filter(va => !existingEntityIds.has(va.entityId))
+                        .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+                    for (let i = 0; i < toAdd.length; i++) {
+                        const va = toAdd[i]
+                        const entity = allEntities.find(e => e.id === va.entityId)
+                        if (entity) {
+                            await window.api.addQuotationAssured({
+                                quotationId: quotation.id,
+                                entityId: va.entityId,
+                                name: entity.name,
+                                role: va.role || undefined,
+                                vesselLabel: vLabel,
+                                order: currentAssuredCount + i
+                            })
+                            existingEntityIds.add(va.entityId)
+                            totalAssuredsAdded++
+                        }
                     }
+                    currentAssuredCount += toAdd.length
                 }
-                currentAssuredCount += toAdd.length
                 currentCount++
             }
 

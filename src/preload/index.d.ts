@@ -322,12 +322,12 @@ export interface Api {
   cargoReorderInstituteClauses: (ids: string[]) => Promise<void>
   cargoGetClauses: (section: string) => Promise<CargoClause[]>
   cargoGetAllClauses: () => Promise<CargoClause[]>
-  cargoAddClause: (section: string, title: string, text?: string, code?: string) => Promise<CargoClause>
-  cargoUpdateClause: (id: string, updates: { title?: string; text?: string; code?: string; active?: boolean }) => Promise<void>
+  cargoAddClause: (section: string, title: string, text?: string, code?: string, hasAmount?: boolean, amountPlaceholder?: string) => Promise<CargoClause>
+  cargoUpdateClause: (id: string, updates: { title?: string; text?: string; code?: string; active?: boolean; hasAmount?: boolean; amountPlaceholder?: string }) => Promise<void>
   cargoDeleteClause: (id: string) => Promise<void>
   cargoReorderClauses: (ids: string[]) => Promise<void>
   cargoGetQuotationClauses: (qId: string, section: string) => Promise<QuotationCargoClause[]>
-  cargoSetQuotationClauses: (qId: string, section: string, items: { cargoClauseId: string; textOverride?: string }[]) => Promise<void>
+  cargoSetQuotationClauses: (qId: string, section: string, items: { cargoClauseId: string; textOverride?: string; amount?: number | null }[]) => Promise<void>
   cargoGetQuotationCustomClauses: (qId: string, section: string) => Promise<QuotationCargoCustomClause[]>
   cargoAddQuotationCustomClause: (qId: string, section: string, text: string) => Promise<QuotationCargoCustomClause>
   cargoUpdateQuotationCustomClause: (id: string, updates: { text?: string }) => Promise<void>
