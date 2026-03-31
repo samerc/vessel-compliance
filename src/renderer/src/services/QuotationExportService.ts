@@ -1221,6 +1221,11 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const hmSeenIds = new Set<string>()
         for (const qc of hmCondsRaw) { if (qc.alternativeId) { hmSeenIds.add(qc.hullConditionId); hmConds.push(qc) } }
         for (const qc of hmCondsRaw) { if (!qc.alternativeId && !hmSeenIds.has(qc.hullConditionId)) { hmSeenIds.add(qc.hullConditionId); hmConds.push(qc) } }
+        hmConds.sort((a, b) => {
+          const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+          const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+          return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+        })
         hcBlocks.push({ title: 'Hull and Machinery', underline: true, desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hmConds), addl: renderAddlForSection(b => b.type === 'alt' || b.type === 'allAlts') })
         hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         const bothAddl = renderAddlForSection(b => b.type === 'both')
@@ -2958,6 +2963,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const dHmSeenIds = new Set<string>()
         for (const qc of dHmCondsRaw) { if (qc.alternativeId) { dHmSeenIds.add(qc.hullConditionId); dHmConds.push(qc) } }
         for (const qc of dHmCondsRaw) { if (!qc.alternativeId && !dHmSeenIds.has(qc.hullConditionId)) { dHmSeenIds.add(qc.hullConditionId); dHmConds.push(qc) } }
+        dHmConds.sort((a, b) => {
+          const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
+          const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+          return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
+        })
 
         if (selectedClause) {
           hcContent.push(bup('Hull and Machinery'))

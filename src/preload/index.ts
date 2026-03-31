@@ -294,7 +294,7 @@ const api = {
   // Agreed Value Options
   hullGetAgreedValueOptions: (qId: string) => ipcRenderer.invoke('hull:getAgreedValueOptions', qId),
   hullAddAgreedValueOption: (qId: string, amount: number, currency?: string, label?: string) => ipcRenderer.invoke('hull:addAgreedValueOption', qId, amount, currency, label),
-  hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string }) => ipcRenderer.invoke('hull:updateAgreedValueOption', id, updates),
+  hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => ipcRenderer.invoke('hull:updateAgreedValueOption', id, updates),
   hullDeleteAgreedValueOption: (id: string) => ipcRenderer.invoke('hull:deleteAgreedValueOption', id),
   hullReorderAgreedValueOptions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAgreedValueOptions', ids),
   // Hull Alternatives
