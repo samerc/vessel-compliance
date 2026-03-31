@@ -318,7 +318,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 const discountLabel = (quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : '') + (quotation.ncbEnabled && quotation.upccEnabled ? ' + ' : '') + (quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '')
                 const hullMultiAlt = quotation.quotationTypeCode === 'H' && (hullAlternatives.length > 1 || hullAlternatives.some(a => a.vesselScopeId))
                 const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
-                const anyMultiAlt = hullMultiAlt || piMultiAlt
+                const anyMultiAlt = hullMultiAlt || piMultiAlt || valueOptions.length > 0
                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
                 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 return (
@@ -326,7 +326,24 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: anyMultiAlt ? '8px' : '0' }}>
                             Payable Premium ({discountLabel})
                         </div>
-                        {piMultiAlt ? (
+                        {valueOptions.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {valueOptions.map((opt, idx) => (
+                                    <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>
+                                            {opt.label || `Option ${idx + 1}`}
+                                        </span>
+                                        <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(computePayable(opt.premiumAmount || 0))}</span>
+                                    </div>
+                                ))}
+                                {quotation.ivEnabled && quotation.ivPremiumAmount != null && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Increased Value</span>
+                                        <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(computePayable(quotation.ivPremiumAmount || 0))}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : piMultiAlt ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {piAlternatives.map((alt, idx) => (
                                     <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

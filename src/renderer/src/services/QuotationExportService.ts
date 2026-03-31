@@ -1646,6 +1646,13 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           pdfPremLines.push({ label: premLabel, tech: alt.premiumAmount || 0 })
         }
         if (q.ivEnabled && q.ivPremiumAmount != null) pdfPremLines.push({ label: 'IV', tech: q.ivPremiumAmount })
+      } else if (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null)) {
+        for (const opt of data.agreedValueOptions) {
+          if (opt.premiumAmount != null) {
+            pdfPremLines.push({ label: opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`, tech: opt.premiumAmount })
+          }
+        }
+        if (q.ivEnabled && q.ivPremiumAmount != null) pdfPremLines.push({ label: 'IV', tech: q.ivPremiumAmount })
       } else if (q.ivEnabled) {
         pdfPremLines.push({ label: 'Section A', tech: q.premiumAmount || 0 })
         if (q.ivPremiumAmount != null) pdfPremLines.push({ label: 'Section B', tech: q.ivPremiumAmount })
@@ -3588,6 +3595,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             if (vessel) wAltLabel = `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
           }
           lines.push({ label: wAltLabel, tech: alt.premiumAmount || 0 })
+        }
+        if (wq.ivEnabled && wq.ivPremiumAmount != null) lines.push({ label: 'IV', tech: wq.ivPremiumAmount })
+      } else if (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null)) {
+        for (const opt of data.agreedValueOptions) {
+          if (opt.premiumAmount != null) {
+            lines.push({ label: opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`, tech: opt.premiumAmount })
+          }
         }
         if (wq.ivEnabled && wq.ivPremiumAmount != null) lines.push({ label: 'IV', tech: wq.ivPremiumAmount })
       } else if (wq.ivEnabled) {
