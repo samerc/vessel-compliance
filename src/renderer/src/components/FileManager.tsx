@@ -993,21 +993,21 @@ export default function FileManager() {
             </div>
           </div>
 
-          {/* File list */}
+          {/* File list — modern table */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
             {/* Table header */}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 100px 140px',
-                padding: '8px 16px',
-                background: 'var(--table-header-bg)',
+                gridTemplateColumns: '1fr 90px 130px 120px',
+                padding: '10px 16px',
+                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
                 borderBottom: '1px solid var(--table-border)',
-                fontSize: '0.78rem',
-                fontWeight: 600,
+                fontSize: '0.72rem',
+                fontWeight: 700,
                 color: 'var(--text-secondary)',
                 textTransform: 'uppercase',
-                letterSpacing: '0.04em',
+                letterSpacing: '0.06em',
                 position: 'sticky',
                 top: 0,
                 zIndex: 1,
@@ -1016,84 +1016,156 @@ export default function FileManager() {
               <span>Name</span>
               <span style={{ textAlign: 'right' }}>Size</span>
               <span style={{ textAlign: 'right' }}>Modified</span>
+              <span style={{ textAlign: 'center' }}>Actions</span>
             </div>
 
             {filteredContents.length === 0 ? (
               <div
                 style={{
-                  padding: 40,
+                  padding: 48,
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
-                  fontSize: '0.9rem',
+                  fontSize: '0.88rem',
                 }}
               >
                 <Folder
-                  size={36}
-                  style={{ color: 'var(--text-secondary)', opacity: 0.4, marginBottom: 12 }}
+                  size={40}
+                  style={{ color: 'var(--text-secondary)', opacity: 0.3, marginBottom: 14 }}
                 />
-                <div>{search ? 'No matching items' : 'This folder is empty'}</div>
+                <div style={{ fontWeight: 500 }}>{search ? 'No matching items' : 'This folder is empty'}</div>
+                <div style={{ fontSize: '0.78rem', marginTop: 4, opacity: 0.7 }}>
+                  {search ? 'Try a different search term' : 'Create a new folder or add files via Explorer'}
+                </div>
               </div>
             ) : (
-              filteredContents.map((item) => (
+              filteredContents.map((item, idx) => (
                 <div
                   key={item.path}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 100px 140px',
-                    padding: '7px 16px',
-                    borderBottom: '1px solid var(--table-border)',
+                    gridTemplateColumns: '1fr 90px 130px 120px',
+                    padding: '8px 16px',
+                    borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)'}`,
                     cursor: 'pointer',
-                    fontSize: '0.87rem',
+                    fontSize: '0.85rem',
                     color: 'var(--text-primary)',
-                    transition: 'background 0.15s',
+                    transition: 'background 0.12s',
+                    background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'),
+                    alignItems: 'center',
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = 'var(--bg-card-hover)')
+                    (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,210,255,0.06)')
                   }
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'))}
                   onDoubleClick={() => handleDoubleClickItem(item)}
                   onContextMenu={(e) => handleContentsContextMenu(e, item.path, item.isDirectory)}
                 >
+                  {/* Name + icon */}
                   <span
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
+                      gap: 10,
                       overflow: 'hidden',
                     }}
                   >
-                    {item.isDirectory ? (
-                      <Folder size={16} style={{ color: '#ffb020', flexShrink: 0 }} />
-                    ) : (
-                      getFileIcon(item.name)
-                    )}
+                    <span style={{
+                      width: 30, height: 30, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      background: item.isDirectory ? 'rgba(255,176,32,0.12)' : (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)')
+                    }}>
+                      {item.isDirectory ? (
+                        <Folder size={16} style={{ color: '#ffb020' }} />
+                      ) : (
+                        getFileIcon(item.name)
+                      )}
+                    </span>
                     <span
                       style={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
+                        fontWeight: item.isDirectory ? 600 : 400,
                       }}
                     >
                       {item.name}
                     </span>
                   </span>
+
+                  {/* Size */}
                   <span
                     style={{
                       textAlign: 'right',
                       color: 'var(--text-secondary)',
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                     }}
                   >
-                    {!item.isDirectory && item.size != null ? formatSize(item.size) : ''}
+                    {!item.isDirectory && item.size != null ? formatSize(item.size) : '—'}
                   </span>
+
+                  {/* Modified */}
                   <span
                     style={{
                       textAlign: 'right',
                       color: 'var(--text-secondary)',
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                     }}
                   >
                     {formatDate(item.modified)}
+                  </span>
+
+                  {/* Action buttons */}
+                  <span style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                    {!item.isDirectory && (
+                      <button
+                        onClick={() => handleOpenFile(item.path)}
+                        title="Open file"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.1)' : 'rgba(0,210,255,0.1)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        <ExternalLink size={14} />
+                      </button>
+                    )}
+                    {item.isDirectory && (
+                      <button
+                        onClick={() => handleSelectFolder(item.path)}
+                        title="Open folder"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ffb020', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,176,32,0.1)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        <FolderOpen size={14} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setRenameModal({ path: item.path, name: item.name }) }}
+                      title="Rename"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                    {item.isDirectory && (
+                      <button
+                        onClick={() => { setMoveModal({ sourcePath: item.path }) }}
+                        title="Move folder"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        <Move size={14} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleOpenInExplorer(item.path)}
+                      title="Show in Explorer"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <HardDrive size={14} />
+                    </button>
                   </span>
                 </div>
               ))
@@ -1103,18 +1175,20 @@ export default function FileManager() {
           {/* Status bar */}
           <div
             style={{
-              padding: '6px 16px',
+              padding: '8px 16px',
               borderTop: '1px solid var(--table-border)',
-              fontSize: '0.78rem',
+              fontSize: '0.75rem',
               color: 'var(--text-secondary)',
               display: 'flex',
               gap: 16,
+              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
             }}
           >
             <span>
               {filteredContents.filter((c) => c.isDirectory).length} folder
               {filteredContents.filter((c) => c.isDirectory).length !== 1 ? 's' : ''}
             </span>
+            <span>·</span>
             <span>
               {filteredContents.filter((c) => !c.isDirectory).length} file
               {filteredContents.filter((c) => !c.isDirectory).length !== 1 ? 's' : ''}
@@ -1236,7 +1310,7 @@ export default function FileManager() {
           <div style={modalBox} onClick={(e) => e.stopPropagation()}>
             <div style={modalTitle}>
               <Edit3 size={18} style={{ color: 'var(--accent-primary)' }} />
-              Rename Folder
+              Rename
             </div>
             <p
               style={{
