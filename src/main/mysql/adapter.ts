@@ -2734,9 +2734,17 @@ export class MySQLAdapter {
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_agreed_value_options (
                     id VARCHAR(36) PRIMARY KEY, quotation_id VARCHAR(36) NOT NULL,
                     label VARCHAR(100) DEFAULT NULL, amount DECIMAL(15,2) NOT NULL,
-                    currency VARCHAR(10) DEFAULT 'USD', order_index INT DEFAULT 0,
+                    currency VARCHAR(10) DEFAULT 'USD', premium_amount DECIMAL(15,2) DEFAULT NULL,
+                    order_index INT DEFAULT 0,
                     INDEX idx_qavo_quotation (quotation_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+            // Migration: premium_amount on quotation_agreed_value_options
+            try {
+                const [paCol] = await this.pool.query("SHOW COLUMNS FROM quotation_agreed_value_options LIKE 'premium_amount'") as any[]
+                if ((paCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_agreed_value_options ADD COLUMN premium_amount DECIMAL(15,2) DEFAULT NULL AFTER currency")
+                }
             } catch {}
 
         } catch (error) {
@@ -7567,7 +7575,7 @@ export class MySQLAdapter {
             { table: 'quotation_notes', cols: 'quotation_id, title, content, order_index' },
             { table: 'quotation_cargo_clauses', cols: 'quotation_id, cargo_clause_id, text_override, order_index, section' },
             { table: 'quotation_cargo_custom_clauses', cols: 'quotation_id, text, section, order_index' },
-            { table: 'quotation_agreed_value_options', cols: 'quotation_id, label, amount, currency, order_index' },
+            { table: 'quotation_agreed_value_options', cols: 'quotation_id, label, amount, currency, premium_amount, order_index' },
         ]
 
         for (const { table, cols } of simpleTables) {
@@ -10295,10 +10303,10 @@ export class MySQLAdapter {
     async getQuotationAgreedValueOptions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, quotation_id as quotationId, label, amount, currency, order_index as `order` FROM quotation_agreed_value_options WHERE quotation_id = ? ORDER BY order_index ASC',
+            'SELECT id, quotation_id as quotationId, label, amount, currency, premium_amount as premiumAmount, order_index as `order` FROM quotation_agreed_value_options WHERE quotation_id = ? ORDER BY order_index ASC',
             [quotationId]
         )
-        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount) }))
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null }))
     }
 
     async addQuotationAgreedValueOption(quotationId: string, amount: number, currency?: string, label?: string): Promise<any> {
@@ -10309,13 +10317,13 @@ export class MySQLAdapter {
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
             await this.pool.execute(
-                'INSERT INTO quotation_agreed_value_options (id, quotation_id, label, amount, currency, order_index) VALUES (?, ?, ?, ?, ?, ?)',
-                [id, quotationId, label || null, amount, currency || 'USD', order]
+                'INSERT INTO quotation_agreed_value_options (id, quotation_id, label, amount, currency, premium_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [id, quotationId, label || null, amount, currency || 'USD', null, order]
             )
         } finally {
             await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
         }
-        return { id, quotationId, label: label || null, amount, currency: currency || 'USD', order }
+        return { id, quotationId, label: label || null, amount, currency: currency || 'USD', premiumAmount: null, order }
     }
 
     async updateQuotationAgreedValueOption(id: string, updates: { label?: string; amount?: number; currency?: string }): Promise<void> {
@@ -10325,6 +10333,7 @@ export class MySQLAdapter {
         if (updates.label !== undefined) { fields.push('label = ?'); values.push(updates.label || null) }
         if (updates.amount !== undefined) { fields.push('amount = ?'); values.push(updates.amount) }
         if (updates.currency !== undefined) { fields.push('currency = ?'); values.push(updates.currency) }
+        if ((updates as any).premiumAmount !== undefined) { fields.push('premium_amount = ?'); values.push((updates as any).premiumAmount ?? null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_agreed_value_options SET ${fields.join(', ')} WHERE id = ?`, values)

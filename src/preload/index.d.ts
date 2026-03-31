@@ -296,7 +296,7 @@ export interface Api {
   // Agreed Value Options
   hullGetAgreedValueOptions: (qId: string) => Promise<QuotationAgreedValueOption[]>
   hullAddAgreedValueOption: (qId: string, amount: number, currency?: string, label?: string) => Promise<QuotationAgreedValueOption>
-  hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string }) => Promise<void>
+  hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => Promise<void>
   hullDeleteAgreedValueOption: (id: string) => Promise<void>
   hullReorderAgreedValueOptions: (ids: string[]) => Promise<void>
   // Hull Alternatives

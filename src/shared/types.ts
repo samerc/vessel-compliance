@@ -849,6 +849,7 @@ export interface QuotationAgreedValueOption {
   label?: string
   amount: number
   currency: string
+  premiumAmount?: number | null
   order: number
 }
 

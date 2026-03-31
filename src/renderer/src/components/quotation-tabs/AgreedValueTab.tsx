@@ -146,28 +146,40 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
             {valueOptions.length > 0 ? (
                 <div style={{ marginBottom: '12px' }}>
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>Value Options</label>
+                    {/* Header row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 70px 1fr 1fr 32px', gap: '8px', marginBottom: '4px', fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '0 2px' }}>
+                        <span>Label</span><span>Currency</span><span>Insured Value</span><span>Premium</span><span></span>
+                    </div>
                     {valueOptions.map((opt, idx) => (
-                        <div key={opt.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                        <div key={opt.id} style={{ display: 'grid', gridTemplateColumns: '120px 70px 1fr 1fr 32px', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
                             <input
                                 value={opt.label || ''}
                                 placeholder={`Option ${idx + 1}`}
                                 onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, label: e.target.value } : o))}
                                 onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { label: e.target.value })}
-                                style={{ width: '120px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
                             />
                             <input
                                 value={opt.currency || 'USD'}
                                 onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, currency: e.target.value } : o))}
                                 onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { currency: e.target.value })}
-                                style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' }}
+                                style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
                             />
                             <input
                                 type="number"
                                 value={opt.amount || ''}
                                 onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: parseFloat(e.target.value) || 0 } : o))}
                                 onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { amount: parseFloat(e.target.value) || 0 })}
-                                placeholder="0.00"
-                                style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                placeholder="Insured value"
+                                style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
+                            />
+                            <input
+                                type="number"
+                                value={opt.premiumAmount ?? ''}
+                                onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
+                                onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
+                                placeholder="Premium"
+                                style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
                             />
                             <button onClick={async () => { await window.api.hullDeleteAgreedValueOption(opt.id); setValueOptions(prev => prev.filter(o => o.id !== opt.id)) }}
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}>
