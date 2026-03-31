@@ -115,6 +115,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
     const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
     const [showDraftExportModal, setShowDraftExportModal] = useState<'pdf' | 'word' | null>(null)
+    const [exportWarnings, setExportWarnings] = useState<{ warnings: string[]; format: 'pdf' | 'word'; action: 'direct' | 'approve' | 'draft' } | null>(null)
     const [showCopyFromQuotation, setShowCopyFromQuotation] = useState(false)
     const [deleteModal, setDeleteModal] = useState<{
         show: boolean
@@ -294,20 +295,87 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
     const isDraft = (q.referenceNumber || '').startsWith('DRAFT-')
 
+    const validateBeforeExport = async (quotation: Quotation): Promise<string[]> => {
+        const warnings: string[] = []
+        const typeCode = quotation.quotationTypeCode
+
+        // Premium — required for all types except cargo rate mode
+        if (typeCode !== 'C' || quotation.premiumType !== 'rate') {
+            if (quotation.premiumAmount == null || quotation.premiumAmount === 0) {
+                warnings.push('Premium amount is not set')
+            }
+        }
+
+        // P&I: Limit of Liability
+        if (typeCode === 'P' && (quotation.limitOfLiabilityAmount == null || quotation.limitOfLiabilityAmount === 0)) {
+            warnings.push('Limit of Liability amount is not set')
+        }
+
+        // Hull: Agreed Value + per-alternative premiums
+        if (typeCode === 'H') {
+            if (quotation.agreedValue == null || quotation.agreedValue === 0) {
+                warnings.push('Agreed Insured Value is not set')
+            }
+            try {
+                const hullAlts = await window.api.hullGetQuotationAlternatives(quotation.id)
+                const safeAlts = Array.isArray(hullAlts) ? hullAlts : []
+                if (safeAlts.length > 1) {
+                    for (const alt of safeAlts) {
+                        if (alt.premiumAmount == null || alt.premiumAmount === 0) {
+                            const label = alt.label || `Alternative ${safeAlts.indexOf(alt) + 1}`
+                            warnings.push(`Premium for ${label} is not set`)
+                        }
+                    }
+                }
+            } catch { /* ignore — hull alternatives check is best-effort */ }
+        }
+
+        // War: Sum Insured
+        if (typeCode === 'W' && (quotation.agreedValue == null || quotation.agreedValue === 0)) {
+            warnings.push('Sum Insured is not set')
+        }
+
+        // Cargo: Insured Value (when not rate mode)
+        if (typeCode === 'C' && quotation.premiumType !== 'rate' && (quotation.insuredValueAmount == null || quotation.insuredValueAmount === 0)) {
+            warnings.push('Insured Value is not set')
+        }
+
+        return warnings
+    }
+
+    const doExport = async (quotation: Quotation, format: 'pdf' | 'word', successMsg: string) => {
+        if (format === 'pdf') {
+            await exportQuotationToPDF(quotation)
+        } else {
+            await exportQuotationToWord(quotation)
+        }
+        showSuccess(successMsg)
+    }
+
+    const runExportWithValidation = async (
+        quotation: Quotation,
+        format: 'pdf' | 'word',
+        action: 'direct' | 'approve' | 'draft'
+    ): Promise<boolean> => {
+        const warnings = await validateBeforeExport(quotation)
+        if (warnings.length > 0) {
+            setExportWarnings({ warnings, format, action })
+            return false
+        }
+        return true
+    }
+
     const handleExportWithDraftCheck = async (format: 'pdf' | 'word') => {
         if (isDraft && hasPermission('quotations:approve')) {
-            setShowDraftExportModal(format)
+            const ok = await runExportWithValidation(q, format, 'approve')
+            if (ok) setShowDraftExportModal(format)
             return
         }
         // If draft but no approve permission, just export as-is with draft number
+        const ok = await runExportWithValidation(q, format, 'direct')
+        if (!ok) return
         try {
-            if (format === 'pdf') {
-                await exportQuotationToPDF(q)
-                showSuccess('PDF exported')
-            } else {
-                await exportQuotationToWord(q)
-                showSuccess('Word exported')
-            }
+            await doExport(q, format, `${format.toUpperCase()} exported`)
         } catch (err: any) {
             showError(err.message || `${format.toUpperCase()} export failed`)
         }
@@ -334,13 +402,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 const newSteps = await window.api.workflowGetReachableSteps(fullQ.id)
                 setReachableSteps(Array.isArray(newSteps) ? newSteps : [])
                 // Export with updated data
-                if (format === 'pdf') {
-                    await exportQuotationToPDF(fullQ)
-                    showSuccess('Approved and PDF exported')
-                } else {
-                    await exportQuotationToWord(fullQ)
-                    showSuccess('Approved and Word exported')
-                }
+                await doExport(fullQ, format, `Approved and ${format.toUpperCase()} exported`)
             }
         } catch (err: any) {
             showError(err.message || 'Failed to approve and export')
@@ -351,15 +413,27 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const handleExportAsDraft = async (format: 'pdf' | 'word') => {
         setShowDraftExportModal(null)
         try {
-            if (format === 'pdf') {
-                await exportQuotationToPDF(q)
-                showSuccess('PDF exported (as draft)')
-            } else {
-                await exportQuotationToWord(q)
-                showSuccess('Word exported (as draft)')
-            }
+            await doExport(q, format, `${format.toUpperCase()} exported (as draft)`)
         } catch (err: any) {
             showError(err.message || `${format.toUpperCase()} export failed`)
+        }
+    }
+
+    const handleExportWarningProceed = async () => {
+        if (!exportWarnings) return
+        const { format, action } = exportWarnings
+        setExportWarnings(null)
+        if (action === 'approve') {
+            // User confirmed — show the draft export modal now
+            setShowDraftExportModal(format)
+        } else if (action === 'draft') {
+            await handleExportAsDraft(format)
+        } else {
+            try {
+                await doExport(q, format, `${format.toUpperCase()} exported`)
+            } catch (err: any) {
+                showError(err.message || `${format.toUpperCase()} export failed`)
+            }
         }
     }
 
@@ -704,6 +778,32 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                             <button className="btn-secondary" onClick={() => setShowDraftExportModal(null)}>Cancel</button>
                             <button className="btn-secondary" onClick={() => handleExportAsDraft(showDraftExportModal)}>Export as Draft</button>
                             <button className="btn-primary" onClick={() => handleApproveAndExport(showDraftExportModal)}>Approve &amp; Export</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Export validation warnings modal */}
+            {exportWarnings && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }} onClick={() => setExportWarnings(null)}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '460px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                            <div style={{ background: 'rgba(255, 180, 32, 0.12)', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <AlertTriangle size={22} color="#ffb020" />
+                            </div>
+                            <h3 style={{ margin: 0, fontSize: '1rem' }}>Missing Required Fields</h3>
+                        </div>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 12px', lineHeight: 1.5 }}>
+                            The following required amount fields are empty. The export may be incomplete.
+                        </p>
+                        <ul style={{ margin: '0 0 20px', padding: '0 0 0 20px', listStyle: 'disc' }}>
+                            {exportWarnings.warnings.map((w, i) => (
+                                <li key={i} style={{ color: 'var(--text-primary)', fontSize: '0.85rem', lineHeight: 1.6 }}>{w}</li>
+                            ))}
+                        </ul>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button className="btn-secondary" onClick={() => setExportWarnings(null)}>Cancel</button>
+                            <button className="btn-primary" onClick={handleExportWarningProceed}>Export Anyway</button>
                         </div>
                     </div>
                 </div>
