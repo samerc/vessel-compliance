@@ -91,10 +91,14 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
         const name = defaultName || newGroupName.trim()
         if (!name) return
         try {
-            await window.api.addQuotationAssuredGroup(quotation.id, name)
-            setNewGroupName('')
-            showSuccess('Group added')
-            loadData()
+            const result = await window.api.addQuotationAssuredGroup(quotation.id, name)
+            if (result && !(result as any).error) {
+                setGroups(prev => [...prev, result])
+                setNewGroupName('')
+                showSuccess('Group added')
+            } else {
+                showError('Failed to add group')
+            }
         } catch (err: any) { showError(err.message || 'Failed to add group') }
     }
 
