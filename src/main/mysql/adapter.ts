@@ -7974,10 +7974,15 @@ export class MySQLAdapter {
             [quotationId]
         )
         const order = (maxRow as any[])[0].nextOrder
-        await this.pool.execute(
-            'INSERT INTO quotation_assured_groups (id, quotation_id, name, order_index) VALUES (?, ?, ?, ?)',
-            [id, quotationId, name, order]
-        )
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute(
+                'INSERT INTO quotation_assured_groups (id, quotation_id, name, order_index) VALUES (?, ?, ?, ?)',
+                [id, quotationId, name, order]
+            )
+        } finally {
+            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
         return { id, quotationId, name, order }
     }
 
