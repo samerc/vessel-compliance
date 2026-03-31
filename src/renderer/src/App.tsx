@@ -70,7 +70,7 @@ function App(): React.JSX.Element {
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set<string>(['recent']))
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set<string>(['recent', 'admin']))
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [recentItems, setRecentItems] = useState<RecentItem[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
@@ -493,7 +493,7 @@ function App(): React.JSX.Element {
               <NavGroup id="recent" label="Recent" icon={<RefreshCw size={14} />}
                 groupCollapsed={collapsedGroups.has('recent')} onToggle={toggleGroup} sidebarCollapsed={sc}
               >
-                {recentItems.slice(0, 8).map(item => {
+                {recentItems.slice(0, 4).map(item => {
                   const iconMap: Record<string, React.ReactNode> = {
                     vessel: <Anchor size={14} />,
                     entity: <Building2 size={14} />,
@@ -575,26 +575,37 @@ function App(): React.JSX.Element {
               {hasPermission('reminders:view') && navItem('reminders', <Bell size={18} />, 'Reminders')}
             </NavGroup>
 
+            <NavGroup id="business" label="Business" icon={<FileText size={14} />}
+              groupCollapsed={collapsedGroups.has('business')} onToggle={toggleGroup} sidebarCollapsed={sc}
+            >
+              {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
+              {hasPermission('policies:view') && navItem('policies-list', <FileCheck size={18} />, 'Policies')}
+              {navItem('calculators', <Calculator size={18} />, 'Calculators')}
+            </NavGroup>
+
             <NavGroup id="operations" label="Operations" icon={<Layers size={14} />}
               groupCollapsed={collapsedGroups.has('operations')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
               {hasPermission('entities:view') && navItem('directory', <BookOpen size={18} />, 'Directory')}
               {hasPermission('surveys:view') && navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
               {hasPermission('surveys:view') && navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
-              {navItem('calculators', <Calculator size={18} />, 'Calculators')}
-              {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
-              {hasPermission('policies:view') && navItem('policies-list', <FileCheck size={18} />, 'Policies')}
               {navItem('templates', <Mail size={18} />, 'Templates')}
               {navItem('file-manager', <FolderOpen size={18} />, 'File Manager')}
-              {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
             </NavGroup>
 
-            <>
-              <div style={{ height: '1px', background: 'var(--glass-border)', margin: '6px 4px', opacity: 0.5 }} />
+            <NavGroup id="reports" label="Reports" icon={<BarChart2 size={14} />}
+              groupCollapsed={collapsedGroups.has('reports')} onToggle={toggleGroup} sidebarCollapsed={sc}
+            >
+              {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
+              {hasPermission('admin:activityLog') && navItem('activity-log', <ScrollText size={18} />, 'Activity Log')}
+            </NavGroup>
+
+            <NavGroup id="admin" label="Admin" icon={<Settings size={14} />}
+              groupCollapsed={collapsedGroups.has('admin')} onToggle={toggleGroup} sidebarCollapsed={sc}
+            >
               {hasPermission('admin:settings') && navItem('admin', <Settings size={18} />, 'Settings')}
               {hasPermission('admin:users') && navItem('users', <UserCog size={18} />, 'User Management')}
-              {hasPermission('admin:activityLog') && navItem('activity-log', <ScrollText size={18} />, 'Activity Log')}
-            </>
+            </NavGroup>
           </nav>
 
           {/* Footer: version + collapse toggle */}
