@@ -348,6 +348,8 @@ export default function FileManager() {
         const newSelected = selectedPath.replace(renameModal.path, result.newPath)
         setSelectedPath(newSelected)
         await loadContents(newSelected)
+      } else if (selectedPath) {
+        await loadContents(selectedPath)
       }
     } catch (err: any) {
       showError('Rename failed: ' + (err?.message || err))
@@ -368,6 +370,8 @@ export default function FileManager() {
       ) {
         setSelectedPath(rootPath)
         if (rootPath) await loadContents(rootPath)
+      } else if (selectedPath) {
+        await loadContents(selectedPath)
       }
     } catch (err: any) {
       showError('Move failed: ' + (err?.message || err))
