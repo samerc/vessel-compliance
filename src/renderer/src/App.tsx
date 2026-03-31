@@ -590,7 +590,7 @@ function App(): React.JSX.Element {
               {hasPermission('surveys:view') && navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
               {hasPermission('surveys:view') && navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
               {navItem('templates', <Mail size={18} />, 'Templates')}
-              {navItem('file-manager', <FolderOpen size={18} />, 'File Manager')}
+              {hasPermission('fileManager:view') && navItem('file-manager', <FolderOpen size={18} />, 'File Manager')}
             </NavGroup>
 
             <NavGroup id="reports" label="Reports" icon={<BarChart2 size={14} />}

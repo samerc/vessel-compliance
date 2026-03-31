@@ -285,6 +285,14 @@ export const PERMISSION_CATEGORIES = [
     ],
   },
   {
+    key: 'fileManager',
+    label: 'File Manager',
+    permissions: [
+      { key: 'fileManager:view', label: 'View file manager' },
+      { key: 'fileManager:manage', label: 'Move / rename files and folders' },
+    ],
+  },
+  {
     key: 'admin',
     label: 'Administration',
     permissions: [

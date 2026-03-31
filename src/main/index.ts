@@ -3993,7 +3993,7 @@ app.whenReady().then(() => {
     return FileManagerService.readTree(dirPath, depth)
   })
   safeHandle('fileManager:moveFolder', async (event, sourcePath: string, destParentPath: string) => {
-    await requirePermission(event, 'admin:settings')
+    await requirePermission(event, 'fileManager:manage')
     const result = FileManagerService.moveItem(sourcePath, destParentPath)
     console.log('[FileManager] Move:', result.oldPath, '→', result.newPath)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
@@ -4001,15 +4001,15 @@ app.whenReady().then(() => {
     return { ...result, remapped: remapped.remapped }
   })
   safeHandle('fileManager:renameFolder', async (event, folderPath: string, newName: string) => {
-    await requirePermission(event, 'admin:settings')
+    await requirePermission(event, 'fileManager:manage')
     const result = FileManagerService.renameItem(folderPath, newName)
     console.log('[FileManager] Rename:', result.oldPath, '→', result.newPath)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
     console.log('[FileManager] Remapped:', remapped.remapped, 'file links')
     return { ...result, remapped: remapped.remapped }
   })
-  safeHandle('fileManager:createFolder', (event, parentPath: string, name: string) => {
-    requireSession(event)
+  safeHandle('fileManager:createFolder', async (event, parentPath: string, name: string) => {
+    await requirePermission(event, 'fileManager:manage')
     return FileManagerService.createFolder(parentPath, name)
   })
   safeHandle('fileManager:exists', (event, filePath: string) => {
