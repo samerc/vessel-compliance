@@ -401,18 +401,21 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             try { updateField('ivClauseId', ivClauses[0].id) } catch {}
         }
 
-        // Auto-apply default conditions when none exist yet
-        if (safeExistCond.length === 0 && safeConds.length > 0 && !condDefaultsApplied.current) {
+        // Auto-apply default conditions when none exist yet — only if alternatives exist
+        // (without alternatives, null-scoped defaults become orphans and cause duplication)
+        if (safeExistCond.length === 0 && safeConds.length > 0 && !condDefaultsApplied.current && safeAlts.length > 0) {
             condDefaultsApplied.current = true
             const defaults = safeConds.filter((c: any) => c.defaultSelected)
             if (defaults.length > 0) {
+                // Assign defaults to the first alternative instead of null scope
+                const firstAlt = safeAlts[0]
                 try {
                     await window.api.hullSetQuotationHullConditions(
                         quotation.id,
                         defaults.map((c: any) => ({
                             hullConditionId: c.id,
                             conditionSection: c.conditionSection || 'both',
-                            alternativeId: null
+                            alternativeId: firstAlt.id
                         }))
                     )
                     const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
@@ -855,7 +858,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 })), ...newConds.map((c: any) => ({
                     hullConditionId: c.id,
                     conditionSection: c.conditionSection || 'both',
-                    alternativeId: null
+                    alternativeId: visibleAlternatives[0]?.id || null
                 }))]
                 await window.api.hullSetQuotationHullConditions(quotation.id, merged)
             }
@@ -1218,21 +1221,22 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                 if (newAlt && !(newAlt as any).error) {
                                     setAlternatives([newAlt])
                                     try { updateField('hullClauseId', clauseId) } catch {}
-                                    // Auto-select default conditions
+                                    // Auto-select default conditions for this clause, scoped to the new alternative
+                                    // Replace any existing null-scoped conditions (from prior auto-apply) with alt-scoped ones
                                     const clauseConds = allConditions.filter(c => c.hullClauseId === clauseId && c.defaultSelected)
-                                    if (clauseConds.length > 0) {
-                                        const newConds = clauseConds.map(c => ({
-                                            hullConditionId: c.id,
-                                            alternativeId: newAlt.id,
-                                            textOverride: null,
-                                            amount: null,
-                                            vesselScope: null,
-                                            vesselAmounts: null
-                                        }))
-                                        const updated = [...qConditions, ...newConds.map(c => ({ ...c, id: '', quotationId: quotation.id } as any))]
-                                        await window.api.hullSetQuotationHullConditions(quotation.id, updated)
-                                        setQConditions(updated)
-                                    }
+                                    const newConds = clauseConds.map(c => ({
+                                        hullConditionId: c.id,
+                                        alternativeId: newAlt.id,
+                                        conditionSection: c.conditionSection || 'both',
+                                        textOverride: undefined,
+                                        amount: undefined,
+                                        vesselScope: null,
+                                        vesselAmounts: null
+                                    }))
+                                    // Save ONLY alt-scoped conditions, dropping any orphaned null-scoped defaults
+                                    await window.api.hullSetQuotationHullConditions(quotation.id, newConds)
+                                    const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
+                                    setQConditions(Array.isArray(fresh) ? fresh : [])
                                 }
                             } catch {}
                         }}
