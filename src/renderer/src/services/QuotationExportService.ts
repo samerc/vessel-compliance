@@ -908,7 +908,6 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         for (const opt of data.agreedValueOptions) {
           const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
           avText += `${label}  :  ${formatCurrency(opt.amount, opt.currency)}`
-          if (opt.premiumAmount != null) avText += `    Premium: ${formatCurrency(opt.premiumAmount, opt.currency)} p.a.`
           avText += '\n'
         }
       } else if (hasPerAltValues) {
@@ -963,7 +962,6 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         for (const opt of data.agreedValueOptions) {
           const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
           avText += `${label}  :  ${formatCurrency(opt.amount, opt.currency)}`
-          if (opt.premiumAmount != null) avText += `    Premium: ${formatCurrency(opt.premiumAmount, opt.currency)} p.a.`
           avText += '\n'
         }
         avText += '\n'
@@ -2560,9 +2558,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const avOptRows: TableRow[] = []
         for (const opt of data.agreedValueOptions) {
           const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
-          const valText = opt.premiumAmount != null
-            ? `${formatCurrency(opt.amount, opt.currency)}    Premium: ${formatCurrency(opt.premiumAmount, opt.currency)} p.a.`
-            : formatCurrency(opt.amount, opt.currency)
+          const valText = formatCurrency(opt.amount, opt.currency)
           avOptRows.push(avRow2(label, valText))
         }
         avContent.push(new Table({ rows: avOptRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW2, avColonW2, avAmtW2], layout: TableLayoutType.FIXED }))
@@ -2635,9 +2631,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const avOptRows3: TableRow[] = []
         for (const opt of data.agreedValueOptions) {
           const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
-          const valText = opt.premiumAmount != null
-            ? `${formatCurrency(opt.amount, opt.currency)}    Premium: ${formatCurrency(opt.premiumAmount, opt.currency)} p.a.`
-            : formatCurrency(opt.amount, opt.currency)
+          const valText = formatCurrency(opt.amount, opt.currency)
           avOptRows3.push(avRow3(label, valText))
         }
         avContent.push(new Table({ rows: avOptRows3, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW3, avColonW3, avAmtW3], layout: TableLayoutType.FIXED }))
