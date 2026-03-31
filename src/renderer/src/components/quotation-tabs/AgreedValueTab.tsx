@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, ChevronUp, ChevronDown, X } from 'lucide-react'
-import { Quotation, HullAgreedValueText, QuotationAgreedValueItem, QuotationVessel } from '../../../../shared/types'
+import { Quotation, HullAgreedValueText, QuotationAgreedValueItem, QuotationVessel, QuotationHullAlternative } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
 
 export default function AgreedValueTab({ quotation, updateField, setQ, showError }: {
@@ -13,22 +13,25 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
     const [items, setItems] = useState<QuotationAgreedValueItem[]>([])
     const [allTexts, setAllTexts] = useState<HullAgreedValueText[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
     const [newText, setNewText] = useState('')
     const defaultsApplied = useRef(false)
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [texts, existingItems, qv] = await Promise.all([
+        const [texts, existingItems, qv, alts] = await Promise.all([
             window.api.hullGetAgreedValueTexts(),
             window.api.hullGetQuotationAgreedValueItems(quotation.id),
-            window.api.getQuotationVessels(quotation.id)
+            window.api.getQuotationVessels(quotation.id),
+            window.api.hullGetQuotationAlternatives(quotation.id)
         ])
         const safeTexts = Array.isArray(texts) ? texts : []
         const safeItems = Array.isArray(existingItems) ? existingItems : []
         setAllTexts(safeTexts)
         setItems(safeItems)
         setQVessels(Array.isArray(qv) ? qv : [])
+        setHullAlts(Array.isArray(alts) ? alts : [])
 
         // Sync sections from master texts (fixes items saved before section was tracked)
         if (safeItems.length > 0 && safeTexts.length > 0) {
@@ -137,7 +140,59 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
             </p>
 
             {/* H&M Value + Currency */}
-            {qVessels.length > 1 ? (
+            {hullAlts.length > 1 ? (
+                <>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>H&M Values per Alternative</label>
+                            <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {hullAlts.map((alt, ai) => {
+                                    const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+                                    const altColor = altColors[ai % altColors.length]
+                                    return (
+                                        <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                <span style={{ display: 'inline-block', width: '3px', height: '14px', background: altColor, borderRadius: '2px', marginRight: '6px', verticalAlign: 'middle' }} />
+                                                Alternative {ai + 1}{alt.label ? ` (${alt.label})` : ''}:
+                                            </span>
+                                            <input
+                                                type="text"
+                                                value={alt.agreedValueCurrency || quotation.agreedValueCurrency || 'USD'}
+                                                onChange={e => {
+                                                    setHullAlts(prev => prev.map(a => a.id === alt.id ? { ...a, agreedValueCurrency: e.target.value } : a))
+                                                }}
+                                                onBlur={async e => {
+                                                    await window.api.hullUpdateQuotationAlternative(alt.id, { agreedValueCurrency: e.target.value })
+                                                }}
+                                                style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' }}
+                                            />
+                                            <input
+                                                type="number"
+                                                value={alt.agreedValue ?? ''}
+                                                onChange={e => {
+                                                    const val = e.target.value ? Number(e.target.value) : null
+                                                    setHullAlts(prev => prev.map(a => a.id === alt.id ? { ...a, agreedValue: val } : a))
+                                                }}
+                                                onBlur={async e => {
+                                                    const val = e.target.value ? Number(e.target.value) : null
+                                                    await window.api.hullUpdateQuotationAlternative(alt.id, { agreedValue: val })
+                                                    // Sync total to quotation-level agreedValue
+                                                    const updatedAlts = hullAlts.map(a => a.id === alt.id ? { ...a, agreedValue: val } : a)
+                                                    const total = updatedAlts.reduce((sum, a) => sum + (a.agreedValue || 0), 0)
+                                                    setQ(p => ({ ...p, agreedValue: total || undefined }))
+                                                    updateField('agreedValue', total || null)
+                                                }}
+                                                placeholder="0.00"
+                                                style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                                            />
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            ) : qVessels.length > 1 ? (
                 <>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1 }}>

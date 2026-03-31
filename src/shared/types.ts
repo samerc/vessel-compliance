@@ -849,6 +849,8 @@ export interface QuotationHullAlternative {
   hullClauseId: string
   label?: string
   premiumAmount?: number
+  agreedValue?: number | null
+  agreedValueCurrency?: string
   order: number
   vesselScopeId?: string | null
 }

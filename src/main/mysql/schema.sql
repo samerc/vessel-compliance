@@ -661,6 +661,8 @@ CREATE TABLE IF NOT EXISTS quotation_hull_alternatives (
   hull_clause_id VARCHAR(36) DEFAULT NULL,
   label VARCHAR(100) DEFAULT NULL,
   premium_amount DECIMAL(15,2) DEFAULT NULL,
+  agreed_value DECIMAL(15,2) DEFAULT NULL,
+  agreed_value_currency VARCHAR(10) DEFAULT NULL,
   order_index INT DEFAULT 0,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
