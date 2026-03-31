@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, X, RefreshCw } from 'lucide-react'
 import { Quotation, AssuredRole, Entity, QuotationAssured, QuotationAssuredGroup, QuotationVessel, Vessel } from '../../../../shared/types'
+import { useTheme } from '../../contexts/ThemeContext'
 
 export default function InsuredTab({ quotation, vessels: _vessels = [], showSuccess, showError, updateField }: { quotation: Quotation; vessels?: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
     void _vessels
+    const { theme } = useTheme()
+    const isLight = theme === 'light'
     const [assureds, setAssureds] = useState<QuotationAssured[]>([])
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
@@ -163,7 +166,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                     style={{ width: '100%', border: '1px solid var(--input-border)' }}
                 />
                 {showCoDropdown && coFiltered.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '200px', overflowY: 'auto' }}>
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '200px', overflowY: 'auto' }}>
                         {coFiltered.map(e => (
                             <div
                                 key={e.id}

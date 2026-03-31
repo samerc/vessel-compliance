@@ -188,8 +188,8 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 )
                             })}
                             {quotation.ivEnabled && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: '3px solid #ffb020' }}>
-                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffb020', minWidth: '140px' }}>Increased Value</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Increased Value</label>
                                     <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
                                 </div>
@@ -205,8 +205,8 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
                             </div>
                             {quotation.quotationTypeCode === 'H' && quotation.ivEnabled && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: '3px solid #ffb020' }}>
-                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffb020', minWidth: '140px' }}>Section B (IV)</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Section B (IV)</label>
                                     <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
                                 </div>
@@ -327,7 +327,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 })}
                                 {quotation.ivEnabled && quotation.ivPremiumAmount != null && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffb020', minWidth: '140px' }}>Increased Value</span>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Increased Value</span>
                                         <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{currency} {fmt(computePayable(quotation.ivPremiumAmount || 0))}</span>
                                     </div>
                                 )}

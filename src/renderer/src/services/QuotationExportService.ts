@@ -1066,7 +1066,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         return text
       }
 
-      const ivConds = hc.filter(qc => ivClauseId && getCondClauseId(qc) === ivClauseId)
+      // Dedup IV conditions by hullConditionId (prefer alt-specific over null-scoped)
+      const ivCondsRaw = hc.filter(qc => ivClauseId && getCondClauseId(qc) === ivClauseId)
+      const ivConds: typeof ivCondsRaw = []
+      const ivSeenIds = new Set<string>()
+      for (const qc of ivCondsRaw) { if (qc.alternativeId) { ivSeenIds.add(qc.hullConditionId); ivConds.push(qc) } }
+      for (const qc of ivCondsRaw) { if (!qc.alternativeId && !ivSeenIds.has(qc.hullConditionId)) { ivSeenIds.add(qc.hullConditionId); ivConds.push(qc) } }
       const hasIvSection = data.quotation.ivEnabled && (ivConds.length > 0 || selectedIvClause)
 
       // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
@@ -1160,7 +1165,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const singleAlt = alts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
         const hmClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
-        const hmConds = hc.filter(qc => hmClauseId && getCondClauseId(qc) === hmClauseId && !(ivClauseId && getCondClauseId(qc) === ivClauseId))
+        // Dedup H&M conditions by hullConditionId (prefer alt-specific over null-scoped)
+        const hmCondsRaw = hc.filter(qc => hmClauseId && getCondClauseId(qc) === hmClauseId && !(ivClauseId && getCondClauseId(qc) === ivClauseId))
+        const hmConds: typeof hmCondsRaw = []
+        const hmSeenIds = new Set<string>()
+        for (const qc of hmCondsRaw) { if (qc.alternativeId) { hmSeenIds.add(qc.hullConditionId); hmConds.push(qc) } }
+        for (const qc of hmCondsRaw) { if (!qc.alternativeId && !hmSeenIds.has(qc.hullConditionId)) { hmSeenIds.add(qc.hullConditionId); hmConds.push(qc) } }
         hcBlocks.push({ title: 'Hull and Machinery', underline: true, desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hmConds), addl: renderAddlForSection(b => b.type === 'alt' || b.type === 'allAlts') })
         hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         const bothAddl = renderAddlForSection(b => b.type === 'both')
@@ -3411,7 +3421,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
         const totalTech = data.quotationVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
         discRows.push(vpRow2('Total', formatCurrency(totalTech, wq.premiumCurrency)))
-        discRows.push(new TableRow({ children: [new TableCell({ borders: noBorders(), columnSpan: 2, children: [emptyP()] })] }))
+        discRows.push(new TableRow({ children: [new TableCell({ borders: noBorders(), width: { size: vpNameW, type: WidthType.DXA }, children: [emptyP()] }), new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [emptyP()] })] }))
         discRows.push(new TableRow({ children: [
           new TableCell({ borders: noBorders(), columnSpan: 2, width: { size: BODY_W, type: WidthType.DXA }, children: [bp('Payable Premium')] })
         ] }))
@@ -3493,6 +3503,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           for (const l of lines) {
             rows.push(premRow(l.label || 'Technical Premium', formatCurrency(l.tech, wq.premiumCurrency)))
           }
+          rows.push(premRow('', ''))
           rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', ''))
           for (const l of lines) {
             rows.push(premRow(l.label || 'Payable Premium', formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)))
