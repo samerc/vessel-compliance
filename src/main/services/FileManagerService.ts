@@ -60,25 +60,25 @@ export class FileManagerService {
     return node
   }
 
-  /** Move a folder and return old→new path for remapping */
-  static moveFolder(
+  /** Move a file or folder and return old→new path for remapping */
+  static moveItem(
     sourcePath: string,
     destParentPath: string
   ): { oldPath: string; newPath: string } {
-    const folderName = path.basename(sourcePath)
-    const newPath = path.join(destParentPath, folderName)
-    if (fs.existsSync(newPath)) throw new Error(`Folder "${folderName}" already exists at destination`)
+    const itemName = path.basename(sourcePath)
+    const newPath = path.join(destParentPath, itemName)
+    if (fs.existsSync(newPath)) throw new Error(`"${itemName}" already exists at destination`)
     fs.renameSync(sourcePath, newPath)
     return { oldPath: sourcePath, newPath }
   }
 
-  /** Rename a folder */
-  static renameFolder(folderPath: string, newName: string): { oldPath: string; newPath: string } {
-    const parentDir = path.dirname(folderPath)
+  /** Rename a file or folder */
+  static renameItem(itemPath: string, newName: string): { oldPath: string; newPath: string } {
+    const parentDir = path.dirname(itemPath)
     const newPath = path.join(parentDir, newName)
     if (fs.existsSync(newPath)) throw new Error(`"${newName}" already exists`)
-    fs.renameSync(folderPath, newPath)
-    return { oldPath: folderPath, newPath }
+    fs.renameSync(itemPath, newPath)
+    return { oldPath: itemPath, newPath }
   }
 
   /** Create a new folder */

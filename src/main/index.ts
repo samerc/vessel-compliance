@@ -3994,7 +3994,7 @@ app.whenReady().then(() => {
   })
   safeHandle('fileManager:moveFolder', async (event, sourcePath: string, destParentPath: string) => {
     await requirePermission(event, 'admin:settings')
-    const result = FileManagerService.moveFolder(sourcePath, destParentPath)
+    const result = FileManagerService.moveItem(sourcePath, destParentPath)
     console.log('[FileManager] Move:', result.oldPath, '→', result.newPath)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
     console.log('[FileManager] Remapped:', remapped.remapped, 'file links')
@@ -4002,7 +4002,7 @@ app.whenReady().then(() => {
   })
   safeHandle('fileManager:renameFolder', async (event, folderPath: string, newName: string) => {
     await requirePermission(event, 'admin:settings')
-    const result = FileManagerService.renameFolder(folderPath, newName)
+    const result = FileManagerService.renameItem(folderPath, newName)
     console.log('[FileManager] Rename:', result.oldPath, '→', result.newPath)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
     console.log('[FileManager] Remapped:', remapped.remapped, 'file links')

@@ -999,8 +999,8 @@ export default function FileManager() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 90px 130px 120px',
-                padding: '10px 16px',
+                gridTemplateColumns: '1fr 100px 150px 160px',
+                padding: '12px 20px',
                 background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
                 borderBottom: '1px solid var(--table-border)',
                 fontSize: '0.72rem',
@@ -1022,153 +1022,117 @@ export default function FileManager() {
             {filteredContents.length === 0 ? (
               <div
                 style={{
-                  padding: 48,
+                  padding: 56,
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
-                  fontSize: '0.88rem',
+                  fontSize: '0.9rem',
                 }}
               >
                 <Folder
-                  size={40}
-                  style={{ color: 'var(--text-secondary)', opacity: 0.3, marginBottom: 14 }}
+                  size={44}
+                  style={{ color: 'var(--text-secondary)', opacity: 0.3, marginBottom: 16 }}
                 />
                 <div style={{ fontWeight: 500 }}>{search ? 'No matching items' : 'This folder is empty'}</div>
-                <div style={{ fontSize: '0.78rem', marginTop: 4, opacity: 0.7 }}>
+                <div style={{ fontSize: '0.8rem', marginTop: 6, opacity: 0.7 }}>
                   {search ? 'Try a different search term' : 'Create a new folder or add files via Explorer'}
                 </div>
               </div>
             ) : (
-              filteredContents.map((item, idx) => (
-                <div
-                  key={item.path}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 90px 130px 120px',
-                    padding: '8px 16px',
-                    borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)'}`,
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    transition: 'background 0.12s',
-                    background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'),
-                    alignItems: 'center',
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,210,255,0.06)')
-                  }
-                  onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'))}
-                  onDoubleClick={() => handleDoubleClickItem(item)}
-                  onContextMenu={(e) => handleContentsContextMenu(e, item.path, item.isDirectory)}
-                >
-                  {/* Name + icon */}
-                  <span
+              filteredContents.map((item, idx) => {
+                const btnStyle = (color: string) => ({
+                  background: 'none' as const, border: 'none' as const, cursor: 'pointer' as const,
+                  color, padding: '6px 8px', borderRadius: 6, display: 'flex' as const, alignItems: 'center' as const,
+                  transition: 'background 0.12s',
+                })
+                return (
+                  <div
+                    key={item.path}
                     style={{
-                      display: 'flex',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 100px 150px 160px',
+                      padding: '10px 20px',
+                      borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)'}`,
+                      cursor: 'pointer',
+                      fontSize: '0.88rem',
+                      color: 'var(--text-primary)',
+                      transition: 'background 0.12s',
+                      background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'),
                       alignItems: 'center',
-                      gap: 10,
-                      overflow: 'hidden',
+                      minHeight: 48,
                     }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,210,255,0.06)')
+                    }
+                    onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'))}
+                    onDoubleClick={() => handleDoubleClickItem(item)}
+                    onContextMenu={(e) => handleContentsContextMenu(e, item.path, item.isDirectory)}
                   >
-                    <span style={{
-                      width: 30, height: 30, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      background: item.isDirectory ? 'rgba(255,176,32,0.12)' : (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)')
-                    }}>
-                      {item.isDirectory ? (
-                        <Folder size={16} style={{ color: '#ffb020' }} />
+                    {/* Name + icon */}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}>
+                      <span style={{
+                        width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        background: item.isDirectory ? 'rgba(255,176,32,0.12)' : (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)')
+                      }}>
+                        {item.isDirectory ? (
+                          <Folder size={18} style={{ color: '#ffb020' }} />
+                        ) : (
+                          getFileIcon(item.name)
+                        )}
+                      </span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: item.isDirectory ? 600 : 400 }}>
+                        {item.name}
+                      </span>
+                    </span>
+
+                    {/* Size */}
+                    <span style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                      {!item.isDirectory && item.size != null ? formatSize(item.size) : '—'}
+                    </span>
+
+                    {/* Modified */}
+                    <span style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                      {formatDate(item.modified)}
+                    </span>
+
+                    {/* Action buttons */}
+                    <span style={{ display: 'flex', gap: 2, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                      {!item.isDirectory ? (
+                        <button onClick={() => handleOpenFile(item.path)} title="Open file"
+                          style={btnStyle('var(--accent-primary)')}
+                          onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.12)' : 'rgba(0,210,255,0.12)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          <ExternalLink size={15} />
+                        </button>
                       ) : (
-                        getFileIcon(item.name)
+                        <button onClick={() => handleSelectFolder(item.path)} title="Open folder"
+                          style={btnStyle('#ffb020')}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,176,32,0.12)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          <FolderOpen size={15} />
+                        </button>
                       )}
+                      <button onClick={() => { setRenameModal({ path: item.path, name: item.name }) }} title="Rename"
+                        style={btnStyle('var(--text-secondary)')}
+                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        <Edit3 size={15} />
+                      </button>
+                      <button onClick={() => { setMoveModal({ sourcePath: item.path }) }} title="Move"
+                        style={btnStyle('var(--text-secondary)')}
+                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        <Move size={15} />
+                      </button>
+                      <button onClick={() => handleOpenInExplorer(item.path)} title="Show in Explorer"
+                        style={btnStyle('var(--text-secondary)')}
+                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        <HardDrive size={15} />
+                      </button>
                     </span>
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontWeight: item.isDirectory ? 600 : 400,
-                      }}
-                    >
-                      {item.name}
-                    </span>
-                  </span>
-
-                  {/* Size */}
-                  <span
-                    style={{
-                      textAlign: 'right',
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.78rem',
-                    }}
-                  >
-                    {!item.isDirectory && item.size != null ? formatSize(item.size) : '—'}
-                  </span>
-
-                  {/* Modified */}
-                  <span
-                    style={{
-                      textAlign: 'right',
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.78rem',
-                    }}
-                  >
-                    {formatDate(item.modified)}
-                  </span>
-
-                  {/* Action buttons */}
-                  <span style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
-                    {!item.isDirectory && (
-                      <button
-                        onClick={() => handleOpenFile(item.path)}
-                        title="Open file"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.1)' : 'rgba(0,210,255,0.1)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                      >
-                        <ExternalLink size={14} />
-                      </button>
-                    )}
-                    {item.isDirectory && (
-                      <button
-                        onClick={() => handleSelectFolder(item.path)}
-                        title="Open folder"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ffb020', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,176,32,0.1)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                      >
-                        <FolderOpen size={14} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setRenameModal({ path: item.path, name: item.name }) }}
-                      title="Rename"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    {item.isDirectory && (
-                      <button
-                        onClick={() => { setMoveModal({ sourcePath: item.path }) }}
-                        title="Move folder"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                      >
-                        <Move size={14} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleOpenInExplorer(item.path)}
-                      title="Show in Explorer"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                    >
-                      <HardDrive size={14} />
-                    </button>
-                  </span>
-                </div>
-              ))
+                  </div>
+                )
+              })
             )}
           </div>
 
