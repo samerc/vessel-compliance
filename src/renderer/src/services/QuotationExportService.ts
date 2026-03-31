@@ -1068,6 +1068,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           } else {
             let t = qc.textOverride || def.text
             const amount = resolveAmount(qc)
+            if (def.hasAmount) {
+              console.log(`[Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", amount=${amount}, qc.amount=${qc.amount}, text="${t.substring(0, 60)}"`)
+            }
             if (def.hasAmount && def.amountPlaceholder && amount != null) {
               const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
               t = t.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
