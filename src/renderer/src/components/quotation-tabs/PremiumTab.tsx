@@ -197,6 +197,32 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 </div>
                             )}
                         </div>
+                    ) : valueOptions.length > 0 ? (
+                        /* Value options replace Section A — each option has its own premium */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                            {valueOptions.map((opt, idx) => (
+                                <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px', whiteSpace: 'nowrap' }}>
+                                        {opt.label || `Option ${idx + 1}`}
+                                        <span style={{ fontWeight: 400, color: 'var(--text-secondary)', fontSize: '0.72rem', marginLeft: '6px' }}>
+                                            ({opt.currency} {opt.amount?.toLocaleString()})
+                                        </span>
+                                    </label>
+                                    <input type="number" value={opt.premiumAmount ?? ''}
+                                        onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
+                                        onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
+                                        placeholder="Premium" style={{ flex: 1, maxWidth: '200px' }} />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{opt.currency || currency} p.a.</span>
+                                </div>
+                            ))}
+                            {quotation.quotationTypeCode === 'H' && quotation.ivEnabled && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Section B (IV)</label>
+                                    <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                </div>
+                            )}
+                        </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
@@ -213,28 +239,6 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
                                 </div>
                             )}
-                        </div>
-                    )}
-                    {/* Per-value-option premiums (when agreed value options exist) */}
-                    {valueOptions.length > 0 && (
-                        <div style={{ marginBottom: '14px' }}>
-                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Premium per Value Option</label>
-                            {valueOptions.map((opt, idx) => (
-                                <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px' }}>
-                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)', minWidth: '140px', whiteSpace: 'nowrap' }}>
-                                        {opt.label || `Option ${idx + 1}`}
-                                        <span style={{ fontWeight: 400, color: 'var(--text-secondary)', fontSize: '0.75rem', marginLeft: '6px' }}>
-                                            ({opt.currency} {opt.amount?.toLocaleString()})
-                                        </span>
-                                    </label>
-                                    <input type="number" value={opt.premiumAmount ?? ''}
-                                        onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
-                                        onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
-                                        placeholder="Premium"
-                                        style={{ flex: 1, maxWidth: '200px' }} />
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{opt.currency || currency} p.a.</span>
-                                </div>
-                            ))}
                         </div>
                     )}
 
