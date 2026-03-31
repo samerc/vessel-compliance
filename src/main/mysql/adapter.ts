@@ -10477,7 +10477,7 @@ export class MySQLAdapter {
     async getQuotationHullConditions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_condition_id as hullConditionId, text_override as textOverride, condition_section as conditionSection, amount, vessel_amounts as vesselAmounts, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: r.amount ? Number(r.amount) : undefined, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, conditionSection: r.conditionSection || 'both', alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, amount: r.amount != null ? Number(r.amount) : undefined, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, conditionSection: r.conditionSection || 'both', alternativeId: r.alternativeId || null }))
     }
 
     async setQuotationHullConditions(quotationId: string, items: { hullConditionId: string; textOverride?: string; conditionSection?: string; amount?: number; vesselAmounts?: Record<string, number> | null; vesselScope?: string[] | null; alternativeId?: string | null }[]): Promise<void> {
