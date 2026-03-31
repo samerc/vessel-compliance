@@ -10490,18 +10490,20 @@ export class MySQLAdapter {
             seen.add(key)
             return true
         })
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const conn = await this.pool.getConnection()
         try {
-            await this.pool.execute('DELETE FROM quotation_hull_conditions WHERE quotation_id = ?', [quotationId])
+            await conn.execute('SET FOREIGN_KEY_CHECKS=0')
+            await conn.execute('DELETE FROM quotation_hull_conditions WHERE quotation_id = ?', [quotationId])
             for (let i = 0; i < dedupedItems.length; i++) {
                 const item = dedupedItems[i]
-                await this.pool.execute(
+                await conn.execute(
                     'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, condition_section, amount, vessel_amounts, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [uuidv4(), quotationId, item.hullConditionId, item.textOverride || null, item.conditionSection || 'both', item.amount ?? null, item.vesselAmounts ? JSON.stringify(item.vesselAmounts) : null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null]
                 )
             }
+            await conn.execute('SET FOREIGN_KEY_CHECKS=1')
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            conn.release()
         }
     }
 
