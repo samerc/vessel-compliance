@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Quotation, QuotationInstalment, QuotationPIAlternative, QuotationHullAlternative, QuotationVessel, PISectionTexts, InstalmentDefaults, PremiumTextTemplate, HullClause } from '../../../../shared/types'
+import { Quotation, QuotationInstalment, QuotationPIAlternative, QuotationHullAlternative, QuotationVessel, PISectionTexts, InstalmentDefaults, PremiumTextTemplate, HullClause, QuotationAgreedValueOption } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './shared'
@@ -13,6 +13,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
     const [ncbTemplates, setNcbTemplates] = useState<PremiumTextTemplate[]>([])
     const [upccTemplates, setUpccTemplates] = useState<PremiumTextTemplate[]>([])
+    const [valueOptions, setValueOptions] = useState<QuotationAgreedValueOption[]>([])
 
     useEffect(() => {
         loadInstalments()
@@ -26,6 +27,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         if (quotation.quotationTypeCode === 'H') {
             window.api.hullGetQuotationAlternatives(quotation.id).then(a => setHullAlternatives(Array.isArray(a) ? a : []))
             window.api.hullGetClauses().then(c => setHullClauses(Array.isArray(c) ? c : []))
+            window.api.hullGetAgreedValueOptions(quotation.id).then(o => setValueOptions(Array.isArray(o) ? o : [])).catch(() => {})
         }
         if (quotation.quotationTypeCode === 'P') {
             window.api.piGetQuotationAlternatives(quotation.id).then(a => setPiAlternatives(Array.isArray(a) ? a : []))
@@ -213,6 +215,29 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                             )}
                         </div>
                     )}
+                    {/* Per-value-option premiums (when agreed value options exist) */}
+                    {valueOptions.length > 0 && (
+                        <div style={{ marginBottom: '14px' }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Premium per Value Option</label>
+                            {valueOptions.map((opt, idx) => (
+                                <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px' }}>
+                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)', minWidth: '140px', whiteSpace: 'nowrap' }}>
+                                        {opt.label || `Option ${idx + 1}`}
+                                        <span style={{ fontWeight: 400, color: 'var(--text-secondary)', fontSize: '0.75rem', marginLeft: '6px' }}>
+                                            ({opt.currency} {opt.amount?.toLocaleString()})
+                                        </span>
+                                    </label>
+                                    <input type="number" value={opt.premiumAmount ?? ''}
+                                        onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
+                                        onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
+                                        placeholder="Premium"
+                                        style={{ flex: 1, maxWidth: '200px' }} />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{opt.currency || currency} p.a.</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
                         <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
                         <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
