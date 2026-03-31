@@ -936,6 +936,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       } else if (hasHm) {
         avText += `Section A: ${formatCurrency(data.quotation.agreedValue, hmCurr)}\n`
       }
+      if (hasValueOptions) avText += '\n' // spacing between options and Section B
       const ivCurr = data.quotation.ivCurrency || 'USD'
       const hasPerVesselIv = isMultiVessel && data.quotationVessels.some(v => v.ivValue != null)
       if (hasPerVesselIv) {
@@ -1633,7 +1634,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const alt = data.piAlternatives[ai]
         pdfPremLines.push({ label: alt.label || `Alternative ${ai + 1}`, tech: alt.premiumAmount || 0 })
       }
-    } else if (q.premiumAmount != null || hullMultiAlt) {
+    } else if (q.premiumAmount != null || hullMultiAlt || (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null))) {
       if (hullMultiAlt) {
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
           const alt = data.hullAlternatives[ai]
@@ -2589,6 +2590,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       } else if (dHasHm) {
         avContent.push(np(`Section A: ${formatCurrency(data.quotation.agreedValue, dHmCurr)}`))
       }
+      if (dHasValueOptions) avContent.push(emptyP()) // spacing between options and Section B
       const dIvCurr = data.quotation.ivCurrency || 'USD'
       const dHasPerVesselIv = dIsMultiVessel && data.quotationVessels.some(v => v.ivValue != null)
       if (dHasPerVesselIv) {
@@ -2814,7 +2816,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return paras
       }
 
-      const dIvConds = hc.filter(qc => dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
+      // Dedup IV conditions by hullConditionId (prefer alt-specific over null-scoped)
+      const dIvCondsRaw = hc.filter(qc => dIvClauseId && dGetCondClauseId(qc) === dIvClauseId)
+      const dIvConds: typeof dIvCondsRaw = []
+      const dIvSeenIds = new Set<string>()
+      for (const qc of dIvCondsRaw) { if (qc.alternativeId) { dIvSeenIds.add(qc.hullConditionId); dIvConds.push(qc) } }
+      for (const qc of dIvCondsRaw) { if (!qc.alternativeId && !dIvSeenIds.has(qc.hullConditionId)) { dIvSeenIds.add(qc.hullConditionId); dIvConds.push(qc) } }
       const dHasIvSection = data.quotation.ivEnabled && (dIvConds.length > 0 || dSelectedIvClause)
 
       // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
@@ -2945,7 +2952,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const singleAlt = dAlts[0]
         const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
         const dHmClauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
-        const dHmConds = hc.filter(qc => dHmClauseId && dGetCondClauseId(qc) === dHmClauseId && !(dIvClauseId && dGetCondClauseId(qc) === dIvClauseId))
+        // Dedup H&M conditions by hullConditionId (prefer alt-specific over null-scoped)
+        const dHmCondsRaw = hc.filter(qc => dHmClauseId && dGetCondClauseId(qc) === dHmClauseId && !(dIvClauseId && dGetCondClauseId(qc) === dIvClauseId))
+        const dHmConds: typeof dHmCondsRaw = []
+        const dHmSeenIds = new Set<string>()
+        for (const qc of dHmCondsRaw) { if (qc.alternativeId) { dHmSeenIds.add(qc.hullConditionId); dHmConds.push(qc) } }
+        for (const qc of dHmCondsRaw) { if (!qc.alternativeId && !dHmSeenIds.has(qc.hullConditionId)) { dHmSeenIds.add(qc.hullConditionId); dHmConds.push(qc) } }
 
         if (selectedClause) {
           hcContent.push(bup('Hull and Machinery'))
@@ -3553,7 +3565,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       premContent.push(np('per annum'))
       premContent.push(emptyP())
-    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId) || data.piAlternatives.length > 1) {
+    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId) || data.piAlternatives.length > 1 || (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null))) {
       const wMultiAlt = data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId)
       const wPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
       const wPiMultiAlt = data.piAlternatives.length > 1
