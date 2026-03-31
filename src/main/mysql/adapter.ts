@@ -2729,6 +2729,16 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: quotation_agreed_value_options table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_agreed_value_options (
+                    id VARCHAR(36) PRIMARY KEY, quotation_id VARCHAR(36) NOT NULL,
+                    label VARCHAR(100) DEFAULT NULL, amount DECIMAL(15,2) NOT NULL,
+                    currency VARCHAR(10) DEFAULT 'USD', order_index INT DEFAULT 0,
+                    INDEX idx_qavo_quotation (quotation_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7557,6 +7567,7 @@ export class MySQLAdapter {
             { table: 'quotation_notes', cols: 'quotation_id, title, content, order_index' },
             { table: 'quotation_cargo_clauses', cols: 'quotation_id, cargo_clause_id, text_override, order_index, section' },
             { table: 'quotation_cargo_custom_clauses', cols: 'quotation_id, text, section, order_index' },
+            { table: 'quotation_agreed_value_options', cols: 'quotation_id, label, amount, currency, order_index' },
         ]
 
         for (const { table, cols } of simpleTables) {
@@ -10276,6 +10287,58 @@ export class MySQLAdapter {
             }
         } finally {
             await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
+    }
+
+    // ==================== Quotation Agreed Value Options ====================
+
+    async getQuotationAgreedValueOptions(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, quotation_id as quotationId, label, amount, currency, order_index as `order` FROM quotation_agreed_value_options WHERE quotation_id = ? ORDER BY order_index ASC',
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount) }))
+    }
+
+    async addQuotationAgreedValueOption(quotationId: string, amount: number, currency?: string, label?: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_agreed_value_options WHERE quotation_id = ?', [quotationId])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute(
+                'INSERT INTO quotation_agreed_value_options (id, quotation_id, label, amount, currency, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+                [id, quotationId, label || null, amount, currency || 'USD', order]
+            )
+        } finally {
+            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
+        return { id, quotationId, label: label || null, amount, currency: currency || 'USD', order }
+    }
+
+    async updateQuotationAgreedValueOption(id: string, updates: { label?: string; amount?: number; currency?: string }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.label !== undefined) { fields.push('label = ?'); values.push(updates.label || null) }
+        if (updates.amount !== undefined) { fields.push('amount = ?'); values.push(updates.amount) }
+        if (updates.currency !== undefined) { fields.push('currency = ?'); values.push(updates.currency) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_agreed_value_options SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationAgreedValueOption(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_agreed_value_options WHERE id = ?', [id])
+    }
+
+    async reorderQuotationAgreedValueOptions(ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE quotation_agreed_value_options SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
     }
 

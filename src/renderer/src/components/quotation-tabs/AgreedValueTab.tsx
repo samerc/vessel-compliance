@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, ChevronUp, ChevronDown, X } from 'lucide-react'
-import { Quotation, HullAgreedValueText, QuotationAgreedValueItem, QuotationVessel, QuotationHullAlternative } from '../../../../shared/types'
+import { Plus, ChevronUp, ChevronDown, X, Trash2 } from 'lucide-react'
+import { Quotation, HullAgreedValueText, QuotationAgreedValueItem, QuotationVessel, QuotationHullAlternative, QuotationAgreedValueOption } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
 
 export default function AgreedValueTab({ quotation, updateField, setQ, showError }: {
@@ -15,16 +15,18 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
     const [newText, setNewText] = useState('')
+    const [valueOptions, setValueOptions] = useState<QuotationAgreedValueOption[]>([])
     const defaultsApplied = useRef(false)
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [texts, existingItems, qv, alts] = await Promise.all([
+        const [texts, existingItems, qv, alts, opts] = await Promise.all([
             window.api.hullGetAgreedValueTexts(),
             window.api.hullGetQuotationAgreedValueItems(quotation.id),
             window.api.getQuotationVessels(quotation.id),
-            window.api.hullGetQuotationAlternatives(quotation.id)
+            window.api.hullGetQuotationAlternatives(quotation.id),
+            window.api.hullGetAgreedValueOptions(quotation.id)
         ])
         const safeTexts = Array.isArray(texts) ? texts : []
         const safeItems = Array.isArray(existingItems) ? existingItems : []
@@ -32,6 +34,7 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
         setItems(safeItems)
         setQVessels(Array.isArray(qv) ? qv : [])
         setHullAlts(Array.isArray(alts) ? alts : [])
+        setValueOptions(Array.isArray(opts) ? opts : [])
 
         // Sync sections from master texts (fixes items saved before section was tracked)
         if (safeItems.length > 0 && safeTexts.length > 0) {
@@ -140,7 +143,46 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
             </p>
 
             {/* H&M Value + Currency */}
-            {hullAlts.length > 1 ? (
+            {valueOptions.length > 0 ? (
+                <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>Value Options</label>
+                    {valueOptions.map((opt, idx) => (
+                        <div key={opt.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                            <input
+                                value={opt.label || ''}
+                                placeholder={`Option ${idx + 1}`}
+                                onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, label: e.target.value } : o))}
+                                onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { label: e.target.value })}
+                                style={{ width: '120px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                            />
+                            <input
+                                value={opt.currency || 'USD'}
+                                onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, currency: e.target.value } : o))}
+                                onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { currency: e.target.value })}
+                                style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' }}
+                            />
+                            <input
+                                type="number"
+                                value={opt.amount || ''}
+                                onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: parseFloat(e.target.value) || 0 } : o))}
+                                onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { amount: parseFloat(e.target.value) || 0 })}
+                                placeholder="0.00"
+                                style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                            />
+                            <button onClick={async () => { await window.api.hullDeleteAgreedValueOption(opt.id); setValueOptions(prev => prev.filter(o => o.id !== opt.id)) }}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}>
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                    ))}
+                    <button onClick={async () => {
+                        const result = await window.api.hullAddAgreedValueOption(quotation.id, 0, quotation.agreedValueCurrency || 'USD')
+                        if (result && !(result as any).error) setValueOptions(prev => [...prev, result])
+                    }} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 10px', marginTop: '6px' }}>
+                        <Plus size={12} /> Add Option
+                    </button>
+                </div>
+            ) : hullAlts.length > 1 ? (
                 <>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1 }}>
@@ -191,6 +233,14 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                             </div>
                         </div>
                     </div>
+                    <button onClick={async () => {
+                        const amt = quotation.agreedValue || 0
+                        const cur = quotation.agreedValueCurrency || 'USD'
+                        const result = await window.api.hullAddAgreedValueOption(quotation.id, amt, cur, 'Option 1')
+                        if (result && !(result as any).error) setValueOptions([result])
+                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Plus size={12} /> Add value options (quote multiple values)
+                    </button>
                 </>
             ) : qVessels.length > 1 ? (
                 <>
@@ -243,8 +293,17 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                             />
                         </div>
                     </div>
+                    <button onClick={async () => {
+                        const amt = quotation.agreedValue || 0
+                        const cur = quotation.agreedValueCurrency || 'USD'
+                        const result = await window.api.hullAddAgreedValueOption(quotation.id, amt, cur, 'Option 1')
+                        if (result && !(result as any).error) setValueOptions([result])
+                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Plus size={12} /> Add value options (quote multiple values)
+                    </button>
                 </>
             ) : (
+                <>
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
                     <div style={{ flex: 1, maxWidth: '250px' }}>
                         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>H&M Value</label>
@@ -276,6 +335,15 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                         />
                     </div>
                 </div>
+                <button onClick={async () => {
+                    const amt = quotation.agreedValue || 0
+                    const cur = quotation.agreedValueCurrency || 'USD'
+                    const result = await window.api.hullAddAgreedValueOption(quotation.id, amt, cur, 'Option 1')
+                    if (result && !(result as any).error) setValueOptions([result])
+                }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Plus size={12} /> Add value options (quote multiple values)
+                </button>
+                </>
             )}
 
             {/* IV toggle */}

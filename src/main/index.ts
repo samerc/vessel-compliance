@@ -2026,6 +2026,13 @@ app.whenReady().then(() => {
   safeHandle('quotation:updateItemAlternativeId', async (event, table, id, alternativeId) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationItemAlternativeId(table, id, alternativeId) })
   safeHandle('quotation:copySections', async (event, targetId, sourceId, sections) => { await requirePermission(event, 'quotations:edit'); return db.copyQuotationSections(targetId, sourceId, sections) })
 
+  // Agreed Value Options
+  safeHandle('hull:getAgreedValueOptions', (event, qId) => { requireSession(event); return db.getQuotationAgreedValueOptions(qId) })
+  safeHandle('hull:addAgreedValueOption', async (event, qId, amount, currency, label) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationAgreedValueOption(qId, amount, currency, label) })
+  safeHandle('hull:updateAgreedValueOption', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationAgreedValueOption(id, updates) })
+  safeHandle('hull:deleteAgreedValueOption', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationAgreedValueOption(id) })
+  safeHandle('hull:reorderAgreedValueOptions', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationAgreedValueOptions(ids) })
+
   // Hull Alternatives
   safeHandle('hull:getQuotationAlternatives', (event, qId) => { requireSession(event); return db.getQuotationHullAlternatives(qId) })
   safeHandle('hull:addQuotationAlternative', async (event, qId, hullClauseId, label, vesselScopeId) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationHullAlternative(qId, hullClauseId, label, vesselScopeId) })

@@ -291,6 +291,12 @@ const api = {
   piDeleteQuotationAlternative: (id: string) => ipcRenderer.invoke('pi:deleteQuotationAlternative', id),
   piReorderQuotationAlternatives: (ids: string[]) => ipcRenderer.invoke('pi:reorderQuotationAlternatives', ids),
   updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => ipcRenderer.invoke('quotation:updateItemAlternativeId', table, id, alternativeId),
+  // Agreed Value Options
+  hullGetAgreedValueOptions: (qId: string) => ipcRenderer.invoke('hull:getAgreedValueOptions', qId),
+  hullAddAgreedValueOption: (qId: string, amount: number, currency?: string, label?: string) => ipcRenderer.invoke('hull:addAgreedValueOption', qId, amount, currency, label),
+  hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string }) => ipcRenderer.invoke('hull:updateAgreedValueOption', id, updates),
+  hullDeleteAgreedValueOption: (id: string) => ipcRenderer.invoke('hull:deleteAgreedValueOption', id),
+  hullReorderAgreedValueOptions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAgreedValueOptions', ids),
   // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('hull:getQuotationAlternatives', qId),
   hullAddQuotationAlternative: (qId: string, hullClauseId?: string | null, label?: string, vesselScopeId?: string | null) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label, vesselScopeId),

@@ -843,6 +843,15 @@ export interface QuotationAgreedValueItem {
   vesselScope?: string[] | null
 }
 
+export interface QuotationAgreedValueOption {
+  id: string
+  quotationId: string
+  label?: string
+  amount: number
+  currency: string
+  order: number
+}
+
 export interface QuotationHullAlternative {
   id: string
   quotationId: string

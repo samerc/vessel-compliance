@@ -693,6 +693,17 @@ CREATE TABLE IF NOT EXISTS quotation_hull_additional_conditions (
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Agreed value options (multiple valuation choices per quotation)
+CREATE TABLE IF NOT EXISTS quotation_agreed_value_options (
+  id VARCHAR(36) PRIMARY KEY,
+  quotation_id VARCHAR(36) NOT NULL,
+  label VARCHAR(100) DEFAULT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  currency VARCHAR(10) DEFAULT 'USD',
+  order_index INT DEFAULT 0,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- War Risk conditions (admin-managed)
 CREATE TABLE IF NOT EXISTS war_conditions (
   id VARCHAR(36) PRIMARY KEY,

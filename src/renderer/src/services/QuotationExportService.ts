@@ -24,7 +24,7 @@ import {
   PIClause, PIWarranty, PIExclusion, PIAdditionalClause, PISectionTexts,
   PISanctionsVersion, QuotationVessel, QuotationCustomWarranty, QuotationCustomExclusion, QuotationCustomSection, QuotationSubjectivity,
   HullClause, HullClauseCondition, HullAdditionalCondition,
-  QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative,
+  QuotationAgreedValueItem, QuotationAgreedValueOption, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative,
   QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, Fleet,
   QuotationCargoClause, QuotationCargoCustomClause,
   QuotationAssuredGroup
@@ -92,6 +92,7 @@ interface QuotationData {
   vesselIacsMap: Record<string, boolean>  // quotation vessel ID → is IACS classed
   // Hull-specific data
   hullAgreedValueItems: QuotationAgreedValueItem[]
+  agreedValueOptions: QuotationAgreedValueOption[]
   hullClauses: HullClause[]
   hullConditions: QuotationHullCondition[]
   allHullConditions: HullClauseCondition[]
@@ -197,6 +198,9 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const piAlternativesRaw = quotation.quotationTypeCode === 'P'
     ? await window.api.piGetQuotationAlternatives(quotation.id)
     : []
+
+  // Fetch agreed value options
+  const agreedValueOptionsRaw = await window.api.hullGetAgreedValueOptions(quotation.id)
 
   // Fetch cargo-specific data
   const isCargo = quotation.quotationTypeCode === 'C'
@@ -304,6 +308,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     logoPath: resolvedLogoPath,
     vesselIacsMap,
     hullAgreedValueItems: Array.isArray(hullAgreedValueItems) ? hullAgreedValueItems : [],
+    agreedValueOptions: Array.isArray(agreedValueOptionsRaw) ? agreedValueOptionsRaw : [],
     hullClauses: resolvedHullClauses,
     hullConditions: Array.isArray(hullConditionsRaw) ? hullConditionsRaw : [],
     allHullConditions: resolvedAllHullConditions,
@@ -879,6 +884,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     // Per-alternative agreed values
     const hasPerAltValues = data.hullAlternatives.length > 1 && data.hullAlternatives.some(a => a.agreedValue != null)
 
+    // Multi-value options (independent of alternatives)
+    const hasValueOptions = data.agreedValueOptions.length > 0
+
     if (hasIv) {
       // Interest section — A) H&M text inline, B) IV text inline
       const hmTextItems = avItems.filter(it => (it.section || 'hm') === 'hm')
@@ -895,7 +903,13 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
       // Agreed Insured Value — amounts only for IV
       let avText = ''
-      if (hasPerAltValues) {
+      if (hasValueOptions) {
+        avText += 'Section A:\n'
+        for (const opt of data.agreedValueOptions) {
+          const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
+          avText += `${label}  :  ${formatCurrency(opt.amount, opt.currency)}\n`
+        }
+      } else if (hasPerAltValues) {
         avText += 'Section A:\n'
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
           const alt = data.hullAlternatives[ai]
@@ -937,12 +951,18 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         avText += `Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}\n`
       }
       sectionMap.set('agreedValue', ['Agreed Insured Value', avText.trim()])
-    } else if (avItems.length > 0 || hasHm || hasPerAltValues) {
+    } else if (avItems.length > 0 || hasHm || hasPerAltValues || hasValueOptions) {
       // Standard agreed value — value not bold (body column), spacing between value and texts
       // Filter out IV items when IV is disabled
       const hmItems = avItems.filter(it => (it.section || 'hm') !== 'iv')
       let avText = ''
-      if (hasPerAltValues) {
+      if (hasValueOptions) {
+        for (const opt of data.agreedValueOptions) {
+          const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
+          avText += `${label}  :  ${formatCurrency(opt.amount, opt.currency)}\n`
+        }
+        avText += '\n'
+      } else if (hasPerAltValues) {
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
           const alt = data.hullAlternatives[ai]
           if (alt.agreedValue != null) {
@@ -2486,6 +2506,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     // Per-alternative agreed values
     const dHasPerAltValues = data.hullAlternatives.length > 1 && data.hullAlternatives.some(a => a.agreedValue != null)
 
+    // Multi-value options (independent of alternatives)
+    const dHasValueOptions = data.agreedValueOptions.length > 0
+
     if (dHasIv) {
       // Interest section — A) H&M texts, B) IV texts (labels as bullets)
       const dHmItems = avItems.filter(it => (it.section || 'hm') === 'hm')
@@ -2515,7 +2538,15 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const avRow2 = (name: string, amount: string) => new TableRow({
         children: [avCell2(name, false, avNameW2), avCell2(':', false, avColonW2), avCell2(amount, false, avAmtW2)]
       })
-      if (dHasPerAltValues) {
+      if (dHasValueOptions) {
+        avContent.push(np('Section A:'))
+        const avOptRows: TableRow[] = []
+        for (const opt of data.agreedValueOptions) {
+          const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
+          avOptRows.push(avRow2(label, formatCurrency(opt.amount, opt.currency)))
+        }
+        avContent.push(new Table({ rows: avOptRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW2, avColonW2, avAmtW2], layout: TableLayoutType.FIXED }))
+      } else if (dHasPerAltValues) {
         avContent.push(np('Section A:'))
         const avAltRows: TableRow[] = []
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
@@ -2563,7 +2594,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         avContent.push(np(`Section B: ${formatCurrency(data.quotation.ivValue, data.quotation.ivCurrency || 'USD')}`))
       }
       rowMap.set('agreedValue', makeRow('Agreed Insured Value', avContent))
-    } else if (avItems.length > 0 || dHasHm || dHasPerAltValues) {
+    } else if (avItems.length > 0 || dHasHm || dHasPerAltValues || dHasValueOptions) {
       // Standard agreed value — value not bold, spacing between value and texts
       // Filter out IV items when IV is disabled
       const dHmItems = avItems.filter(it => (it.section || 'hm') !== 'iv')
@@ -2579,7 +2610,15 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const avRow3 = (name: string, amount: string) => new TableRow({
         children: [avCell3(name, false, avNameW3), avCell3(':', false, avColonW3), avCell3(amount, false, avAmtW3)]
       })
-      if (dHasPerAltValues) {
+      if (dHasValueOptions) {
+        const avOptRows3: TableRow[] = []
+        for (const opt of data.agreedValueOptions) {
+          const label = opt.label || `Option ${data.agreedValueOptions.indexOf(opt) + 1}`
+          avOptRows3.push(avRow3(label, formatCurrency(opt.amount, opt.currency)))
+        }
+        avContent.push(new Table({ rows: avOptRows3, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW3, avColonW3, avAmtW3], layout: TableLayoutType.FIXED }))
+        avContent.push(emptyP())
+      } else if (dHasPerAltValues) {
         const avAltRows3: TableRow[] = []
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
           const alt = data.hullAlternatives[ai]
