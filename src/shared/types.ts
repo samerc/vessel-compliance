@@ -1,3 +1,12 @@
+export interface FileNode {
+  name: string
+  path: string
+  isDirectory: boolean
+  children?: FileNode[]
+  size?: number
+  modified?: string
+}
+
 export interface DocumentType {
   id: string
   name: string

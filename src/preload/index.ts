@@ -842,6 +842,19 @@ const api = {
   tcUpload: (data: { typeCode: string; fileName: string; fileData: number[] }) => ipcRenderer.invoke('tc:upload', data),
   tcDelete: (typeCode: string) => ipcRenderer.invoke('tc:delete', typeCode),
 
+  // File Manager
+  fileManagerGetRoot: () => ipcRenderer.invoke('fileManager:getRoot'),
+  fileManagerSetRoot: (rootPath: string) => ipcRenderer.invoke('fileManager:setRoot', rootPath),
+  fileManagerReadDirectory: (dirPath: string) => ipcRenderer.invoke('fileManager:readDirectory', dirPath),
+  fileManagerReadTree: (dirPath: string, depth?: number) => ipcRenderer.invoke('fileManager:readTree', dirPath, depth),
+  fileManagerMoveFolder: (sourcePath: string, destParentPath: string) => ipcRenderer.invoke('fileManager:moveFolder', sourcePath, destParentPath),
+  fileManagerRenameFolder: (folderPath: string, newName: string) => ipcRenderer.invoke('fileManager:renameFolder', folderPath, newName),
+  fileManagerCreateFolder: (parentPath: string, name: string) => ipcRenderer.invoke('fileManager:createFolder', parentPath, name),
+  fileManagerExists: (filePath: string) => ipcRenderer.invoke('fileManager:exists', filePath),
+  fileManagerHealthCheck: () => ipcRenderer.invoke('fileManager:healthCheck'),
+  fileManagerOpenInExplorer: (filePath: string) => ipcRenderer.invoke('fileManager:openInExplorer', filePath),
+  fileManagerOpenFile: (filePath: string) => ipcRenderer.invoke('fileManager:openFile', filePath),
+
   // DOCX-to-PDF Conversion
   convertDocxToPdf: (docxPath: string) => ipcRenderer.invoke('convert:docxToPdf', docxPath),
   convertCountPdfPages: (pdfPath: string) => ipcRenderer.invoke('convert:countPdfPages', pdfPath),

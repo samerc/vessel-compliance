@@ -7,6 +7,7 @@ import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
 import { auth } from './auth'
 import { complianceScheduler } from './services/ComplianceScheduler'
+import { FileManagerService } from './services/FileManagerService'
 import { DailyAlertScheduler } from './services/DailyAlertScheduler'
 import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
@@ -3972,6 +3973,57 @@ app.whenReady().then(() => {
     }
 
     return { data: Array.from(pdfData as Buffer), fileName: `${data.filePrefix}.pdf` }
+  })
+
+  // ==================== File Manager ====================
+  safeHandle('fileManager:getRoot', async (event) => {
+    requireSession(event)
+    return db.getSetting('file_manager_root')
+  })
+  safeHandle('fileManager:setRoot', async (event, rootPath: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.setSetting('file_manager_root', rootPath)
+  })
+  safeHandle('fileManager:readDirectory', (event, dirPath: string) => {
+    requireSession(event)
+    return FileManagerService.readDirectory(dirPath)
+  })
+  safeHandle('fileManager:readTree', (event, dirPath: string, depth?: number) => {
+    requireSession(event)
+    return FileManagerService.readTree(dirPath, depth)
+  })
+  safeHandle('fileManager:moveFolder', async (event, sourcePath: string, destParentPath: string) => {
+    await requirePermission(event, 'admin:settings')
+    const result = FileManagerService.moveFolder(sourcePath, destParentPath)
+    const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
+    return { ...result, remapped: remapped.remapped }
+  })
+  safeHandle('fileManager:renameFolder', async (event, folderPath: string, newName: string) => {
+    await requirePermission(event, 'admin:settings')
+    const result = FileManagerService.renameFolder(folderPath, newName)
+    const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
+    return { ...result, remapped: remapped.remapped }
+  })
+  safeHandle('fileManager:createFolder', (event, parentPath: string, name: string) => {
+    requireSession(event)
+    return FileManagerService.createFolder(parentPath, name)
+  })
+  safeHandle('fileManager:exists', (event, filePath: string) => {
+    requireSession(event)
+    return FileManagerService.exists(filePath)
+  })
+  safeHandle('fileManager:healthCheck', async (event) => {
+    requireSession(event)
+    const allPaths = await db.getAllStoredFilePaths()
+    return allPaths.map((p) => ({ ...p, exists: FileManagerService.exists(p.path) }))
+  })
+  safeHandle('fileManager:openInExplorer', (event, filePath: string) => {
+    requireSession(event)
+    shell.showItemInFolder(filePath)
+  })
+  safeHandle('fileManager:openFile', (event, filePath: string) => {
+    requireSession(event)
+    return shell.openPath(filePath)
   })
 
   // Initialize update service with main window

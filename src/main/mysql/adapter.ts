@@ -12454,6 +12454,88 @@ export class MySQLAdapter {
             await this.pool.execute('UPDATE cargo_institute_clauses SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
     }
+
+    // --- File Manager ---
+
+    /** Remap all file paths that start with oldPrefix to newPrefix */
+    async remapAllFilePaths(oldPrefix: string, newPrefix: string): Promise<{ remapped: number }> {
+        if (!this.pool) return { remapped: 0 }
+        let total = 0
+
+        // vessel_documents.file_path
+        const [r1] = await this.pool.execute(
+            'UPDATE vessel_documents SET file_path = CONCAT(?, SUBSTRING(file_path, ?)) WHERE file_path LIKE ?',
+            [newPrefix, oldPrefix.length + 1, oldPrefix + '%']
+        )
+        total += (r1 as any).affectedRows || 0
+
+        // survey_attachments.file_path
+        const [r2] = await this.pool.execute(
+            'UPDATE survey_attachments SET file_path = CONCAT(?, SUBSTRING(file_path, ?)) WHERE file_path LIKE ?',
+            [newPrefix, oldPrefix.length + 1, oldPrefix + '%']
+        )
+        total += (r2 as any).affectedRows || 0
+
+        // entities — 4 path columns
+        const fmEntityCols = ['passport_file_path', 'certificate_of_incorporation_path', 'articles_of_association_path', 'kyc_file_path']
+        for (const col of fmEntityCols) {
+            const [r] = await this.pool.execute(
+                `UPDATE entities SET ${col} = CONCAT(?, SUBSTRING(${col}, ?)) WHERE ${col} LIKE ?`,
+                [newPrefix, oldPrefix.length + 1, oldPrefix + '%']
+            )
+            total += (r as any).affectedRows || 0
+        }
+
+        return { remapped: total }
+    }
+
+    /** Get all stored file paths for health check */
+    async getAllStoredFilePaths(): Promise<{ table: string; id: string; column: string; path: string; label: string }[]> {
+        if (!this.pool) return []
+        const results: { table: string; id: string; column: string; path: string; label: string }[] = []
+
+        // vessel_documents
+        const [vdRows] = await this.pool.query(
+            `SELECT vd.id, vd.file_path, v.name as vesselName, dt.name as docType
+             FROM vessel_documents vd
+             LEFT JOIN vessels v ON vd.vessel_id = v.id
+             LEFT JOIN document_types dt ON vd.document_type_id = dt.id
+             WHERE vd.file_path IS NOT NULL AND vd.file_path != ''`
+        )
+        for (const r of vdRows as any[]) {
+            results.push({ table: 'vessel_documents', id: r.id, column: 'file_path', path: r.file_path, label: `${r.vesselName || 'Unknown'} — ${r.docType || 'Document'}` })
+        }
+
+        // survey_attachments
+        const [saRows] = await this.pool.query(
+            `SELECT sa.id, sa.file_path, sa.file_name, cs.survey_date, v.name as vesselName
+             FROM survey_attachments sa
+             LEFT JOIN condition_surveys cs ON sa.survey_id = cs.id
+             LEFT JOIN vessels v ON cs.vessel_id = v.id
+             WHERE sa.file_path IS NOT NULL AND sa.file_path != ''`
+        )
+        for (const r of saRows as any[]) {
+            results.push({ table: 'survey_attachments', id: r.id, column: 'file_path', path: r.file_path, label: `${r.vesselName || 'Survey'} — ${r.file_name || 'Attachment'}` })
+        }
+
+        // entities
+        const fmEntCols = [
+            { col: 'passport_file_path', label: 'Passport/ID' },
+            { col: 'certificate_of_incorporation_path', label: 'Certificate of Incorporation' },
+            { col: 'articles_of_association_path', label: 'Articles of Association' },
+            { col: 'kyc_file_path', label: 'KYC' },
+        ]
+        for (const ec of fmEntCols) {
+            const [rows] = await this.pool.query(
+                `SELECT id, name, ${ec.col} as filePath FROM entities WHERE ${ec.col} IS NOT NULL AND ${ec.col} != ''`
+            )
+            for (const r of rows as any[]) {
+                results.push({ table: 'entities', id: r.id, column: ec.col, path: r.filePath, label: `${r.name} — ${ec.label}` })
+            }
+        }
+
+        return results
+    }
 }
 
 export const db = new MySQLAdapter()
