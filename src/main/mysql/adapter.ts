@@ -6341,7 +6341,75 @@ export class MySQLAdapter {
 
     async deleteQuotationVessel(id: string): Promise<void> {
         if (!this.pool) return
+        // Get the vessel info before deleting (for cascade cleanup)
+        const [vRows] = await this.pool.query('SELECT quotation_id, vessel_label FROM quotation_vessels WHERE id = ?', [id])
+        const vessel = (vRows as any[])[0]
         await this.pool.execute('DELETE FROM quotation_vessels WHERE id = ?', [id])
+        if (!vessel) return
+        const qId = vessel.quotation_id
+        const label = vessel.vessel_label
+
+        // Clean up assureds linked to this vessel label
+        if (label) {
+            await this.pool.execute('DELETE FROM quotation_assureds WHERE quotation_id = ? AND vessel_label = ?', [qId, label])
+        }
+
+        // Clean up hull alternatives scoped to this vessel
+        await this.pool.execute('DELETE FROM quotation_hull_alternatives WHERE quotation_id = ? AND vessel_scope_id = ?', [qId, id])
+
+        // Remove vessel from vessel_scope arrays on warranties, conditions, deductibles, etc.
+        // These store JSON arrays of vessel IDs — remove this vessel ID from them
+        const scopeTables = [
+            'quotation_warranties', 'quotation_custom_warranties',
+            'quotation_hull_conditions', 'quotation_hull_additional_conditions',
+            'quotation_deductibles', 'quotation_text_deductibles',
+            'quotation_exclusions', 'quotation_custom_exclusions',
+            'quotation_subjectivities', 'quotation_clauses',
+            'quotation_additional_clauses', 'quotation_survey_warranties'
+        ]
+        for (const table of scopeTables) {
+            try {
+                const [rows] = await this.pool.query(
+                    `SELECT id, vessel_scope FROM ${table} WHERE quotation_id = ? AND vessel_scope IS NOT NULL`,
+                    [qId]
+                )
+                for (const r of rows as any[]) {
+                    try {
+                        const scope = JSON.parse(r.vessel_scope)
+                        if (Array.isArray(scope) && scope.includes(id)) {
+                            const updated = scope.filter((vid: string) => vid !== id)
+                            await this.pool.execute(
+                                `UPDATE ${table} SET vessel_scope = ? WHERE id = ?`,
+                                [updated.length > 0 ? JSON.stringify(updated) : null, r.id]
+                            )
+                        }
+                    } catch {}
+                }
+            } catch {}
+        }
+
+        // Relabel remaining vessels sequentially (V1, V2, V3...)
+        const [remaining] = await this.pool.query(
+            'SELECT id, vessel_label FROM quotation_vessels WHERE quotation_id = ? ORDER BY order_index',
+            [qId]
+        )
+        for (let i = 0; i < (remaining as any[]).length; i++) {
+            const newLabel = `V${i + 1}`
+            const row = (remaining as any[])[i]
+            if (row.vessel_label !== newLabel) {
+                // Update assureds with old label to new label
+                await this.pool.execute(
+                    'UPDATE quotation_assureds SET vessel_label = ? WHERE quotation_id = ? AND vessel_label = ?',
+                    [newLabel, qId, row.vessel_label]
+                )
+                await this.pool.execute(
+                    'UPDATE quotation_vessels SET vessel_label = ?, order_index = ? WHERE id = ?',
+                    [newLabel, i, row.id]
+                )
+            } else {
+                await this.pool.execute('UPDATE quotation_vessels SET order_index = ? WHERE id = ?', [i, row.id])
+            }
+        }
     }
 
     async reorderQuotationVessels(orderedIds: string[]): Promise<void> {
@@ -10326,11 +10394,19 @@ export class MySQLAdapter {
 
     async setQuotationHullConditions(quotationId: string, items: { hullConditionId: string; textOverride?: string; conditionSection?: string; amount?: number; vesselAmounts?: Record<string, number> | null; vesselScope?: string[] | null; alternativeId?: string | null }[]): Promise<void> {
         if (!this.pool) return
+        // Dedup by hullConditionId + alternativeId (keep first occurrence)
+        const seen = new Set<string>()
+        const dedupedItems = items.filter(item => {
+            const key = `${item.hullConditionId}::${item.alternativeId || 'null'}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+        })
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
             await this.pool.execute('DELETE FROM quotation_hull_conditions WHERE quotation_id = ?', [quotationId])
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i]
+            for (let i = 0; i < dedupedItems.length; i++) {
+                const item = dedupedItems[i]
                 await this.pool.execute(
                     'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, condition_section, amount, vessel_amounts, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [uuidv4(), quotationId, item.hullConditionId, item.textOverride || null, item.conditionSection || 'both', item.amount ?? null, item.vesselAmounts ? JSON.stringify(item.vesselAmounts) : null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null]
