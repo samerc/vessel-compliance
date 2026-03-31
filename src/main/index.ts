@@ -3995,13 +3995,17 @@ app.whenReady().then(() => {
   safeHandle('fileManager:moveFolder', async (event, sourcePath: string, destParentPath: string) => {
     await requirePermission(event, 'admin:settings')
     const result = FileManagerService.moveFolder(sourcePath, destParentPath)
+    console.log('[FileManager] Move:', result.oldPath, '→', result.newPath)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
+    console.log('[FileManager] Remapped:', remapped.remapped, 'file links')
     return { ...result, remapped: remapped.remapped }
   })
   safeHandle('fileManager:renameFolder', async (event, folderPath: string, newName: string) => {
     await requirePermission(event, 'admin:settings')
     const result = FileManagerService.renameFolder(folderPath, newName)
+    console.log('[FileManager] Rename:', result.oldPath, '→', result.newPath)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
+    console.log('[FileManager] Remapped:', remapped.remapped, 'file links')
     return { ...result, remapped: remapped.remapped }
   })
   safeHandle('fileManager:createFolder', (event, parentPath: string, name: string) => {

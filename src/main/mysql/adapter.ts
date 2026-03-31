@@ -12462,30 +12462,33 @@ export class MySQLAdapter {
         if (!this.pool) return { remapped: 0 }
         let total = 0
 
-        // vessel_documents.file_path
-        const [r1] = await this.pool.execute(
-            'UPDATE vessel_documents SET file_path = CONCAT(?, SUBSTRING(file_path, ?)) WHERE file_path LIKE ?',
-            [newPrefix, oldPrefix.length + 1, oldPrefix + '%']
-        )
-        total += (r1 as any).affectedRows || 0
+        // Normalize: strip trailing separators
+        const oldNorm = oldPrefix.replace(/[\\/]+$/, '')
+        const newNorm = newPrefix.replace(/[\\/]+$/, '')
 
-        // survey_attachments.file_path
-        const [r2] = await this.pool.execute(
-            'UPDATE survey_attachments SET file_path = CONCAT(?, SUBSTRING(file_path, ?)) WHERE file_path LIKE ?',
-            [newPrefix, oldPrefix.length + 1, oldPrefix + '%']
-        )
-        total += (r2 as any).affectedRows || 0
+        const tables: { table: string; column: string }[] = [
+            { table: 'vessel_documents', column: 'file_path' },
+            { table: 'survey_attachments', column: 'file_path' },
+            { table: 'entities', column: 'passport_file_path' },
+            { table: 'entities', column: 'certificate_of_incorporation_path' },
+            { table: 'entities', column: 'articles_of_association_path' },
+            { table: 'entities', column: 'kyc_file_path' }
+        ]
 
-        // entities — 4 path columns
-        const fmEntityCols = ['passport_file_path', 'certificate_of_incorporation_path', 'articles_of_association_path', 'kyc_file_path']
-        for (const col of fmEntityCols) {
-            const [r] = await this.pool.execute(
-                `UPDATE entities SET ${col} = CONCAT(?, SUBSTRING(${col}, ?)) WHERE ${col} LIKE ?`,
-                [newPrefix, oldPrefix.length + 1, oldPrefix + '%']
-            )
-            total += (r as any).affectedRows || 0
+        // Use LEFT() for prefix matching instead of LIKE (avoids backslash escape issues)
+        for (const { table, column } of tables) {
+            try {
+                const [r] = await this.pool.execute(
+                    `UPDATE ${table} SET ${column} = CONCAT(?, SUBSTRING(${column}, ? + 1)) WHERE LEFT(${column}, ?) = ?`,
+                    [newNorm, oldNorm.length, oldNorm.length, oldNorm]
+                )
+                total += (r as any).affectedRows || 0
+            } catch (err) {
+                console.error(`[remapAllFilePaths] Error on ${table}.${column}:`, err)
+            }
         }
 
+        console.log(`[remapAllFilePaths] old="${oldNorm}" new="${newNorm}" remapped=${total}`)
         return { remapped: total }
     }
 
