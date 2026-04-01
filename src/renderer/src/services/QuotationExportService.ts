@@ -2036,7 +2036,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 // ==================== Word Export ====================
 
 export async function exportQuotationToWord(quotation: Quotation): Promise<void> {
+  console.log('[DOCX EXPORT] Starting DOCX export for', quotation.referenceNumber)
   const data = await gatherData(quotation)
+  console.log('[DOCX EXPORT] Data gathered. hullConditions:', data.hullConditions.length, 'hullAlternatives:', data.hullAlternatives.length)
   const vName = vesselName(data)
   const selectedClauses = data.allClauses.filter(c => data.selectedClauseIds.includes(c.id))
   void data.selectedWarrantyIds // warranties resolved in renderWarBullets
