@@ -229,15 +229,70 @@ export default function SanctionsSearch() {
                 </div>
             )}
 
+            {/* Results summary */}
+            {results.length > 0 && (
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{results.length} result{results.length !== 1 ? 's' : ''}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>—</span>
+                    {Object.entries(results.reduce((acc, m) => { const t = m.target_type || 'Unknown'; acc[t] = (acc[t] || 0) + 1; return acc }, {} as Record<string, number>)).map(([type, count]) => (
+                        <span key={type} style={{
+                            fontSize: '0.78rem', padding: '3px 10px', borderRadius: '12px',
+                            background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+                            color: 'var(--text-secondary)'
+                        }}>
+                            {type}: {count}
+                        </span>
+                    ))}
+                </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {results.map((match) => (
+                {/* Group results by target_type */}
+                {(() => {
+                    const groups: Record<string, SanctionsMatch[]> = {}
+                    for (const m of results) {
+                        const type = m.target_type || 'Unknown'
+                        if (!groups[type]) groups[type] = []
+                        groups[type].push(m)
+                    }
+                    const typeOrder = ['Individual', 'Entity', 'Vessel', 'Aircraft']
+                    const sortedTypes = Object.keys(groups).sort((a, b) => {
+                        const ia = typeOrder.indexOf(a)
+                        const ib = typeOrder.indexOf(b)
+                        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+                    })
+                    const typeIcons: Record<string, string> = { Individual: '👤', Entity: '🏢', Vessel: '🚢', Aircraft: '✈️' }
+                    const typeColors: Record<string, string> = { Individual: '#ffa726', Entity: '#42a5f5', Vessel: '#26c6da', Aircraft: '#ab47bc' }
+
+                    return sortedTypes.map(type => (
+                        <div key={type}>
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                                padding: '10px 4px', marginTop: '8px', marginBottom: '4px',
+                                borderBottom: `2px solid ${typeColors[type] || 'var(--table-border)'}`,
+                            }}>
+                                <span style={{ fontSize: '1.1rem' }}>{typeIcons[type] || '📋'}</span>
+                                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: typeColors[type] || 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    {type}
+                                </span>
+                                <span style={{
+                                    fontSize: '0.72rem', fontWeight: 600,
+                                    padding: '2px 8px', borderRadius: '10px',
+                                    background: `${typeColors[type] || 'var(--accent-primary)'}18`,
+                                    color: typeColors[type] || 'var(--text-secondary)'
+                                }}>
+                                    {groups[type].length}
+                                </span>
+                            </div>
+                            {groups[type].map((match) => (
                     <div
                         key={match.id}
                         className="glass-card"
                         style={{
                             padding: '0',
                             overflow: 'hidden',
-                            borderLeft: `4px solid ${getSourceColor(match.source)}`
+                            borderLeft: `4px solid ${getSourceColor(match.source)}`,
+                            marginBottom: '12px'
                         }}
                     >
                         <div
@@ -338,6 +393,9 @@ export default function SanctionsSearch() {
                         )}
                     </div>
                 ))}
+                        </div>
+                    ))
+                })()}
             </div>
         </div>
     )
