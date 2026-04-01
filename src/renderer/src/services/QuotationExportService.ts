@@ -1053,28 +1053,32 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const currency = data.quotation.premiumCurrency || 'USD'
         for (const qc of conds) {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
-          if (!def) { console.log(`[Export] Condition ${qc.hullConditionId} — no definition found in allHullConditions (${data.allHullConditions.length} defs)`); continue }
-          console.log(`[Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", qc.amount=${qc.amount}, vesselAmounts=${JSON.stringify(qc.vesselAmounts)}`)
+          if (!def) continue
           // If vesselAmounts exist and differ, emit one line per vessel
-          if (qc.vesselAmounts && def.hasAmount && def.amountPlaceholder && Object.keys(qc.vesselAmounts).length > 0) {
+          if (qc.vesselAmounts && def.hasAmount && Object.keys(qc.vesselAmounts).length > 0) {
             for (const vessel of data.quotationVessels) {
               const va = qc.vesselAmounts[vessel.id]
               if (va == null) continue
               let t = qc.textOverride || def.text
-              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-              t = t.replace(new RegExp(escaped, 'g'), formatCurrency(va, currency))
+              if (def.amountPlaceholder && t.includes(def.amountPlaceholder)) {
+                const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                t = t.replace(new RegExp(escaped, 'g'), formatCurrency(va, currency))
+              } else {
+                t = t.trimEnd() + ' ' + formatCurrency(va, currency)
+              }
               const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
               pairs.push([`Cl. ${def.conditionNumber}`, `${t} ${vName}`])
             }
           } else {
             let t = qc.textOverride || def.text
             const amount = resolveAmount(qc)
-            if (def.hasAmount) {
-              console.log(`[Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", amount=${amount}, qc.amount=${qc.amount}, text="${t.substring(0, 60)}"`)
-            }
-            if (def.hasAmount && def.amountPlaceholder && amount != null) {
-              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-              t = t.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
+            if (def.hasAmount && amount != null) {
+              if (def.amountPlaceholder && t.includes(def.amountPlaceholder)) {
+                const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                t = t.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
+              } else {
+                t = t.trimEnd() + ' ' + formatCurrency(amount, currency)
+              }
             }
             const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
             pairs.push([`Cl. ${def.conditionNumber}`, `${t}${scope}`])
@@ -1228,8 +1232,6 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
           return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
         })
-        console.log(`[Export] H&M path: hmCondsRaw=${hmCondsRaw.length}, hmConds=${hmConds.length}, ivConds=${ivConds.length}, total hc=${hc.length}`)
-        console.log(`[Export] hmConds:`, hmConds.map(c => ({ id: c.hullConditionId, altId: c.alternativeId, amount: c.amount })))
         hcBlocks.push({ title: 'Hull and Machinery', underline: true, desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hmConds), addl: renderAddlForSection(b => b.type === 'alt' || b.type === 'allAlts') })
         hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         const bothAddl = renderAddlForSection(b => b.type === 'both')
@@ -2036,9 +2038,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 // ==================== Word Export ====================
 
 export async function exportQuotationToWord(quotation: Quotation): Promise<void> {
-  console.log('[DOCX EXPORT] Starting DOCX export for', quotation.referenceNumber)
   const data = await gatherData(quotation)
-  console.log('[DOCX EXPORT] Data gathered. hullConditions:', data.hullConditions.length, 'hullAlternatives:', data.hullAlternatives.length)
   const vName = vesselName(data)
   const selectedClauses = data.allClauses.filter(c => data.selectedClauseIds.includes(c.id))
   void data.selectedWarrantyIds // warranties resolved in renderWarBullets
@@ -2683,7 +2683,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   // ---- Hull Conditions ----
   {
-    console.log(`[DOCX] Hull conditions entry: hullConditions=${data.hullConditions.length}, hullAdditionalConditions=${data.hullAdditionalConditions.length}, alts=${data.hullAlternatives.length}`)
     const hc = data.hullConditions
     // Sort additional conditions by per-quotation order_index (falls back to settings order)
     const dAddlSettingsOrder = new Map(data.allHullAdditionalConditions.map((c, i) => [c.id, c.order ?? i]))
@@ -2737,13 +2736,17 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const isNewHC = origData && !origHullConditionIds.has(qc.hullConditionId)
           const hcColor = isNewHC ? RED : '000000'
           // If vesselAmounts exist and differ, emit one row per vessel
-          if (qc.vesselAmounts && def.hasAmount && def.amountPlaceholder && Object.keys(qc.vesselAmounts).length > 0) {
+          if (qc.vesselAmounts && def.hasAmount && Object.keys(qc.vesselAmounts).length > 0) {
             for (const vessel of data.quotationVessels) {
               const va = qc.vesselAmounts[vessel.id]
               if (va == null) continue
               let text = qc.textOverride || def.text
-              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-              text = text.replace(new RegExp(escaped, 'g'), formatCurrency(va, currency))
+              if (def.amountPlaceholder && text.includes(def.amountPlaceholder)) {
+                const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                text = text.replace(new RegExp(escaped, 'g'), formatCurrency(va, currency))
+              } else {
+                text = text.trimEnd() + ' ' + formatCurrency(va, currency)
+              }
               const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
               tableRows.push(new TableRow({
                 children: [
@@ -2755,10 +2758,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           } else {
             let text = qc.textOverride || def.text
             const amount = dResolveAmount(qc)
-            console.log(`[DOCX Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", amount=${amount}, qc.amount=${qc.amount}, text="${text.substring(0, 100)}", containsPlaceholder=${def.amountPlaceholder ? text.includes(def.amountPlaceholder) : 'N/A'}`)
-            if (def.hasAmount && def.amountPlaceholder && amount != null) {
-              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-              text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
+            if (def.hasAmount && amount != null) {
+              if (def.amountPlaceholder && text.includes(def.amountPlaceholder)) {
+                const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
+              } else {
+                // Placeholder not in text — append the amount
+                text = text.trimEnd() + ' ' + formatCurrency(amount, currency)
+              }
             }
             const scope = vesselScopeSuffix(qc.vesselScope, data.quotationVessels)
             tableRows.push(new TableRow({
@@ -2861,7 +2868,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return merged
       }
 
-      console.log(`[DOCX Hull] dMultiAlt=${dMultiAlt}, dHasIvSection=${dHasIvSection}, dAlts=${dAlts.length}, hc=${hc.length}, ivClauseId=${dIvClauseId}, ivConds=${dIvConds.length}`)
       if (dMultiAlt) {
         if (dIsPerVessel) {
           // Group by vessel: each vessel gets its alternatives rendered as a section
