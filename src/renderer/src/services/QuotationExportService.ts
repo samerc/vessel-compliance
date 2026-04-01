@@ -2755,7 +2755,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           } else {
             let text = qc.textOverride || def.text
             const amount = dResolveAmount(qc)
-            console.log(`[DOCX Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", amount=${amount}, qc.amount=${qc.amount}`)
+            console.log(`[DOCX Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", amount=${amount}, qc.amount=${qc.amount}, text="${text.substring(0, 100)}", containsPlaceholder=${def.amountPlaceholder ? text.includes(def.amountPlaceholder) : 'N/A'}`)
             if (def.hasAmount && def.amountPlaceholder && amount != null) {
               const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
               text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
