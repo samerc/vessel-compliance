@@ -1053,7 +1053,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const currency = data.quotation.premiumCurrency || 'USD'
         for (const qc of conds) {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
-          if (!def) continue
+          if (!def) { console.log(`[Export] Condition ${qc.hullConditionId} — no definition found in allHullConditions (${data.allHullConditions.length} defs)`); continue }
+          console.log(`[Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", qc.amount=${qc.amount}, vesselAmounts=${JSON.stringify(qc.vesselAmounts)}`)
           // If vesselAmounts exist and differ, emit one line per vessel
           if (qc.vesselAmounts && def.hasAmount && def.amountPlaceholder && Object.keys(qc.vesselAmounts).length > 0) {
             for (const vessel of data.quotationVessels) {
@@ -1227,6 +1228,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
           return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
         })
+        console.log(`[Export] H&M path: hmCondsRaw=${hmCondsRaw.length}, hmConds=${hmConds.length}, ivConds=${ivConds.length}, total hc=${hc.length}`)
+        console.log(`[Export] hmConds:`, hmConds.map(c => ({ id: c.hullConditionId, altId: c.alternativeId, amount: c.amount })))
         hcBlocks.push({ title: 'Hull and Machinery', underline: true, desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(hmConds), addl: renderAddlForSection(b => b.type === 'alt' || b.type === 'allAlts') })
         hcBlocks.push({ title: 'Increased Value', underline: true, desc: selectedIvClause ? (selectedIvClause.description || selectedIvClause.name) : undefined, condPairs: getCondPairs(ivConds), addl: renderAddlForSection(b => b.type === 'iv') })
         const bothAddl = renderAddlForSection(b => b.type === 'both')
@@ -2749,6 +2752,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           } else {
             let text = qc.textOverride || def.text
             const amount = dResolveAmount(qc)
+            console.log(`[DOCX Export] Cl. ${def.conditionNumber}: hasAmount=${def.hasAmount}, placeholder="${def.amountPlaceholder}", amount=${amount}, qc.amount=${qc.amount}`)
             if (def.hasAmount && def.amountPlaceholder && amount != null) {
               const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
               text = text.replace(new RegExp(escaped, 'g'), formatCurrency(amount, currency))
