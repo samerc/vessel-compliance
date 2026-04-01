@@ -451,6 +451,7 @@ export default function UserManager() {
                                     } catch (err: any) {
                                         showError(err.message || 'Failed to force password reset')
                                     }
+                                    setConfirmation(prev => ({ ...prev, show: false }))
                                 }
                             })
                         }}
@@ -638,6 +639,7 @@ export default function UserManager() {
                                                                     } catch (err: any) {
                                                                         showError(err.message || 'Failed')
                                                                     }
+                                                                    setConfirmation(prev => ({ ...prev, show: false }))
                                                                 }
                                                             })
                                                         }}
