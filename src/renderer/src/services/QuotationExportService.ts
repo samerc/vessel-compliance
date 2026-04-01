@@ -2681,6 +2681,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   // ---- Hull Conditions ----
   {
+    console.log(`[DOCX] Hull conditions entry: hullConditions=${data.hullConditions.length}, hullAdditionalConditions=${data.hullAdditionalConditions.length}, alts=${data.hullAlternatives.length}`)
     const hc = data.hullConditions
     // Sort additional conditions by per-quotation order_index (falls back to settings order)
     const dAddlSettingsOrder = new Map(data.allHullAdditionalConditions.map((c, i) => [c.id, c.order ?? i]))
