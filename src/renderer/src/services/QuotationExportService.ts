@@ -2858,6 +2858,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return merged
       }
 
+      console.log(`[DOCX Hull] dMultiAlt=${dMultiAlt}, dHasIvSection=${dHasIvSection}, dAlts=${dAlts.length}, hc=${hc.length}, ivClauseId=${dIvClauseId}, ivConds=${dIvConds.length}`)
       if (dMultiAlt) {
         if (dIsPerVessel) {
           // Group by vessel: each vessel gets its alternatives rendered as a section
