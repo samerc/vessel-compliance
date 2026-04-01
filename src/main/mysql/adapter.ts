@@ -12654,7 +12654,6 @@ export class MySQLAdapter {
             }
         }
 
-        console.log(`[remapAllFilePaths] old="${oldNorm}" new="${newNorm}" remapped=${total}`)
         return { remapped: total }
     }
 

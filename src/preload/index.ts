@@ -111,7 +111,6 @@ const api = {
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
-  updateUserWindowPreferences: (width: number, height: number, x?: number, y?: number) => ipcRenderer.invoke('users:updateWindowPreferences', width, height, x, y),
   updateSanctionsThreshold: (threshold: number) => ipcRenderer.invoke('users:updateSanctionsThreshold', threshold),
   updateUserAppVersion: (version: string) => ipcRenderer.invoke('users:updateAppVersion', version),
   updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => ipcRenderer.invoke('users:updateSidebarState', sidebarCollapsed, collapsedGroups),

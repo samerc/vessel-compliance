@@ -338,9 +338,6 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   // Update Handlers
   safeHandle('update:checkForUpdates', async () => {
     await updateService.checkForUpdates(true)
@@ -2029,7 +2026,7 @@ app.whenReady().then(() => {
   // Agreed Value Options
   safeHandle('hull:getAgreedValueOptions', (event, qId) => { requireSession(event); return db.getQuotationAgreedValueOptions(qId) })
   safeHandle('hull:addAgreedValueOption', async (event, qId, amount, currency, label) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationAgreedValueOption(qId, amount, currency, label) })
-  safeHandle('hull:updateAgreedValueOption', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); console.log('[AgreedValueOption] update', id, JSON.stringify(updates)); return db.updateQuotationAgreedValueOption(id, updates) })
+  safeHandle('hull:updateAgreedValueOption', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationAgreedValueOption(id, updates) })
   safeHandle('hull:deleteAgreedValueOption', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationAgreedValueOption(id) })
   safeHandle('hull:reorderAgreedValueOptions', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationAgreedValueOptions(ids) })
 
