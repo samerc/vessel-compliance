@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, FolderOpen } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, FolderOpen, Sparkles } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -458,24 +458,28 @@ function App(): React.JSX.Element {
                     {([
                       { id: 'dark' as const, icon: <Moon size={13} />, label: 'Dark' },
                       { id: 'light' as const, icon: <Sun size={13} />, label: 'Light' },
-                      { id: 'premium' as const, icon: <Crown size={13} />, label: 'Frost' }
-                    ] as const).map(t => (
+                      { id: 'premium' as const, icon: <Crown size={13} />, label: 'Frost' },
+                      { id: 'aurora' as const, icon: <Sparkles size={13} />, label: 'Aurora' }
+                    ] as const).map(t => {
+                      const accentMap: Record<string, string> = { premium: '#7c8cf8', aurora: '#7c6cef' }
+                      const accent = accentMap[t.id]
+                      return (
                       <button
                         key={t.id}
                         onClick={() => { setThemeTo(t.id); setShowUserMenu(false) }}
                         style={{
                           flex: 1, padding: '5px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                          background: theme === t.id ? (t.id === 'premium' ? 'rgba(124,140,248,0.12)' : 'rgba(0,210,255,0.1)') : 'transparent',
-                          border: theme === t.id ? (t.id === 'premium' ? '1px solid rgba(124,140,248,0.3)' : '1px solid var(--accent-primary)') : '1px solid transparent',
+                          background: theme === t.id ? (accent ? `${accent}18` : 'rgba(0,210,255,0.1)') : 'transparent',
+                          border: theme === t.id ? (accent ? `1px solid ${accent}50` : '1px solid var(--accent-primary)') : '1px solid transparent',
                           borderRadius: '6px', cursor: 'pointer',
-                          color: theme === t.id ? (t.id === 'premium' ? '#7c8cf8' : 'var(--accent-primary)') : 'var(--text-secondary)',
+                          color: theme === t.id ? (accent || 'var(--accent-primary)') : 'var(--text-secondary)',
                           fontSize: '0.72rem', fontWeight: theme === t.id ? 600 : 400
                         }}
                       >
                         {t.icon}
                         {t.label}
                       </button>
-                    ))}
+                    )})}
                   </div>
                 </div>
                 <button onClick={() => { logout(); setShowUserMenu(false) }} style={{ width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left' }} className="hover-effect">

@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from './AuthContext'
 
-type Theme = 'light' | 'dark' | 'premium'
+type Theme = 'light' | 'dark' | 'premium' | 'aurora'
 
-const THEME_CYCLE: Theme[] = ['dark', 'light', 'premium']
+const THEME_CYCLE: Theme[] = ['dark', 'light', 'premium', 'aurora']
 
 interface ThemeContextType {
     theme: Theme
+    isLight: boolean
     toggleTheme: () => void
     setThemeTo: (t: Theme) => void
 }
@@ -56,9 +57,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [user?.id, isAuthenticated])
 
     const applyTheme = (t: Theme) => {
-        document.body.classList.remove('light', 'premium')
+        document.body.classList.remove('light', 'premium', 'aurora')
         if (t === 'light') document.body.classList.add('light')
         else if (t === 'premium') document.body.classList.add('premium')
+        else if (t === 'aurora') document.body.classList.add('aurora')
     }
 
     const toggleTheme = async () => {
@@ -78,7 +80,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (loading) return null
 
     return (
-        <ThemeContext.Provider value={{ theme, toggleTheme, setThemeTo }}>
+        <ThemeContext.Provider value={{ theme, isLight: theme === 'light' || theme === 'aurora', toggleTheme, setThemeTo }}>
             {children}
         </ThemeContext.Provider>
     )
