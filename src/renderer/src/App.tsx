@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, FolderOpen, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, FolderOpen, Sparkles, Eye, EyeOff } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -84,6 +84,7 @@ function App(): React.JSX.Element {
   const [resetPassword, setResetPassword] = useState('')
   const [resetConfirm, setResetConfirm] = useState('')
   const [resetError, setResetError] = useState('')
+  const [showResetPw, setShowResetPw] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
 
   useEffect(() => {
@@ -830,42 +831,66 @@ function App(): React.JSX.Element {
           <div style={{
             position: 'fixed', inset: 0, zIndex: 99999,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)'
+            background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)'
           }}>
             <div style={{
               background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px', padding: '32px', width: '400px',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+              borderRadius: '20px', padding: '40px 44px', width: '460px',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.35)',
+              border: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`
             }}>
-              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                <KeyRound size={40} style={{ color: 'var(--accent-primary)', marginBottom: '12px' }} />
-                <h2 style={{ margin: 0, fontSize: '1.3rem' }}>Password Reset Required</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: '8px' }}>
-                  For security purposes, please set a new password to continue.
+              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', marginBottom: '16px'
+                }}>
+                  <KeyRound size={32} style={{ color: '#ffffff' }} />
+                </div>
+                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>Change Your Password</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '10px', lineHeight: 1.5 }}>
+                  For security purposes, please set a new password to continue using the application.
                 </p>
               </div>
               {resetError && (
-                <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,77,77,0.1)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '14px', textAlign: 'center' }}>
+                <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,77,77,0.08)', border: '1px solid rgba(255,77,77,0.2)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '20px', textAlign: 'center' }}>
                   {resetError}
                 </div>
               )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>New Password</label>
-                  <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)}
-                    placeholder="At least 6 characters"
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)', fontSize: '0.9rem', boxSizing: 'border-box' }}
-                    autoFocus />
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 500 }}>New Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showResetPw ? 'text' : 'password'} value={resetPassword} onChange={e => setResetPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      style={{ width: '100%', padding: '12px 44px 12px 16px', borderRadius: '10px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)', fontSize: '0.95rem', boxSizing: 'border-box' }}
+                      autoFocus />
+                    <button type="button" onClick={() => setShowResetPw(!showResetPw)}
+                      style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                      {showResetPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Confirm Password</label>
-                  <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)}
-                    placeholder="Re-enter password"
-                    onKeyDown={e => { if (e.key === 'Enter') handleForceReset() }}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 500 }}>Confirm Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showResetPw ? 'text' : 'password'} value={resetConfirm} onChange={e => setResetConfirm(e.target.value)}
+                      placeholder="Re-enter your password"
+                      onKeyDown={e => { if (e.key === 'Enter') handleForceReset() }}
+                      style={{ width: '100%', padding: '12px 44px 12px 16px', borderRadius: '10px', border: `1px solid ${resetConfirm && resetPassword && resetConfirm !== resetPassword ? 'var(--danger)' : 'var(--input-border)'}`, background: 'var(--input-bg)', color: 'var(--input-text)', fontSize: '0.95rem', boxSizing: 'border-box' }} />
+                    <button type="button" onClick={() => setShowResetPw(!showResetPw)}
+                      style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                      {showResetPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {resetConfirm && resetPassword && resetConfirm !== resetPassword && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: '4px', display: 'block' }}>Passwords do not match</span>
+                  )}
                 </div>
-                <button onClick={handleForceReset} disabled={resetLoading || !resetPassword || !resetConfirm}
-                  className="btn-primary" style={{ padding: '12px', fontSize: '0.9rem', marginTop: '8px' }}>
+                {resetPassword.length > 0 && resetPassword.length < 6 && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--warning)', marginTop: '-8px' }}>Password must be at least 6 characters</span>
+                )}
+                <button onClick={handleForceReset} disabled={resetLoading || !resetPassword || !resetConfirm || resetPassword.length < 6 || resetPassword !== resetConfirm}
+                  className="btn-primary" style={{ padding: '14px', fontSize: '0.95rem', marginTop: '8px', borderRadius: '10px', fontWeight: 600 }}>
                   {resetLoading ? 'Updating...' : 'Set New Password'}
                 </button>
               </div>
