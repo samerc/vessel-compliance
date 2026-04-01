@@ -23,6 +23,7 @@ import {
 import { FileNode } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateShort } from '../utils/dateUtils'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,13 +36,7 @@ const formatSize = (bytes: number) => {
 }
 
 const formatDate = (iso?: string) => {
-  if (!iso) return ''
-  try {
-    const d = new Date(iso)
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-  } catch {
-    return ''
-  }
+  return formatDateShort(iso) || ''
 }
 
 const baseName = (p: string) => {

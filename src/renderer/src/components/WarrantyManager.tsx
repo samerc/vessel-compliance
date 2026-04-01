@@ -3,7 +3,7 @@ import { Plus, ChevronDown, Bell, Check, X, AlertTriangle, Clock, FileWarning, C
 import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { formatDateShort } from '../utils/dateUtils'
+import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
 
 interface WarrantyManagerProps {
   vesselId: string
@@ -38,10 +38,6 @@ function daysRemaining(deadlineDate: Date): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
-function formatDate(s?: string | null): string {
-  if (!s) return '-'
-  return formatDateShort(s) || s
-}
 
 export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: WarrantyManagerProps) {
   const { user, hasPermission } = useAuth()
@@ -428,11 +424,11 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px 10px 42px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
             {deadlineInfo}
             {w.inceptionDate && (
-              <span style={{ fontSize: '0.78rem' }}>Inception: {formatDate(w.inceptionDate)}</span>
+              <span style={{ fontSize: '0.78rem' }}>Inception: {formatDateOrDash(w.inceptionDate)}</span>
             )}
             {w.nextReminderDate && isActive && (
               <span style={{ fontSize: '0.78rem', color: '#e6a800', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <Bell size={11} /> Next: {formatDate(w.nextReminderDate)}
+                <Bell size={11} /> Next: {formatDateOrDash(w.nextReminderDate)}
               </span>
             )}
             {w.conditionSurveyId && (
@@ -467,13 +463,13 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
               {w.inceptionDate && (
                 <div style={{ fontSize: '0.85rem' }}>
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Inception Date</span>
-                  <div style={{ fontWeight: '500' }}>{formatDate(w.inceptionDate)}</div>
+                  <div style={{ fontWeight: '500' }}>{formatDateOrDash(w.inceptionDate)}</div>
                 </div>
               )}
               {w.completedAt && (
                 <div style={{ fontSize: '0.85rem' }}>
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Completed</span>
-                  <div style={{ fontWeight: '500' }}>{formatDate(w.completedAt)}</div>
+                  <div style={{ fontWeight: '500' }}>{formatDateOrDash(w.completedAt)}</div>
                 </div>
               )}
             </div>
@@ -512,7 +508,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                     }}>
                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>Sent:</span>
-                        <span style={{ fontWeight: '700' }}>{formatDate(r.sentAt)}</span>
+                        <span style={{ fontWeight: '700' }}>{formatDateOrDash(r.sentAt)}</span>
                         <span style={{ padding: '1px 6px', borderRadius: '6px', fontSize: '0.7rem', background: 'rgba(0,170,255,0.12)', color: '#00aaff', textTransform: 'uppercase' }}>
                           {r.channel}
                         </span>
@@ -523,7 +519,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                         )}
                         {r.nextReminderDate && (
                           <span style={{ fontSize: '0.75rem', color: '#e6a800', display: 'flex', alignItems: 'center', gap: '3px', marginLeft: 'auto' }}>
-                            <Bell size={11} /> Next: {formatDate(r.nextReminderDate)}
+                            <Bell size={11} /> Next: {formatDateOrDash(r.nextReminderDate)}
                           </span>
                         )}
                       </div>

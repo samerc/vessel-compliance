@@ -20,7 +20,7 @@ import { Quotation, QuotationType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import { formatDateShort } from '../utils/dateUtils'
+import { formatDateOrDash } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
@@ -427,10 +427,6 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     return `${currency || 'USD'} ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-'
-    return formatDateShort(dateStr) || '-'
-  }
 
   const thStyle = (field: SortField, align: 'left' | 'right' = 'left'): React.CSSProperties => ({
     padding: '12px 14px',
@@ -576,7 +572,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
               whiteSpace: 'nowrap'
             }}
           >
-            {formatDate(q.quotationDate)}
+            {formatDateOrDash(q.quotationDate)}
           </td>
         )}
         {qVisibleSet.has('vesselName') && (
@@ -707,7 +703,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
               whiteSpace: 'nowrap'
             }}
           >
-            {formatDate(q.updatedAt)}
+            {formatDateOrDash(q.updatedAt)}
           </td>
         )}
         <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>

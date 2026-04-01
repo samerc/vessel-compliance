@@ -4,7 +4,7 @@ import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../..
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { formatDateShort } from '../utils/dateUtils'
+import { formatDateOrDash } from '../utils/dateUtils'
 
 interface SurveyFollowUpProps {
   onNavigateToVessel?: (vesselId: string) => void
@@ -36,10 +36,6 @@ function daysRemaining(deadlineDate: Date): number {
   return Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function formatDate(s?: string | null): string {
-  if (!s) return '-'
-  return formatDateShort(s) || s
-}
 
 type UrgencyLevel = 'overdue' | 'urgent' | 'normal' | 'done'
 
@@ -392,7 +388,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
                                 <Clock size={12} />
-                                {formatDate(calcDeadlineDate(w.inceptionDate, w.deadlineDays).toISOString().split('T')[0])}
+                                {formatDateOrDash(calcDeadlineDate(w.inceptionDate, w.deadlineDays).toISOString().split('T')[0])}
                               </div>
                               <div style={{ marginTop: '3px' }}>{renderUrgencyPill(w)}</div>
                             </div>
@@ -418,7 +414,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                               <Bell size={12} />{w.reminderCount ?? 0}
                             </span>
                             {w.nextReminderDate && (w.status === 'pending' || w.status === 'survey_done') && (
-                              <span style={{ fontSize: '0.72rem', color: '#e6a800' }}>→ {formatDate(w.nextReminderDate)}</span>
+                              <span style={{ fontSize: '0.72rem', color: '#e6a800' }}>→ {formatDateOrDash(w.nextReminderDate)}</span>
                             )}
                           </div>
                           <button
@@ -494,7 +490,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                                   }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sent:</span>
-                                      <span style={{ fontWeight: '700', whiteSpace: 'nowrap' }}>{formatDate(r.sentAt)}</span>
+                                      <span style={{ fontWeight: '700', whiteSpace: 'nowrap' }}>{formatDateOrDash(r.sentAt)}</span>
                                       <span style={{ padding: '1px 6px', borderRadius: '5px', fontSize: '0.7rem', background: 'rgba(0,170,255,0.12)', color: '#00aaff', textTransform: 'uppercase' }}>{r.channel}</span>
                                       {r.reference && (
                                         <span style={{ padding: '1px 7px', borderRadius: '5px', fontSize: '0.7rem', background: isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.08)', color: 'var(--text-primary)', fontFamily: 'monospace', fontWeight: '600' }}>
@@ -503,7 +499,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                                       )}
                                       {r.nextReminderDate && (
                                         <span style={{ fontSize: '0.74rem', color: '#e6a800', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px', marginLeft: 'auto' }}>
-                                          <Bell size={10} /> Next: {formatDate(r.nextReminderDate)}
+                                          <Bell size={10} /> Next: {formatDateOrDash(r.nextReminderDate)}
                                         </span>
                                       )}
                                       {r.loggedByName && <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>by {r.loggedByName}</span>}
@@ -562,12 +558,12 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                       ) : (e.vesselName || e.vessel_name || '—')}
                     </div>
                   </td>
-                  <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{formatDate(e.surveyDate || e.survey_date)}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{formatDateOrDash(e.surveyDate || e.survey_date)}</td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{e.surveyType || e.survey_type || '—'}</td>
                   <td style={{ padding: '10px 12px' }}>
                     <span style={{ color: '#e6a800', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Bell size={12} />
-                      {formatDate(e.endorsementReminderDate || e.endorsement_reminder_date)}
+                      {formatDateOrDash(e.endorsementReminderDate || e.endorsement_reminder_date)}
                     </span>
                   </td>
                   <td style={{ padding: '10px 12px' }}>

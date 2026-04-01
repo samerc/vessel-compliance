@@ -6,6 +6,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import XLSX from 'xlsx-js-style'
+import { formatDateOrDash } from '../utils/dateUtils'
 
 interface RenewalItem {
   id: string
@@ -57,11 +58,6 @@ function formatPremium(value: number | null, currency: string | null): string {
   return `${sym}${Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
-function formatDate(dateStr: string): string {
-  if (!dateStr) return '-'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
@@ -599,7 +595,7 @@ export default function RenewalPipelineReport() {
                         {formatPremium(r.premium, r.currency)}
                       </td>
                       <td style={cellStyle}>
-                        {formatDate(r.endDate)}
+                        {formatDateOrDash(r.endDate)}
                       </td>
                       <td style={cellStyle}>
                         {r.renewalStatusName ? (

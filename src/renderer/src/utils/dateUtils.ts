@@ -44,6 +44,11 @@ export function formatDateLong(dateStr: string | Date | null | undefined): strin
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+/** 16 Mar 2026 or '-' — short display with dash fallback for empty values */
+export function formatDateOrDash(dateStr: string | Date | null | undefined): string {
+  return formatDateShort(dateStr) || '-'
+}
+
 /** YYYY-MM-DD — ISO format for filenames and storage */
 export function formatDateISO(date?: Date): string {
   const d = date || new Date()
