@@ -13,6 +13,7 @@ import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
+import * as bcrypt from 'bcryptjs'
 
 // Force hardware acceleration even over Remote Desktop (RDP)
 // RDP disables GPU by default, causing fuzzy SVG/text rendering
@@ -464,6 +465,26 @@ app.whenReady().then(() => {
         windowSessions.delete(windowId)
       }
     }
+  })
+
+  // Force Password Reset Handlers
+  safeHandle('auth:isPasswordResetRequired', async (event) => {
+    const user = requireSession(event)
+    return db.isPasswordResetRequired(user.id)
+  })
+
+  safeHandle('auth:forceResetPassword', async (event, newPassword) => {
+    const user = requireSession(event)
+    if (!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters')
+    const hash = await bcrypt.hash(newPassword, 10)
+    await db.updateUserPassword(user.id, hash)
+    return { success: true }
+  })
+
+  safeHandle('admin:forcePasswordResetAll', async (event) => {
+    await requirePermission(event, 'admin:users')
+    await db.forcePasswordResetAll()
+    return { success: true }
   })
 
   // Theme Handlers (user-specific, session required)

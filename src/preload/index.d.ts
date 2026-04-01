@@ -8,6 +8,9 @@ export interface Api {
   authLogin: (credentials: { username: string; password: string }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
   authGetSession: () => Promise<Omit<User, 'passwordHash'> | null>
   authResetPassword: (username: string) => Promise<{ success: boolean; message?: string; newPassword?: string }>
+  authIsPasswordResetRequired: () => Promise<boolean>
+  authForceResetPassword: (newPassword: string) => Promise<{ success: boolean }>
+  adminForcePasswordResetAll: () => Promise<{ success: boolean }>
   authLogout: () => Promise<void>
   authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string; userId?: string }>
   getUsers: () => Promise<User[]>

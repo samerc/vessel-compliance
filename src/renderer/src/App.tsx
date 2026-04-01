@@ -77,6 +77,39 @@ function App(): React.JSX.Element {
   const [density, setDensity] = useState<'compact' | 'normal' | 'spacious'>(() => {
     return (localStorage.getItem('tableDensity') as 'compact' | 'normal' | 'spacious') || 'normal'
   })
+  const isLight = theme === 'light'
+
+  // Force password reset state
+  const [forcePasswordReset, setForcePasswordReset] = useState(false)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetConfirm, setResetConfirm] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      window.api.authIsPasswordResetRequired().then(required => {
+        setForcePasswordReset(!!required)
+      }).catch(() => {})
+    }
+  }, [isAuthenticated])
+
+  const handleForceReset = async () => {
+    if (resetPassword.length < 6) { setResetError('Password must be at least 6 characters'); return }
+    if (resetPassword !== resetConfirm) { setResetError('Passwords do not match'); return }
+    setResetLoading(true)
+    setResetError('')
+    try {
+      await window.api.authForceResetPassword(resetPassword)
+      setForcePasswordReset(false)
+      setResetPassword('')
+      setResetConfirm('')
+    } catch (err: any) {
+      setResetError(err.message || 'Failed to update password')
+    } finally {
+      setResetLoading(false)
+    }
+  }
 
   useEffect(() => {
     document.body.className = document.body.className.replace(/density-\w+/g, '').trim() + ` density-${density}`
@@ -792,6 +825,52 @@ function App(): React.JSX.Element {
             }}
             onViewChangelog={() => setShowChangelog(true)}
           />
+        )}
+        {forcePasswordReset && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 99999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)'
+          }}>
+            <div style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px', padding: '32px', width: '400px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <KeyRound size={40} style={{ color: 'var(--accent-primary)', marginBottom: '12px' }} />
+                <h2 style={{ margin: 0, fontSize: '1.3rem' }}>Password Reset Required</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: '8px' }}>
+                  For security purposes, please set a new password to continue.
+                </p>
+              </div>
+              {resetError && (
+                <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,77,77,0.1)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '14px', textAlign: 'center' }}>
+                  {resetError}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>New Password</label>
+                  <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                    autoFocus />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Confirm Password</label>
+                  <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)}
+                    placeholder="Re-enter password"
+                    onKeyDown={e => { if (e.key === 'Enter') handleForceReset() }}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                </div>
+                <button onClick={handleForceReset} disabled={resetLoading || !resetPassword || !resetConfirm}
+                  className="btn-primary" style={{ padding: '12px', fontSize: '0.9rem', marginTop: '8px' }}>
+                  {resetLoading ? 'Updating...' : 'Set New Password'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </ErrorBoundary>

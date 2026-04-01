@@ -432,6 +432,35 @@ export default function UserManager() {
                 )}
             </div>}
 
+            {/* Force Password Reset All */}
+            {canManageUsers && (
+                <div style={{ marginBottom: '24px' }}>
+                    <button
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
+                        onClick={() => {
+                            setConfirmation({
+                                show: true,
+                                title: 'Force Password Reset?',
+                                message: 'All users will be required to set a new password on their next login. Continue?',
+                                isDangerous: true,
+                                onConfirm: async () => {
+                                    try {
+                                        await window.api.adminForcePasswordResetAll()
+                                        showSuccess('All users will be required to reset their password on next login')
+                                    } catch (err: any) {
+                                        showError(err.message || 'Failed to force password reset')
+                                    }
+                                }
+                            })
+                        }}
+                    >
+                        <KeyRound size={16} />
+                        Force Password Reset (All Users)
+                    </button>
+                </div>
+            )}
+
             {/* Temp password banner */}
             {tempPassword && (
                 <div className="glass-card" style={{ padding: '16px', marginBottom: '24px', background: 'rgba(34, 197, 94, 0.08)', textAlign: 'center' }}>

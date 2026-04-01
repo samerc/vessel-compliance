@@ -2747,6 +2747,16 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: force_password_reset on users
+            try {
+                const [fprCol] = await this.pool.query("SHOW COLUMNS FROM users LIKE 'force_password_reset'") as any[]
+                if ((fprCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN DEFAULT FALSE")
+                    // Force all existing users to reset on this update
+                    await this.pool.query("UPDATE users SET force_password_reset = TRUE")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -4124,9 +4134,20 @@ export class MySQLAdapter {
     async updateUserPassword(userId: string, newPasswordHash: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute(
-            'UPDATE users SET password_hash = ? WHERE id = ?',
+            'UPDATE users SET password_hash = ?, force_password_reset = FALSE WHERE id = ?',
             [newPasswordHash, userId]
         )
+    }
+
+    async isPasswordResetRequired(userId: string): Promise<boolean> {
+        if (!this.pool) return false
+        const [rows] = await this.pool.query('SELECT force_password_reset FROM users WHERE id = ?', [userId])
+        return Boolean((rows as any[])[0]?.force_password_reset)
+    }
+
+    async forcePasswordResetAll(): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE users SET force_password_reset = TRUE')
     }
 
     async updateUserRole(userId: string, role: 'admin' | 'user'): Promise<void> {
