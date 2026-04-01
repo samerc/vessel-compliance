@@ -11,6 +11,7 @@ export interface Api {
   authIsPasswordResetRequired: () => Promise<boolean>
   authForceResetPassword: (newPassword: string) => Promise<{ success: boolean }>
   adminForcePasswordResetAll: () => Promise<{ success: boolean }>
+  adminForcePasswordResetUsers: (userIds: string[]) => Promise<{ success: boolean }>
   authLogout: () => Promise<void>
   authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string; userId?: string }>
   getUsers: () => Promise<User[]>

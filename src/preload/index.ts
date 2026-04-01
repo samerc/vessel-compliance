@@ -98,6 +98,7 @@ const api = {
   authIsPasswordResetRequired: () => ipcRenderer.invoke('auth:isPasswordResetRequired'),
   authForceResetPassword: (newPassword: string) => ipcRenderer.invoke('auth:forceResetPassword', newPassword),
   adminForcePasswordResetAll: () => ipcRenderer.invoke('admin:forcePasswordResetAll'),
+  adminForcePasswordResetUsers: (userIds: string[]) => ipcRenderer.invoke('admin:forcePasswordResetUsers', userIds),
   authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),

@@ -4150,6 +4150,12 @@ export class MySQLAdapter {
         await this.pool.execute('UPDATE users SET force_password_reset = TRUE')
     }
 
+    async forcePasswordResetUsers(userIds: string[]): Promise<void> {
+        if (!this.pool || userIds.length === 0) return
+        const placeholders = userIds.map(() => '?').join(',')
+        await this.pool.execute(`UPDATE users SET force_password_reset = TRUE WHERE id IN (${placeholders})`, userIds)
+    }
+
     async updateUserRole(userId: string, role: 'admin' | 'user'): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('UPDATE users SET role = ? WHERE id = ?', [role, userId])

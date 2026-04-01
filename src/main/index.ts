@@ -486,6 +486,11 @@ app.whenReady().then(() => {
     await db.forcePasswordResetAll()
     return { success: true }
   })
+  safeHandle('admin:forcePasswordResetUsers', async (event, userIds: string[]) => {
+    await requirePermission(event, 'admin:users')
+    await db.forcePasswordResetUsers(userIds)
+    return { success: true }
+  })
 
   // Theme Handlers (user-specific, session required)
   safeHandle('theme:get', async (event) => {

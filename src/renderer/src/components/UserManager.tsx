@@ -625,6 +625,31 @@ export default function UserManager() {
                                                 )}
                                                 {canManageUsers && (
                                                     <button
+                                                        onClick={() => {
+                                                            setConfirmation({
+                                                                show: true,
+                                                                title: 'Force Password Change',
+                                                                message: `${user.username} will be required to set a new password on next login. Continue?`,
+                                                                isDangerous: false,
+                                                                onConfirm: async () => {
+                                                                    try {
+                                                                        await window.api.adminForcePasswordResetUsers([user.id])
+                                                                        showSuccess(`${user.username} will be required to change password on next login`)
+                                                                    } catch (err: any) {
+                                                                        showError(err.message || 'Failed')
+                                                                    }
+                                                                }
+                                                            })
+                                                        }}
+                                                        style={{ background: 'transparent', color: 'var(--warning)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                                                        className="hover-effect"
+                                                        title="Force Password Change on Next Login"
+                                                    >
+                                                        <Shield size={16} />
+                                                    </button>
+                                                )}
+                                                {canManageUsers && (
+                                                    <button
                                                         onClick={() => handleDelete(user.id)}
                                                         style={{ background: 'transparent', color: 'var(--danger)', padding: '7px', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
                                                         className="hover-effect"
