@@ -77,21 +77,29 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 const toAdd = vassureds
                     .filter(va => !existingEntityIds.has(va.entityId))
                     .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+                let addIdx = 0
                 for (let i = 0; i < toAdd.length; i++) {
                     const va = toAdd[i]
                     const entity = allEntities.find(e => e.id === va.entityId)
-                    if (entity) {
-                        await window.api.addQuotationAssured({
-                            quotationId: quotation.id,
-                            entityId: va.entityId,
-                            name: entity.name,
-                            role: va.role || undefined,
-                            vesselLabel: vLabel,
-                            order: existingQAssureds.length + i
-                        })
+                    if (!entity) continue
+                    // c/o role → set as broker, not as an assured
+                    if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
+                        if (!quotation.coName) {
+                            await window.api.updateQuotation(quotation.id, { coName: entity.name } as any)
+                        }
+                        continue
                     }
+                    await window.api.addQuotationAssured({
+                        quotationId: quotation.id,
+                        entityId: va.entityId,
+                        name: entity.name,
+                        role: va.role || undefined,
+                        vesselLabel: vLabel,
+                        order: existingQAssureds.length + addIdx
+                    })
+                    addIdx++
                 }
-                assuredsAdded = toAdd.length
+                assuredsAdded = addIdx
             }
 
             setSelectedVesselId('')
@@ -204,23 +212,31 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     const toAdd = (Array.isArray(vassureds) ? vassureds : [])
                         .filter(va => !existingEntityIds.has(va.entityId))
                         .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+                    let fleetAddIdx = 0
                     for (let i = 0; i < toAdd.length; i++) {
                         const va = toAdd[i]
                         const entity = allEntities.find(e => e.id === va.entityId)
-                        if (entity) {
-                            await window.api.addQuotationAssured({
-                                quotationId: quotation.id,
-                                entityId: va.entityId,
-                                name: entity.name,
-                                role: va.role || undefined,
-                                vesselLabel: vLabel,
-                                order: currentAssuredCount + i
-                            })
-                            existingEntityIds.add(va.entityId)
-                            totalAssuredsAdded++
+                        if (!entity) continue
+                        // c/o role → set as broker, not as an assured
+                        if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
+                            if (!quotation.coName) {
+                                await window.api.updateQuotation(quotation.id, { coName: entity.name } as any)
+                            }
+                            continue
                         }
+                        await window.api.addQuotationAssured({
+                            quotationId: quotation.id,
+                            entityId: va.entityId,
+                            name: entity.name,
+                            role: va.role || undefined,
+                            vesselLabel: vLabel,
+                            order: currentAssuredCount + fleetAddIdx
+                        })
+                        existingEntityIds.add(va.entityId)
+                        totalAssuredsAdded++
+                        fleetAddIdx++
                     }
-                    currentAssuredCount += toAdd.length
+                    currentAssuredCount += fleetAddIdx
                 }
                 currentCount++
             }
