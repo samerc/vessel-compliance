@@ -34,6 +34,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
     const [vesselActive, setVesselActive] = useState(vessel.isActive)
     const [showRemapModal, setShowRemapModal] = useState(false)
+    const [remapEntityIds, setRemapEntityIds] = useState<string[]>([])
 
     // Confirmation modal state
     const [confirmation, setConfirmation] = useState<{
@@ -1188,8 +1189,16 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 {detailView === 'documents' && (
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <button
-                            onClick={() => setShowRemapModal(true)}
-                            title="Remap file paths for this vessel"
+                            onClick={async () => {
+                                // Load associated entity IDs for combined remap
+                                try {
+                                    const assureds = await window.api.getVesselAssureds(vessel.id)
+                                    const eIds = (Array.isArray(assureds) ? assureds : []).map((a: any) => a.entityId).filter(Boolean)
+                                    setRemapEntityIds([...new Set(eIds)])
+                                } catch { setRemapEntityIds([]) }
+                                setShowRemapModal(true)
+                            }}
+                            title="Remap file paths for this vessel and its entities"
                             style={{
                                 marginBottom: '2px',
                                 display: 'flex',
@@ -1832,7 +1841,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 <RemapFilePathsModal
                     vesselId={vessel.id}
                     vesselName={vessel.name}
-                    onClose={() => setShowRemapModal(false)}
+                    includeEntityIds={remapEntityIds}
+                    onClose={() => { setShowRemapModal(false); setRemapEntityIds([]) }}
                 />
             )}
 

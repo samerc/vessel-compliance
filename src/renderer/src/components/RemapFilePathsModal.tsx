@@ -24,6 +24,7 @@ interface RemapFilePathsModalProps {
     vesselName?: string
     entityId?: string
     entityName?: string
+    includeEntityIds?: string[]  // Also include these entity file paths (for vessel + associated entities)
     onClose: () => void
 }
 
@@ -58,13 +59,12 @@ function applyPrefix(filePath: string, oldPrefix: string, newPrefix: string): st
     return newPrefix + filePath.slice(oldPrefix.length)
 }
 
-export default function RemapFilePathsModal({ vesselId, vesselName, entityId, entityName, onClose }: RemapFilePathsModalProps) {
+export default function RemapFilePathsModal({ vesselId, vesselName, entityId, entityName, includeEntityIds, onClose }: RemapFilePathsModalProps) {
     const { theme } = useTheme()
     const { showSuccess, showError } = useToast()
     const isLight = theme === 'light'
-    const isEntity = !!entityId
+    const isEntity = !!entityId && !vesselId
     const targetId = entityId || vesselId || ''
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const targetName = entityName || vesselName || ''
 
     const [step, setStep] = useState<'pick' | 'preview'>('pick')
@@ -77,18 +77,34 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
     const [checking, setChecking] = useState(false)
 
     useEffect(() => {
-        const loadFn = isEntity
-            ? window.api.entityGetFilePaths(targetId)
-            : window.api.vesselGetFilePaths(targetId)
-        loadFn.then(data => {
-            setEntries(data)
-            if (data.length > 0) {
-                const detected = detectCommonPrefix(data.map(d => d.filePath))
+        const load = async () => {
+            const allEntries: FileEntry[] = []
+            // Load vessel files
+            if (vesselId) {
+                const vData = await window.api.vesselGetFilePaths(vesselId)
+                allEntries.push(...(Array.isArray(vData) ? vData : []))
+            }
+            // Load entity files (single entity mode)
+            if (entityId && !vesselId) {
+                const eData = await window.api.entityGetFilePaths(entityId)
+                allEntries.push(...(Array.isArray(eData) ? eData : []))
+            }
+            // Load associated entity files (vessel + entities mode)
+            if (includeEntityIds && includeEntityIds.length > 0) {
+                for (const eid of includeEntityIds) {
+                    const eData = await window.api.entityGetFilePaths(eid)
+                    if (Array.isArray(eData)) allEntries.push(...eData)
+                }
+            }
+            setEntries(allEntries)
+            if (allEntries.length > 0) {
+                const detected = detectCommonPrefix(allEntries.filter(e => e.filePath).map(d => d.filePath))
                 setOldPrefix(detected)
             }
             setLoading(false)
-        })
-    }, [targetId, isEntity])
+        }
+        load()
+    }, [targetId, isEntity, vesselId, entityId, includeEntityIds])
 
     async function handlePreview() {
         if (!oldPrefix || !newPrefix) return
@@ -127,12 +143,16 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
                 id: r.entry.id,
                 newPath: r.customPath ?? r.candidatePath
             }))
-            if (isEntity) {
-                await window.api.entityRemapFilePaths(remaps)
-            } else {
-                await window.api.vesselRemapFilePaths(remaps)
+            // Split remaps by source type: vessel docs vs entity docs
+            const vesselRemaps = remaps.filter(r => r.source === 'document' || r.source === 'attachment')
+            const entityRemaps = remaps.filter(r => r.source !== 'document' && r.source !== 'attachment')
+            if (vesselRemaps.length > 0) {
+                await window.api.vesselRemapFilePaths(vesselRemaps)
             }
-            showSuccess(`Updated ${toUpdate.length} file path${toUpdate.length !== 1 ? 's' : ''} for ${vesselName}`)
+            if (entityRemaps.length > 0) {
+                await window.api.entityRemapFilePaths(entityRemaps)
+            }
+            showSuccess(`Updated ${toUpdate.length} file path${toUpdate.length !== 1 ? 's' : ''} for ${targetName}`)
             onClose()
         } catch (e: any) {
             showError(e.message || 'Failed to remap file paths')
