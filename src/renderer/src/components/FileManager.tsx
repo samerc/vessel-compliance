@@ -336,7 +336,11 @@ export default function FileManager() {
     }
     try {
       const result = await window.api.fileManagerRenameFolder(renameModal.path, newName)
-      showSuccess(`Renamed. ${result.remapped} file link${result.remapped !== 1 ? 's' : ''} remapped.`)
+      if ((result as any)?.error) {
+        showError('Rename failed: ' + ((result as any).message || 'Unknown error'))
+        return
+      }
+      showSuccess(`Renamed. ${result.remapped || 0} file link${result.remapped !== 1 ? 's' : ''} remapped.`)
       setRenameModal(null)
       await loadTree()
       if (selectedPath === renameModal.path || selectedPath?.startsWith(renameModal.path + '\\')) {
@@ -355,7 +359,11 @@ export default function FileManager() {
     if (!moveModal || !moveDestination) return
     try {
       const result = await window.api.fileManagerMoveFolder(moveModal.sourcePath, moveDestination)
-      showSuccess(`Moved. ${result.remapped} file link${result.remapped !== 1 ? 's' : ''} remapped.`)
+      if ((result as any)?.error) {
+        showError('Move failed: ' + ((result as any).message || 'Unknown error'))
+        return
+      }
+      showSuccess(`Moved. ${result.remapped || 0} file link${result.remapped !== 1 ? 's' : ''} remapped.`)
       setMoveModal(null)
       setMoveDestination(null)
       await loadTree()

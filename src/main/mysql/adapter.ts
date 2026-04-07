@@ -2027,6 +2027,18 @@ export class MySQLAdapter {
                 }
             }
 
+            // Sync: ensure Administrator group has all current permissions (catches new permissions added in updates)
+            try {
+                const [adminGrp] = await this.pool.query("SELECT id FROM user_groups WHERE name = 'Administrator' AND is_system = TRUE LIMIT 1") as any[]
+                if ((adminGrp as any[]).length > 0) {
+                    const adminGrpId = (adminGrp as any[])[0].id
+                    const { ALL_PERMISSION_KEYS } = await import('../../shared/types')
+                    for (const key of ALL_PERMISSION_KEYS) {
+                        await this.pool.execute('INSERT IGNORE INTO group_permissions (group_id, permission_key) VALUES (?, ?)', [adminGrpId, key])
+                    }
+                }
+            } catch {}
+
             // Seed default email templates if table is empty
             {
                 const [etRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM email_templates')
