@@ -12680,14 +12680,18 @@ export class MySQLAdapter {
             { table: 'entities', column: 'kyc_file_path' }
         ]
 
-        // Use LEFT() for prefix matching instead of LIKE (avoids backslash escape issues)
+        // Use LEFT() with LOWER() for case-insensitive prefix matching (Windows paths are case-insensitive)
+        const oldLower = oldNorm.toLowerCase()
+        console.log(`[remapAllFilePaths] oldNorm="${oldNorm}" (len=${oldNorm.length}) → newNorm="${newNorm}"`)
         for (const { table, column } of tables) {
             try {
                 const [r] = await this.pool.execute(
-                    `UPDATE ${table} SET ${column} = CONCAT(?, SUBSTRING(${column}, ? + 1)) WHERE LEFT(${column}, ?) = ?`,
-                    [newNorm, oldNorm.length, oldNorm.length, oldNorm]
+                    `UPDATE ${table} SET ${column} = CONCAT(?, SUBSTRING(${column}, ? + 1)) WHERE LOWER(LEFT(${column}, ?)) = ?`,
+                    [newNorm, oldNorm.length, oldNorm.length, oldLower]
                 )
-                total += (r as any).affectedRows || 0
+                const affected = (r as any).affectedRows || 0
+                if (affected > 0) console.log(`[remapAllFilePaths] ${table}.${column}: ${affected} rows updated`)
+                total += affected
             } catch (err) {
                 console.error(`[remapAllFilePaths] Error on ${table}.${column}:`, err)
             }
