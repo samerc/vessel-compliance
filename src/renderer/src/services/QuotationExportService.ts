@@ -188,7 +188,12 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   }
 
   const safeWarrantyRows = Array.isArray(warrantyRows) ? warrantyRows : []
-  const selectedWarrantyIds = safeWarrantyRows.map((r: any) => r.piWarrantyId)
+  // Deduplicate warranty IDs preserving order (same warranty may appear for multiple alternatives)
+  const selectedWarrantyIds: string[] = []
+  const seenWarIds = new Set<string>()
+  for (const r of safeWarrantyRows) {
+    if (!seenWarIds.has(r.piWarrantyId)) { seenWarIds.add(r.piWarrantyId); selectedWarrantyIds.push(r.piWarrantyId) }
+  }
   const warrantyVesselScopes: Record<string, string[] | null> = {}
   const warrantyAltIds: Record<string, string | null> = {}
   for (const r of safeWarrantyRows) {
