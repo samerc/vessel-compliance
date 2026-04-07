@@ -36,10 +36,21 @@ export function formatDateShort(dateStr: string | Date | null | undefined): stri
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-/** April 13, 2026 — long display with full month name (US format) */
+/** May 1, 2026 — long display with full month name, no leading zero on day */
 export function formatDateLong(dateStr: string | Date | null | undefined): string {
   if (!dateStr) return ''
-  const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
+  let d: Date
+  if (typeof dateStr === 'string') {
+    // For date-only strings (YYYY-MM-DD), parse as local date to avoid timezone shift
+    const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (parts) {
+      d = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]))
+    } else {
+      d = new Date(dateStr)
+    }
+  } else {
+    d = dateStr
+  }
   if (isNaN(d.getTime())) return ''
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }

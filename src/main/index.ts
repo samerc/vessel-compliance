@@ -3000,6 +3000,7 @@ app.whenReady().then(() => {
   safeHandle('db:setQuotationExclusions', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationExclusions(qId, items) })
   safeHandle('db:addQuotationExclusion', async (event, qId, piExclusionId, altId) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationExclusion(qId, piExclusionId, altId) })
   safeHandle('db:deleteQuotationExclusion', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationExclusion(id) })
+  safeHandle('db:reorderQuotationExclusions', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationExclusions(ids) })
   safeHandle('db:getQuotationCustomExclusions', (event, qId) => { requireSession(event); return db.getQuotationCustomExclusions(qId) })
   safeHandle('db:addQuotationCustomExclusion', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationCustomExclusion(data) })
   safeHandle('db:updateQuotationCustomExclusion', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationCustomExclusion(id, updates) })

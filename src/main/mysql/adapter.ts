@@ -2769,6 +2769,14 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: add order_index to quotation_exclusions for reordering
+            try {
+                const [qeOiCols] = await this.pool.query("SHOW COLUMNS FROM quotation_exclusions LIKE 'order_index'") as any[]
+                if ((qeOiCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_exclusions ADD COLUMN order_index INT DEFAULT 0")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -8420,8 +8428,8 @@ export class MySQLAdapter {
     async getQuotationExclusions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText, vessel_scope as vesselScope, alternative_id as alternativeId
-             FROM quotation_exclusions WHERE quotation_id = ?`, [quotationId])
+            `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText, vessel_scope as vesselScope, alternative_id as alternativeId, COALESCE(order_index, 0) as \`order\`
+             FROM quotation_exclusions WHERE quotation_id = ? ORDER BY order_index ASC`, [quotationId])
         return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
     }
 
@@ -8432,24 +8440,35 @@ export class MySQLAdapter {
         const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
         for (const r of existing) { if (r.pi_exclusion_id) scopeMap[r.pi_exclusion_id] = { vs: r.vessel_scope, alt: r.alternative_id } }
         await this.pool.execute('DELETE FROM quotation_exclusions WHERE quotation_id = ?', [quotationId])
-        for (const item of items) {
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i]
             const saved = item.piExclusionId ? scopeMap[item.piExclusionId] : undefined
-            await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)',
-                [uuidv4(), quotationId, item.piExclusionId || null, item.customText || null, saved?.vs || null, saved?.alt || null])
+            await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [uuidv4(), quotationId, item.piExclusionId || null, item.customText || null, saved?.vs || null, saved?.alt || null, i])
         }
     }
 
     async addQuotationExclusion(quotationId: string, piExclusionId: string, alternativeId?: string | null): Promise<any> {
         if (!this.pool) return null
         const id = uuidv4()
-        await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, alternative_id) VALUES (?, ?, ?, ?)',
-            [id, quotationId, piExclusionId, alternativeId || null])
-        return { id, quotationId, piExclusionId, alternativeId: alternativeId || null }
+        // Get next order_index
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_exclusions WHERE quotation_id = ?', [quotationId]) as any[]
+        const nextOrder = maxRow[0]?.nextOrder || 0
+        await this.pool.execute('INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, alternative_id, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, quotationId, piExclusionId, alternativeId || null, nextOrder])
+        return { id, quotationId, piExclusionId, alternativeId: alternativeId || null, order: nextOrder }
     }
 
     async deleteQuotationExclusion(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotation_exclusions WHERE id = ?', [id])
+    }
+
+    async reorderQuotationExclusions(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE quotation_exclusions SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
     }
 
     // -- Quotation Custom Exclusions --

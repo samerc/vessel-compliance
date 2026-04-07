@@ -114,6 +114,8 @@ interface QuotationData {
   cargoConditionCustom: QuotationCargoCustomClause[]
   cargoSpecialCustom: QuotationCargoCustomClause[]
   cargoLawCustom: QuotationCargoCustomClause[]
+  // Resolved classification names per vessel ID (from junction table)
+  vesselClassificationNames: Record<string, string>
 }
 
 async function gatherData(quotation: Quotation): Promise<QuotationData> {
@@ -243,20 +245,31 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const resolvedAllWarConditions = snapshot ? snapshot.allWarConditions : (Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [])
   const resolvedWarSettings = snapshot ? snapshot.warSettings : (warSettingsRaw && !(warSettingsRaw as any).error ? warSettingsRaw : null)
 
-  // Determine IACS status per quotation vessel
+  // Determine IACS status and resolve classification names per quotation vessel
   const vesselIacsMap: Record<string, boolean> = {}
+  const vesselClassificationNames: Record<string, string> = {}
   const safeQVessels = Array.isArray(quotationVessels) ? quotationVessels : []
   const classSocieties = await window.api.getClassificationSocieties()
   const safeCS = Array.isArray(classSocieties) ? classSocieties : []
   const iacsIds = new Set(safeCS.filter(cs => cs.isIacs).map(cs => cs.id))
   // Build a set of IACS names/abbreviations for fallback text matching
   const iacsNames = new Set(safeCS.filter(cs => cs.isIacs).flatMap(cs => [cs.name?.toLowerCase(), cs.abbreviation?.toLowerCase()].filter(Boolean)))
+  // Build a map of classification society ID -> name for resolving UUIDs
+  const csNameMap: Record<string, string> = {}
+  for (const cs of safeCS) { if (cs.id && cs.name) csNameMap[cs.id] = cs.name }
   for (const qv of safeQVessels) {
     if (qv.vesselId) {
       try {
         const vcs = await window.api.getVesselClassifications(qv.vesselId)
-        const hasIacs = (Array.isArray(vcs) ? vcs : []).some((vc: any) => iacsIds.has(vc.classificationSocietyId))
-        if (hasIacs) { vesselIacsMap[qv.id] = true; continue }
+        const safeVcs = Array.isArray(vcs) ? vcs : []
+        const hasIacs = safeVcs.some((vc: any) => iacsIds.has(vc.classificationSocietyId))
+        if (hasIacs) { vesselIacsMap[qv.id] = true }
+        // Resolve classification names from junction table
+        const classNames = safeVcs.map((vc: any) => vc.classificationSocietyName || vc.abbreviation).filter(Boolean)
+        if (classNames.length > 0) {
+          vesselClassificationNames[qv.vesselId] = classNames.join(', ')
+          if (hasIacs) continue
+        }
       } catch {}
     }
     // Fallback: check the text classification field on the quotation vessel
@@ -307,6 +320,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     clauseOverrides,
     logoPath: resolvedLogoPath,
     vesselIacsMap,
+    vesselClassificationNames,
     hullAgreedValueItems: Array.isArray(hullAgreedValueItems) ? hullAgreedValueItems : [],
     agreedValueOptions: Array.isArray(agreedValueOptionsRaw) ? agreedValueOptionsRaw : [],
     hullClauses: resolvedHullClauses,
@@ -378,14 +392,18 @@ function formatBuiltYear(built?: number | null, rebuilt?: number | null): string
   return String(built)
 }
 
-function getVesselInfo(qv: QuotationVessel, allVessels: Vessel[], flagStates?: { id: string; name: string; iso3Code?: string }[]): VesselInfo {
+function getVesselInfo(qv: QuotationVessel, allVessels: Vessel[], flagStates?: { id: string; name: string; iso3Code?: string }[], classificationNames?: Record<string, string>): VesselInfo {
   const reg = qv.vesselId ? allVessels.find(v => v.id === qv.vesselId) : null
   if (reg) {
     // Resolve flag name and ISO3 code from system vessel's flagStateId
     const flagMatch = reg.flagStateId && flagStates ? flagStates.find(f => f.id === reg.flagStateId) : null
     const flagName = flagMatch?.name || qv.flag
     const flagCode = flagMatch?.iso3Code || undefined
-    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, rebuilt: reg.rebuiltYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, flagCode, classification: reg.classificationSociety, callSign: reg.callSign }
+    // Use junction table classification names if available, falling back to text field
+    const classification = (classificationNames && qv.vesselId && classificationNames[qv.vesselId])
+      ? classificationNames[qv.vesselId]
+      : (reg.classificationSociety || qv.classification)
+    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, rebuilt: reg.rebuiltYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, flagCode, classification, callSign: reg.callSign }
   }
   return { name: qv.name || 'Unknown', imo: qv.imoNumber, built: qv.builtYear, rebuilt: qv.rebuiltYear, gt: qv.grossTonnage, type: qv.vesselType, flag: qv.flag, classification: qv.classification, callSign: qv.callSign }
 }
@@ -702,7 +720,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   // Insured Vessel(s)
   {
     const vesselLines = data.quotationVessels.map(qv => {
-      const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+      const vi = getVesselInfo(qv, data.allVessels, data.flagStates, data.vesselClassificationNames)
       const prefix = data.quotationVessels.length > 1 ? `${qv.vesselLabel}: ` : ''
       return `${prefix}${vi.name}  |  IMO: ${vi.imo || '-'}  |  Built: ${formatBuiltYear(vi.built, vi.rebuilt)}  |  GT: ${vi.gt ? Number(vi.gt).toLocaleString() : '-'}  |  Type: ${vi.type || '-'}  |  Class: ${vi.classification || '-'}`
     })
@@ -1402,6 +1420,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         for (const wid of warIds) {
           const w = data.allWarranties.find(ww => ww.id === wid)
           if (!w) continue
+          if (w.typeScope && w.typeScope !== 'all' && w.typeScope !== wTypeCode) continue
           const wVesselScope = data.warrantyVesselScopes[wid]
           for (const entry of resolveIacsWarranty(w.text, wVesselScope, data)) {
             t += `- ${entry.text}${vesselScopeSuffix(entry.vesselScope, data.quotationVessels)}\n`
@@ -2307,7 +2326,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           children: vesselHeaders.map((h, i) => makeVCell(h, true, vColWidths[i]))
         }),
         ...data.quotationVessels.map(qv => {
-          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+          const vi = getVesselInfo(qv, data.allVessels, data.flagStates, data.vesselClassificationNames)
           const flagDisplay = vi.flagCode || vi.flag || '-'
           const cells = showVesselLabel
             ? [qv.vesselLabel, vi.name, vi.imo || '-', formatBuiltYear(vi.built, vi.rebuilt), vi.gt ? Number(vi.gt).toLocaleString() : '-', flagDisplay, vi.type || '-', vi.classification || '-']

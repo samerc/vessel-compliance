@@ -107,6 +107,26 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         setSelectedRows(Array.isArray(qe) ? qe : [])
     }
 
+    const moveExclusion = async (index: number, direction: 'up' | 'down') => {
+        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+        // Get selected rows for the current alternative
+        const filtered = altId
+            ? selectedRows.filter((r: any) => r.alternativeId === altId)
+            : selectedRows
+        const newOrder = [...filtered]
+        const swapIndex = direction === 'up' ? index - 1 : index + 1
+        if (swapIndex < 0 || swapIndex >= newOrder.length) return
+        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        // Update local state immediately
+        if (altId) {
+            const otherRows = selectedRows.filter((r: any) => r.alternativeId !== altId)
+            setSelectedRows([...otherRows, ...newOrder])
+        } else {
+            setSelectedRows(newOrder)
+        }
+        await window.api.reorderQuotationExclusions(newOrder.map(r => r.id))
+    }
+
     const updateExclusionScope = async (id: string, scope: string[] | null) => {
         setSelectedRows(prev => prev.map(e => e.id === id ? { ...e, vesselScope: scope } : e))
         await window.api.updateQuotationItemVesselScope('quotation_exclusions', id, scope)
@@ -218,6 +238,38 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                 })}
             </div>
             {visibleExclusions.length === 0 && allExclusions.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No exclusions defined. Add them in Settings.</p>}
+
+            {/* Selected Exclusion Order */}
+            {(() => {
+                const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+                const orderedSelected = altId
+                    ? selectedRows.filter((r: any) => r.alternativeId === altId)
+                    : selectedRows
+                if (orderedSelected.length < 2) return null
+                return (
+                    <div style={{ marginTop: '16px', borderTop: '1px solid var(--table-border)', paddingTop: '12px' }}>
+                        <h4 style={{ fontSize: '0.9rem', margin: '0 0 8px', color: 'var(--text-secondary)' }}>Selected Exclusion Order</h4>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', margin: '0 0 8px' }}>Reorder exclusions as they will appear in the export.</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {orderedSelected.map((row: any, i: number) => {
+                                const excl = row.piExclusionId ? allExclusions.find(e => e.id === row.piExclusionId) : null
+                                const text = row.customText || excl?.text || '(unknown)'
+                                const shortText = text.length > 80 ? text.slice(0, 80) + '...' : text
+                                return (
+                                    <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '5px', background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)', fontSize: '0.8rem' }}>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', width: '20px', textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
+                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortText}</span>
+                                        <div style={{ display: 'flex', gap: '1px', flexShrink: 0 }}>
+                                            <button onClick={() => moveExclusion(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                            <button onClick={() => moveExclusion(i, 'down')} disabled={i === orderedSelected.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === orderedSelected.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )
+            })()}
 
             {/* Custom Exclusions Section */}
             <div style={{ marginTop: '24px', borderTop: '1px solid var(--table-border)', paddingTop: '16px' }}>

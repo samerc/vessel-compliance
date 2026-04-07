@@ -632,6 +632,7 @@ export interface Api {
   setQuotationExclusions: (qId: string, items: { piExclusionId?: string; customText?: string }[]) => Promise<void>
   addQuotationExclusion: (qId: string, piExclusionId: string, altId?: string | null) => Promise<any>
   deleteQuotationExclusion: (id: string) => Promise<void>
+  reorderQuotationExclusions: (ids: string[]) => Promise<void>
   getQuotationCustomExclusions: (qId: string) => Promise<QuotationCustomExclusion[]>
   addQuotationCustomExclusion: (data: { quotationId: string; text: string; order?: number }) => Promise<QuotationCustomExclusion>
   updateQuotationCustomExclusion: (id: string, updates: { text?: string }) => Promise<void>
