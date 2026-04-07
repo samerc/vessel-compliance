@@ -123,11 +123,15 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         showSuccess(`Applied "${ws.name}"`)
     }
 
-    const moveSelected = async (index: number, direction: 'up' | 'down') => {
-        const swapIndex = direction === 'up' ? index - 1 : index + 1
-        if (swapIndex < 0 || swapIndex >= selectedIds.length) return
+    const dragWarrantyRef = useRef<number | null>(null)
+    const handleWarrantyDragStart = (globalIdx: number) => { dragWarrantyRef.current = globalIdx }
+    const handleWarrantyDrop = async (targetIdx: number) => {
+        const fromIdx = dragWarrantyRef.current
+        dragWarrantyRef.current = null
+        if (fromIdx === null || fromIdx === targetIdx) return
         const newIds = [...selectedIds]
-        ;[newIds[index], newIds[swapIndex]] = [newIds[swapIndex], newIds[index]]
+        const [moved] = newIds.splice(fromIdx, 1)
+        newIds.splice(targetIdx, 0, moved)
         await saveSelected(newIds)
     }
 
@@ -468,13 +472,10 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                             if (!w) return null
                                             const globalIdx = selectedIds.indexOf(wid)
                                             return (
-                                                <div key={wid} style={{ borderTop: '1px solid var(--table-border)', ...altStyle(warrantyAltIds[wid]) }}>
+                                                <div key={wid} draggable onDragStart={() => handleWarrantyDragStart(globalIdx)} onDragOver={e => e.preventDefault()} onDrop={() => handleWarrantyDrop(globalIdx)} style={{ borderTop: '1px solid var(--table-border)', ...altStyle(warrantyAltIds[wid]) }}>
                                                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 8px', fontSize: '0.78rem' }}>
                                                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', minWidth: '20px', textAlign: 'right' }}>{globalIdx + 1}.</span>
-                                                        <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
-                                                            <button onClick={() => moveSelected(globalIdx, 'up')} disabled={globalIdx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: globalIdx === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
-                                                            <button onClick={() => moveSelected(globalIdx, 'down')} disabled={globalIdx === selectedIds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: globalIdx === selectedIds.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
-                                                        </div>
+                                                        <span style={{ cursor: 'grab', color: 'var(--text-secondary)', opacity: 0.4, fontSize: '0.7rem', flexShrink: 0 }} title="Drag to reorder">⠿</span>
                                                         <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>{w.text}</span>
                                                         <button onClick={() => toggle(wid)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }} title="Remove"><X size={12} /></button>
                                                     </div>
@@ -499,13 +500,10 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                             if (!w) return null
                                             const globalIdx = selectedIds.indexOf(id)
                                             return (
-                                                <div key={id} style={{ borderTop: li > 0 ? '1px solid var(--table-border)' : 'none', background: li % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'), ...altStyle(warrantyAltIds[id]) }}>
+                                                <div key={id} draggable onDragStart={() => handleWarrantyDragStart(globalIdx)} onDragOver={e => e.preventDefault()} onDrop={() => handleWarrantyDrop(globalIdx)} style={{ borderTop: li > 0 ? '1px solid var(--table-border)' : 'none', background: li % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'), ...altStyle(warrantyAltIds[id]) }}>
                                                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 8px', fontSize: '0.78rem' }}>
                                                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', minWidth: '20px', textAlign: 'right' }}>{globalIdx + 1}.</span>
-                                                        <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
-                                                            <button onClick={() => moveSelected(globalIdx, 'up')} disabled={globalIdx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: globalIdx === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
-                                                            <button onClick={() => moveSelected(globalIdx, 'down')} disabled={globalIdx === selectedIds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: globalIdx === selectedIds.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
-                                                        </div>
+                                                        <span style={{ cursor: 'grab', color: 'var(--text-secondary)', opacity: 0.4, fontSize: '0.7rem', flexShrink: 0 }} title="Drag to reorder">⠿</span>
                                                         <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>{w.text}</span>
                                                         <button onClick={() => toggle(id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }} title="Remove"><X size={12} /></button>
                                                     </div>
