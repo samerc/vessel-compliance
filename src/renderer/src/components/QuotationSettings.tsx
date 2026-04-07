@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck, GripVertical } from 'lucide-react'
 import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, QuotationTypeScope, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -710,11 +710,18 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
         setEditingId(null); showSuccess('Warranty updated'); loadData()
     }
 
-    const handleMove = async (index: number, direction: 'up' | 'down') => {
+    const dragWarrantySettingsRef = useRef<string | null>(null)
+    const handleWarrantySettingsDragStart = (warrantyId: string) => { dragWarrantySettingsRef.current = warrantyId }
+    const handleWarrantySettingsDrop = async (targetId: string) => {
+        const dragId = dragWarrantySettingsRef.current
+        dragWarrantySettingsRef.current = null
+        if (!dragId || dragId === targetId) return
         const newOrder = [...warranties]
-        const swapIndex = direction === 'up' ? index - 1 : index + 1
-        if (swapIndex < 0 || swapIndex >= newOrder.length) return
-        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+        const fromIdx = newOrder.findIndex(w => w.id === dragId)
+        const toIdx = newOrder.findIndex(w => w.id === targetId)
+        if (fromIdx === -1 || toIdx === -1) return
+        const [moved] = newOrder.splice(fromIdx, 1)
+        newOrder.splice(toIdx, 0, moved)
         setWarranties(newOrder)
         await window.api.piReorderWarranties(newOrder.map(w => w.id))
     }
@@ -969,8 +976,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                     </div>
                 </form>
 
-                {filteredWarranties.map((w, i) => (
-                    <div key={w.id} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(w.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(w.id) ? 'rgba(0, 210, 255, 0.04)' : 'transparent' }}>
+                {filteredWarranties.map((w) => (
+                    <div key={w.id} draggable onDragStart={() => handleWarrantySettingsDragStart(w.id)} onDragOver={e => e.preventDefault()} onDrop={() => handleWarrantySettingsDrop(w.id)} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(w.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(w.id) ? 'rgba(0, 210, 255, 0.04)' : 'transparent', cursor: 'grab' }}>
                         {bulkMode && (
                             <input type="checkbox" checked={bulkSelected.has(w.id)} onChange={() => toggleBulkSelect(w.id)} style={{ ...ckStyle, marginTop: '3px', flexShrink: 0 }} />
                         )}
@@ -1012,8 +1019,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                    <button onClick={() => handleMove(i, 'down')} disabled={i === warranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === warranties.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                    <span style={{ cursor: 'grab', color: 'var(--text-secondary)', opacity: 0.4, fontSize: '0.8rem', padding: '0 4px' }} title="Drag to reorder">⠿</span>
                                     <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []); setEditTypeScope(w.typeScope || 'all') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
                                     <button onClick={async () => { await window.api.piDeleteWarranty(w.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
