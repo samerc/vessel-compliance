@@ -593,6 +593,15 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                             {q.quotationTypeName}
                         </span>
                     )}
+                    {/* Vessel/Fleet name */}
+                    {qVessels.length > 0 && (
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                            {qVessels.length === 1
+                                ? (qVessels[0].name || qVessels[0].vesselLabel)
+                                : q.title || qVessels.map(v => v.name || v.vesselLabel).join(' / ')
+                            }
+                        </span>
+                    )}
                     {/* Workflow step badge */}
                     {q.workflowStepName && (
                         <div style={{ position: 'relative' }}>

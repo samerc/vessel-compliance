@@ -11400,12 +11400,13 @@ export class MySQLAdapter {
 
     async setQuotationSurveyWarranties(quotationId: string, items: any[]): Promise<void> {
         if (!this.pool) return
+        const conn = await this.pool.getConnection()
         try {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-            await this.pool.execute('DELETE FROM quotation_survey_warranties WHERE quotation_id = ?', [quotationId])
+            await conn.execute('SET FOREIGN_KEY_CHECKS=0')
+            await conn.execute('DELETE FROM quotation_survey_warranties WHERE quotation_id = ?', [quotationId])
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
-                await this.pool.execute(
+                await conn.execute(
                     `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
@@ -11417,8 +11418,9 @@ export class MySQLAdapter {
                     ]
                 )
             }
+            await conn.execute('SET FOREIGN_KEY_CHECKS=1')
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            conn.release()
         }
     }
 
@@ -11430,9 +11432,10 @@ export class MySQLAdapter {
             [data.quotationId]
         )
         const order = (maxRow as any[])[0].next_order
+        const conn = await this.pool.getConnection()
         try {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-            await this.pool.execute(
+            await conn.execute('SET FOREIGN_KEY_CHECKS=0')
+            await conn.execute(
                 `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -11443,8 +11446,9 @@ export class MySQLAdapter {
                     data.alternativeId || null
                 ]
             )
+            await conn.execute('SET FOREIGN_KEY_CHECKS=1')
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            conn.release()
         }
         return { id, ...data, order }
     }
