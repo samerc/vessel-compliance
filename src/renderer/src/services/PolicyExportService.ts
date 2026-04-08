@@ -1969,7 +1969,8 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
       const resolvedAmount = (policyVesselId && d.vesselAmounts && d.vesselAmounts[policyVesselId] != null)
         ? d.vesselAmounts[policyVesselId]
         : d.amount
-      const mainDesc = d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+      const replDed = (text: string, cur: string, amt: number | undefined | null) => { const a = amt != null ? polFormatCurrency(amt, cur) : '___'; return text.replace(/\{currency\}\s*\{amount\}/g, a).replace(/\{currency\}/g, cur).replace(/\{amount\}/g, a) }
+      const mainDesc = replDed(d.description, d.currency, d.secondaryAmount)
       dedRows.push(new TableRow({
         children: [
           new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(resolvedAmount, d.currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
@@ -1977,7 +1978,7 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
         ]
       }))
       if (d.secondaryDescription) {
-        const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+        const secDesc = replDed(d.secondaryDescription, d.currency, d.secondaryAmount)
         dedRows.push(new TableRow({
           children: [
             new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? polFormatCurrency(d.secondaryAmount, d.currency) : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),

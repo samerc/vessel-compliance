@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Upload, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, GripVertical, X, Pencil, Upload, AlertTriangle } from 'lucide-react'
 import { Quotation, PIClause, PIExclusion, QuotationCustomExclusion, QuotationPIAlternative, QuotationVessel, Vessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
@@ -24,6 +24,8 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     const [allClauses, setAllClauses] = useState<PIClause[]>([])
     const [selectedClauseIds, setSelectedClauseIds] = useState<Set<string>>(new Set())
     const autoApplied = useRef(false)
+    const dragExcRef = useRef<number | null>(null)
+    const dragCustomRef = useRef<number | null>(null)
     const { theme } = useTheme()
     const isLight = theme === 'light'
 
@@ -107,17 +109,18 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         setSelectedRows(Array.isArray(qe) ? qe : [])
     }
 
-    const moveExclusion = async (index: number, direction: 'up' | 'down') => {
+    const handleExcDragStart = (idx: number) => { dragExcRef.current = idx }
+    const handleExcDrop = async (targetIdx: number) => {
+        const fromIdx = dragExcRef.current
+        dragExcRef.current = null
+        if (fromIdx === null || fromIdx === targetIdx) return
         const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
-        // Get selected rows for the current alternative
         const filtered = altId
             ? selectedRows.filter((r: any) => r.alternativeId === altId)
             : selectedRows
         const newOrder = [...filtered]
-        const swapIndex = direction === 'up' ? index - 1 : index + 1
-        if (swapIndex < 0 || swapIndex >= newOrder.length) return
-        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
-        // Update local state immediately
+        const [moved] = newOrder.splice(fromIdx, 1)
+        newOrder.splice(targetIdx, 0, moved)
         if (altId) {
             const otherRows = selectedRows.filter((r: any) => r.alternativeId !== altId)
             setSelectedRows([...otherRows, ...newOrder])
@@ -125,6 +128,18 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
             setSelectedRows(newOrder)
         }
         await window.api.reorderQuotationExclusions(newOrder.map(r => r.id))
+    }
+
+    const handleCustomDragStart = (idx: number) => { dragCustomRef.current = idx }
+    const handleCustomDrop = async (targetIdx: number) => {
+        const fromIdx = dragCustomRef.current
+        dragCustomRef.current = null
+        if (fromIdx === null || fromIdx === targetIdx) return
+        const newOrder = [...customExclusions]
+        const [moved] = newOrder.splice(fromIdx, 1)
+        newOrder.splice(targetIdx, 0, moved)
+        setCustomExclusions(newOrder)
+        await window.api.reorderQuotationCustomExclusions(newOrder.map(ce => ce.id))
     }
 
     const updateExclusionScope = async (id: string, scope: string[] | null) => {
@@ -159,15 +174,6 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         await window.api.deleteQuotationCustomExclusion(id)
         setCustomExclusions(prev => prev.filter(ce => ce.id !== id))
         showSuccess('Deleted')
-    }
-
-    const moveCustom = async (index: number, direction: 'up' | 'down') => {
-        const newOrder = [...customExclusions]
-        const swapIndex = direction === 'up' ? index - 1 : index + 1
-        if (swapIndex < 0 || swapIndex >= newOrder.length) return
-        ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
-        setCustomExclusions(newOrder)
-        await window.api.reorderQuotationCustomExclusions(newOrder.map(ce => ce.id))
     }
 
     const updateCustomScope = async (id: string, scope: string[] | null) => {
@@ -256,13 +262,10 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                                 const text = row.customText || excl?.text || '(unknown)'
                                 const shortText = text.length > 80 ? text.slice(0, 80) + '...' : text
                                 return (
-                                    <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '5px', background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)', fontSize: '0.8rem' }}>
+                                    <div key={row.id} draggable onDragStart={() => handleExcDragStart(i)} onDragOver={e => e.preventDefault()} onDrop={() => handleExcDrop(i)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '5px', background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)', fontSize: '0.8rem', cursor: 'grab' }}>
+                                        <GripVertical size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0, opacity: 0.5 }} />
                                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', width: '20px', textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
                                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortText}</span>
-                                        <div style={{ display: 'flex', gap: '1px', flexShrink: 0 }}>
-                                            <button onClick={() => moveExclusion(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                            <button onClick={() => moveExclusion(i, 'down')} disabled={i === orderedSelected.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === orderedSelected.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                        </div>
                                     </div>
                                 )
                             })}
@@ -282,7 +285,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                     if (piAlternatives.length < 2 || !selectedPIAltId) return true
                     return ce.alternativeId === selectedPIAltId
                 }).map((ce, i) => (
-                    <div key={ce.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)' }}>
+                    <div key={ce.id} draggable={editingCustomId !== ce.id} onDragStart={() => handleCustomDragStart(i)} onDragOver={e => e.preventDefault()} onDrop={() => handleCustomDrop(i)} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)', cursor: editingCustomId === ce.id ? 'default' : 'grab' }}>
                         {editingCustomId === ce.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                                 <textarea value={editCustomText} onChange={e => setEditCustomText(e.target.value)} style={{ flex: 1, minHeight: '40px', resize: 'none' }} />
@@ -291,10 +294,9 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                             </div>
                         ) : (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                <GripVertical size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0, opacity: 0.5, marginTop: '2px' }} />
                                 <span style={{ flex: 1, fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{ce.text}</span>
                                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                    <button onClick={() => moveCustom(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                    <button onClick={() => moveCustom(i, 'down')} disabled={i === customExclusions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === customExclusions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                                     <button onClick={() => { setEditingCustomId(ce.id); setEditCustomText(ce.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)' }}><Pencil size={12} /></button>
                                     <button onClick={() => deleteCustom(ce.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>

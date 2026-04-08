@@ -238,11 +238,11 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                             <button onClick={async () => { await handleUpdate(d.id, { description: editDescText }); setEditingDescId(null); setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, description: editDescText } : dd)) }} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem', alignSelf: 'flex-end' }}>Save</button>
                         </div>
                     ) : (
-                        <div style={{ fontSize: '0.83rem', paddingLeft: '24px', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString() : '___')}</div>
+                        <div style={{ fontSize: '0.83rem', paddingLeft: '24px', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{d.description.replace(/\{currency\}\s*\{amount\}/g, d.secondaryAmount != null ? `${d.currency} ${d.secondaryAmount.toLocaleString()}` : '___').replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? `${d.currency} ${d.secondaryAmount.toLocaleString()}` : '___')}</div>
                     )}
                     {d.secondaryDescription && (
                         <div style={{ fontSize: '0.78rem', paddingLeft: '24px', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                            {d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString() : '___')}
+                            {d.secondaryDescription.replace(/\{currency\}\s*\{amount\}/g, d.secondaryAmount != null ? `${d.currency} ${d.secondaryAmount.toLocaleString()}` : '___').replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? `${d.currency} ${d.secondaryAmount.toLocaleString()}` : '___')}
                         </div>
                     )}
                     <div style={{ paddingLeft: '30px' }}>

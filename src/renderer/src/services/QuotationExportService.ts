@@ -389,6 +389,17 @@ function formatAmountOnly(amount: number | undefined): string {
   return amount.toLocaleString('en-US', { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })
 }
 
+/** Replace {currency} and {amount} placeholders in deductible description templates.
+ *  Handles combined `{currency} {amount}` to avoid double-currency when {amount} includes currency. */
+function replaceDedPlaceholders(text: string, currency: string, amount: number | undefined | null): string {
+  const amtStr = amount != null ? formatCurrency(amount, currency) : '___'
+  // Replace combined {currency} {amount} first to avoid "USD USD 5,000"
+  return text
+    .replace(/\{currency\}\s*\{amount\}/g, amtStr)
+    .replace(/\{currency\}/g, currency)
+    .replace(/\{amount\}/g, amtStr)
+}
+
 interface VesselInfo { imo?: string; built?: number; rebuilt?: number | null; gt?: number; type?: string; flag?: string; flagCode?: string; classification?: string; callSign?: string; name: string }
 
 function formatBuiltYear(built?: number | null, rebuilt?: number | null): string {
@@ -1492,9 +1503,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       let t = ''
       for (const d of deds) {
         const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
-        const mainDesc = d.description
-          .replace(/\{currency\}/g, d.currency)
-          .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+        const mainDesc = replaceDedPlaceholders(d.description, d.currency, d.secondaryAmount)
         // Per-vessel amounts: emit one line per vessel
         if (d.vesselAmounts && Object.keys(d.vesselAmounts).length > 0) {
           for (const vessel of data.quotationVessels) {
@@ -1503,18 +1512,14 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
             const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
             t += `${formatCurrency(va, d.currency)}  \u2014  ${mainDesc} ${vName}\n`
             if (d.secondaryDescription) {
-              const secDesc = d.secondaryDescription
-                .replace(/\{currency\}/g, d.currency)
-                .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+              const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, d.secondaryAmount)
               t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc} ${vName}\n`
             }
           }
         } else {
           t += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}${dScope}\n`
           if (d.secondaryDescription) {
-            const secDesc = d.secondaryDescription
-              .replace(/\{currency\}/g, d.currency)
-              .replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+            const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, d.secondaryAmount)
             t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc}\n`
           }
         }
@@ -3327,7 +3332,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const origDed = origData && d.piDeductibleId ? origData.deductibles.find(od => od.piDeductibleId === d.piDeductibleId) : null
         const amountChanged = origDed && origDed.amount !== d.amount
         const dedColor = (isNewDed || amountChanged) ? RED : '000000'
-        const mainDesc = d.description.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+        const mainDesc = replaceDedPlaceholders(d.description, d.currency, d.secondaryAmount)
         // Per-vessel amounts: emit one row per vessel
         if (d.vesselAmounts && Object.keys(d.vesselAmounts).length > 0) {
           for (const vessel of data.quotationVessels) {
@@ -3343,7 +3348,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               ]
             }))
             if (d.secondaryDescription) {
-              const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+              const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, d.secondaryAmount)
               dedRows.push(new TableRow({
                 children: [
                   new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: vaColor })] })] }),
@@ -3360,7 +3365,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             ]
           }))
           if (d.secondaryDescription) {
-            const secDesc = d.secondaryDescription.replace(/\{currency\}/g, d.currency).replace(/\{amount\}/g, d.secondaryAmount != null ? d.secondaryAmount.toLocaleString('en-US') : '___')
+            const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, d.secondaryAmount)
             dedRows.push(new TableRow({
               children: [
                 new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: dedColor })] })] }),
