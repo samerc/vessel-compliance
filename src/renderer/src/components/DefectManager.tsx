@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, ChevronDown, ChevronUp, FileText, Download } from 'lucide-react'
+import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock } from 'lucide-react'
 import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -15,6 +15,13 @@ interface DefectManagerProps {
   refreshKey?: number
 }
 
+const severityColors: Record<string, string> = {
+  Critical: '#ef5350',
+  Major: '#ffa726',
+  Minor: '#ffd54f',
+  Observation: '#90a4ae'
+}
+
 export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: DefectManagerProps) {
   const { user, hasPermission } = useAuth()
   const canManageDefects = hasPermission('surveys:defects')
@@ -25,7 +32,8 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [closeModalDefect, setCloseModalDefect] = useState<SurveyDefect | null>(null)
   const [closureNotes, setClosureNotes] = useState('')
   const [editingDefectId, setEditingDefectId] = useState<string | null>(null)
-  const [expandedClosureIds, setExpandedClosureIds] = useState<Set<string>>(new Set())
+  const [expandedDefectIds, setExpandedDefectIds] = useState<Set<string>>(new Set())
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
   const { theme } = useTheme()
   const isLight = theme === 'light'
 
@@ -43,6 +51,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [newDescription, setNewDescription] = useState('')
   const [newSeverity, setNewSeverity] = useState<'Critical' | 'Major' | 'Minor' | 'Observation' | ''>('')
   const [newDueDate, setNewDueDate] = useState('')
+  const [newNotes, setNewNotes] = useState('')
 
   // Edit defect form
   const [editNumber, setEditNumber] = useState('')
@@ -96,13 +105,15 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       description: newDescription,
       severity: newSeverity ? (newSeverity as 'Critical' | 'Major' | 'Minor' | 'Observation') : undefined,
       status: 'OPEN',
-      dueDate: newDueDate || undefined
+      dueDate: newDueDate || undefined,
+      notes: newNotes || undefined
     })
 
     setNewNumber('')
     setNewDescription('')
     setNewSeverity('')
     setNewDueDate('')
+    setNewNotes('')
     setShowAddForm(false)
     loadDefects()
     onUpdate()
@@ -175,8 +186,8 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     })
   }
 
-  const toggleClosureNotes = (defectId: string) => {
-    setExpandedClosureIds(prev => {
+  const toggleExpanded = (defectId: string) => {
+    setExpandedDefectIds(prev => {
       const newSet = new Set(prev)
       if (newSet.has(defectId)) {
         newSet.delete(defectId)
@@ -187,22 +198,13 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     })
   }
 
-  const getSeverityStyle = (severity?: string) => {
-    switch (severity) {
-      case 'Critical': return { bg: '#ff4d4d', color: '#fff' }
-      case 'Major': return { bg: '#ff8c00', color: '#fff' }
-      case 'Minor': return { bg: '#ffcc00', color: '#000' }
-      case 'Observation': return { bg: '#00d2ff', color: '#000' }
-      case '':
-      case undefined:
-      case null:
-        return { bg: 'var(--input-bg)', color: 'var(--text-secondary)', border: '1px dashed var(--input-border)' }
-      default: return { bg: 'var(--text-secondary)', color: '#fff' }
-    }
-  }
-
-  const truncate = (text: string, maxLen: number) => {
-    return text.length > maxLen ? text.substring(0, maxLen) + '...' : text
+  const isOverdue = (defect: SurveyDefect) => {
+    if (defect.status !== 'OPEN' || !defect.dueDate) return false
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const due = new Date(defect.dueDate)
+    due.setHours(0, 0, 0, 0)
+    return due < today
   }
 
   const [showPdfModal, setShowPdfModal] = useState(false)
@@ -248,11 +250,29 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     XLSX.writeFile(wb, `Defects_${vessel.name}_${survey.surveyDate}.xlsx`)
   }
 
+  // Computed stats
+  const openCount = defects.filter(d => d.status === 'OPEN').length
+  const closedCount = defects.filter(d => d.status !== 'OPEN').length
+  const overdueCount = defects.filter(d => isOverdue(d)).length
+
+  // Filtered defects
+  const filteredDefects = defects.filter(d => {
+    if (statusFilter === 'open') return d.status === 'OPEN'
+    if (statusFilter === 'closed') return d.status !== 'OPEN'
+    return true
+  })
+
+  const formatDueDate = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
   return (
     <div style={{ marginTop: '20px', padding: '20px', background: 'var(--bg-card)', borderRadius: '12px', border: 'var(--glass-border)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h4 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          Defects
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Defects</h4>
           <select
             value={`${sortField}-${sortOrder}`}
             onChange={(e) => {
@@ -262,12 +282,11 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
             }}
             style={{
               fontSize: '12px',
-              padding: '4px',
-              borderRadius: '4px',
+              padding: '4px 8px',
+              borderRadius: '6px',
               border: '1px solid var(--input-border)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              marginLeft: '10px'
+              background: 'var(--input-bg)',
+              color: 'var(--text-primary)'
             }}
           >
             <option value="defectNumber-asc">Number (Asc)</option>
@@ -275,7 +294,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
             <option value="createdAt-desc">Newest First</option>
             <option value="createdAt-asc">Oldest First</option>
           </select>
-        </h4>
+        </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {defects.length > 0 && (
             <>
@@ -317,32 +336,76 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
         </div>
       </div>
 
+      {/* Stats Strip */}
+      {defects.length > 0 && (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <StatBadge label="Total" value={defects.length} />
+          <StatBadge label="Open" value={openCount} color={openCount > 0 ? 'var(--danger)' : undefined} />
+          <StatBadge label="Closed" value={closedCount} color={closedCount > 0 ? (isLight ? '#008c46' : '#00ff88') : undefined} />
+          <StatBadge
+            label="Overdue"
+            value={overdueCount}
+            color={overdueCount > 0 ? '#ffa726' : undefined}
+            alert={overdueCount > 0}
+          />
+        </div>
+      )}
+
+      {/* Quick Filter */}
+      {defects.length > 0 && (
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
+          {(['all', 'open', 'closed'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setStatusFilter(f)}
+              style={{
+                padding: '5px 14px',
+                borderRadius: '6px',
+                border: statusFilter === f
+                  ? '1px solid var(--accent-primary)'
+                  : '1px solid var(--input-border)',
+                background: statusFilter === f
+                  ? (isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(0, 210, 255, 0.1)')
+                  : 'transparent',
+                color: statusFilter === f ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                fontSize: '12px',
+                fontWeight: statusFilter === f ? '600' : '500',
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+                transition: 'all 0.15s'
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Add Defect Form */}
       {showAddForm && (
-        <form onSubmit={handleAddDefect} style={{ marginBottom: '20px', padding: '15px', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--input-border)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+        <form onSubmit={handleAddDefect} style={{
+          marginBottom: '20px',
+          padding: '16px',
+          background: 'var(--input-bg)',
+          borderRadius: '10px',
+          border: '1px solid var(--input-border)'
+        }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
             <input
               type="text"
               placeholder="Number (auto)"
               value={newNumber}
               onChange={(e) => setNewNumber(e.target.value)}
               aria-label="Defect number"
-            />
-            <textarea
-              placeholder="Description *"
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              required
-              rows={2}
-              style={{ resize: 'vertical' }}
-              aria-label="Defect description"
+              style={{ width: '80px', flexShrink: 0 }}
             />
             <select
               value={newSeverity}
               onChange={(e) => setNewSeverity(e.target.value as any)}
-              style={{ color: 'var(--text-primary)' }}
+              style={{ color: 'var(--text-primary)', minWidth: '130px' }}
               aria-label="Severity"
             >
-              <option value="">Not Set</option>
+              <option value="">Severity: Not Set</option>
               <option value="Critical">Critical</option>
               <option value="Major">Major</option>
               <option value="Minor">Minor</option>
@@ -356,272 +419,468 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
               min="1900-01-01"
               max="2100-12-31"
               aria-label="Due date"
+              style={{ minWidth: '140px' }}
             />
           </div>
-          <button type="submit" className="btn-primary">
+          <textarea
+            placeholder="Description *"
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            required
+            rows={4}
+            style={{ width: '100%', resize: 'vertical', marginBottom: '10px' }}
+            aria-label="Defect description"
+          />
+          <textarea
+            placeholder="Notes (optional)"
+            value={newNotes}
+            onChange={(e) => setNewNotes(e.target.value)}
+            rows={2}
+            style={{ width: '100%', resize: 'vertical', marginBottom: '12px' }}
+            aria-label="Notes"
+          />
+          <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={16} />
             Add Defect
           </button>
         </form>
       )}
 
+      {/* Defect List */}
       {defects.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No defects recorded</p>
+      ) : filteredDefects.length === 0 ? (
+        <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+          No {statusFilter} defects
+        </p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <caption className="sr-only">Survey defects</caption>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
-                <th scope="col" style={{ textAlign: 'left', padding: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Number</th>
-                <th scope="col" style={{ textAlign: 'left', padding: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Description</th>
-                <th scope="col" style={{ textAlign: 'left', padding: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Severity</th>
-                <th scope="col" style={{ textAlign: 'left', padding: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Status</th>
-                <th scope="col" style={{ textAlign: 'left', padding: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Due Date</th>
-                <th scope="col" style={{ textAlign: 'center', padding: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {defects.map((defect) => {
-                const isEditing = editingDefectId === defect.id
-                const severityStyle = getSeverityStyle(defect.severity)
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {filteredDefects.map((defect) => {
+            const isEditing = editingDefectId === defect.id
+            const isExpanded = expandedDefectIds.has(defect.id)
+            const overdue = isOverdue(defect)
+            const sevColor = severityColors[defect.severity || ''] || 'var(--table-border)'
+            const hasExpandContent = defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt
 
-                if (isEditing) {
-                  return (
-                    <tr key={defect.id} style={{ borderBottom: '1px solid var(--table-border)', background: 'var(--input-bg)' }}>
-                      <td colSpan={6} style={{ padding: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                          <input
-                            type="text"
-                            placeholder="Number"
-                            value={editNumber}
-                            onChange={(e) => setEditNumber(e.target.value)}
-                            required
-                            aria-label="Defect number"
-                          />
-                          <textarea
-                            placeholder="Description"
-                            value={editDescription}
-                            onChange={(e) => setEditDescription(e.target.value)}
-                            required
-                            rows={2}
-                            style={{ resize: 'vertical' }}
-                            aria-label="Defect description"
-                          />
-                          <select
-                            value={editSeverity}
-                            onChange={(e) => setEditSeverity(e.target.value as any)}
-                            style={{ color: 'var(--text-primary)' }}
-                            aria-label="Severity"
-                          >
-                            <option value="">Not Set</option>
-                            <option value="Critical">Critical</option>
-                            <option value="Major">Major</option>
-                            <option value="Minor">Minor</option>
-                            <option value="Observation">Observation</option>
-                          </select>
-                          <input
-                            type="date"
-                            placeholder="Due Date"
-                            value={editDueDate}
-                            onChange={(e) => setEditDueDate(e.target.value)}
-                            min="1900-01-01"
-                            max="2100-12-31"
-                            aria-label="Due date"
-                          />
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                          <textarea
-                            placeholder="Notes (optional)"
-                            value={editNotes}
-                            onChange={(e) => setEditNotes(e.target.value)}
-                            rows={2}
-                            style={{ width: '100%', resize: 'vertical' }}
-                            aria-label="Notes"
-                          />
-                        </div>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <button
-                            onClick={() => handleSaveEdit(defect.id)}
-                            className="btn-primary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
-                          >
-                            <Save size={16} />
-                            Save
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="btn-secondary"
-                            style={{ padding: '8px 16px' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                }
+            if (isEditing) {
+              return (
+                <div key={defect.id} style={{
+                  padding: '16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--accent-primary)',
+                  borderLeft: `4px solid var(--accent-primary)`,
+                  background: 'var(--input-bg)'
+                }}>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      placeholder="Number"
+                      value={editNumber}
+                      onChange={(e) => setEditNumber(e.target.value)}
+                      required
+                      aria-label="Defect number"
+                      style={{ width: '80px', flexShrink: 0 }}
+                    />
+                    <select
+                      value={editSeverity}
+                      onChange={(e) => setEditSeverity(e.target.value as any)}
+                      style={{ color: 'var(--text-primary)', minWidth: '130px' }}
+                      aria-label="Severity"
+                    >
+                      <option value="">Severity: Not Set</option>
+                      <option value="Critical">Critical</option>
+                      <option value="Major">Major</option>
+                      <option value="Minor">Minor</option>
+                      <option value="Observation">Observation</option>
+                    </select>
+                    <input
+                      type="date"
+                      placeholder="Due Date"
+                      value={editDueDate}
+                      onChange={(e) => setEditDueDate(e.target.value)}
+                      min="1900-01-01"
+                      max="2100-12-31"
+                      aria-label="Due date"
+                      style={{ minWidth: '140px' }}
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Description *"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    required
+                    rows={4}
+                    style={{ width: '100%', resize: 'vertical', marginBottom: '10px' }}
+                    aria-label="Defect description"
+                  />
+                  <textarea
+                    placeholder="Notes (optional)"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={2}
+                    style={{ width: '100%', resize: 'vertical', marginBottom: '12px' }}
+                    aria-label="Notes"
+                  />
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => handleSaveEdit(defect.id)}
+                      className="btn-primary"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
+                    >
+                      <Save size={16} />
+                      Save
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="btn-secondary"
+                      style={{ padding: '8px 16px' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )
+            }
 
-                return (
-                  <>
-                    <tr key={defect.id} style={{ borderBottom: expandedClosureIds.has(defect.id) ? 'none' : '1px solid var(--table-border)' }}>
-                      <td style={{ padding: '12px', color: 'var(--text-primary)', fontWeight: 'bold' }}>{defect.defectNumber}</td>
-                      <td style={{ padding: '12px', color: 'var(--text-primary)' }}>{truncate(defect.description, 80)}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '6px', background: severityStyle.bg, color: severityStyle.color, fontSize: '12px', fontWeight: 'bold', display: 'inline-block', border: severityStyle.border }}>
-                          {defect.severity || 'Not Set'}
+            return (
+              <div
+                key={defect.id}
+                style={{
+                  borderRadius: '10px',
+                  border: '1px solid var(--table-border)',
+                  borderLeft: `4px solid ${sevColor}`,
+                  overflow: 'hidden',
+                  transition: 'background 0.12s'
+                }}
+              >
+                {/* Collapsed Row */}
+                <div
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('button')) return
+                    if (hasExpandContent) toggleExpanded(defect.id)
+                  }}
+                  style={{
+                    padding: '14px 16px',
+                    cursor: hasExpandContent ? 'pointer' : 'default',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    background: isExpanded
+                      ? (isLight ? 'rgba(0, 119, 163, 0.04)' : 'rgba(0, 210, 255, 0.04)')
+                      : 'transparent'
+                  }}
+                >
+                  {/* Expand indicator */}
+                  <div style={{
+                    flexShrink: 0,
+                    marginTop: '2px',
+                    color: 'var(--text-secondary)',
+                    opacity: hasExpandContent ? 1 : 0.3,
+                    transition: 'transform 0.2s'
+                  }}>
+                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+
+                  {/* Number */}
+                  <span style={{
+                    fontWeight: '700',
+                    color: 'var(--text-primary)',
+                    fontSize: '14px',
+                    flexShrink: 0,
+                    minWidth: '28px'
+                  }}>
+                    #{defect.defectNumber}
+                  </span>
+
+                  {/* Description + Due Date */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      lineHeight: '1.4',
+                      ...(isExpanded ? {} : {
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical' as const,
+                        overflow: 'hidden'
+                      })
+                    }}>
+                      {defect.description}
+                    </div>
+                    {defect.dueDate && (
+                      <div style={{
+                        marginTop: '4px',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <Clock size={12} style={{ color: 'var(--text-secondary)' }} />
+                        <span style={{
+                          color: overdue ? 'var(--danger)' : 'var(--text-secondary)',
+                          fontWeight: overdue ? '600' : '400'
+                        }}>
+                          Due: {formatDueDate(defect.dueDate)}
                         </span>
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        {defect.status === 'OPEN' ? (
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: '600',
-                              background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
-                              border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                              color: 'var(--danger)',
-                              textTransform: 'uppercase'
-                            }}
-                          >
-                            <AlertCircle size={14} />
-                            OPEN
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: '600',
-                              background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
-                              border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
-                              color: isLight ? '#008c46' : '#00ff88',
-                              textTransform: 'uppercase'
-                            }}
-                          >
-                            <CheckCircle size={14} />
-                            CLOSED
-                          </div>
+                        {overdue && (
+                          <span style={{
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            background: isLight ? 'rgba(255, 152, 0, 0.15)' : 'rgba(255, 167, 38, 0.15)',
+                            color: '#ffa726',
+                            border: '1px solid rgba(255, 167, 38, 0.3)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Overdue
+                          </span>
                         )}
-                      </td>
-                      <td style={{ padding: '12px', color: 'var(--text-primary)' }}>{defect.dueDate || 'N/A'}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                          {canManageDefects && (
-                            <button
-                              onClick={() => handleEditDefect(defect)}
-                              className="btn-primary"
-                              style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-                              title="Edit defect"
-                            >
-                              <Edit size={14} />
-                              Edit
-                            </button>
-                          )}
-                          {canManageDefects && defect.status === 'OPEN' && (
-                            <button
-                              onClick={() => setCloseModalDefect(defect)}
-                              style={{ padding: '6px 12px', background: 'var(--success)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
-                              title="Close defect"
-                            >
-                              Close
-                            </button>
-                          )}
-                          {canManageDefects && defect.status !== 'OPEN' && (
-                            <button
-                              onClick={() => handleReopenDefect(defect)}
-                              style={{ padding: '6px 12px', background: 'var(--warning)', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
-                              title="Reopen defect"
-                            >
-                              Reopen
-                            </button>
-                          )}
-                          {(defect.notes || defect.closureNotes || defect.closedBy) && (
-                            <button
-                              onClick={() => toggleClosureNotes(defect.id)}
-                              aria-expanded={expandedClosureIds.has(defect.id)}
-                              aria-label={`${expandedClosureIds.has(defect.id) ? 'Hide' : 'View'} notes for defect ${defect.defectNumber}`}
-                              style={{
-                                padding: '6px 12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '12px',
-                                fontWeight: '600',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                border: 'none',
-                                background: isLight ? 'rgba(0, 119, 163, 0.15)' : 'rgba(0, 210, 255, 0.15)',
-                                color: 'var(--accent-primary)'
-                              }}
-                              title="View notes"
-                            >
-                              {expandedClosureIds.has(defect.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                              Notes
-                            </button>
-                          )}
-                          {canManageDefects && (
-                            <button
-                              onClick={() => handleDeleteDefect(defect)}
-                              aria-label={`Delete defect ${defect.defectNumber}`}
-                              style={{ padding: '6px 12px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              title="Delete defect"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {expandedClosureIds.has(defect.id) && (defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt) && (
-                      <tr key={`${defect.id}-notes`} style={{ borderBottom: '1px solid var(--table-border)', background: isLight ? 'rgba(0, 119, 163, 0.04)' : 'rgba(0, 210, 255, 0.04)' }}>
-                        <td colSpan={6} style={{ padding: '12px', fontSize: '13px' }}>
-                          {defect.notes && (
-                            <div style={{ marginBottom: (defect.closedAt || defect.closedBy || defect.closureNotes) ? '10px' : '0' }}>
-                              <strong style={{ color: 'var(--text-primary)' }}>Notes:</strong>
-                              <div style={{ marginTop: '4px', padding: '8px', background: 'var(--input-bg)', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
-                                {defect.notes}
-                              </div>
-                            </div>
-                          )}
-                          {(defect.closedAt || defect.closedBy) && (
-                            <div style={{ display: 'flex', gap: '20px', color: 'var(--text-secondary)' }}>
-                              {defect.closedAt && (
-                                <div>
-                                  <strong style={{ color: 'var(--text-primary)' }}>Closed:</strong> {formatDate(defect.closedAt)}
-                                </div>
-                              )}
-                              {defect.closedBy && (
-                                <div>
-                                  <strong style={{ color: 'var(--text-primary)' }}>By:</strong> {defect.closedBy}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {defect.closureNotes && (
-                            <div style={{ marginTop: '8px' }}>
-                              <strong style={{ color: 'var(--text-primary)' }}>Closure Notes:</strong>
-                              <div style={{ marginTop: '4px', padding: '8px', background: 'var(--input-bg)', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
-                                {defect.closureNotes}
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
+                      </div>
                     )}
-                  </>
-                )
-              })}
-            </tbody>
-          </table>
+                  </div>
+
+                  {/* Badges */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {/* Severity Badge */}
+                    {defect.severity ? (
+                      <span style={{
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: sevColor + '22',
+                        color: sevColor,
+                        border: `1px solid ${sevColor}44`,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.3px',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {defect.severity}
+                      </span>
+                    ) : (
+                      <span style={{
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        color: 'var(--text-secondary)',
+                        border: '1px dashed var(--input-border)',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        No Severity
+                      </span>
+                    )}
+
+                    {/* Status Badge */}
+                    {defect.status === 'OPEN' ? (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: isLight ? 'rgba(200, 0, 0, 0.1)' : 'rgba(255, 77, 77, 0.1)',
+                        border: isLight ? '1px solid rgba(200, 0, 0, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                        color: 'var(--danger)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.3px',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        <AlertCircle size={12} />
+                        Open
+                      </span>
+                    ) : (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: isLight ? 'rgba(0, 140, 70, 0.1)' : 'rgba(0, 255, 136, 0.1)',
+                        border: isLight ? '1px solid rgba(0, 140, 70, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)',
+                        color: isLight ? '#008c46' : '#00ff88',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.3px',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        <CheckCircle size={12} />
+                        Closed
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  {canManageDefects && (
+                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                      <button
+                        onClick={() => handleEditDefect(defect)}
+                        className="btn-secondary"
+                        style={{ padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                        title="Edit defect"
+                      >
+                        <Edit size={13} />
+                        Edit
+                      </button>
+                      {defect.status === 'OPEN' ? (
+                        <button
+                          onClick={() => setCloseModalDefect(defect)}
+                          style={{
+                            padding: '5px 10px',
+                            background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.12)',
+                            color: isLight ? '#008c46' : '#00ff88',
+                            border: isLight ? '1px solid rgba(0, 140, 70, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Close defect"
+                        >
+                          <CheckCircle size={13} />
+                          Close
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReopenDefect(defect)}
+                          style={{
+                            padding: '5px 10px',
+                            background: isLight ? 'rgba(255, 152, 0, 0.12)' : 'rgba(255, 204, 0, 0.12)',
+                            color: isLight ? '#e68a00' : '#ffcc00',
+                            border: isLight ? '1px solid rgba(255, 152, 0, 0.3)' : '1px solid rgba(255, 204, 0, 0.3)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Reopen defect"
+                        >
+                          <RotateCcw size={13} />
+                          Reopen
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteDefect(defect)}
+                        aria-label={`Delete defect ${defect.defectNumber}`}
+                        style={{
+                          padding: '5px 8px',
+                          background: 'transparent',
+                          color: 'var(--danger)',
+                          border: '1px solid transparent',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: 0.7,
+                          transition: 'opacity 0.15s'
+                        }}
+                        title="Delete defect"
+                        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Expanded Content */}
+                {isExpanded && hasExpandContent && (
+                  <div style={{
+                    padding: '0 16px 14px 52px',
+                    borderTop: '1px solid var(--table-border)',
+                    background: isLight ? 'rgba(0, 119, 163, 0.03)' : 'rgba(0, 210, 255, 0.03)'
+                  }}>
+                    {defect.notes && (
+                      <div style={{ marginTop: '12px' }}>
+                        <div style={{
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '4px'
+                        }}>
+                          Notes
+                        </div>
+                        <div style={{
+                          padding: '8px 10px',
+                          background: 'var(--input-bg)',
+                          borderRadius: '6px',
+                          color: 'var(--text-primary)',
+                          fontSize: '13px',
+                          lineHeight: '1.5',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {defect.notes}
+                        </div>
+                      </div>
+                    )}
+                    {(defect.closedAt || defect.closedBy) && (
+                      <div style={{
+                        marginTop: '12px',
+                        display: 'flex',
+                        gap: '16px',
+                        fontSize: '12px',
+                        color: 'var(--text-secondary)'
+                      }}>
+                        {defect.closedBy && (
+                          <span>
+                            <strong style={{ color: 'var(--text-primary)' }}>Closed by:</strong>{' '}
+                            {defect.closedBy}
+                          </span>
+                        )}
+                        {defect.closedAt && (
+                          <span>
+                            <strong style={{ color: 'var(--text-primary)' }}>on</strong>{' '}
+                            {formatDate(defect.closedAt)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {defect.closureNotes && (
+                      <div style={{ marginTop: '10px' }}>
+                        <div style={{
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '4px'
+                        }}>
+                          Closure Notes
+                        </div>
+                        <div style={{
+                          padding: '8px 10px',
+                          background: 'var(--input-bg)',
+                          borderRadius: '6px',
+                          color: 'var(--text-primary)',
+                          fontSize: '13px',
+                          lineHeight: '1.5',
+                          whiteSpace: 'pre-wrap',
+                          borderLeft: `3px solid ${isLight ? '#008c46' : '#00ff88'}`
+                        }}>
+                          {defect.closureNotes}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -672,9 +931,9 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                       style={{ marginTop: '2px', flexShrink: 0 }}
                     />
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: '600', fontSize: '0.88rem', color: 'var(--text-primary)' }}>#{d.defectNumber} — {d.description.substring(0, 60)}{d.description.length > 60 ? '…' : ''}</div>
-                      {d.notes && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '3px' }}>{d.notes.substring(0, 80)}{d.notes.length > 80 ? '…' : ''}</div>}
-                      {d.closureNotes && <div style={{ fontSize: '0.8rem', color: '#2d8a4e', marginTop: '2px', fontStyle: 'italic' }}>Closure: {d.closureNotes.substring(0, 80)}{d.closureNotes.length > 80 ? '…' : ''}</div>}
+                      <div style={{ fontWeight: '600', fontSize: '0.88rem', color: 'var(--text-primary)' }}>#{d.defectNumber} — {d.description.substring(0, 60)}{d.description.length > 60 ? '...' : ''}</div>
+                      {d.notes && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '3px' }}>{d.notes.substring(0, 80)}{d.notes.length > 80 ? '...' : ''}</div>}
+                      {d.closureNotes && <div style={{ fontSize: '0.8rem', color: '#2d8a4e', marginTop: '2px', fontStyle: 'italic' }}>Closure: {d.closureNotes.substring(0, 80)}{d.closureNotes.length > 80 ? '...' : ''}</div>}
                     </div>
                   </label>
                 ))}
@@ -701,6 +960,35 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
           onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
         />
       )}
+    </div>
+  )
+}
+
+function StatBadge({ label, value, color, alert }: {
+  label: string
+  value: number
+  color?: string
+  alert?: boolean
+}) {
+  return (
+    <div style={{
+      padding: '6px 14px',
+      borderRadius: '8px',
+      background: 'var(--bg-card)',
+      border: alert ? '1px solid rgba(255, 167, 38, 0.4)' : 'var(--glass-border)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '12px'
+    }}>
+      <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{label}:</span>
+      <span style={{
+        fontWeight: '700',
+        color: color || 'var(--text-primary)',
+        fontSize: '13px'
+      }}>
+        {value}
+      </span>
     </div>
   )
 }
