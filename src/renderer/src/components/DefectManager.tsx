@@ -643,154 +643,117 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
 
                   {/* Badges */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    {/* Severity Badge */}
+                    {/* Severity Badge — flat pill, non-interactive */}
                     {defect.severity ? (
                       <span style={{
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        background: sevColor + '22',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        background: sevColor + '18',
                         color: sevColor,
-                        border: `1px solid ${sevColor}44`,
                         textTransform: 'uppercase',
-                        letterSpacing: '0.3px',
+                        letterSpacing: '0.4px',
                         whiteSpace: 'nowrap'
                       }}>
                         {defect.severity}
                       </span>
                     ) : (
                       <span style={{
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '10px',
                         fontWeight: '500',
                         color: 'var(--text-secondary)',
-                        border: '1px dashed var(--input-border)',
+                        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
                         whiteSpace: 'nowrap'
                       }}>
                         No Severity
                       </span>
                     )}
 
-                    {/* Status Badge */}
+                    {/* Status Badge — flat pill, non-interactive */}
                     {defect.status === 'OPEN' ? (
                       <span style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        background: isLight ? 'rgba(200, 0, 0, 0.1)' : 'rgba(255, 77, 77, 0.1)',
-                        border: isLight ? '1px solid rgba(200, 0, 0, 0.3)' : '1px solid rgba(255, 77, 77, 0.3)',
+                        gap: '3px',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        background: isLight ? 'rgba(200, 0, 0, 0.08)' : 'rgba(255, 77, 77, 0.08)',
                         color: 'var(--danger)',
                         textTransform: 'uppercase',
-                        letterSpacing: '0.3px',
+                        letterSpacing: '0.4px',
                         whiteSpace: 'nowrap'
                       }}>
-                        <AlertCircle size={12} />
+                        <AlertCircle size={10} />
                         Open
                       </span>
                     ) : (
                       <span style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        background: isLight ? 'rgba(0, 140, 70, 0.1)' : 'rgba(0, 255, 136, 0.1)',
-                        border: isLight ? '1px solid rgba(0, 140, 70, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)',
+                        gap: '3px',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        background: isLight ? 'rgba(0, 140, 70, 0.08)' : 'rgba(0, 255, 136, 0.08)',
                         color: isLight ? '#008c46' : '#00ff88',
                         textTransform: 'uppercase',
-                        letterSpacing: '0.3px',
+                        letterSpacing: '0.4px',
                         whiteSpace: 'nowrap'
                       }}>
-                        <CheckCircle size={12} />
+                        <CheckCircle size={10} />
                         Closed
                       </span>
                     )}
                   </div>
 
-                  {/* Action Buttons */}
+                  {/* Action Buttons — icon-only, clearly interactive */}
                   {canManageDefects && (
-                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: '2px', flexShrink: 0, marginLeft: '12px', borderLeft: '1px solid var(--table-border)', paddingLeft: '10px' }}>
                       <button
-                        onClick={() => handleEditDefect(defect)}
-                        className="btn-secondary"
-                        style={{ padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-                        title="Edit defect"
+                        onClick={(e) => { e.stopPropagation(); handleEditDefect(defect) }}
+                        style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', transition: 'all 0.12s' }}
+                        title="Edit"
+                        onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--accent-primary)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
                       >
-                        <Edit size={13} />
-                        Edit
+                        <Edit size={15} />
                       </button>
                       {defect.status === 'OPEN' ? (
                         <button
-                          onClick={() => setCloseModalDefect(defect)}
-                          style={{
-                            padding: '5px 10px',
-                            background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.12)',
-                            color: isLight ? '#008c46' : '#00ff88',
-                            border: isLight ? '1px solid rgba(0, 140, 70, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
+                          onClick={(e) => { e.stopPropagation(); setCloseModalDefect(defect) }}
+                          style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', transition: 'all 0.12s' }}
                           title="Close defect"
+                          onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,140,70,0.1)' : 'rgba(0,255,136,0.1)'; e.currentTarget.style.color = isLight ? '#008c46' : '#00ff88' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
                         >
-                          <CheckCircle size={13} />
-                          Close
+                          <CheckCircle size={15} />
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleReopenDefect(defect)}
-                          style={{
-                            padding: '5px 10px',
-                            background: isLight ? 'rgba(255, 152, 0, 0.12)' : 'rgba(255, 204, 0, 0.12)',
-                            color: isLight ? '#e68a00' : '#ffcc00',
-                            border: isLight ? '1px solid rgba(255, 152, 0, 0.3)' : '1px solid rgba(255, 204, 0, 0.3)',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
+                          onClick={(e) => { e.stopPropagation(); handleReopenDefect(defect) }}
+                          style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', transition: 'all 0.12s' }}
                           title="Reopen defect"
+                          onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(255,152,0,0.1)' : 'rgba(255,204,0,0.1)'; e.currentTarget.style.color = isLight ? '#e68a00' : '#ffcc00' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
                         >
-                          <RotateCcw size={13} />
-                          Reopen
+                          <RotateCcw size={15} />
                         </button>
                       )}
                       <button
-                        onClick={() => handleDeleteDefect(defect)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteDefect(defect) }}
                         aria-label={`Delete defect ${defect.defectNumber}`}
-                        style={{
-                          padding: '5px 8px',
-                          background: 'transparent',
-                          color: 'var(--danger)',
-                          border: '1px solid transparent',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          opacity: 0.7,
-                          transition: 'opacity 0.15s'
-                        }}
-                        title="Delete defect"
-                        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+                        style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', transition: 'all 0.12s' }}
+                        title="Delete"
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,77,77,0.1)'; e.currentTarget.style.color = 'var(--danger)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   )}
