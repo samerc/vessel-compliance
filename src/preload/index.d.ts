@@ -541,7 +541,9 @@ export interface Api {
     dateFrom?: string
     dateTo?: string
     renewalFilter?: string
+    viewFilter?: 'all' | 'registry' | 'drafts'
     registryOnly?: boolean
+    groupId?: string
     favoriteIds?: string[]
     sortField?: string
     sortDir?: 'asc' | 'desc'
@@ -552,6 +554,18 @@ export interface Api {
   quotationDeleteFilter: (id: string) => Promise<void>
   quotationGetFavorites: () => Promise<string[]>
   quotationToggleFavorite: (quotationId: string) => Promise<boolean>
+  quotationBulkDelete: (ids: string[]) => Promise<number>
+
+  // Quotation Groups
+  quotationGroupGetAll: () => Promise<{ id: string; name: string; userId: string | null; color: string | null; order: number; memberCount: number }[]>
+  quotationGroupAdd: (name: string, userId: string | null, color?: string) => Promise<{ id: string; name: string; userId: string | null; color: string | null; order: number; memberCount: number }>
+  quotationGroupUpdate: (id: string, updates: { name?: string; color?: string }) => Promise<void>
+  quotationGroupDelete: (id: string) => Promise<void>
+  quotationGroupGetMembers: (groupId: string) => Promise<string[]>
+  quotationGroupAddMember: (groupId: string, quotationId: string) => Promise<void>
+  quotationGroupRemoveMember: (groupId: string, quotationId: string) => Promise<void>
+  quotationGroupBulkAdd: (groupId: string, quotationIds: string[]) => Promise<void>
+
   getQuotation: (id: string) => Promise<Quotation | null>
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>

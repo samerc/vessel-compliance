@@ -2777,6 +2777,31 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: quotation_groups table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_groups (
+                    id VARCHAR(36) PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    user_id VARCHAR(36) DEFAULT NULL,
+                    color VARCHAR(20) DEFAULT NULL,
+                    order_index INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_qg_user (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
+            // Migration: quotation_group_members table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_group_members (
+                    id VARCHAR(36) PRIMARY KEY,
+                    group_id VARCHAR(36) NOT NULL,
+                    quotation_id VARCHAR(36) NOT NULL,
+                    UNIQUE KEY uniq_group_quotation (group_id, quotation_id),
+                    INDEX idx_qgm_group (group_id),
+                    INDEX idx_qgm_quotation (quotation_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -6782,7 +6807,9 @@ export class MySQLAdapter {
         dateFrom?: string
         dateTo?: string
         renewalFilter?: string
+        viewFilter?: 'all' | 'registry' | 'drafts'
         registryOnly?: boolean
+        groupId?: string
         favoriteIds?: string[]
         sortField?: string
         sortDir?: 'asc' | 'desc'
@@ -6844,8 +6871,16 @@ export class MySQLAdapter {
         } else if (params.renewalFilter === 'new') {
             conditions.push('(q.is_renewal = FALSE OR q.is_renewal IS NULL)')
         }
-        if (params.registryOnly) {
+        if (params.viewFilter === 'registry') {
             conditions.push("q.reference_number NOT LIKE 'DRAFT-%'")
+        } else if (params.viewFilter === 'drafts') {
+            conditions.push("q.reference_number LIKE 'DRAFT-%'")
+        } else if (params.registryOnly) {
+            conditions.push("q.reference_number NOT LIKE 'DRAFT-%'")
+        }
+        if (params.groupId) {
+            conditions.push('q.id IN (SELECT quotation_id FROM quotation_group_members WHERE group_id = ?)')
+            values.push(params.groupId)
         }
         if (params.favoriteIds && params.favoriteIds.length > 0) {
             conditions.push(`q.id IN (${params.favoriteIds.map(() => '?').join(',')})`)
@@ -6975,6 +7010,76 @@ export class MySQLAdapter {
     async deleteQuotationSavedFilter(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotation_saved_filters WHERE id = ?', [id])
+    }
+
+    async bulkDeleteQuotations(ids: string[]): Promise<number> {
+        if (!this.pool || ids.length === 0) return 0
+        const placeholders = ids.map(() => '?').join(',')
+        const [r] = await this.pool.execute(`DELETE FROM quotations WHERE id IN (${placeholders})`, ids)
+        return (r as any).affectedRows || 0
+    }
+
+    // --- Quotation Groups ---
+    async getQuotationGroups(userId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, name, user_id as userId, color, order_index as `order` FROM quotation_groups WHERE user_id IS NULL OR user_id = ? ORDER BY user_id IS NOT NULL, order_index ASC',
+            [userId]
+        )
+        for (const g of rows as any[]) {
+            const [cnt] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotation_group_members WHERE group_id = ?', [g.id])
+            g.memberCount = (cnt as any[])[0].cnt
+        }
+        return rows as any[]
+    }
+
+    async addQuotationGroup(name: string, userId?: string | null, color?: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_groups WHERE user_id IS NULL OR user_id = ?', [userId || null])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute('INSERT INTO quotation_groups (id, name, user_id, color, order_index) VALUES (?, ?, ?, ?, ?)', [id, name, userId || null, color || null, order])
+        return { id, name, userId: userId || null, color: color || null, order, memberCount: 0 }
+    }
+
+    async updateQuotationGroup(id: string, updates: { name?: string; color?: string }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.color !== undefined) { fields.push('color = ?'); values.push(updates.color || null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_groups SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationTagGroup(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_group_members WHERE group_id = ?', [id])
+        await this.pool.execute('DELETE FROM quotation_groups WHERE id = ?', [id])
+    }
+
+    async addQuotationToGroup(groupId: string, quotationId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('INSERT IGNORE INTO quotation_group_members (id, group_id, quotation_id) VALUES (?, ?, ?)', [uuidv4(), groupId, quotationId])
+    }
+
+    async removeQuotationFromGroup(groupId: string, quotationId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_group_members WHERE group_id = ? AND quotation_id = ?', [groupId, quotationId])
+    }
+
+    async getQuotationGroupMembers(groupId: string): Promise<string[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT quotation_id FROM quotation_group_members WHERE group_id = ?', [groupId])
+        return (rows as any[]).map(r => r.quotation_id)
+    }
+
+    async bulkAddQuotationsToGroup(groupId: string, quotationIds: string[]): Promise<void> {
+        if (!this.pool || quotationIds.length === 0) return
+        for (const qId of quotationIds) {
+            await this.pool.execute('INSERT IGNORE INTO quotation_group_members (id, group_id, quotation_id) VALUES (?, ?, ?)', [uuidv4(), groupId, qId])
+        }
     }
 
     async getQuotationFavorites(userId: string): Promise<string[]> {

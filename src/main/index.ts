@@ -2835,6 +2835,39 @@ app.whenReady().then(() => {
   safeHandle('quotation:deleteFilter', (event, id: string) => { requireSession(event); return db.deleteQuotationSavedFilter(id) })
   safeHandle('quotation:getFavorites', (event) => { const user = requireSession(event); return db.getQuotationFavorites(user.id) })
   safeHandle('quotation:toggleFavorite', (event, quotationId: string) => { const user = requireSession(event); return db.toggleQuotationFavorite(user.id, quotationId) })
+  safeHandle('quotation:bulkDelete', async (event, ids: string[]) => {
+    await requirePermission(event, 'quotations:bulkDelete')
+    return db.bulkDeleteQuotations(ids)
+  })
+
+  // Quotation Groups
+  safeHandle('quotationGroup:getAll', (event) => { const user = requireSession(event); return db.getQuotationGroups(user.id) })
+  safeHandle('quotationGroup:add', async (event, name: string, userId: string | null, color?: string) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.addQuotationGroup(name, userId, color)
+  })
+  safeHandle('quotationGroup:update', async (event, id: string, updates: { name?: string; color?: string }) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.updateQuotationGroup(id, updates)
+  })
+  safeHandle('quotationGroup:delete', async (event, id: string) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.deleteQuotationTagGroup(id)
+  })
+  safeHandle('quotationGroup:getMembers', (event, groupId: string) => { requireSession(event); return db.getQuotationGroupMembers(groupId) })
+  safeHandle('quotationGroup:addMember', async (event, groupId: string, quotationId: string) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.addQuotationToGroup(groupId, quotationId)
+  })
+  safeHandle('quotationGroup:removeMember', async (event, groupId: string, quotationId: string) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.removeQuotationFromGroup(groupId, quotationId)
+  })
+  safeHandle('quotationGroup:bulkAdd', async (event, groupId: string, quotationIds: string[]) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.bulkAddQuotationsToGroup(groupId, quotationIds)
+  })
+
   safeHandle('db:getQuotation', (event, id) => { requireSession(event); return db.getQuotation(id) })
   safeHandle('db:addQuotation', async (event, q) => {
     const user = await requirePermission(event, 'quotations:create')

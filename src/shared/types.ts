@@ -216,6 +216,7 @@ export const PERMISSION_CATEGORIES = [
       { key: 'quotations:export', label: 'Export quotations (PDF / DOCX)' },
       { key: 'quotations:approve', label: 'Approve quotations' },
       { key: 'quotations:settings', label: 'Manage quotation settings (conditions, warranties, deductibles, etc.)' },
+      { key: 'quotations:bulkDelete', label: 'Bulk delete quotations' },
     ],
   },
   {

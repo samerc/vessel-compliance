@@ -535,6 +535,18 @@ const api = {
   quotationDeleteFilter: (id: string) => ipcRenderer.invoke('quotation:deleteFilter', id),
   quotationGetFavorites: () => ipcRenderer.invoke('quotation:getFavorites'),
   quotationToggleFavorite: (quotationId: string) => ipcRenderer.invoke('quotation:toggleFavorite', quotationId),
+  quotationBulkDelete: (ids: string[]) => ipcRenderer.invoke('quotation:bulkDelete', ids),
+
+  // Quotation Groups
+  quotationGroupGetAll: () => ipcRenderer.invoke('quotationGroup:getAll'),
+  quotationGroupAdd: (name: string, userId: string | null, color?: string) => ipcRenderer.invoke('quotationGroup:add', name, userId, color),
+  quotationGroupUpdate: (id: string, updates: { name?: string; color?: string }) => ipcRenderer.invoke('quotationGroup:update', id, updates),
+  quotationGroupDelete: (id: string) => ipcRenderer.invoke('quotationGroup:delete', id),
+  quotationGroupGetMembers: (groupId: string) => ipcRenderer.invoke('quotationGroup:getMembers', groupId),
+  quotationGroupAddMember: (groupId: string, quotationId: string) => ipcRenderer.invoke('quotationGroup:addMember', groupId, quotationId),
+  quotationGroupRemoveMember: (groupId: string, quotationId: string) => ipcRenderer.invoke('quotationGroup:removeMember', groupId, quotationId),
+  quotationGroupBulkAdd: (groupId: string, quotationIds: string[]) => ipcRenderer.invoke('quotationGroup:bulkAdd', groupId, quotationIds),
+
   getQuotation: (id: string) => ipcRenderer.invoke('db:getQuotation', id),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
   updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),
