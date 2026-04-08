@@ -1119,6 +1119,78 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         >
                                             <FileSpreadsheet size={16} /> All Policies (Excel)
                                         </button>
+                                        <button
+                                            onClick={async () => {
+                                                setShowExportMenu(false)
+                                                try {
+                                                    // Build missing documents list
+                                                    const lines: string[] = []
+                                                    lines.push(`${vessel.name} — Missing Documents`)
+                                                    lines.push('')
+
+                                                    // Vessel documents
+                                                    const customDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
+                                                    const allDocTypes = [...docTypes, ...(Array.isArray(customDocTypes) ? customDocTypes : []).map((c: any) => ({ id: c.id, name: c.name, required: true }))]
+                                                    const missingVessel = allDocTypes.filter(dt => !vesselDocs.some(d => d.documentTypeId === dt.id && d.filePath))
+                                                    if (missingVessel.length > 0) {
+                                                        lines.push('Vessel Documents:')
+                                                        for (const dt of missingVessel) lines.push(`  - ${dt.name}`)
+                                                        lines.push('')
+                                                    }
+
+                                                    // Entity documents
+                                                    const assureds = await window.api.getVesselAssureds(vessel.id)
+                                                    const entities = await window.api.getEntities()
+                                                    const safeAssureds = Array.isArray(assureds) ? assureds : []
+                                                    const safeEntities = Array.isArray(entities) ? entities : []
+                                                    for (const va of safeAssureds) {
+                                                        const entity = safeEntities.find((e: any) => e.id === va.entityId)
+                                                        if (!entity) continue
+                                                        const missing: string[] = []
+                                                        const isCompany = entity.type === 'company'
+                                                        if (isCompany) {
+                                                            if (!entity.certificateOfIncorporationPath) missing.push('Certificate of Incorporation')
+                                                            if (!entity.articlesOfAssociationPath) missing.push('Articles of Association')
+                                                            if (!entity.kycFilePath) missing.push('KYC')
+                                                        } else {
+                                                            if (!entity.passportFilePath) missing.push('ID / Passport')
+                                                        }
+                                                        if (missing.length > 0) {
+                                                            lines.push(`${entity.name}${va.role ? ` (${va.role})` : ''}:`)
+                                                            for (const m of missing) lines.push(`  - ${m}`)
+                                                            lines.push('')
+                                                        }
+                                                    }
+
+                                                    if (missingVessel.length === 0 && lines.length <= 2) {
+                                                        showSuccess('No missing documents')
+                                                        return
+                                                    }
+
+                                                    await navigator.clipboard.writeText(lines.join('\n'))
+                                                    showSuccess('Missing documents list copied to clipboard')
+                                                } catch (err: any) {
+                                                    showError(err.message || 'Failed to copy')
+                                                }
+                                            }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px 16px',
+                                                textAlign: 'left',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                borderTop: '1px solid var(--glass-border)',
+                                                color: 'var(--text-primary)',
+                                                cursor: 'pointer',
+                                                fontSize: '0.85rem'
+                                            }}
+                                            className="hover-effect"
+                                        >
+                                            <Copy size={16} /> Copy Missing Documents
+                                        </button>
                                     </div>
                                 )}
                             </div>
