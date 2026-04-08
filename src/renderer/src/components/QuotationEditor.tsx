@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Plus, Trash2, ChevronDown, GitBranch, RefreshCw, Lock, MoreHorizontal, Copy, Search, X } from 'lucide-react'
-import { exportQuotationToPDF, exportQuotationToWord } from '../services/QuotationExportService'
+import { exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
 import InsuredTab from './quotation-tabs/InsuredTab'
 import VesselTab from './quotation-tabs/VesselTab'
@@ -343,12 +343,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         return warnings
     }
 
-    const doExport = async (quotation: Quotation, format: 'pdf' | 'word', successMsg: string) => {
-        if (format === 'pdf') {
-            await exportQuotationToPDF(quotation)
-        } else {
-            await exportQuotationToWord(quotation)
-        }
+    const doExport = async (quotation: Quotation, _format: 'pdf' | 'word', successMsg: string) => {
+        await exportQuotationToWord(quotation)
         showSuccess(successMsg)
     }
 
@@ -730,8 +726,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
                                     borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                 }}>
-                                    {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('pdf') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export PDF</button>}
-                                    {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('word') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export Word</button>}
+                                    {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('word') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export</button>}
                                     <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
                                     {!isLocked && canEdit && <button onClick={() => { setShowActionsMenu(false); setShowCopyFromQuotation(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Copy size={15} /> Copy from Quotation</button>}
                                     {!isLocked && canEdit && <button onClick={async () => { setShowActionsMenu(false); await handleReloadFromSettings() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Reload from Settings</button>}
