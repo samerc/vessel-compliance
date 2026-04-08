@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import XLSX from 'xlsx-js-style'
-import { Download, FileText, Users, AlertCircle, CheckCircle, Briefcase } from 'lucide-react'
+import { Download, FileText, Users, AlertCircle, CheckCircle, Briefcase, Copy } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useToast } from '../contexts/ToastContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { exportCustomerPortfolioPDF } from '../services/CustomerPortfolioService'
 import { formatDate } from '../utils/dateUtils'
@@ -206,8 +207,10 @@ export async function exportCustomerCompliancePDF(
 export default function CustomerComplianceReport() {
   const { theme } = useTheme()
   const isLight = theme === 'light'
+  const { showSuccess, showError } = useToast()
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all')
+  const [copyingMissing, setCopyingMissing] = useState(false)
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([])
   const [groups, setGroups] = useState<CustomerGroup[]>([])
   const [loading, setLoading] = useState(false)
@@ -457,6 +460,117 @@ export default function CustomerComplianceReport() {
     }
   }
 
+  const copyMissingDocuments = async () => {
+    setCopyingMissing(true)
+    try {
+      const allVessels = await window.api.getVessels()
+      const allEntities = await window.api.getEntities()
+      const docTypesRaw = await window.api.getDocumentTypes()
+      const safeDocTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
+      const safeVessels = Array.isArray(allVessels) ? allVessels : []
+      const safeEntities = Array.isArray(allEntities) ? allEntities : []
+      const fleets = await window.api.getFleets()
+      const safeFleets = Array.isArray(fleets) ? fleets : []
+
+      // Get vessel IDs from current report groups
+      const vesselIds = groups.flatMap(g => g.vessels.map(v => v.vesselId))
+      const reportVessels = safeVessels.filter(v => vesselIds.includes(v.id) && v.isActive)
+
+      // Group by fleet
+      const byFleet = new Map<string, typeof reportVessels>()
+      const standalone: typeof reportVessels = []
+      for (const v of reportVessels) {
+        if (v.fleetId) {
+          const existing = byFleet.get(v.fleetId) || []
+          existing.push(v)
+          byFleet.set(v.fleetId, existing)
+        } else {
+          standalone.push(v)
+        }
+      }
+
+      const customerName = selectedCustomerId === 'all' ? 'All Customers' : (customers.find(c => c.id === selectedCustomerId)?.name || 'Customer')
+      const lines: string[] = [`${customerName} — Missing Documents`, '']
+
+      const buildVesselMissing = async (v: typeof reportVessels[0]) => {
+        const vLines: string[] = []
+        // Vessel docs
+        const vDocs = await window.api.getVesselDocuments(v.id)
+        const customTypes = await window.api.getVesselCustomDocTypes(v.id)
+        const allTypes = [...safeDocTypes, ...(Array.isArray(customTypes) ? customTypes : []).map((c: any) => ({ id: c.id, name: c.name }))]
+        const safeVDocs = Array.isArray(vDocs) ? vDocs : []
+        const missingVessel = allTypes.filter(dt => !safeVDocs.some((d: any) => d.documentTypeId === dt.id && d.filePath))
+        if (missingVessel.length > 0) {
+          vLines.push('  Vessel Documents:')
+          for (const dt of missingVessel) vLines.push(`    - ${dt.name}`)
+        }
+        // Entity docs
+        const assureds = await window.api.getVesselAssureds(v.id)
+        for (const va of (Array.isArray(assureds) ? assureds : [])) {
+          const entity = safeEntities.find((e: any) => e.id === va.entityId)
+          if (!entity) continue
+          const missing: string[] = []
+          if (entity.type === 'company') {
+            if (!entity.certificateOfIncorporationPath) missing.push('Certificate of Incorporation')
+            if (!entity.articlesOfAssociationPath) missing.push('Articles of Association')
+            if (!entity.kycFilePath) missing.push('KYC')
+          } else {
+            if (!entity.passportFilePath) missing.push('ID / Passport')
+          }
+          if (missing.length > 0) {
+            vLines.push(`  ${entity.name}${va.role ? ` (${va.role})` : ''}:`)
+            for (const m of missing) vLines.push(`    - ${m}`)
+          }
+        }
+        return vLines
+      }
+
+      // By fleet
+      const sortedFleetIds = [...byFleet.keys()].sort((a, b) => {
+        const fa = safeFleets.find(f => f.id === a)
+        const fb = safeFleets.find(f => f.id === b)
+        return (fa?.name || '').localeCompare(fb?.name || '')
+      })
+      for (const fId of sortedFleetIds) {
+        const fleet = safeFleets.find(f => f.id === fId)
+        const fleetVessels = byFleet.get(fId) || []
+        lines.push(`${fleet?.name || 'Fleet'}:`)
+        for (const v of fleetVessels.sort((a, b) => a.name.localeCompare(b.name))) {
+          const vMissing = await buildVesselMissing(v)
+          if (vMissing.length > 0) {
+            lines.push(`  ${v.name}:`)
+            lines.push(...vMissing)
+            lines.push('')
+          }
+        }
+      }
+
+      // Standalone
+      if (standalone.length > 0) {
+        if (byFleet.size > 0) lines.push('Standalone Vessels:')
+        for (const v of standalone.sort((a, b) => a.name.localeCompare(b.name))) {
+          const vMissing = await buildVesselMissing(v)
+          if (vMissing.length > 0) {
+            lines.push(`  ${v.name}:`)
+            lines.push(...vMissing)
+            lines.push('')
+          }
+        }
+      }
+
+      if (lines.length <= 2) {
+        showSuccess('No missing documents found')
+      } else {
+        await navigator.clipboard.writeText(lines.join('\n'))
+        showSuccess('Missing documents copied to clipboard')
+      }
+    } catch (err: any) {
+      showError(err.message || 'Failed to copy missing documents')
+    } finally {
+      setCopyingMissing(false)
+    }
+  }
+
   const border = isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
   const totalVessels = groups.reduce((s, g) => s + g.vessels.length, 0)
   const totalMissing = groups.reduce((s, g) => g.vessels.reduce((sv, v) => sv + v.missing, s), 0)
@@ -489,6 +603,9 @@ export default function CustomerComplianceReport() {
             </button>
             <button onClick={exportToExcel} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Download size={16} /> Export Excel
+            </button>
+            <button onClick={copyMissingDocuments} disabled={copyingMissing} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Copy size={16} /> {copyingMissing ? 'Copying...' : 'Copy Missing'}
             </button>
           </>
         )}
