@@ -406,6 +406,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [showRebuiltYear, setShowRebuiltYear] = useState(!!vessel.rebuiltYear)
     const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
     const [editVesselType, setEditVesselType] = useState(vessel.vesselType || '')
+    const [showAddVesselType, setShowAddVesselType] = useState(false)
+    const [newVesselTypeName, setNewVesselTypeName] = useState('')
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
     const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
     const [classDropdownOpen, setClassDropdownOpen] = useState(false)
@@ -457,6 +459,20 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             }
         } catch (err: any) {
             showError(err.message || 'Failed to update policies')
+        }
+    }
+
+    const handleAddVesselType = async () => {
+        if (!newVesselTypeName.trim()) return
+        try {
+            const created = await window.api.addVesselType({ name: newVesselTypeName.trim(), order: vesselTypes.length })
+            setVesselTypes(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+            setEditVesselType(created.name)
+            setShowAddVesselType(false)
+            setNewVesselTypeName('')
+            showSuccess('Vessel type added')
+        } catch (err: any) {
+            showError(err.message || 'Failed to add vessel type')
         }
     }
 
@@ -746,19 +762,35 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Type:</span>
-                                    <select
-                                        value={editVesselType}
-                                        onChange={e => setEditVesselType(e.target.value)}
-                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', width: '160px' }}
-                                        aria-label="Vessel type"
-                                    >
-                                        <option value="">No type</option>
-                                        {vesselTypes.map(vt => (
-                                            <option key={vt.id} value={vt.name}>
-                                                {vt.description ? `${vt.name} – ${vt.description}` : vt.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    {showAddVesselType ? (
+                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                            <input value={newVesselTypeName} onChange={e => setNewVesselTypeName(e.target.value)}
+                                                placeholder="Type name" autoFocus
+                                                onKeyDown={e => { if (e.key === 'Enter') handleAddVesselType(); if (e.key === 'Escape') setShowAddVesselType(false) }}
+                                                style={{ padding: '4px 8px', borderRadius: '4px', width: '120px', fontSize: '0.85rem' }} />
+                                            <button onClick={handleAddVesselType} disabled={!newVesselTypeName.trim()} className="btn-primary" style={{ padding: '3px 8px', fontSize: '0.78rem' }}>Add</button>
+                                            <button onClick={() => { setShowAddVesselType(false); setNewVesselTypeName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={14} /></button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <select
+                                                value={editVesselType}
+                                                onChange={e => setEditVesselType(e.target.value)}
+                                                style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', width: '160px' }}
+                                                aria-label="Vessel type"
+                                            >
+                                                <option value="">No type</option>
+                                                {vesselTypes.map(vt => (
+                                                    <option key={vt.id} value={vt.name}>
+                                                        {vt.description ? `${vt.name} – ${vt.description}` : vt.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <button onClick={() => setShowAddVesselType(true)} style={{ background: 'none', border: '1px dashed var(--input-border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--accent-primary)', padding: '3px 6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center' }} title="Add new vessel type">
+                                                <Plus size={12} />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', paddingTop: '6px', flexShrink: 0 }}>Class:</span>
