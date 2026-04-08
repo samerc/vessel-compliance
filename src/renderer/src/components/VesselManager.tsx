@@ -68,6 +68,8 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [selectMode, setSelectMode] = useState(false)
     const [selectedVesselIds, setSelectedVesselIds] = useState<Set<string>>(new Set())
     const [bulkFleetDropdown, setBulkFleetDropdown] = useState(false)
+    const [newFleetInput, setNewFleetInput] = useState(false)
+    const [newFleetName, setNewFleetName] = useState('')
 
     // Column preferences
     const VESSEL_COLUMNS: ColumnDef[] = [
@@ -299,6 +301,19 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
             setSelectedVesselIds(new Set())
         } else {
             setSelectedVesselIds(new Set(vessels.map(v => v.id)))
+        }
+    }
+
+    const handleCreateFleetAndAssign = async () => {
+        if (!newFleetName.trim()) return
+        try {
+            const created = await window.api.addFleet({ name: newFleetName.trim() })
+            setFleets(prev => [...prev, created])
+            setNewFleetName('')
+            setNewFleetInput(false)
+            await handleBulkAssignFleet(created.id)
+        } catch (err: any) {
+            showError(err.message || 'Failed to create fleet')
         }
     }
 
@@ -702,7 +717,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                     >
                                         Standalone
                                     </div>
-                                    {fleets.map(f => (
+                                    {[...fleets].sort((a, b) => a.name.localeCompare(b.name)).map(f => (
                                         <div
                                             key={f.id}
                                             onClick={() => handleBulkAssignFleet(f.id)}
@@ -712,6 +727,24 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                             {f.name}
                                         </div>
                                     ))}
+                                    <div style={{ borderTop: '1px solid var(--glass-border)', marginTop: '4px', paddingTop: '4px' }}>
+                                        {newFleetInput ? (
+                                            <div style={{ display: 'flex', gap: '4px', padding: '4px' }}>
+                                                <input value={newFleetName} onChange={e => setNewFleetName(e.target.value)} placeholder="Fleet name" autoFocus
+                                                    onKeyDown={e => { if (e.key === 'Enter' && newFleetName.trim()) handleCreateFleetAndAssign(); if (e.key === 'Escape') { setNewFleetInput(false); setNewFleetName('') } }}
+                                                    style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', fontSize: '0.82rem', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)' }} />
+                                                <button onClick={handleCreateFleetAndAssign} disabled={!newFleetName.trim()} className="btn-primary" style={{ padding: '3px 8px', fontSize: '0.75rem' }}>Add</button>
+                                            </div>
+                                        ) : (
+                                            <div
+                                                onClick={() => setNewFleetInput(true)}
+                                                style={{ padding: '8px 10px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.82rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                className="hover-effect"
+                                            >
+                                                <Plus size={13} /> Create New Fleet
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
