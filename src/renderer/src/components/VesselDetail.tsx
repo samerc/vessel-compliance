@@ -2561,7 +2561,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
             {/* Add/Edit Modal */}
             {/* Add/Edit Modal */}
             {showAddModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setShowAddModal(false)}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
                     <div
                         ref={modalRef}
                         role="dialog"
