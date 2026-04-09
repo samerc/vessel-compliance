@@ -330,20 +330,24 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
                         <span style={{ color: 'var(--table-border)', fontSize: '0.7rem' }}>|</span>
                     </>
                 )}
-                {allAdditional.length > 0 && (
+                {allAdditional.length > 0 && (() => {
+                    const alreadyIds = new Set(additionalClauses.map((ac: any) => ac.piAdditionalClauseId))
+                    return (
                     <select
                         onChange={e => { if (e.target.value) { addAdditionalClause(e.target.value); e.target.value = '' } }}
                         style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)', fontSize: '0.83rem' }}
                         value=""
                     >
                         <option value="">Add individual clause…</option>
-                        {allAdditional.map(ac => (
-                            <option key={ac.id} value={ac.id}>
-                                {ac.title ? `${ac.title} — ` : ''}{ac.code ? `[${ac.code}] ` : ''}{ac.text.substring(0, 70)}{ac.text.length > 70 ? '…' : ''}
+                        {allAdditional.map(ac => {
+                            const added = alreadyIds.has(ac.id)
+                            return (
+                            <option key={ac.id} value={ac.id} disabled={added} style={added ? { color: 'var(--text-secondary)' } : undefined}>
+                                {added ? '\u2713 ' : ''}{ac.title ? `${ac.title} — ` : ''}{ac.code ? `[${ac.code}] ` : ''}{ac.text.substring(0, 70)}{ac.text.length > 70 ? '…' : ''}
                             </option>
-                        ))}
+                        )})}
                     </select>
-                )}
+                )})()}
             </div>
             {additionalClauses.map((ac: any) => {
                 const def = allAdditional.find(a => a.id === ac.piAdditionalClauseId)

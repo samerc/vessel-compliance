@@ -10844,7 +10844,7 @@ export class MySQLAdapter {
 
     async updateQuotationItemAlternativeId(table: string, id: string, alternativeId: string | null): Promise<void> {
         if (!this.pool) return
-        const allowedTables = ['quotation_clauses', 'quotation_additional_clauses', 'quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_exclusions', 'quotation_custom_exclusions']
+        const allowedTables = ['quotation_clauses', 'quotation_additional_clauses', 'quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_exclusions', 'quotation_custom_exclusions', 'quotation_survey_warranties']
         if (!allowedTables.includes(table)) throw new Error('Invalid table')
         await this.pool.execute(`UPDATE ${table} SET alternative_id = ? WHERE id = ?`, [alternativeId, id])
     }

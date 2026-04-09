@@ -3,6 +3,7 @@ import { Plus, Trash2, GripVertical, X, Pencil, Upload, AlertTriangle } from 'lu
 import { Quotation, PIClause, PIExclusion, QuotationCustomExclusion, QuotationPIAlternative, QuotationVessel, Vessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
+import { AlternativeScopeChips } from './shared'
 
 export default function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
@@ -147,6 +148,16 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         await window.api.updateQuotationItemVesselScope('quotation_exclusions', id, scope)
     }
 
+    const updateExclusionAltId = async (id: string, altId: string | null) => {
+        await window.api.updateQuotationItemAlternativeId('quotation_exclusions', id, altId)
+        setSelectedRows(prev => prev.map(e => e.id === id ? { ...e, alternativeId: altId } : e))
+    }
+
+    const updateCustomExclusionAltId = async (id: string, altId: string | null) => {
+        await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', id, altId)
+        setCustomExclusions(prev => prev.map(ce => ce.id === id ? { ...ce, alternativeId: altId } : ce))
+    }
+
     // Custom exclusion handlers
     const addCustom = async () => {
         if (!newCustomText.trim()) return
@@ -234,9 +245,10 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                                     </div>
                                 </div>
                             </label>
-                            {row && qVessels.length > 1 && (
+                            {row && (
                                 <div style={{ paddingLeft: '30px' }}>
-                                    <VesselScopeChips vessels={qVessels} vesselScope={row.vesselScope} onChange={scope => updateExclusionScope(row.id, scope)} />
+                                    {qVessels.length > 1 && <VesselScopeChips vessels={qVessels} vesselScope={row.vesselScope} onChange={scope => updateExclusionScope(row.id, scope)} />}
+                                    <AlternativeScopeChips alternatives={piAlternatives} currentAltId={row.alternativeId || null} onChangeAltId={altId => updateExclusionAltId(row.id, altId)} />
                                 </div>
                             )}
                         </div>
@@ -302,9 +314,10 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                                 </div>
                             </div>
                         )}
-                        {editingCustomId !== ce.id && qVessels.length > 1 && (
+                        {editingCustomId !== ce.id && (
                             <div style={{ marginTop: '4px' }}>
-                                <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />
+                                {qVessels.length > 1 && <VesselScopeChips vessels={qVessels} vesselScope={ce.vesselScope} onChange={scope => updateCustomScope(ce.id, scope)} />}
+                                <AlternativeScopeChips alternatives={piAlternatives} currentAltId={ce.alternativeId || null} onChangeAltId={altId => updateCustomExclusionAltId(ce.id, altId)} />
                             </div>
                         )}
                     </div>

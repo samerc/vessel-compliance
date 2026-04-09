@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
-import { Quotation, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty } from '../../../../shared/types'
+import { Quotation, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, QuotationPIAlternative } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
+import { AlternativeScopeChips } from './shared'
 
 const DEADLINE_PRESETS = [
     'prior inception',
@@ -12,7 +13,7 @@ const DEADLINE_PRESETS = [
     'prior drydocking',
 ]
 
-export default function SurveyWarrantiesTab({ quotation, showSuccess, showError }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void }) {
+export default function SurveyWarrantiesTab({ quotation, showSuccess, showError, piAlternatives = [] }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[] }) {
     const [items, setItems] = useState<QuotationSurveyWarranty[]>([])
     const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
     const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
@@ -103,6 +104,13 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError 
         try {
             await window.api.quotationSurveyWarrantyDelete(id)
             setItems(prev => prev.filter(i => i.id !== id))
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const updateItemAltId = async (id: string, altId: string | null) => {
+        try {
+            await window.api.updateQuotationItemAlternativeId('quotation_survey_warranties', id, altId)
+            setItems(prev => prev.map(i => i.id === id ? { ...i, alternativeId: altId } : i))
         } catch (e: any) { showError(e.message) }
     }
 
@@ -269,6 +277,9 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError 
                                 <button disabled={idx === items.length - 1} onClick={() => reorder(idx, 1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === items.length - 1 ? 'default' : 'pointer', padding: '1px', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                                 <button onClick={() => deleteItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '1px', marginTop: '4px' }}><Trash2 size={14} /></button>
                             </div>
+                        </div>
+                        <div style={{ paddingLeft: '12px' }}>
+                            <AlternativeScopeChips alternatives={piAlternatives} currentAltId={item.alternativeId || null} onChangeAltId={altId => updateItemAltId(item.id, altId)} />
                         </div>
                     </div>
                 )
