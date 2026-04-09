@@ -152,6 +152,8 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
 
     // Renew dropdown
     const [renewMenuId, setRenewMenuId] = useState<string | null>(null)
+    const renewBtnRefs = useRef<Record<string, HTMLButtonElement>>({})
+    const [renewMenuPos, setRenewMenuPos] = useState<{ top: number; right: number } | null>(null)
     const [renewLoading, setRenewLoading] = useState<string | null>(null)
 
     // Close renew dropdown on outside click (use timeout to avoid closing on the same click that opened)
@@ -724,68 +726,41 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                     </button>
                     {/* Renew */}
                     {hasPermission('quotations:create') && (
-                        <div style={{ position: 'relative', display: 'inline-flex' }}>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    console.log('[Renew] Button clicked for', r.vesselName, 'fleet:', r.fleetName)
-                                    if (!r.fleetName) {
-                                        handleRenew(r, false)
+                        <button
+                            ref={el => { if (r.id && el) renewBtnRefs.current[r.id] = el }}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (!r.fleetName) {
+                                    handleRenew(r, false)
+                                } else {
+                                    if (renewMenuId === r.id) {
+                                        setRenewMenuId(null)
+                                        setRenewMenuPos(null)
                                     } else {
-                                        setRenewMenuId(renewMenuId === r.id ? null : r.id)
+                                        const btn = renewBtnRefs.current[r.id]
+                                        if (btn) {
+                                            const rect = btn.getBoundingClientRect()
+                                            setRenewMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+                                        }
+                                        setRenewMenuId(r.id)
                                     }
-                                }}
-                                disabled={renewLoading === r.id}
-                                style={{
-                                    padding: '6px 9px', background: 'transparent',
-                                    border: 'none', borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
-                                    cursor: 'pointer', color: 'var(--accent-primary)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px',
-                                    transition: 'background 0.12s'
-                                }}
-                                title="Create renewal quotation"
-                                onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)' }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                            >
-                                <RefreshCw size={14} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
-                                {r.fleetName && <ChevronDownIcon size={10} />}
-                            </button>
-                            {renewMenuId === r.id && (
-                                <div
-                                    onClick={e => e.stopPropagation()}
-                                    style={{
-                                        position: 'absolute', top: '100%', right: 0, marginTop: '4px',
-                                        background: isLight ? '#ffffff' : '#1a1d28',
-                                        border: '1px solid var(--glass-border)',
-                                        borderRadius: '8px', padding: '4px', minWidth: '180px', zIndex: 100,
-                                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                                    }}
-                                >
-                                    <div
-                                        onClick={() => handleRenew(r, false)}
-                                        style={{
-                                            padding: '8px 12px', cursor: 'pointer', borderRadius: '4px',
-                                            fontSize: '0.82rem', color: 'var(--text-primary)'
-                                        }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                    >
-                                        Renew Vessel Only
-                                    </div>
-                                    <div
-                                        onClick={() => handleRenew(r, true)}
-                                        style={{
-                                            padding: '8px 12px', cursor: 'pointer', borderRadius: '4px',
-                                            fontSize: '0.82rem', color: 'var(--text-primary)'
-                                        }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                    >
-                                        Renew Fleet ({r.fleetName})
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                                }
+                            }}
+                            disabled={renewLoading === r.id}
+                            style={{
+                                padding: '6px 9px', background: 'transparent',
+                                border: 'none', borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                                cursor: 'pointer', color: 'var(--accent-primary)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px',
+                                transition: 'background 0.12s'
+                            }}
+                            title="Create renewal quotation"
+                            onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                            <RefreshCw size={14} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
+                            {r.fleetName && <ChevronDownIcon size={10} />}
+                        </button>
                     )}
                     {/* View */}
                     <button
@@ -1250,6 +1225,41 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                     )}
                 </div>
             )}
+
+            {/* Renew dropdown (fixed position, rendered outside table to avoid clipping) */}
+            {renewMenuId && renewMenuPos && (() => {
+                const row = renewals.find(r => r.id === renewMenuId)
+                if (!row) return null
+                return (
+                    <div
+                        onMouseDown={e => e.stopPropagation()}
+                        style={{
+                            position: 'fixed', top: renewMenuPos.top, right: renewMenuPos.right,
+                            background: isLight ? '#ffffff' : '#1a1d28',
+                            border: '1px solid var(--glass-border)',
+                            borderRadius: '8px', padding: '4px', minWidth: '200px', zIndex: 9999,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                        }}
+                    >
+                        <div
+                            onClick={() => handleRenew(row, false)}
+                            style={{ padding: '10px 14px', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                            Renew Vessel Only
+                        </div>
+                        <div
+                            onClick={() => handleRenew(row, true)}
+                            style={{ padding: '10px 14px', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                            Renew Fleet ({row.fleetName})
+                        </div>
+                    </div>
+                )
+            })()}
 
             {/* Renewal Notes modal */}
             {notesModal && (
