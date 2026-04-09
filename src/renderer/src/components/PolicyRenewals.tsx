@@ -154,12 +154,12 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     const [renewMenuId, setRenewMenuId] = useState<string | null>(null)
     const [renewLoading, setRenewLoading] = useState<string | null>(null)
 
-    // Close renew dropdown on outside click
+    // Close renew dropdown on outside click (use timeout to avoid closing on the same click that opened)
     useEffect(() => {
         if (!renewMenuId) return
         const handler = () => setRenewMenuId(null)
-        document.addEventListener('click', handler)
-        return () => document.removeEventListener('click', handler)
+        const timer = setTimeout(() => document.addEventListener('mousedown', handler), 10)
+        return () => { clearTimeout(timer); document.removeEventListener('mousedown', handler) }
     }, [renewMenuId])
 
     // Column preferences
@@ -696,11 +696,11 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             </td>
             )}
             {rnVisSet.has('actions') && (
-            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+            <td style={{ padding: '8px 14px', textAlign: 'center' }}>
                 <div style={{
                     display: 'inline-flex', gap: 0, alignItems: 'center',
-                    borderRadius: '8px', overflow: 'hidden',
-                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`
+                    borderRadius: '8px',
+                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`
                 }}>
                     {/* Notes */}
                     <button
@@ -765,7 +765,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                             padding: '8px 12px', cursor: 'pointer', borderRadius: '4px',
                                             fontSize: '0.82rem', color: 'var(--text-primary)'
                                         }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)')}
                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                     >
                                         Renew Vessel Only
@@ -776,7 +776,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                             padding: '8px 12px', cursor: 'pointer', borderRadius: '4px',
                                             fontSize: '0.82rem', color: 'var(--text-primary)'
                                         }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)')}
                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                     >
                                         Renew Fleet ({r.fleetName})
