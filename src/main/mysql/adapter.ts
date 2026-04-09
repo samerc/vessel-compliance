@@ -8040,6 +8040,208 @@ export class MySQLAdapter {
         return newId
     }
 
+    async renewFleetPolicies(vesselIds: string[], quotationTypeCode: string, createdBy: string): Promise<string> {
+        if (!this.pool || vesselIds.length === 0) throw new Error('No vessels provided')
+
+        // Find active policy documents for each vessel
+        const policyMap: Map<string, string> = new Map() // vesselId → policyDocId
+        const quotationMap: Map<string, string> = new Map() // vesselId → sourceQuotationId
+        for (const vid of vesselIds) {
+            const policyDocId = await this.findActivePolicyDocForVessel(vid, quotationTypeCode)
+            if (policyDocId) {
+                const policy = await this.getPolicyDocumentById(policyDocId)
+                if (policy?.quotationId) {
+                    policyMap.set(vid, policyDocId)
+                    quotationMap.set(vid, policy.quotationId)
+                }
+            }
+        }
+
+        // Determine primary vessel (first one with a policy, or first vessel)
+        const primaryVesselId = vesselIds.find(vid => policyMap.has(vid)) || vesselIds[0]
+        let newQuotationId: string
+
+        if (policyMap.has(primaryVesselId)) {
+            // Clone primary policy → creates base quotation with full coverage
+            newQuotationId = await this.renewPolicy(policyMap.get(primaryVesselId)!, createdBy)
+        } else {
+            // No policies at all → create blank quotation
+            const quotationTypes = await this.getQuotationTypes()
+            const qt = quotationTypes.find((t: any) => t.code === quotationTypeCode) || quotationTypes[0]
+            const q = await this.addQuotation({
+                quotationTypeId: qt?.id,
+                isRenewal: true,
+                createdBy
+            } as any)
+            newQuotationId = q.id
+        }
+
+        // Load the new quotation's current vessels
+        const existingVessels = await this.getQuotationVessels(newQuotationId)
+        const existingVesselDbIds = new Set(existingVessels.map(v => v.vesselId).filter(Boolean))
+
+        // Add remaining fleet vessels that aren't already in the quotation
+        const flagStates = await this.getFlagStates()
+        let vesselOrder = existingVessels.length
+        for (const vid of vesselIds) {
+            if (existingVesselDbIds.has(vid)) continue
+            const [vRows] = await this.pool.query('SELECT * FROM vessels WHERE id = ?', [vid])
+            const v = (vRows as any[])[0]
+            if (!v) continue
+            // Resolve flag name
+            let flagName = ''
+            if (v.flag_state_id) {
+                const fs = flagStates.find((f: any) => f.id === v.flag_state_id)
+                flagName = fs?.name || ''
+            }
+            // Resolve classification name
+            let className = v.classification_society || ''
+            if (v.classification_society) {
+                const [cRows] = await this.pool.query('SELECT name FROM classification_societies WHERE id = ?', [v.classification_society])
+                if ((cRows as any[]).length > 0) className = (cRows as any[])[0].name
+            }
+            await this.addQuotationVessel({
+                quotationId: newQuotationId,
+                vesselId: vid,
+                vesselLabel: `V${vesselOrder + 1}`,
+                order: vesselOrder,
+                name: v.name,
+                imoNumber: v.imo_number,
+                builtYear: v.built_year,
+                rebuiltYear: v.rebuilt_year,
+                grossTonnage: v.gross_tonnage,
+                flag: flagName,
+                vesselType: v.vessel_type,
+                classification: className,
+                callSign: v.call_sign
+            })
+            vesselOrder++
+        }
+
+        // Reload all quotation vessels to get their IDs for scope mapping
+        const allQVessels = await this.getQuotationVessels(newQuotationId)
+        const vesselIdToQvId = new Map<string, string>() // DB vesselId → quotation_vessel.id
+        for (const qv of allQVessels) {
+            if (qv.vesselId) vesselIdToQvId.set(qv.vesselId, qv.id)
+        }
+        const vesselIdToLabel = new Map<string, string>()
+        for (const qv of allQVessels) {
+            if (qv.vesselId) vesselIdToLabel.set(qv.vesselId, qv.vesselLabel)
+        }
+
+        // Get existing quotation assureds
+        const existingAssureds = await this.getQuotationAssureds(newQuotationId)
+        const existingEntityIds = new Set(existingAssureds.map((a: any) => a.entityId).filter(Boolean))
+
+        // For each non-primary vessel that has a policy, merge their data
+        for (const vid of vesselIds) {
+            if (vid === primaryVesselId) continue
+            const sourceQId = quotationMap.get(vid)
+            if (!sourceQId) {
+                // No policy — just add assureds from vessel's assured list
+                const vassureds = await this.getVesselAssureds(vid)
+                const entities = await this.getEntities()
+                const vLabel = vesselIdToLabel.get(vid) || ''
+                let assuredOrder = (await this.getQuotationAssureds(newQuotationId)).length
+                for (const va of vassureds) {
+                    if (existingEntityIds.has(va.entityId)) continue
+                    const entity = entities.find((e: any) => e.id === va.entityId)
+                    if (!entity) continue
+                    // c/o role → skip (handled as broker)
+                    if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') continue
+                    await this.addQuotationAssured({
+                        quotationId: newQuotationId,
+                        entityId: va.entityId,
+                        name: entity.name,
+                        role: va.role || undefined,
+                        vesselLabel: allQVessels.length > 1 ? vLabel : undefined,
+                        order: assuredOrder++
+                    })
+                    existingEntityIds.add(va.entityId)
+                }
+                continue
+            }
+
+            // Merge from source quotation
+            const sourceQ = await this.getQuotation(sourceQId)
+            if (!sourceQ) continue
+
+            // Merge per-vessel premium
+            const qvId = vesselIdToQvId.get(vid)
+            if (qvId && sourceQ.premiumAmount) {
+                await this.pool.execute(
+                    'UPDATE quotation_vessels SET premium_amount = ? WHERE id = ?',
+                    [sourceQ.premiumAmount, qvId]
+                )
+            }
+
+            // Merge per-vessel agreed value
+            if (qvId && sourceQ.agreedValue) {
+                await this.pool.execute(
+                    'UPDATE quotation_vessels SET agreed_value = ? WHERE id = ?',
+                    [sourceQ.agreedValue, qvId]
+                )
+            }
+            if (qvId && sourceQ.ivValue) {
+                await this.pool.execute(
+                    'UPDATE quotation_vessels SET iv_value = ? WHERE id = ?',
+                    [sourceQ.ivValue, qvId]
+                )
+            }
+
+            // Merge warranties (add any not already in the quotation, with vessel scope)
+            const sourceWarranties = await this.getQuotationWarranties(sourceQId)
+            const existingWarranties = await this.getQuotationWarranties(newQuotationId)
+            const existingWarrantyIds = new Set(existingWarranties.map((w: any) => w.piWarrantyId))
+            let warrantyOrder = existingWarranties.length
+            for (const sw of sourceWarranties) {
+                if (!existingWarrantyIds.has(sw.piWarrantyId)) {
+                    // Add with vessel scope pointing to this vessel
+                    const vesselScope = qvId ? JSON.stringify([qvId]) : null
+                    await this.pool.execute(
+                        'INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)',
+                        [uuidv4(), newQuotationId, sw.piWarrantyId, warrantyOrder++, vesselScope, null]
+                    )
+                    existingWarrantyIds.add(sw.piWarrantyId)
+                }
+            }
+
+            // Merge custom warranties
+            const sourceCustomWarranties = await this.getQuotationCustomWarranties(sourceQId)
+            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+            try {
+                for (const cw of sourceCustomWarranties) {
+                    const vesselScope = qvId ? JSON.stringify([qvId]) : null
+                    await this.pool.execute(
+                        'INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
+                        [uuidv4(), newQuotationId, cw.text, 0, vesselScope]
+                    )
+                }
+            } finally {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            }
+
+            // Merge assureds (dedup by entity ID)
+            const sourceAssureds = await this.getQuotationAssureds(sourceQId)
+            const vLabel = vesselIdToLabel.get(vid) || ''
+            let assuredOrder = (await this.getQuotationAssureds(newQuotationId)).length
+            for (const sa of sourceAssureds) {
+                if (sa.entityId && existingEntityIds.has(sa.entityId)) continue
+                await this.addQuotationAssured({
+                    quotationId: newQuotationId,
+                    entityId: sa.entityId || undefined,
+                    name: sa.name,
+                    role: sa.role || undefined,
+                    vesselLabel: allQVessels.length > 1 ? vLabel : undefined,
+                    order: assuredOrder++
+                })
+                if (sa.entityId) existingEntityIds.add(sa.entityId)
+            }
+        }
+
+        return newQuotationId
+    }
+
     async getQuotationRevisionCount(revisionGroupId: string): Promise<number> {
         if (!this.pool) return 0
         const [rows] = await this.pool.query(

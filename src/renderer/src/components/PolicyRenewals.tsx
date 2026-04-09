@@ -345,6 +345,23 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             const quotationType = quotationTypes.find((qt: any) => qt.code === qtCode) || quotationTypes[0]
             if (!quotationType) throw new Error('No quotation types configured')
 
+            // Fleet renewal: merge policy data from all fleet vessels into one quotation
+            if (includeFleet) {
+                const allVessels = await window.api.getVessels()
+                const primaryVessel = allVessels.find((v: any) => v.id === row.vesselId)
+                const primaryFleetId = primaryVessel?.fleetId
+                if (primaryFleetId) {
+                    const fleetVessels = allVessels.filter((v: any) => v.isActive && v.fleetId === primaryFleetId)
+                    const fleetVesselIds = fleetVessels.map((v: any) => v.id)
+                    const result = await window.api.policyRenewFleet(fleetVesselIds, qtCode)
+                    if (result && !(result as any).error && result.quotationId) {
+                        showSuccess(`Fleet renewal quotation created with ${fleetVessels.length} vessels`)
+                        onCreateRenewalQuotation?.(result.quotationId)
+                        return
+                    }
+                }
+            }
+
             // Try to find an active policy document for this vessel → use policyRenew (clones everything)
             if (!includeFleet) {
                 const policyDocId = await window.api.policyFindActiveForVessel(row.vesselId, qtCode)

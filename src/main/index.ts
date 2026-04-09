@@ -2686,6 +2686,19 @@ app.whenReady().then(() => {
     return { quotationId }
   })
 
+  safeHandle('policy:renewFleet', async (event, vesselIds: string[], quotationTypeCode: string) => {
+    const user = await requirePermission(event, 'quotations:create')
+    const quotationId = await db.renewFleetPolicies(vesselIds, quotationTypeCode, user.id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'RENEW',
+      module: 'Policies',
+      details: `Created fleet renewal quotation for ${vesselIds.length} vessels`
+    })
+    return { quotationId }
+  })
+
   // ── Signatures ─────────────────────────────────────────────
   safeHandle('signature:get', async (event) => {
     const user = requireSession(event)

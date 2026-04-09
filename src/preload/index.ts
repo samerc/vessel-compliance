@@ -779,6 +779,7 @@ const api = {
   policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
   policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => ipcRenderer.invoke('policy:findActiveForVessel', vesselId, quotationTypeCode),
   policyRenew: (policyId: string) => ipcRenderer.invoke('policy:renew', policyId),
+  policyRenewFleet: (vesselIds: string[], quotationTypeCode: string) => ipcRenderer.invoke('policy:renewFleet', vesselIds, quotationTypeCode),
   policySign: (policyId: string) => ipcRenderer.invoke('policy:sign', policyId),
   policyGetSignature: (policyId: string) => ipcRenderer.invoke('policy:getSignature', policyId),
 
