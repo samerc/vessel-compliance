@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Pencil } from 'lucide-react'
-import { Quotation, QuotationSubLimit, QuotationVessel, PISectionTexts } from '../../../../shared/types'
+import { Quotation, QuotationSubLimit, QuotationVessel, QuotationPIAlternative, PISectionTexts } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
+import { ALT_COLORS } from './shared'
 
 export default function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveText }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [subLimits, setSubLimits] = useState<QuotationSubLimit[]>([])
     const [templates, setTemplates] = useState<import('../../../../shared/types').PISubLimitTemplate[]>([])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+    const [piAlts, setPiAlts] = useState<QuotationPIAlternative[]>([])
     const [newText, setNewText] = useState('')
     const [newAmount, setNewAmount] = useState('')
     const [newCurrency, setNewCurrency] = useState('USD')
@@ -22,6 +24,10 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
         setSubLimits(sl)
         setTemplates(Array.isArray(tmpl) ? tmpl : [])
         setQVessels(Array.isArray(qv) ? qv : [])
+        if (quotation.quotationTypeCode === 'P') {
+            const alts = await window.api.piGetQuotationAlternatives(quotation.id)
+            setPiAlts(Array.isArray(alts) ? alts : [])
+        }
     }
 
     const handleAddSubLimit = async () => {
@@ -51,16 +57,52 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
                 Set the limit of liability and configure sub-limits if required.
             </p>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', maxWidth: '600px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Currency:</span>
-                    <input type="text" value={quotation.limitOfLiabilityCurrency || 'USD'} onChange={e => { setQ(p => ({ ...p, limitOfLiabilityCurrency: e.target.value })) }} onBlur={e => updateField('limitOfLiabilityCurrency', e.target.value)} style={{ width: '70px' }} />
+            {piAlts.length >= 2 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', maxWidth: '600px' }}>
+                    {piAlts.map((alt, idx) => (
+                        <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${ALT_COLORS[idx % ALT_COLORS.length]}` }}>
+                            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: ALT_COLORS[idx % ALT_COLORS.length], minWidth: '140px' }}>
+                                {alt.label || `Alternative ${idx + 1}`}
+                            </label>
+                            <input
+                                type="text"
+                                value={alt.lolCurrency || quotation.limitOfLiabilityCurrency || 'USD'}
+                                onChange={e => {
+                                    const val = e.target.value
+                                    setPiAlts(prev => prev.map(a => a.id === alt.id ? { ...a, lolCurrency: val } : a))
+                                }}
+                                onBlur={e => window.api.piUpdateQuotationAlternative(alt.id, { lolCurrency: e.target.value || undefined })}
+                                style={{ width: '60px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'center' }}
+                            />
+                            <input
+                                type="number"
+                                value={alt.lolAmount ?? ''}
+                                onChange={e => {
+                                    const val = e.target.value ? parseFloat(e.target.value) : undefined
+                                    setPiAlts(prev => prev.map(a => a.id === alt.id ? { ...a, lolAmount: val } : a))
+                                }}
+                                onBlur={e => {
+                                    const val = e.target.value ? parseFloat(e.target.value) : null
+                                    window.api.piUpdateQuotationAlternative(alt.id, { lolAmount: val })
+                                }}
+                                placeholder="LOL Amount"
+                                style={{ flex: 1, maxWidth: '200px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
+                            />
+                        </div>
+                    ))}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Amount:</span>
-                    <input type="number" value={quotation.limitOfLiabilityAmount || ''} onChange={e => { setQ(p => ({ ...p, limitOfLiabilityAmount: parseFloat(e.target.value) || undefined })) }} onBlur={e => updateField('limitOfLiabilityAmount', parseFloat(e.target.value) || null)} style={{ width: '180px' }} />
+            ) : (
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', maxWidth: '600px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Currency:</span>
+                        <input type="text" value={quotation.limitOfLiabilityCurrency || 'USD'} onChange={e => { setQ(p => ({ ...p, limitOfLiabilityCurrency: e.target.value })) }} onBlur={e => updateField('limitOfLiabilityCurrency', e.target.value)} style={{ width: '70px' }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Amount:</span>
+                        <input type="number" value={quotation.limitOfLiabilityAmount || ''} onChange={e => { setQ(p => ({ ...p, limitOfLiabilityAmount: parseFloat(e.target.value) || undefined })) }} onBlur={e => updateField('limitOfLiabilityAmount', parseFloat(e.target.value) || null)} style={{ width: '180px' }} />
+                    </div>
                 </div>
-            </div>
+            )}
 
             {qVessels.length >= 2 && (
                 <div style={{ marginBottom: '16px' }}>

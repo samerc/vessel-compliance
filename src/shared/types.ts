@@ -871,6 +871,8 @@ export interface QuotationPIAlternative {
   quotationId: string
   label?: string
   premiumAmount?: number
+  lolAmount?: number | null
+  lolCurrency?: string
   order: number
 }
 

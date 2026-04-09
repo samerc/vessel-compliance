@@ -754,16 +754,21 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const lolVA = data.quotation.limitOfLiabilityVesselAmounts
     const multiVessel = data.quotationVessels.length >= 2
 
+    // Per-alternative LOL (P&I with 2+ alternatives)
+    const piAltLol = data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
+
     // Determine if per-vessel amounts differ
     let hasDifferentLol = false
-    if (multiVessel && lolVA && Object.keys(lolVA).length > 0) {
+    if (!piAltLol && multiVessel && lolVA && Object.keys(lolVA).length > 0) {
       const amounts = data.quotationVessels.map(qv => lolVA[qv.id] ?? baseAmt)
       hasDifferentLol = amounts.some(a => a !== amounts[0])
     }
 
     // Build the amount string for the template
     let amountDisplay: string
-    if (hasDifferentLol) {
+    if (piAltLol) {
+      amountDisplay = 'values as per below'
+    } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
     } else if (multiVessel && baseAmt != null) {
       amountDisplay = `${formatAmountOnly(baseAmt)} (all vessels)`
@@ -795,6 +800,20 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     } else if (baseAmt != null) {
       liabilityText = `${amountDisplay} all claims in the aggregate.`
     }
+
+    // Per-alternative LOL lines
+    if (piAltLol) {
+      const altLines = data.piAlternatives.map((alt, idx) => {
+        const altCur = alt.lolCurrency || cur
+        const altAmt = alt.lolAmount
+        if (altAmt == null) return ''
+        return `${alt.label || `Alternative ${idx + 1}`}: ${formatCurrency(altAmt, altCur)} all claims in the aggregate`
+      }).filter(Boolean)
+      if (altLines.length > 0) {
+        liabilityText += (liabilityText ? '\n\n' : '') + altLines.join('\n')
+      }
+    }
+
     const pdfSubLimitLines = data.subLimits.map(sl =>
       sl.text.replace('{amount}', formatAmountOnly(sl.amount)).replace('{currency}', sl.currency || 'USD')
     )
@@ -2362,9 +2381,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const lolVA = data.quotation.limitOfLiabilityVesselAmounts
     const multiVessel = data.quotationVessels.length >= 2
 
+    // Per-alternative LOL (P&I with 2+ alternatives)
+    const dPiAltLol = data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
+
     // Determine if per-vessel amounts differ
     let hasDifferentLol = false
-    if (multiVessel && lolVA && Object.keys(lolVA).length > 0) {
+    if (!dPiAltLol && multiVessel && lolVA && Object.keys(lolVA).length > 0) {
       const amounts = data.quotationVessels.map(qv => lolVA[qv.id] ?? baseAmt)
       hasDifferentLol = amounts.some(a => a !== amounts[0])
     }
@@ -2382,7 +2404,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     // Build the amount string for the template
     let amountDisplay: string
-    if (hasDifferentLol) {
+    if (dPiAltLol) {
+      amountDisplay = 'values as per below'
+    } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
     } else if (multiVessel && baseAmt != null) {
       amountDisplay = `${formatAmountOnly(baseAmt)} (all vessels)`
@@ -2421,6 +2445,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (baseAmt != null) {
       liabContent.push(np(`${amountDisplay} all claims in the aggregate.`))
     }
+
+    // Per-alternative LOL lines
+    if (dPiAltLol) {
+      liabContent.push(emptyP())
+      for (let ai = 0; ai < data.piAlternatives.length; ai++) {
+        const alt = data.piAlternatives[ai]
+        const altCur = alt.lolCurrency || cur
+        const altAmt = alt.lolAmount
+        if (altAmt == null) continue
+        liabContent.push(np(`${alt.label || `Alternative ${ai + 1}`}: ${formatCurrency(altAmt, altCur)} all claims in the aggregate`))
+      }
+    }
+
     const lolRawHasPlaceholder = (data.quotation.limitOfLiabilityText || st(data, 'limitOfLiabilityDefaultText') || '').includes('{sub_limits}')
     if (!lolRawHasPlaceholder && wordSubLimitParas.length > 0) {
       liabContent.push(...wordSubLimitParas)

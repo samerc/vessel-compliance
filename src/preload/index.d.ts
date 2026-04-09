@@ -293,7 +293,7 @@ export interface Api {
   piGetQuotationAlternatives: (qId: string) => Promise<QuotationPIAlternative[]>
   piAddQuotationAlternative: (qId: string, label?: string) => Promise<QuotationPIAlternative>
   piMigrateSharedToAlternative: (qId: string, altId: string) => Promise<void>
-  piUpdateQuotationAlternative: (id: string, updates: { label?: string; premiumAmount?: number | null }) => Promise<void>
+  piUpdateQuotationAlternative: (id: string, updates: { label?: string; premiumAmount?: number | null; lolAmount?: number | null; lolCurrency?: string }) => Promise<void>
   piDeleteQuotationAlternative: (id: string) => Promise<void>
   piReorderQuotationAlternatives: (ids: string[]) => Promise<void>
   updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => Promise<void>

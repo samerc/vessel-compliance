@@ -2802,6 +2802,15 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } catch {}
 
+            // Migration: per-alternative LOL on quotation_pi_alternatives
+            try {
+                const [lolCol] = await this.pool.query("SHOW COLUMNS FROM quotation_pi_alternatives LIKE 'lol_amount'") as any[]
+                if ((lolCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_pi_alternatives ADD COLUMN lol_amount DECIMAL(15,2) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotation_pi_alternatives ADD COLUMN lol_currency VARCHAR(10) DEFAULT NULL")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7625,8 +7634,8 @@ export class MySQLAdapter {
             const newAId = uuidv4()
             piAltIdMap[a.id] = newAId
             await this.pool.execute(
-                `INSERT INTO quotation_pi_alternatives (id, quotation_id, label, premium_amount, order_index) VALUES (?, ?, ?, ?, ?)`,
-                [newAId, newId, a.label, a.premium_amount, a.order_index]
+                `INSERT INTO quotation_pi_alternatives (id, quotation_id, label, premium_amount, order_index, lol_amount, lol_currency) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [newAId, newId, a.label, a.premium_amount, a.order_index, a.lol_amount, a.lol_currency]
             )
         }
 
@@ -10791,13 +10800,13 @@ export class MySQLAdapter {
     async getQuotationPIAlternatives(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, quotation_id as quotationId, label, premium_amount as premiumAmount, order_index as `order` FROM quotation_pi_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
+            'SELECT id, quotation_id as quotationId, label, premium_amount as premiumAmount, lol_amount as lolAmount, lol_currency as lolCurrency, order_index as `order` FROM quotation_pi_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
             [quotationId]
         )
-        return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined }))
+        return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined, lolAmount: r.lolAmount != null ? Number(r.lolAmount) : undefined, lolCurrency: r.lolCurrency || undefined }))
     }
 
-    async addQuotationPIAlternative(quotationId: string, label?: string): Promise<any> {
+    async addQuotationPIAlternative(quotationId: string, label?: string, lolAmount?: number | null, lolCurrency?: string): Promise<any> {
         if (!this.pool) return null
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_pi_alternatives WHERE quotation_id = ?', [quotationId])
@@ -10805,21 +10814,23 @@ export class MySQLAdapter {
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
             await this.pool.execute(
-                'INSERT INTO quotation_pi_alternatives (id, quotation_id, label, order_index) VALUES (?, ?, ?, ?)',
-                [id, quotationId, label || null, order]
+                'INSERT INTO quotation_pi_alternatives (id, quotation_id, label, order_index, lol_amount, lol_currency) VALUES (?, ?, ?, ?, ?, ?)',
+                [id, quotationId, label || null, order, lolAmount ?? null, lolCurrency || null]
             )
         } finally {
             await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
         }
-        return { id, quotationId, label: label || undefined, premiumAmount: undefined, order }
+        return { id, quotationId, label: label || undefined, premiumAmount: undefined, lolAmount: lolAmount ?? undefined, lolCurrency: lolCurrency || undefined, order }
     }
 
-    async updateQuotationPIAlternative(id: string, updates: { label?: string; premiumAmount?: number | null }): Promise<void> {
+    async updateQuotationPIAlternative(id: string, updates: { label?: string; premiumAmount?: number | null; lolAmount?: number | null; lolCurrency?: string }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
         if (updates.label !== undefined) { fields.push('label = ?'); values.push(updates.label || null) }
         if (updates.premiumAmount !== undefined) { fields.push('premium_amount = ?'); values.push(updates.premiumAmount ?? null) }
+        if (updates.lolAmount !== undefined) { fields.push('lol_amount = ?'); values.push(updates.lolAmount ?? null) }
+        if (updates.lolCurrency !== undefined) { fields.push('lol_currency = ?'); values.push(updates.lolCurrency || null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_pi_alternatives SET ${fields.join(', ')} WHERE id = ?`, values)
