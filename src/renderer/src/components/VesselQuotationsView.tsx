@@ -40,14 +40,16 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
     loadQuotationTypes()
   }, [vessel.id])
 
+  const dropdownRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!showTypeMenu) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowTypeMenu(false)
-      }
+      if (menuRef.current?.contains(e.target as Node)) return
+      if (dropdownRef.current?.contains(e.target as Node)) return
+      setShowTypeMenu(false)
     }
-    if (showTypeMenu) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    const timer = setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 10)
+    return () => { clearTimeout(timer); document.removeEventListener('mousedown', handleClickOutside) }
   }, [showTypeMenu])
 
   const loadQuotations = async () => {
@@ -212,7 +214,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
             {showTypeMenu && quotationTypes.length > 0 && (() => {
               const rect = menuRef.current?.getBoundingClientRect()
               return (
-              <div style={{
+              <div ref={dropdownRef} style={{
                 position: 'fixed',
                 top: rect ? rect.bottom + 4 : 0,
                 right: rect ? window.innerWidth - rect.right : 0,
