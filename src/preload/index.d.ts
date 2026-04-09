@@ -818,6 +818,7 @@ export interface Api {
     selectedAlternativeId?: string | null
     exchangeRate?: number
   }) => Promise<any[]>
+  policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => Promise<string | null>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>
   policySign: (policyId: string) => Promise<{ success: boolean }>
   policyGetSignature: (policyId: string) => Promise<{ imageData: number[]; signedBy: string; signedAt: string; signerName: string } | null>

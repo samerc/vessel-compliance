@@ -330,8 +330,8 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     }
 
     const handleRenew = async (row: any, includeFleet: boolean) => {
-        console.log('[Renew] Starting renewal for', row.vesselName, 'includeFleet:', includeFleet, 'policyType:', row.policyTypeName)
         setRenewMenuId(null)
+        setRenewMenuPos(null)
         setRenewLoading(row.id)
         try {
             // Determine quotation type from policy type name
@@ -344,6 +344,19 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             else if (policyTypeName.includes('loss of hire') || policyTypeName.includes('loh')) qtCode = 'L'
             const quotationType = quotationTypes.find((qt: any) => qt.code === qtCode) || quotationTypes[0]
             if (!quotationType) throw new Error('No quotation types configured')
+
+            // Try to find an active policy document for this vessel → use policyRenew (clones everything)
+            if (!includeFleet) {
+                const policyDocId = await window.api.policyFindActiveForVessel(row.vesselId, qtCode)
+                if (policyDocId) {
+                    const result = await window.api.policyRenew(policyDocId)
+                    if (result && !(result as any).error && result.quotationId) {
+                        showSuccess(`Renewal quotation created from existing policy`)
+                        onCreateRenewalQuotation?.(result.quotationId)
+                        return
+                    }
+                }
+            }
 
             // Calculate new period
             const endDate = row.endDate

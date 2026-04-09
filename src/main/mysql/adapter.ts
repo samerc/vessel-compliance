@@ -9403,6 +9403,18 @@ export class MySQLAdapter {
         }))
     }
 
+    async findActivePolicyDocForVessel(vesselId: string, quotationTypeCode: string): Promise<string | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(`
+            SELECT pd.id FROM policy_documents pd
+            JOIN quotations q ON pd.quotation_id = q.id
+            JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            WHERE pd.vessel_id = ? AND qt.code = ? AND pd.status = 'active'
+            ORDER BY pd.created_at DESC LIMIT 1
+        `, [vesselId, quotationTypeCode])
+        return (rows as any[])[0]?.id || null
+    }
+
     async getPolicyDocumentById(id: string): Promise<any> {
         if (!this.pool) return null
         const [rows] = await this.pool.query(`

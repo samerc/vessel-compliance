@@ -2661,6 +2661,11 @@ app.whenReady().then(() => {
   safeHandle('policy:createRevision', async (event, policyId) => { const session = requireSession(event); await requirePermission(event, 'policies:manage'); return db.createPolicyRevision(policyId, session.id) })
   safeHandle('policy:delete', async (event, id) => { await requirePermission(event, 'policies:manage'); return db.deletePolicyDocument(id) })
 
+  safeHandle('policy:findActiveForVessel', async (event, vesselId: string, quotationTypeCode: string) => {
+    requireSession(event)
+    return db.findActivePolicyDocForVessel(vesselId, quotationTypeCode)
+  })
+
   safeHandle('policy:renew', async (event, policyId: string) => {
     const user = await requirePermission(event, 'quotations:create')
     const quotationId = await db.renewPolicy(policyId, user.id)
