@@ -301,7 +301,32 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
         // Premium — required for all types except cargo rate mode
         if (typeCode !== 'C' || quotation.premiumType !== 'rate') {
-            if (quotation.premiumAmount == null || quotation.premiumAmount === 0) {
+            // Check if premium is set on quotation level OR on alternatives/vessels/value options
+            let hasPremium = quotation.premiumAmount != null && quotation.premiumAmount !== 0
+            if (!hasPremium && typeCode === 'P') {
+                // P&I alternatives may have per-alternative premiums
+                try {
+                    const piAlts = await window.api.piGetQuotationAlternatives(quotation.id)
+                    if (Array.isArray(piAlts) && piAlts.length > 0 && piAlts.some((a: any) => a.premiumAmount)) hasPremium = true
+                } catch {}
+            }
+            if (!hasPremium && typeCode === 'H') {
+                // Hull alternatives or value options may have premiums
+                try {
+                    const hullAlts = await window.api.hullGetQuotationAlternatives(quotation.id)
+                    if (Array.isArray(hullAlts) && hullAlts.some((a: any) => a.premiumAmount)) hasPremium = true
+                    const valOpts = await window.api.hullGetAgreedValueOptions(quotation.id)
+                    if (Array.isArray(valOpts) && valOpts.some((o: any) => o.premiumAmount)) hasPremium = true
+                } catch {}
+            }
+            if (!hasPremium) {
+                // Check per-vessel premiums
+                try {
+                    const qv = await window.api.getQuotationVessels(quotation.id)
+                    if (Array.isArray(qv) && qv.some((v: any) => v.premiumAmount)) hasPremium = true
+                } catch {}
+            }
+            if (!hasPremium) {
                 warnings.push('Premium amount is not set')
             }
         }
