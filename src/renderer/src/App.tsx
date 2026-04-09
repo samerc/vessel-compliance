@@ -737,7 +737,7 @@ function App(): React.JSX.Element {
             onClearPolicyContext={() => { setQuotationPolicyContext(null) }}
             onReturnToPolicy={(policyId) => { setSelectedPolicyId(policyId); setQuotationPolicyContext(null); setInitialQuotationId(null); setActiveTab('policy-detail') }}
           /></Suspense>}
-          {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} /></Suspense>}
+          {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} onCreateRenewalQuotation={(qId) => { setInitialQuotationId(qId); setActiveTab('quotations') }} /></Suspense>}
           {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
           {activeTab === 'templates' && <Suspense fallback={<LoadingFallback />}><TemplatesPage /></Suspense>}

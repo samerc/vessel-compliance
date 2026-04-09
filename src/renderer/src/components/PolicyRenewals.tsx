@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare, Search, DollarSign, TrendingUp, Percent, Filter } from 'lucide-react'
+import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronDown as ChevronDownIcon, Plus, Trash2, Edit3, X, Check, MessageSquare, Search, DollarSign, TrendingUp, Percent, Filter, RefreshCw } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../utils/dateUtils'
 import XLSX from 'xlsx-js-style'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 interface PolicyRenewalsProps {
     onNavigateToVessel?: (vesselId: string) => void
+    onCreateRenewalQuotation?: (quotationId: string) => void
 }
 
 interface RenewalStatusType {
@@ -98,9 +100,10 @@ function formatPremium(value: number | null, currency: string | null): string {
     return `${sym}${Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
-export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsProps) {
+export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuotation }: PolicyRenewalsProps) {
     const { theme } = useTheme()
     const { user, hasPermission } = useAuth()
+    const { showSuccess, showError } = useToast()
     const canManage = hasPermission('renewals:manage')
     const canNotes = hasPermission('renewals:notes') || canManage
     const isLight = theme === 'light'
@@ -152,6 +155,18 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
 
     // Quotation sent date editing
     const [editingQuotDate, setEditingQuotDate] = useState<Record<string, string>>({})
+
+    // Renew dropdown
+    const [renewMenuId, setRenewMenuId] = useState<string | null>(null)
+    const [renewLoading, setRenewLoading] = useState<string | null>(null)
+
+    // Close renew dropdown on outside click
+    useEffect(() => {
+        if (!renewMenuId) return
+        const handler = () => setRenewMenuId(null)
+        document.addEventListener('click', handler)
+        return () => document.removeEventListener('click', handler)
+    }, [renewMenuId])
 
     // Column preferences
     const RENEWAL_COLUMNS: ColumnDef[] = useMemo(() => [
@@ -318,6 +333,82 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
             const st = statusId ? statusTypes.find(s => s.id === statusId) : null
             return { ...r, renewalStatusId: statusId, renewalStatusName: st?.name || null, renewalStatusColor: st?.color || null }
         }))
+    }
+
+    const handleRenew = async (row: any, includeFleet: boolean) => {
+        setRenewMenuId(null)
+        setRenewLoading(row.id)
+        try {
+            // Determine quotation type from policy type name
+            const quotationTypes = await window.api.getQuotationTypes()
+            const policyTypeName = (row.policyTypeName || '').toLowerCase()
+            let qtCode = 'P' // default P&I
+            if (policyTypeName.includes('hull') || policyTypeName.includes('h&m')) qtCode = 'H'
+            else if (policyTypeName.includes('war')) qtCode = 'W'
+            else if (policyTypeName.includes('fdd')) qtCode = 'F'
+            else if (policyTypeName.includes('loss of hire') || policyTypeName.includes('loh')) qtCode = 'L'
+            const quotationType = quotationTypes.find((qt: any) => qt.code === qtCode) || quotationTypes[0]
+            if (!quotationType) throw new Error('No quotation types configured')
+
+            // Calculate new period
+            const endDate = row.endDate
+            const newInception = endDate // new inception = old expiry
+            const inceptionDate = new Date(newInception + 'T00:00:00')
+            const periodText = `12 months from ${inceptionDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}`
+
+            // Create quotation
+            const q = await window.api.addQuotation({
+                quotationTypeId: quotationType.id,
+                policyTypeId: row.policyTypeId,
+                isRenewal: true,
+                periodText,
+                createdBy: user?.username
+            } as any)
+            if (!q || (q as any).error) throw new Error('Failed to create quotation')
+
+            // Get vessels and flag states for populating vessel data
+            const allVessels = await window.api.getVessels()
+            const flagStates = await window.api.getFlagStates()
+            const primaryVessel = allVessels.find((v: any) => v.id === row.vesselId)
+            const primaryFleetId = primaryVessel?.fleetId
+
+            // Determine which vessels to add
+            let vesselsToAdd: any[] = []
+            if (includeFleet && primaryFleetId) {
+                vesselsToAdd = allVessels.filter((v: any) => v.isActive && v.fleetId === primaryFleetId)
+            } else {
+                vesselsToAdd = primaryVessel ? [primaryVessel] : []
+            }
+
+            // Add vessel(s) to quotation
+            for (let i = 0; i < vesselsToAdd.length; i++) {
+                const v = vesselsToAdd[i]
+                const flagName = v.flagStateId
+                    ? (flagStates.find((f: any) => f.id === v.flagStateId)?.name || '')
+                    : ''
+                await window.api.addQuotationVessel({
+                    quotationId: q.id,
+                    vesselId: v.id,
+                    vesselLabel: `V${i + 1}`,
+                    order: i,
+                    name: v.name,
+                    imoNumber: v.imoNumber,
+                    builtYear: v.builtYear,
+                    grossTonnage: v.grossTonnage,
+                    flag: flagName,
+                    vesselType: v.vesselType,
+                    classification: v.classificationSociety,
+                    callSign: v.callSign
+                })
+            }
+
+            showSuccess(`Renewal quotation ${q.referenceNumber || 'draft'} created`)
+            onCreateRenewalQuotation?.(q.id)
+        } catch (err: any) {
+            showError(err.message || 'Failed to create renewal quotation')
+        } finally {
+            setRenewLoading(null)
+        }
     }
 
     const handleResizeStart = (colIdx: number, e: React.MouseEvent) => {
@@ -606,6 +697,63 @@ export default function PolicyRenewals({ onNavigateToVessel }: PolicyRenewalsPro
                             </span>
                         )}
                     </button>
+                    {hasPermission('quotations:create') && (
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!r.fleetName) {
+                                        handleRenew(r, false)
+                                    } else {
+                                        setRenewMenuId(renewMenuId === r.id ? null : r.id)
+                                    }
+                                }}
+                                className="btn-primary"
+                                disabled={renewLoading === r.id}
+                                style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                title="Create renewal quotation"
+                            >
+                                <RefreshCw size={13} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
+                                {renewLoading === r.id ? '...' : 'Renew'}
+                                {r.fleetName && <ChevronDownIcon size={11} />}
+                            </button>
+                            {renewMenuId === r.id && (
+                                <div
+                                    onClick={e => e.stopPropagation()}
+                                    style={{
+                                        position: 'absolute', top: '100%', right: 0, marginTop: '4px',
+                                        background: isLight ? '#ffffff' : '#1a1d28',
+                                        border: '1px solid var(--glass-border)',
+                                        borderRadius: '8px', padding: '4px', minWidth: '180px', zIndex: 100,
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                                    }}
+                                >
+                                    <div
+                                        onClick={() => handleRenew(r, false)}
+                                        style={{
+                                            padding: '8px 12px', cursor: 'pointer', borderRadius: '4px',
+                                            fontSize: '0.82rem', color: 'var(--text-primary)'
+                                        }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        Renew Vessel Only
+                                    </div>
+                                    <div
+                                        onClick={() => handleRenew(r, true)}
+                                        style={{
+                                            padding: '8px 12px', cursor: 'pointer', borderRadius: '4px',
+                                            fontSize: '0.82rem', color: 'var(--text-primary)'
+                                        }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        Renew Fleet ({r.fleetName})
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <button
                         onClick={() => onNavigateToVessel?.(r.vesselId)}
                         className="btn-secondary"
