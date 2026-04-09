@@ -86,7 +86,7 @@ function KPI({ icon, gradient, label, value, sub }: {
     )
 }
 // Default column widths: Vessel, Customer, PolicyType, PolicyNo, EndDate, Premium, Days, Status, QuotSent, Actions
-const DEFAULT_COL_WIDTHS = [180, 170, 140, 130, 110, 110, 100, 140, 120, 100]
+const DEFAULT_COL_WIDTHS = [200, 170, 120, 130, 110, 95, 90, 130, 140, 110]
 
 function formatPremium(value: number | null, currency: string | null): string {
     if (value == null) return '-'
@@ -166,13 +166,13 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     const RENEWAL_COLUMNS: ColumnDef[] = useMemo(() => [
         { id: 'vessel', label: 'Vessel', defaultVisible: true },
         { id: 'customer', label: 'Customer', defaultVisible: true },
-        { id: 'policyType', label: 'Policy Type', defaultVisible: true },
+        { id: 'policyType', label: 'Policy Type', defaultVisible: false },
         { id: 'policyNo', label: 'Policy No.', defaultVisible: false },
         { id: 'endDate', label: 'End Date', defaultVisible: true },
         { id: 'premium', label: 'Premium', defaultVisible: true },
         { id: 'days', label: 'Days', defaultVisible: true },
         { id: 'status', label: 'Status', defaultVisible: true },
-        { id: 'quotSent', label: 'Quot. Sent', defaultVisible: false },
+        { id: 'quotSent', label: 'Quot. Sent', defaultVisible: true },
         { id: 'actions', label: 'Actions', defaultVisible: true }
     ], [])
     const { visibleColumns: rnVisibleCols, setVisibleColumns: setRnVisibleCols } = useColumnPrefs('renewals', RENEWAL_COLUMNS)
@@ -611,9 +611,16 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     const renderRenewalRow = (r: any, idx: number) => (
         <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
             {rnVisSet.has('vessel') && (
-            <td style={{ padding: '8px 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</div>
-                {r.imoNumber && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>IMO: {r.imoNumber}</div>}
+            <td style={{ padding: '8px 12px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</span>
+                    {r.policyTypeName && (
+                        <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600, background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {r.policyTypeName}
+                        </span>
+                    )}
+                </div>
+                {r.imoNumber && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '1px' }}>IMO: {r.imoNumber}</div>}
             </td>
             )}
             {rnVisSet.has('customer') && (
@@ -680,7 +687,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                         await handleSetQuotationDate(r.id, val)
                     }}
                     style={{
-                        padding: '3px 5px', borderRadius: '6px', fontSize: '0.78rem', width: '100%',
+                        padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem', width: '100%', minWidth: '130px',
                         background: 'var(--input-bg)', color: 'var(--text-primary)',
                         border: '1px solid var(--input-border)',
                         colorScheme: isLight ? 'light' : 'dark'
@@ -690,20 +697,28 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             )}
             {rnVisSet.has('actions') && (
             <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                    {/* Notes */}
                     <button
                         onClick={() => handleOpenNotes(r)}
-                        style={{ padding: '5px', background: 'transparent', border: 'none', borderRadius: '5px', cursor: 'pointer', color: 'var(--text-secondary)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        className="hover-effect"
+                        style={{
+                            padding: '6px 8px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                            border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)',
+                            position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.12s'
+                        }}
                         title={r.noteCount > 0 ? `${r.noteCount} note${r.noteCount > 1 ? 's' : ''}` : 'Add notes'}
+                        onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--accent-primary)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
                     >
                         <MessageSquare size={14} />
                         {r.noteCount > 0 && (
-                            <span style={{ position: 'absolute', top: '-4px', right: '-5px', minWidth: '14px', height: '14px', borderRadius: '7px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.6rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}>
+                            <span style={{ position: 'absolute', top: '-3px', right: '-3px', minWidth: '14px', height: '14px', borderRadius: '7px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.6rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}>
                                 {r.noteCount}
                             </span>
                         )}
                     </button>
+                    {/* Renew */}
                     {hasPermission('quotations:create') && (
                         <div style={{ position: 'relative', display: 'inline-block' }}>
                             <button
@@ -716,9 +731,15 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                     }
                                 }}
                                 disabled={renewLoading === r.id}
-                                style={{ padding: '5px', background: 'transparent', border: 'none', borderRadius: '5px', cursor: 'pointer', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px' }}
-                                className="hover-effect"
+                                style={{
+                                    padding: '6px 8px', background: isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)',
+                                    border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-primary)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px',
+                                    transition: 'all 0.12s'
+                                }}
                                 title="Create renewal quotation"
+                                onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.15)' : 'rgba(0,210,255,0.15)' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)' }}
                             >
                                 <RefreshCw size={14} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
                                 {r.fleetName && <ChevronDownIcon size={10} />}
@@ -760,11 +781,18 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                             )}
                         </div>
                     )}
+                    {/* View */}
                     <button
                         onClick={() => onNavigateToVessel?.(r.vesselId)}
-                        style={{ padding: '5px', background: 'transparent', border: 'none', borderRadius: '5px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        className="hover-effect"
+                        style={{
+                            padding: '6px 8px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                            border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.12s'
+                        }}
                         title="View vessel"
+                        onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--text-primary)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
                     >
                         <Eye size={14} />
                     </button>
