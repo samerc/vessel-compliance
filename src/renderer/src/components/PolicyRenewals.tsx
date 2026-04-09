@@ -21,7 +21,7 @@ interface RenewalStatusType {
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-type SortField = 'vesselName' | 'imoNumber' | 'customerName' | 'fleetName' | 'policyTypeName' | 'policyNumber' | 'endDate' | 'premium' | 'renewalStatusName' | 'quotationSentDate' | 'daysUntil'
+type SortField = 'vesselName' | 'customerName' | 'policyTypeName' | 'policyNumber' | 'endDate' | 'premium' | 'renewalStatusName' | 'quotationSentDate' | 'daysUntil'
 type SortDir = 'asc' | 'desc'
 
 const DEFAULT_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
@@ -32,12 +32,6 @@ function daysUntil(dateStr: string): number {
     return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000)
 }
 
-function daysColor(days: number): string {
-    if (days < 0) return 'var(--danger)'
-    if (days <= 30) return '#f59e0b'
-    if (days <= 60) return '#eab308'
-    return '#10b981'
-}
 
 interface PolicyTypeOption {
     id: string
@@ -91,8 +85,8 @@ function KPI({ icon, gradient, label, value, sub }: {
         </div>
     )
 }
-// Default column widths: Vessel, IMO, Customer, Fleet, PolicyType, PolicyNo, EndDate, Premium, Days, Status, QuotSent, Actions
-const DEFAULT_COL_WIDTHS = [160, 100, 140, 120, 150, 130, 110, 110, 80, 150, 120, 120]
+// Default column widths: Vessel, Customer, PolicyType, PolicyNo, EndDate, Premium, Days, Status, QuotSent, Actions
+const DEFAULT_COL_WIDTHS = [180, 170, 140, 130, 110, 110, 100, 140, 120, 100]
 
 function formatPremium(value: number | null, currency: string | null): string {
     if (value == null) return '-'
@@ -171,16 +165,14 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     // Column preferences
     const RENEWAL_COLUMNS: ColumnDef[] = useMemo(() => [
         { id: 'vessel', label: 'Vessel', defaultVisible: true },
-        { id: 'imo', label: 'IMO', defaultVisible: true },
         { id: 'customer', label: 'Customer', defaultVisible: true },
-        { id: 'fleet', label: 'Fleet', defaultVisible: true },
         { id: 'policyType', label: 'Policy Type', defaultVisible: true },
-        { id: 'policyNo', label: 'Policy No.', defaultVisible: true },
+        { id: 'policyNo', label: 'Policy No.', defaultVisible: false },
         { id: 'endDate', label: 'End Date', defaultVisible: true },
         { id: 'premium', label: 'Premium', defaultVisible: true },
         { id: 'days', label: 'Days', defaultVisible: true },
         { id: 'status', label: 'Status', defaultVisible: true },
-        { id: 'quotSent', label: 'Quot. Sent', defaultVisible: true },
+        { id: 'quotSent', label: 'Quot. Sent', defaultVisible: false },
         { id: 'actions', label: 'Actions', defaultVisible: true }
     ], [])
     const { visibleColumns: rnVisibleCols, setVisibleColumns: setRnVisibleCols } = useColumnPrefs('renewals', RENEWAL_COLUMNS)
@@ -587,7 +579,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     const stickyHeaderBg = isLight ? '#eef0f3' : '#181b24'
 
     const thBase: React.CSSProperties = {
-        padding: '14px 16px',
+        padding: '10px 12px',
         fontWeight: '600',
         color: 'var(--text-secondary)',
         fontSize: '0.8rem',
@@ -618,42 +610,57 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
 
     const renderRenewalRow = (r: any, idx: number) => (
         <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
-            {rnVisSet.has('vessel') && <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</td>}
-            {rnVisSet.has('imo') && <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.imoNumber}</td>}
-            {rnVisSet.has('customer') && <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customerName || '-'}</td>}
-            {rnVisSet.has('fleet') && <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.fleetName || '-'}</td>}
-            {rnVisSet.has('policyType') && <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyTypeName}</td>}
-            {rnVisSet.has('policyNo') && <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>}
-            {rnVisSet.has('endDate') && <td style={{ padding: '12px 16px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.endDate || '-'}</td>}
-            {rnVisSet.has('premium') && <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatPremium(r.premium, r.currency)}</td>}
+            {rnVisSet.has('vessel') && (
+            <td style={{ padding: '8px 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</div>
+                {r.imoNumber && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>IMO: {r.imoNumber}</div>}
+            </td>
+            )}
+            {rnVisSet.has('customer') && (
+            <td style={{ padding: '8px 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customerName || '\u2014'}</div>
+                {r.fleetName && <div style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', marginTop: '2px' }}>{r.fleetName}</div>}
+            </td>
+            )}
+            {rnVisSet.has('policyType') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.policyTypeName}</td>}
+            {rnVisSet.has('policyNo') && <td style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>}
+            {rnVisSet.has('endDate') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.endDate || '-'}</td>}
+            {rnVisSet.has('premium') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '0.85rem' }}>{formatPremium(r.premium, r.currency)}</td>}
             {rnVisSet.has('days') && (
-            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', fontVariantNumeric: 'tabular-nums', color: r.endDate ? daysColor(daysUntil(r.endDate)) : 'var(--text-secondary)' }}>
+            <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                 {r.endDate ? (() => {
                     const d = daysUntil(r.endDate)
-                    return d < 0 ? `${Math.abs(d)}d overdue` : `${d}d`
-                })() : '-'}
+                    const color = d < 0 ? 'var(--danger)' : d <= 30 ? '#e68a00' : d <= 60 ? '#ffa726' : 'var(--success)'
+                    const bg = d < 0 ? 'rgba(255,77,77,0.1)' : d <= 30 ? 'rgba(230,138,0,0.1)' : d <= 60 ? 'rgba(255,167,38,0.1)' : 'rgba(0,200,100,0.1)'
+                    const label = d < 0 ? `${Math.abs(d)}d overdue` : d === 0 ? 'Today' : `${d}d`
+                    return (
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 600, background: bg, color, whiteSpace: 'nowrap' }}>
+                            {label}
+                        </span>
+                    )
+                })() : <span style={{ color: 'var(--text-secondary)' }}>-</span>}
             </td>
             )}
             {rnVisSet.has('status') && (
-            <td style={{ padding: '12px 16px' }}>
+            <td style={{ padding: '8px 12px' }}>
                 <select
                     value={r.renewalStatusId || ''}
                     onChange={e => handleSetStatus(r.id, e.target.value || null)}
                     disabled={!canManage}
                     style={{
-                        padding: '4px 8px',
-                        borderRadius: '12px',
+                        padding: '3px 6px',
+                        borderRadius: '10px',
                         border: r.renewalStatusColor ? `2px solid ${r.renewalStatusColor}` : '1px solid var(--input-border)',
                         background: r.renewalStatusColor ? `${r.renewalStatusColor}22` : 'var(--input-bg)',
                         color: r.renewalStatusId ? (isLight ? '#111111' : '#ffffff') : 'var(--text-secondary)',
-                        fontSize: '0.8rem',
-                        fontWeight: r.renewalStatusId ? '700' : '400',
+                        fontSize: '0.78rem',
+                        fontWeight: r.renewalStatusId ? '600' : '400',
                         cursor: 'pointer',
-                        minWidth: '100px',
+                        minWidth: '90px',
                         maxWidth: '100%'
                     }}
                 >
-                    <option value="">— No status —</option>
+                    <option value="">— None —</option>
                     {statusTypes.map(st => (
                         <option key={st.id} value={st.id}>{st.name}</option>
                     ))}
@@ -661,7 +668,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             </td>
             )}
             {rnVisSet.has('quotSent') && (
-            <td style={{ padding: '8px 16px' }}>
+            <td style={{ padding: '8px 12px' }}>
                 <input
                     type="date"
                     value={editingQuotDate[r.id] !== undefined ? editingQuotDate[r.id] : (r.quotationSentDate || '')}
@@ -673,7 +680,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                         await handleSetQuotationDate(r.id, val)
                     }}
                     style={{
-                        padding: '4px 6px', borderRadius: '6px', fontSize: '0.8rem', width: '100%',
+                        padding: '3px 5px', borderRadius: '6px', fontSize: '0.78rem', width: '100%',
                         background: 'var(--input-bg)', color: 'var(--text-primary)',
                         border: '1px solid var(--input-border)',
                         colorScheme: isLight ? 'light' : 'dark'
@@ -682,17 +689,17 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             </td>
             )}
             {rnVisSet.has('actions') && (
-            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
                     <button
                         onClick={() => handleOpenNotes(r)}
-                        className="btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', position: 'relative' }}
+                        style={{ padding: '5px', background: 'transparent', border: 'none', borderRadius: '5px', cursor: 'pointer', color: 'var(--text-secondary)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        className="hover-effect"
                         title={r.noteCount > 0 ? `${r.noteCount} note${r.noteCount > 1 ? 's' : ''}` : 'Add notes'}
                     >
                         <MessageSquare size={14} />
                         {r.noteCount > 0 && (
-                            <span style={{ position: 'absolute', top: '-5px', right: '-6px', minWidth: '16px', height: '16px', borderRadius: '8px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.65rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                            <span style={{ position: 'absolute', top: '-4px', right: '-5px', minWidth: '14px', height: '14px', borderRadius: '7px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.6rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}>
                                 {r.noteCount}
                             </span>
                         )}
@@ -708,14 +715,13 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                         setRenewMenuId(renewMenuId === r.id ? null : r.id)
                                     }
                                 }}
-                                className="btn-primary"
                                 disabled={renewLoading === r.id}
-                                style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                style={{ padding: '5px', background: 'transparent', border: 'none', borderRadius: '5px', cursor: 'pointer', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px' }}
+                                className="hover-effect"
                                 title="Create renewal quotation"
                             >
-                                <RefreshCw size={13} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
-                                {renewLoading === r.id ? '...' : 'Renew'}
-                                {r.fleetName && <ChevronDownIcon size={11} />}
+                                <RefreshCw size={14} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
+                                {r.fleetName && <ChevronDownIcon size={10} />}
                             </button>
                             {renewMenuId === r.id && (
                                 <div
@@ -756,10 +762,11 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                     )}
                     <button
                         onClick={() => onNavigateToVessel?.(r.vesselId)}
-                        className="btn-secondary"
-                        style={{ padding: '4px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        style={{ padding: '5px', background: 'transparent', border: 'none', borderRadius: '5px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        className="hover-effect"
+                        title="View vessel"
                     >
-                        <Eye size={14} /> View
+                        <Eye size={14} />
                     </button>
                 </div>
             </td>
@@ -1015,67 +1022,55 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                     <ResizeHandle colIdx={0} />
                                 </th>
                                 )}
-                                {rnVisSet.has('imo') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[1], cursor: 'pointer' }} onClick={() => handleSort('imoNumber')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>IMO <SortIcon field="imoNumber" /></span>
+                                {rnVisSet.has('customer') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[1], cursor: 'pointer' }} onClick={() => handleSort('customerName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Customer <SortIcon field="customerName" /></span>
                                     <ResizeHandle colIdx={1} />
                                 </th>
                                 )}
-                                {rnVisSet.has('customer') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[2], cursor: 'pointer' }} onClick={() => handleSort('customerName')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Customer <SortIcon field="customerName" /></span>
+                                {rnVisSet.has('policyType') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[2], cursor: 'pointer' }} onClick={() => handleSort('policyTypeName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy Type <SortIcon field="policyTypeName" /></span>
                                     <ResizeHandle colIdx={2} />
                                 </th>
                                 )}
-                                {rnVisSet.has('fleet') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[3], cursor: 'pointer' }} onClick={() => handleSort('fleetName')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Fleet <SortIcon field="fleetName" /></span>
+                                {rnVisSet.has('policyNo') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[3], cursor: 'pointer' }} onClick={() => handleSort('policyNumber')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy No. <SortIcon field="policyNumber" /></span>
                                     <ResizeHandle colIdx={3} />
                                 </th>
                                 )}
-                                {rnVisSet.has('policyType') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[4], cursor: 'pointer' }} onClick={() => handleSort('policyTypeName')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy Type <SortIcon field="policyTypeName" /></span>
+                                {rnVisSet.has('endDate') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[4], cursor: 'pointer' }} onClick={() => handleSort('endDate')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>End Date <SortIcon field="endDate" /></span>
                                     <ResizeHandle colIdx={4} />
                                 </th>
                                 )}
-                                {rnVisSet.has('policyNo') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[5], cursor: 'pointer' }} onClick={() => handleSort('policyNumber')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Policy No. <SortIcon field="policyNumber" /></span>
+                                {rnVisSet.has('premium') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[5], cursor: 'pointer' }} onClick={() => handleSort('premium')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Premium <SortIcon field="premium" /></span>
                                     <ResizeHandle colIdx={5} />
                                 </th>
                                 )}
-                                {rnVisSet.has('endDate') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[6], cursor: 'pointer' }} onClick={() => handleSort('endDate')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>End Date <SortIcon field="endDate" /></span>
+                                {rnVisSet.has('days') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[6], cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('daysUntil')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>Days <SortIcon field="daysUntil" /></span>
                                     <ResizeHandle colIdx={6} />
                                 </th>
                                 )}
-                                {rnVisSet.has('premium') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[7], cursor: 'pointer' }} onClick={() => handleSort('premium')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Premium <SortIcon field="premium" /></span>
+                                {rnVisSet.has('status') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[7], cursor: 'pointer' }} onClick={() => handleSort('renewalStatusName')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Status <SortIcon field="renewalStatusName" /></span>
                                     <ResizeHandle colIdx={7} />
                                 </th>
                                 )}
-                                {rnVisSet.has('days') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[8], cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('daysUntil')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>Days <SortIcon field="daysUntil" /></span>
+                                {rnVisSet.has('quotSent') && (
+                                <th scope="col" style={{ ...thBase, width: colWidths[8], cursor: 'pointer' }} onClick={() => handleSort('quotationSentDate')}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Quot. Sent <SortIcon field="quotationSentDate" /></span>
                                     <ResizeHandle colIdx={8} />
                                 </th>
                                 )}
-                                {rnVisSet.has('status') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[9], cursor: 'pointer' }} onClick={() => handleSort('renewalStatusName')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Status <SortIcon field="renewalStatusName" /></span>
-                                    <ResizeHandle colIdx={9} />
-                                </th>
-                                )}
-                                {rnVisSet.has('quotSent') && (
-                                <th scope="col" style={{ ...thBase, width: colWidths[10], cursor: 'pointer' }} onClick={() => handleSort('quotationSentDate')}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Quot. Sent <SortIcon field="quotationSentDate" /></span>
-                                    <ResizeHandle colIdx={10} />
-                                </th>
-                                )}
-                                <th scope="col" style={{ ...thBase, width: colWidths[11], cursor: 'default', textAlign: 'center' }}>
+                                <th scope="col" style={{ ...thBase, width: colWidths[9], cursor: 'default', textAlign: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                                         {rnVisSet.has('actions') && 'Actions'}
                                         <ColumnSelector
@@ -1085,14 +1080,14 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                             onChange={setRnVisibleCols}
                                         />
                                     </div>
-                                    <ResizeHandle colIdx={11} />
+                                    <ResizeHandle colIdx={9} />
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
                             {sortedRenewals.length === 0 ? (
                                 <tr>
-                                    <td colSpan={12} style={{ padding: '52px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                    <td colSpan={10} style={{ padding: '52px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                         <Calendar size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }} />
                                         {multiMonthView
                                             ? `No policies expiring in the selected 3-month range`
@@ -1129,7 +1124,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                         return (
                                             <React.Fragment key={lbl}>
                                                 <tr>
-                                                    <td colSpan={12} style={{
+                                                    <td colSpan={10} style={{
                                                         padding: '10px 16px',
                                                         borderBottom: '1px solid var(--table-border)',
                                                         borderTop: '2px solid var(--accent-primary)',
@@ -1151,7 +1146,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                                 {fleetGroups ? fleetGroups.map(([fleetName, rows]) => (
                                                     <React.Fragment key={fleetName}>
                                                         <tr>
-                                                            <td colSpan={12} style={{
+                                                            <td colSpan={10} style={{
                                                                 padding: '6px 16px 6px 28px',
                                                                 borderBottom: '1px solid var(--table-border)',
                                                                 fontWeight: '700', fontSize: '0.75rem',
@@ -1172,7 +1167,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                 groupedRenewals.map(([fleetName, rows]) => (
                                     <React.Fragment key={fleetName}>
                                         <tr>
-                                            <td colSpan={12} style={{
+                                            <td colSpan={10} style={{
                                                 padding: '8px 16px',
                                                 borderBottom: '1px solid var(--table-border)',
                                                 borderTop: '2px solid var(--table-border)',
