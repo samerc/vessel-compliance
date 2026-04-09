@@ -560,17 +560,43 @@ export default function CustomerComplianceReport() {
       const customerName = selectedCustomerId === 'all' ? 'All Customers' : (customers.find(c => c.id === selectedCustomerId)?.name || 'Customer')
       const lines: string[] = [`${customerName} — Missing Documents`, '']
 
+      const { resolveEffectivePolicyExpiry } = await import('../utils/policyUtils')
+      const shortCycle = (expiry: string | null | undefined, received: string | null | undefined) => {
+        if (!expiry || !received) return false
+        const e = new Date(expiry + 'T00:00:00')
+        const r = new Date(received + 'T00:00:00')
+        const days = Math.floor((e.getTime() - r.getTime()) / 86400000)
+        return days >= 0 && days < 60
+      }
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const threshold = new Date(today); threshold.setDate(today.getDate() + 30)
+
       const buildVesselMissing = async (v: typeof reportVessels[0]) => {
         const vLines: string[] = []
+        // Resolve P&I expiry for annual docs
+        const dynPolicies = await window.api.getVesselDynamicPolicies(v.id)
+        const effectiveExpiry = resolveEffectivePolicyExpiry(Array.isArray(dynPolicies) ? dynPolicies : [])
         // Vessel docs
         const vDocs = await window.api.getVesselDocuments(v.id)
         const customTypes = await window.api.getVesselCustomDocTypes(v.id)
-        const allTypes = [...safeDocTypes, ...(Array.isArray(customTypes) ? customTypes : []).map((c: any) => ({ id: c.id, name: c.name }))]
+        const allTypes = [...safeDocTypes, ...(Array.isArray(customTypes) ? customTypes : []).map((c: any) => ({ id: c.id, name: c.name, annualRenewal: false }))]
         const safeVDocs = Array.isArray(vDocs) ? vDocs : []
-        const missingVessel = allTypes.filter(dt => !safeVDocs.some((d: any) => d.documentTypeId === dt.id && d.filePath))
-        if (missingVessel.length > 0) {
+        const issues: string[] = []
+        for (const dt of allTypes) {
+          const doc = safeVDocs.find((d: any) => d.documentTypeId === dt.id)
+          if (!doc?.filePath) { issues.push(`${dt.name} — MISSING`); continue }
+          let expiryDate = doc.expiryDate || null
+          if ((dt as any).annualRenewal && effectiveExpiry) expiryDate = effectiveExpiry
+          if (expiryDate) {
+            if ((dt as any).annualRenewal && doc.uploadedDate && shortCycle(expiryDate, doc.uploadedDate)) continue
+            const exp = new Date(expiryDate + 'T00:00:00')
+            if (exp < today) issues.push(`${dt.name} — EXPIRED (${expiryDate})`)
+            else if (exp <= threshold) issues.push(`${dt.name} — EXPIRING SOON (${expiryDate})`)
+          }
+        }
+        if (issues.length > 0) {
           vLines.push('  Vessel Documents:')
-          for (const dt of missingVessel) vLines.push(`    - ${dt.name}`)
+          for (const issue of issues) vLines.push(`    - ${issue}`)
         }
         // Entity docs
         const assureds = await window.api.getVesselAssureds(v.id)

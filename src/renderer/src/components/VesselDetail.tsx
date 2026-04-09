@@ -1135,18 +1135,57 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             onClick={async () => {
                                                 setShowExportMenu(false)
                                                 try {
-                                                    // Build missing documents list
+                                                    // Build missing/expired/expiring documents list
                                                     const lines: string[] = []
-                                                    lines.push(`${vessel.name} — Missing Documents`)
+                                                    lines.push(`${vessel.name} — Outstanding Documents`)
                                                     lines.push('')
+
+                                                    // Resolve effective policy expiry for annual docs
+                                                    const { resolveEffectivePolicyExpiry } = await import('../utils/policyUtils')
+                                                    const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
+                                                    const shortCycle = (expiry: string | null | undefined, received: string | null | undefined) => {
+                                                        if (!expiry || !received) return false
+                                                        const e = new Date(expiry + 'T00:00:00')
+                                                        const r = new Date(received + 'T00:00:00')
+                                                        const days = Math.floor((e.getTime() - r.getTime()) / 86400000)
+                                                        return days >= 0 && days < 60
+                                                    }
+                                                    const today = new Date()
+                                                    today.setHours(0, 0, 0, 0)
+                                                    const threshold = new Date(today)
+                                                    threshold.setDate(today.getDate() + 30)
 
                                                     // Vessel documents
                                                     const customDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
-                                                    const allDocTypes = [...docTypes, ...(Array.isArray(customDocTypes) ? customDocTypes : []).map((c: any) => ({ id: c.id, name: c.name, required: true }))]
-                                                    const missingVessel = allDocTypes.filter(dt => !vesselDocs.some(d => d.documentTypeId === dt.id && d.filePath))
-                                                    if (missingVessel.length > 0) {
+                                                    const allDocTypes = [...docTypes, ...(Array.isArray(customDocTypes) ? customDocTypes : []).map((c: any) => ({ id: c.id, name: c.name, required: true, annualRenewal: false }))]
+                                                    const issues: string[] = []
+                                                    for (const dt of allDocTypes) {
+                                                        const doc = vesselDocs.find(d => d.documentTypeId === dt.id)
+                                                        if (!doc?.filePath) {
+                                                            issues.push(`${dt.name} — MISSING`)
+                                                            continue
+                                                        }
+                                                        // Check expiry
+                                                        let expiryDate = doc.expiryDate || null
+                                                        if ((dt as any).annualRenewal && effectiveExpiry) {
+                                                            expiryDate = effectiveExpiry
+                                                        }
+                                                        if (expiryDate) {
+                                                            // Short-cycle check
+                                                            if ((dt as any).annualRenewal && doc.uploadedDate && shortCycle(expiryDate, doc.uploadedDate)) {
+                                                                continue // compliant via short-cycle
+                                                            }
+                                                            const exp = new Date(expiryDate + 'T00:00:00')
+                                                            if (exp < today) {
+                                                                issues.push(`${dt.name} — EXPIRED (${expiryDate})`)
+                                                            } else if (exp <= threshold) {
+                                                                issues.push(`${dt.name} — EXPIRING SOON (${expiryDate})`)
+                                                            }
+                                                        }
+                                                    }
+                                                    if (issues.length > 0) {
                                                         lines.push('Vessel Documents:')
-                                                        for (const dt of missingVessel) lines.push(`  - ${dt.name}`)
+                                                        for (const issue of issues) lines.push(`  - ${issue}`)
                                                         lines.push('')
                                                     }
 
@@ -1174,8 +1213,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         }
                                                     }
 
-                                                    if (missingVessel.length === 0 && lines.length <= 2) {
-                                                        showSuccess('No missing documents')
+                                                    if (issues.length === 0 && lines.length <= 2) {
+                                                        showSuccess('No outstanding documents')
                                                         return
                                                     }
 
