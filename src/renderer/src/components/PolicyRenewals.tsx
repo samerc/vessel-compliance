@@ -328,6 +328,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     }
 
     const handleRenew = async (row: any, includeFleet: boolean) => {
+        console.log('[Renew] Starting renewal for', row.vesselName, 'includeFleet:', includeFleet, 'policyType:', row.policyTypeName)
         setRenewMenuId(null)
         setRenewLoading(row.id)
         try {
@@ -727,6 +728,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation()
+                                    console.log('[Renew] Button clicked for', r.vesselName, 'fleet:', r.fleetName)
                                     if (!r.fleetName) {
                                         handleRenew(r, false)
                                     } else {
