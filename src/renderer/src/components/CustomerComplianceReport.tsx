@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import XLSX from 'xlsx-js-style'
-import { Download, FileText, Users, AlertCircle, CheckCircle, Briefcase, Copy } from 'lucide-react'
+import JSZip from 'jszip'
+import { Download, FileText, Users, AlertCircle, CheckCircle, Briefcase, Copy, Search, Archive } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { exportCustomerPortfolioPDF } from '../services/CustomerPortfolioService'
+import { ReportService } from '../services/ReportService'
 import { formatDate } from '../utils/dateUtils'
 
 interface CustomerVesselRow {
@@ -212,6 +214,13 @@ export default function CustomerComplianceReport() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all')
   const [copyingMissing, setCopyingMissing] = useState(false)
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([])
+
+  // Batch ZIP export
+  const [showZipModal, setShowZipModal] = useState(false)
+  const [zipSelectedIds, setZipSelectedIds] = useState<Set<string>>(new Set())
+  const [zipSearch, setZipSearch] = useState('')
+  const [exportingZip, setExportingZip] = useState(false)
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number } | null>(null)
   const [groups, setGroups] = useState<CustomerGroup[]>([])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -460,6 +469,65 @@ export default function CustomerComplianceReport() {
     }
   }
 
+  // All vessel IDs from the report
+  const reportVesselIds = useMemo(() => groups.flatMap(g => g.vessels.map(v => v.vesselId)), [groups])
+
+  const handleOpenZipModal = () => {
+    if (reportVesselIds.length === 0) return
+    setZipSelectedIds(new Set(reportVesselIds))
+    setZipSearch('')
+    setShowZipModal(true)
+  }
+
+  const zipFilteredVessels = useMemo(() => {
+    const allVessels = groups.flatMap(g => g.vessels)
+    if (!zipSearch.trim()) return allVessels
+    const q = zipSearch.toLowerCase()
+    return allVessels.filter(v => v.vesselName.toLowerCase().includes(q) || v.imoNumber?.toLowerCase().includes(q))
+  }, [groups, zipSearch])
+
+  const handleExportZip = async () => {
+    const allVessels = groups.flatMap(g => g.vessels)
+    const selected = allVessels.filter(v => zipSelectedIds.has(v.vesselId))
+    if (selected.length === 0) return
+    setShowZipModal(false)
+    setExportingZip(true)
+    setZipProgress({ current: 0, total: selected.length })
+    try {
+      const zip = new JSZip()
+      const vessels = await window.api.getVessels()
+      const docTypesRaw = await window.api.getDocumentTypes()
+      const safeDocTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
+      let failed = 0
+      for (let i = 0; i < selected.length; i++) {
+        const sv = selected[i]
+        setZipProgress({ current: i + 1, total: selected.length })
+        try {
+          const vessel = (Array.isArray(vessels) ? vessels : []).find((v: any) => v.id === sv.vesselId)
+          if (!vessel) { failed++; continue }
+          const vDocs = await window.api.getVesselDocuments(vessel.id)
+          const bytes = await ReportService.exportVesselToPDF(vessel, safeDocTypes, Array.isArray(vDocs) ? vDocs : [], { returnBytes: true })
+          zip.file(`${vessel.name}_Compliance_Report.pdf`, bytes as Uint8Array)
+        } catch { failed++ }
+      }
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const customerName = selectedCustomerId === 'all' ? 'All_Customers' : (customers.find(c => c.id === selectedCustomerId)?.name || 'Customer').replace(/[^a-zA-Z0-9]/g, '_')
+      a.download = `${customerName}_Compliance_Reports.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      if (failed > 0) showError(`${failed} PDF(s) failed to generate`)
+      else showSuccess(`${selected.length} PDFs zipped and downloaded`)
+    } catch (err: any) {
+      showError(err.message || 'Failed to export')
+    } finally {
+      setExportingZip(false)
+      setZipProgress(null)
+    }
+  }
+
   const copyMissingDocuments = async () => {
     setCopyingMissing(true)
     try {
@@ -607,6 +675,9 @@ export default function CustomerComplianceReport() {
             <button onClick={copyMissingDocuments} disabled={copyingMissing} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Copy size={16} /> {copyingMissing ? 'Copying...' : 'Copy Missing'}
             </button>
+            <button onClick={handleOpenZipModal} disabled={exportingZip} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Archive size={16} /> {exportingZip ? `Exporting ${zipProgress ? `${zipProgress.current}/${zipProgress.total}` : '...'}` : 'Export PDFs (ZIP)'}
+            </button>
           </>
         )}
       </div>
@@ -709,6 +780,51 @@ export default function CustomerComplianceReport() {
           <Users size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.3 }} />
           <div style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>No report generated yet</div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Select a customer and click Generate Report.</p>
+        </div>
+      )}
+      {/* ZIP Export Modal */}
+      {showZipModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '500px', maxHeight: '70vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem' }}>Export Compliance PDFs</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 14px' }}>
+              Select vessels to include. Each gets its own PDF, all bundled in a ZIP file.
+            </p>
+            <div style={{ position: 'relative', marginBottom: '10px' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+              <input value={zipSearch} onChange={e => setZipSearch(e.target.value)} placeholder="Filter vessels..."
+                style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)', fontSize: '0.85rem', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <button onClick={() => setZipSelectedIds(new Set(zipFilteredVessels.map(v => v.vesselId)))}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '0.78rem', padding: 0 }}>Select All</button>
+              <button onClick={() => setZipSelectedIds(new Set())}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '0.78rem', padding: 0 }}>Select None</button>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{zipSelectedIds.size} selected</span>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--table-border)', borderRadius: '8px', marginBottom: '16px' }}>
+              {zipFilteredVessels.map(v => (
+                <label key={v.vesselId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--table-border)', fontSize: '0.85rem' }}>
+                  <input type="checkbox" checked={zipSelectedIds.has(v.vesselId)} onChange={() => {
+                    setZipSelectedIds(prev => { const n = new Set(prev); n.has(v.vesselId) ? n.delete(v.vesselId) : n.add(v.vesselId); return n })
+                  }} />
+                  <span style={{ fontWeight: 600 }}>{v.vesselName}</span>
+                  {v.imoNumber && <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>IMO: {v.imoNumber}</span>}
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: '0.75rem', color: v.pct === 100 ? 'var(--success)' : v.missing > 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>
+                    {v.pct}%
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowZipModal(false)} className="btn-secondary" style={{ padding: '8px 16px' }}>Cancel</button>
+              <button onClick={handleExportZip} disabled={zipSelectedIds.size === 0} className="btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Archive size={15} /> Export {zipSelectedIds.size} PDF{zipSelectedIds.size !== 1 ? 's' : ''} as ZIP
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
