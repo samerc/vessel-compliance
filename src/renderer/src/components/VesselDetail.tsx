@@ -1143,12 +1143,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     // Resolve effective policy expiry for annual docs
                                                     const { resolveEffectivePolicyExpiry } = await import('../utils/policyUtils')
                                                     const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
+                                                    // Annual docs received within 90 days of P&I expiry are treated as compliant
+                                                    // (wider window than the 60-day short-cycle used in compliance view,
+                                                    // to account for the renewal period when new docs arrive before new policy)
                                                     const shortCycle = (expiry: string | null | undefined, received: string | null | undefined) => {
                                                         if (!expiry || !received) return false
                                                         const e = new Date(expiry + 'T00:00:00')
-                                                        const r = new Date(received + 'T00:00:00')
+                                                        const r = new Date(received.split('T')[0] + 'T00:00:00')
                                                         const days = Math.floor((e.getTime() - r.getTime()) / 86400000)
-                                                        return days >= 0 && days < 60
+                                                        return days >= 0 && days < 90
                                                     }
                                                     const today = new Date()
                                                     today.setHours(0, 0, 0, 0)
@@ -1172,7 +1175,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         }
                                                         if (expiryDate) {
                                                             // Short-cycle check
-                                                            if ((dt as any).annualRenewal && doc.uploadedDate && shortCycle(expiryDate, doc.uploadedDate)) {
+                                                            // Skip annual docs that were recently received (short-cycle: received within 60 days of expiry)
+                                                            const docReceived = doc.receivedDate || doc.uploadedDate?.split('T')[0]
+                                                            if ((dt as any).annualRenewal && docReceived && shortCycle(expiryDate, docReceived)) {
                                                                 continue // compliant via short-cycle
                                                             }
                                                             const exp = new Date(expiryDate + 'T00:00:00')

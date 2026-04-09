@@ -564,9 +564,9 @@ export default function CustomerComplianceReport() {
       const shortCycle = (expiry: string | null | undefined, received: string | null | undefined) => {
         if (!expiry || !received) return false
         const e = new Date(expiry + 'T00:00:00')
-        const r = new Date(received + 'T00:00:00')
+        const r = new Date(received.split('T')[0] + 'T00:00:00')
         const days = Math.floor((e.getTime() - r.getTime()) / 86400000)
-        return days >= 0 && days < 60
+        return days >= 0 && days < 90
       }
       const today = new Date(); today.setHours(0, 0, 0, 0)
       const threshold = new Date(today); threshold.setDate(today.getDate() + 30)
@@ -588,7 +588,8 @@ export default function CustomerComplianceReport() {
           let expiryDate = doc.expiryDate || null
           if ((dt as any).annualRenewal && effectiveExpiry) expiryDate = effectiveExpiry
           if (expiryDate) {
-            if ((dt as any).annualRenewal && doc.uploadedDate && shortCycle(expiryDate, doc.uploadedDate)) continue
+            const docReceived = doc.receivedDate || doc.uploadedDate?.split('T')[0]
+            if ((dt as any).annualRenewal && docReceived && shortCycle(expiryDate, docReceived)) continue
             const exp = new Date(expiryDate + 'T00:00:00')
             if (exp < today) issues.push(`${dt.name} — EXPIRED (${expiryDate})`)
             else if (exp <= threshold) issues.push(`${dt.name} — EXPIRING SOON (${expiryDate})`)
