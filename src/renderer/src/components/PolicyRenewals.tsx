@@ -90,8 +90,8 @@ const DEFAULT_COL_WIDTHS = [200, 170, 120, 130, 110, 95, 90, 130, 140, 110]
 
 function formatPremium(value: number | null, currency: string | null): string {
     if (value == null) return '-'
-    const sym = currency === 'EUR' ? '\u20AC' : currency === 'GBP' ? '\u00A3' : '$'
-    return `${sym}${Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+    const cur = currency || 'USD'
+    return `${cur} ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
 export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuotation }: PolicyRenewalsProps) {
@@ -632,7 +632,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             {rnVisSet.has('policyType') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.policyTypeName}</td>}
             {rnVisSet.has('policyNo') && <td style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>}
             {rnVisSet.has('endDate') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.endDate || '-'}</td>}
-            {rnVisSet.has('premium') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '0.85rem' }}>{formatPremium(r.premium, r.currency)}</td>}
+            {rnVisSet.has('premium') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', fontSize: '0.82rem' }}>{formatPremium(r.premium, r.currency)}</td>}
             {rnVisSet.has('days') && (
             <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                 {r.endDate ? (() => {
@@ -696,31 +696,34 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             </td>
             )}
             {rnVisSet.has('actions') && (
-            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                <div style={{
+                    display: 'inline-flex', gap: 0, alignItems: 'center',
+                    borderRadius: '8px', overflow: 'hidden',
+                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`
+                }}>
                     {/* Notes */}
                     <button
                         onClick={() => handleOpenNotes(r)}
                         style={{
-                            padding: '6px 8px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
-                            border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)',
+                            padding: '6px 9px', background: 'transparent',
+                            border: 'none', borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                            cursor: 'pointer', color: r.noteCount > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
                             position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            transition: 'all 0.12s'
+                            transition: 'background 0.12s'
                         }}
                         title={r.noteCount > 0 ? `${r.noteCount} note${r.noteCount > 1 ? 's' : ''}` : 'Add notes'}
-                        onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--accent-primary)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                     >
                         <MessageSquare size={14} />
                         {r.noteCount > 0 && (
-                            <span style={{ position: 'absolute', top: '-3px', right: '-3px', minWidth: '14px', height: '14px', borderRadius: '7px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.6rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}>
-                                {r.noteCount}
-                            </span>
+                            <span style={{ position: 'absolute', top: '1px', right: '2px', width: '6px', height: '6px', borderRadius: '3px', background: 'var(--accent-primary)' }} />
                         )}
                     </button>
                     {/* Renew */}
                     {hasPermission('quotations:create') && (
-                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <div style={{ position: 'relative', display: 'inline-flex' }}>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation()
@@ -732,14 +735,15 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                 }}
                                 disabled={renewLoading === r.id}
                                 style={{
-                                    padding: '6px 8px', background: isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)',
-                                    border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-primary)',
+                                    padding: '6px 9px', background: 'transparent',
+                                    border: 'none', borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                                    cursor: 'pointer', color: 'var(--accent-primary)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px',
-                                    transition: 'all 0.12s'
+                                    transition: 'background 0.12s'
                                 }}
                                 title="Create renewal quotation"
-                                onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.15)' : 'rgba(0,210,255,0.15)' }}
-                                onMouseLeave={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                             >
                                 <RefreshCw size={14} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
                                 {r.fleetName && <ChevronDownIcon size={10} />}
@@ -785,14 +789,14 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                     <button
                         onClick={() => onNavigateToVessel?.(r.vesselId)}
                         style={{
-                            padding: '6px 8px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
-                            border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-secondary)',
+                            padding: '6px 9px', background: 'transparent',
+                            border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            transition: 'all 0.12s'
+                            transition: 'background 0.12s'
                         }}
                         title="View vessel"
-                        onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--text-primary)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                     >
                         <Eye size={14} />
                     </button>
