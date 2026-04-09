@@ -6806,6 +6806,78 @@ export class MySQLAdapter {
         }))
     }
 
+    async getQuotationsForVessel(vesselId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT DISTINCT q.id, q.reference_number as referenceNumber,
+                qt.name as quotationTypeName, qt.code as quotationTypeCode,
+                q.quotation_date as quotationDate, q.status, q.is_renewal as isRenewal,
+                q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
+                q.created_at as createdAt, q.updated_at as updatedAt,
+                q.co_name as coName, q.title,
+                q.revision_number as revisionNumber,
+                qws.name as workflowStepName, qws.color as workflowStepColor
+            FROM quotations q
+            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
+            INNER JOIN quotation_vessels qv ON qv.quotation_id = q.id
+            WHERE qv.vessel_id = ?
+            ORDER BY q.created_at DESC
+        `, [vesselId])
+
+        const qIds = (rows as any[]).map(r => r.id)
+        if (qIds.length === 0) return []
+
+        // Batch load vessel counts
+        const [vcRows] = await this.pool.query(`
+            SELECT quotation_id, COUNT(*) as cnt FROM quotation_vessels
+            WHERE quotation_id IN (${qIds.map(() => '?').join(',')})
+            GROUP BY quotation_id
+        `, qIds)
+        const vcMap = new Map<string, number>()
+        for (const v of vcRows as any[]) vcMap.set(v.quotation_id, v.cnt)
+
+        // Batch load P&I clause names
+        const [clauseRows] = await this.pool.query(`
+            SELECT qc.quotation_id, pc.name FROM quotation_clauses qc
+            JOIN pi_clauses pc ON qc.pi_clause_id = pc.id
+            WHERE qc.quotation_id IN (${qIds.map(() => '?').join(',')})
+        `, qIds)
+        const clauseMap = new Map<string, string[]>()
+        for (const c of clauseRows as any[]) {
+            if (!clauseMap.has(c.quotation_id)) clauseMap.set(c.quotation_id, [])
+            clauseMap.get(c.quotation_id)!.push(c.name)
+        }
+
+        // Batch load hull clause codes
+        const [hullRows] = await this.pool.query(`
+            SELECT qha.quotation_id, hc.code, hc.name FROM quotation_hull_alternatives qha
+            JOIN hull_clauses hc ON qha.hull_clause_id = hc.id
+            WHERE qha.quotation_id IN (${qIds.map(() => '?').join(',')})
+            ORDER BY qha.order_index
+        `, qIds)
+        const hullMap = new Map<string, string[]>()
+        for (const h of hullRows as any[]) {
+            if (!hullMap.has(h.quotation_id)) hullMap.set(h.quotation_id, [])
+            hullMap.get(h.quotation_id)!.push(h.code || h.name)
+        }
+
+        return (rows as any[]).map(r => {
+            r.isRenewal = Boolean(r.isRenewal)
+            r.premiumAmount = r.premiumAmount ? Number(r.premiumAmount) : null
+            r.revisionNumber = Number(r.revisionNumber || 0)
+            r.vesselCount = vcMap.get(r.id) || 0
+            if (r.quotationTypeCode === 'P') {
+                r.conditionsSummary = (clauseMap.get(r.id) || []).slice(0, 5).join(', ')
+            } else if (r.quotationTypeCode === 'H') {
+                r.conditionsSummary = (hullMap.get(r.id) || []).slice(0, 3).join(' / ')
+            } else {
+                r.conditionsSummary = ''
+            }
+            return r
+        })
+    }
+
     async getQuotationsPaginated(params: {
         page?: number
         pageSize?: number

@@ -17,16 +17,18 @@ import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
 import ConfirmationModal from './ConfirmationModal'
 import RemapFilePathsModal from './RemapFilePathsModal'
+import VesselQuotationsView from './VesselQuotationsView'
 
 interface VesselDetailProps {
     vessel: Vessel
     onBack: () => void
     backLabel?: string
-    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline'
+    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | 'quotations'
     initialEditing?: boolean
+    onNavigateToQuotation?: (quotationId: string) => void
 }
 
-export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels', initialSection, initialEditing = false }: VesselDetailProps) {
+export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels', initialSection, initialEditing = false, onNavigateToQuotation }: VesselDetailProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
     const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -370,7 +372,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
     const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
-    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline'>(initialSection || 'documents')
+    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | 'quotations'>(initialSection || 'documents')
     useEffect(() => {
         if (initialSection) {
             setDetailView(initialSection)
@@ -1282,7 +1284,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 marginBottom: '16px',
                 alignItems: 'center'
             }}>
-                {(['documents', 'assureds', 'surveys', 'policies', 'history', 'timeline'] as const).map(view => (
+                {(['documents', 'assureds', 'surveys', 'policies', 'quotations', 'history', 'timeline'] as const).map(view => (
                     <button
                         key={view}
                         onClick={() => {
@@ -1310,6 +1312,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         {view === 'assureds' && <Users size={18} />}
                         {view === 'surveys' && <ClipboardList size={18} />}
                         {view === 'policies' && <Shield size={18} />}
+                        {view === 'quotations' && <Hash size={18} />}
                         {view === 'history' && <Calendar size={18} />}
                         {view === 'timeline' && <Clock size={18} />}
                         {view === 'assureds' ? 'Assured' : view.charAt(0).toUpperCase() + view.slice(1)}
@@ -1955,6 +1958,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
             {detailView === 'timeline' && (
                 <VesselTimeline vesselId={vessel.id} isLight={isLight} />
+            )}
+
+            {detailView === 'quotations' && (
+                <VesselQuotationsView
+                    vessel={vessel}
+                    onNavigateToQuotation={(qId) => {
+                        if (onNavigateToQuotation) onNavigateToQuotation(qId)
+                    }}
+                />
             )}
 
             {confirmation.show && (

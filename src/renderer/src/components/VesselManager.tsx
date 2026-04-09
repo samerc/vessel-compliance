@@ -23,7 +23,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string } = {}) {
+export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel, onNavigateToQuotation }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | 'quotations'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string; onNavigateToQuotation?: (quotationId: string) => void } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [entities, setEntities] = useState<Entity[]>([])
@@ -84,7 +84,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const visibleSet = new Set(visibleColumns)
 
     // Section and back-navigation tracking for external navigation
-    const [appliedSection, setAppliedSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | undefined>(undefined)
+    const [appliedSection, setAppliedSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | 'quotations' | undefined>(undefined)
     const [navigatedExternally, setNavigatedExternally] = useState(false)
 
     // Sanctions checking state
@@ -502,7 +502,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
             ? () => { onNavigateBack(); setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); setOpenInEditMode(false) }
             : () => { setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); setOpenInEditMode(false); loadData() }
         const backLabel = navigatedExternally && navigateBackLabel ? navigateBackLabel : 'Back to Vessels'
-        return <VesselDetail vessel={selectedVessel} backLabel={backLabel} onBack={handleBack} initialSection={appliedSection} initialEditing={openInEditMode} />
+        return <VesselDetail vessel={selectedVessel} backLabel={backLabel} onBack={handleBack} initialSection={appliedSection} initialEditing={openInEditMode} onNavigateToQuotation={onNavigateToQuotation} />
     }
 
     return (

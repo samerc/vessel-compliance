@@ -547,6 +547,7 @@ const api = {
   quotationGroupRemoveMember: (groupId: string, quotationId: string) => ipcRenderer.invoke('quotationGroup:removeMember', groupId, quotationId),
   quotationGroupBulkAdd: (groupId: string, quotationIds: string[]) => ipcRenderer.invoke('quotationGroup:bulkAdd', groupId, quotationIds),
 
+  vesselGetQuotations: (vesselId: string) => ipcRenderer.invoke('vessel:getQuotations', vesselId),
   getQuotation: (id: string) => ipcRenderer.invoke('db:getQuotation', id),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
   updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),

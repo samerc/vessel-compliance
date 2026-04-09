@@ -716,6 +716,7 @@ function App(): React.JSX.Element {
               'survey-followup': 'Back to Survey Follow-Up',
               'policies-list': 'Back to Policies',
             } as Record<string, string>)[navigateBackTab] || 'Back' : undefined}
+            onNavigateToQuotation={(qId) => { setInitialQuotationId(qId); setActiveTab('quotations') }}
           />}
           {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
           {activeTab === 'fleets' && <FleetManager />}

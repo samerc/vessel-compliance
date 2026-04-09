@@ -2846,6 +2846,7 @@ app.whenReady().then(() => {
 
   // Quotations
   safeHandle('db:getQuotations', (event) => { requireSession(event); return db.getQuotations() })
+  safeHandle('vessel:getQuotations', (event, vesselId: string) => { requireSession(event); return db.getQuotationsForVessel(vesselId) })
   safeHandle('quotation:getPaginated', (event, params) => { requireSession(event); return db.getQuotationsPaginated(params) })
   safeHandle('quotation:getCreators', (event) => { requireSession(event); return db.getQuotationCreators() })
   safeHandle('quotation:getSavedFilters', (event) => { const user = requireSession(event); return db.getQuotationSavedFilters(user.id) })

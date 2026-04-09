@@ -566,6 +566,7 @@ export interface Api {
   quotationGroupRemoveMember: (groupId: string, quotationId: string) => Promise<void>
   quotationGroupBulkAdd: (groupId: string, quotationIds: string[]) => Promise<void>
 
+  vesselGetQuotations: (vesselId: string) => Promise<any[]>
   getQuotation: (id: string) => Promise<Quotation | null>
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>
