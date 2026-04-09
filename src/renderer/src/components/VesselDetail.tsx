@@ -1143,15 +1143,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     // Resolve effective policy expiry for annual docs
                                                     const { resolveEffectivePolicyExpiry } = await import('../utils/policyUtils')
                                                     const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
-                                                    // Annual docs received within 90 days of P&I expiry are treated as compliant
-                                                    // (wider window than the 60-day short-cycle used in compliance view,
-                                                    // to account for the renewal period when new docs arrive before new policy)
+                                                    // Annual docs received within grace period of P&I expiry are treated as compliant
+                                                    const graceSetting = await window.api.getSetting('annual_grace_days')
+                                                    const graceDays = graceSetting ? parseInt(graceSetting) || 90 : 90
                                                     const shortCycle = (expiry: string | null | undefined, received: string | null | undefined) => {
                                                         if (!expiry || !received) return false
                                                         const e = new Date(expiry + 'T00:00:00')
                                                         const r = new Date(received.split('T')[0] + 'T00:00:00')
                                                         const days = Math.floor((e.getTime() - r.getTime()) / 86400000)
-                                                        return days >= 0 && days < 90
+                                                        return days >= 0 && days < graceDays
                                                     }
                                                     const today = new Date()
                                                     today.setHours(0, 0, 0, 0)
@@ -1163,6 +1163,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     const allDocTypes = [...docTypes, ...(Array.isArray(customDocTypes) ? customDocTypes : []).map((c: any) => ({ id: c.id, name: c.name, required: true, annualRenewal: false }))]
                                                     const issues: string[] = []
                                                     for (const dt of allDocTypes) {
+                                                        if (!(dt as any).required) continue // skip optional documents
                                                         const doc = vesselDocs.find(d => d.documentTypeId === dt.id)
                                                         if (!doc?.filePath) {
                                                             issues.push(`${dt.name} — MISSING`)

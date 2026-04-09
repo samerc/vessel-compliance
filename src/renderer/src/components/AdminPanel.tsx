@@ -96,6 +96,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const DEFAULT_TEMPLATE = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
     const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ periodDays: 7, reminderTemplate: DEFAULT_TEMPLATE })
     const [savingReminder, setSavingReminder] = useState(false)
+    const [annualGraceDays, setAnnualGraceDays] = useState(90)
 
     // User Groups state
     const [userGroups, setUserGroups] = useState<UserGroup[]>([])
@@ -635,6 +636,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         try {
             const settings = await window.api.remindersGetSettings()
             if (settings && !(settings as any).error) setReminderSettings(settings)
+            const grace = await window.api.getSetting('annual_grace_days')
+            if (grace) setAnnualGraceDays(parseInt(grace) || 90)
         } catch { /* ignore */ }
     }
 
@@ -659,6 +662,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         setSavingReminder(true)
         try {
             await window.api.remindersSetSettings(reminderSettings)
+            await window.api.setSetting('annual_grace_days', String(annualGraceDays))
             showSuccess('Reminder settings saved')
         } catch (error: any) {
             showError(error.message || 'Failed to save reminder settings')
@@ -1888,7 +1892,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     Configure the snooze period and copy-to-clipboard template for document reminders.
                 </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '20px', marginBottom: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '200px 200px 1fr', gap: '20px', marginBottom: '20px' }}>
                         <div>
                             <label htmlFor="admin-reminder-period" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Snooze Period (days)</label>
                             <input
@@ -1900,6 +1904,21 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                 onChange={e => setReminderSettings({ ...reminderSettings, periodDays: Number(e.target.value) })}
                                 style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
                             />
+                        </div>
+                        <div>
+                            <label htmlFor="admin-annual-grace" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Annual Doc Grace (days)</label>
+                            <input
+                                id="admin-annual-grace"
+                                type="number"
+                                min={30}
+                                max={180}
+                                value={annualGraceDays}
+                                onChange={e => setAnnualGraceDays(Number(e.target.value) || 90)}
+                                style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                            />
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                Annual docs received within this many days of P&I expiry are treated as compliant during the renewal window.
+                            </p>
                         </div>
                         <div>
                             <label htmlFor="admin-reminder-template" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
