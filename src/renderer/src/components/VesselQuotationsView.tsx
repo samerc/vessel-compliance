@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, RefreshCcw, ChevronDown, FileText, Loader2, ExternalLink, Users } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
@@ -213,7 +214,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
             </button>
             {showTypeMenu && quotationTypes.length > 0 && (() => {
               const rect = menuRef.current?.getBoundingClientRect()
-              return (
+              return createPortal(
               <div ref={dropdownRef} style={{
                 position: 'fixed',
                 top: rect ? rect.bottom + 4 : 0,
@@ -276,8 +277,8 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
                     ))}
                   </>
                 )}
-              </div>
-              )
+              </div>,
+              document.body)
             })()}
           </div>
           <button
