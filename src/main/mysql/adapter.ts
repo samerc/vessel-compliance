@@ -6815,7 +6815,7 @@ export class MySQLAdapter {
                 q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
                 q.created_at as createdAt, q.updated_at as updatedAt,
                 q.co_name as coName, q.title,
-                q.revision_number as revisionNumber,
+                q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId,
                 qws.name as workflowStepName, qws.color as workflowStepColor
             FROM quotations q
             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
@@ -6825,7 +6825,19 @@ export class MySQLAdapter {
             ORDER BY q.created_at DESC
         `, [vesselId])
 
-        const qIds = (rows as any[]).map(r => r.id)
+        // Filter to latest revision per group (same as getQuotations)
+        const latestByGroup = new Map<string, any>()
+        for (const r of rows as any[]) {
+            const gid = r.revisionGroupId || r.id
+            const existing = latestByGroup.get(gid)
+            if (!existing || (r.revisionNumber || 0) > (existing.revisionNumber || 0)) {
+                latestByGroup.set(gid, r)
+            }
+        }
+        const latestIds = new Set([...latestByGroup.values()].map(r => r.id))
+        const filteredRows = (rows as any[]).filter(r => latestIds.has(r.id))
+
+        const qIds = filteredRows.map(r => r.id)
         if (qIds.length === 0) return []
 
         // Batch load vessel counts
@@ -6862,7 +6874,7 @@ export class MySQLAdapter {
             hullMap.get(h.quotation_id)!.push(h.code || h.name)
         }
 
-        return (rows as any[]).map(r => {
+        return filteredRows.map(r => {
             r.isRenewal = Boolean(r.isRenewal)
             r.premiumAmount = r.premiumAmount ? Number(r.premiumAmount) : null
             r.revisionNumber = Number(r.revisionNumber || 0)

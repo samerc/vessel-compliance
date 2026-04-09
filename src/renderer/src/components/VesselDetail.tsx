@@ -537,6 +537,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
     const handleSaveVessel = async () => {
         if (!editName.trim() || !editImo.trim()) return
+        // Derive classification text from junction table selection
+        const classText = vesselClassificationIds.size > 0
+            ? classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(' / ')
+            : (editClassification || null)
         await window.api.updateVessel(vessel.id, {
             name: editName,
             imoNumber: editImo,
@@ -544,7 +548,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : null,
             grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : null,
             vesselType: editVesselType || null,
-            classificationSociety: editClassification || null,
+            classificationSociety: classText,
             callSign: editCallSign || null,
             flagStateId: selectedFlagStateId || null
         } as any)
@@ -1284,7 +1288,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 marginBottom: '16px',
                 alignItems: 'center'
             }}>
-                {(['documents', 'assureds', 'surveys', 'policies', 'quotations', 'history', 'timeline'] as const).map(view => (
+                {(['documents', 'assureds', 'surveys', 'quotations', 'policies', 'history', 'timeline'] as const).map(view => (
                     <button
                         key={view}
                         onClick={() => {

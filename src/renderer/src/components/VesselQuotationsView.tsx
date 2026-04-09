@@ -71,7 +71,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
     }
   }
 
-  const handleNewQuotation = async (typeCode: string) => {
+  const handleNewQuotation = async (typeCode: string, includeFleet = false) => {
     setShowTypeMenu(false)
     setCreating(true)
     try {
@@ -84,50 +84,66 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
       } as any)
       if (!q || (q as any).error) throw new Error('Failed to create quotation')
 
-      // Add vessel to quotation
+      // Determine which vessels to add
       const flagStates = await window.api.getFlagStates()
-      const flagName = vessel.flagStateId
-        ? ((Array.isArray(flagStates) ? flagStates : []).find((f: any) => f.id === vessel.flagStateId)?.name || '')
-        : ''
+      let vesselsToAdd: any[] = [vessel]
+      if (includeFleet && vessel.fleetId) {
+        const allVessels = await window.api.getVessels()
+        vesselsToAdd = (Array.isArray(allVessels) ? allVessels : []).filter((v: any) => v.isActive && v.fleetId === vessel.fleetId)
+      }
 
-      await window.api.addQuotationVessel({
-        quotationId: q.id,
-        vesselId: vessel.id,
-        vesselLabel: 'V1',
-        order: 0,
-        name: vessel.name,
-        imoNumber: vessel.imoNumber,
-        builtYear: vessel.builtYear,
-        grossTonnage: vessel.grossTonnage,
-        flag: flagName,
-        vesselType: vessel.vesselType,
-        classification: vessel.classificationSociety,
-        callSign: vessel.callSign
-      })
+      for (let i = 0; i < vesselsToAdd.length; i++) {
+        const v = vesselsToAdd[i]
+        const flagName = v.flagStateId
+          ? ((Array.isArray(flagStates) ? flagStates : []).find((f: any) => f.id === v.flagStateId)?.name || '')
+          : ''
+        await window.api.addQuotationVessel({
+          quotationId: q.id,
+          vesselId: v.id,
+          vesselLabel: `V${i + 1}`,
+          order: i,
+          name: v.name,
+          imoNumber: v.imoNumber,
+          builtYear: v.builtYear,
+          grossTonnage: v.grossTonnage,
+          flag: flagName,
+          vesselType: v.vesselType,
+          classification: v.classificationSociety,
+          callSign: v.callSign
+        })
+      }
 
       // Auto-load vessel assureds
       try {
         const allEntities = await window.api.getEntities()
         const assuredRoles = await window.api.getAssuredRoles()
         const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
-        const vassureds = await window.api.getVesselAssureds(vessel.id)
-        const toAdd = (Array.isArray(vassureds) ? vassureds : [])
-          .sort((a: any, b: any) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+        const existingEntityIds = new Set<string>()
         let assuredOrder = 0
-        for (const va of toAdd) {
-          const entity = allEntities.find((e: any) => e.id === va.entityId)
-          if (!entity) continue
-          if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
-            if (!q.coName) await window.api.updateQuotation(q.id, { coName: entity.name } as any)
-            continue
+        for (let i = 0; i < vesselsToAdd.length; i++) {
+          const v = vesselsToAdd[i]
+          const vLabel = `V${i + 1}`
+          const vassureds = await window.api.getVesselAssureds(v.id)
+          const toAdd = (Array.isArray(vassureds) ? vassureds : [])
+            .filter((va: any) => !existingEntityIds.has(va.entityId))
+            .sort((a: any, b: any) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+          for (const va of toAdd) {
+            const entity = allEntities.find((e: any) => e.id === va.entityId)
+            if (!entity) continue
+            if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
+              if (!q.coName) await window.api.updateQuotation(q.id, { coName: entity.name } as any)
+              continue
+            }
+            await window.api.addQuotationAssured({
+              quotationId: q.id,
+              entityId: va.entityId,
+              name: entity.name,
+              role: va.role || undefined,
+              vesselLabel: vesselsToAdd.length > 1 ? vLabel : undefined,
+              order: assuredOrder++
+            })
+            existingEntityIds.add(va.entityId)
           }
-          await window.api.addQuotationAssured({
-            quotationId: q.id,
-            entityId: va.entityId,
-            name: entity.name,
-            role: va.role || undefined,
-            order: assuredOrder++
-          })
         }
       } catch { /* ignore assured loading errors */ }
 
@@ -193,14 +209,19 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
               New Quotation
               <ChevronDown size={14} />
             </button>
-            {showTypeMenu && quotationTypes.length > 0 && (
+            {showTypeMenu && quotationTypes.length > 0 && (() => {
+              const rect = menuRef.current?.getBoundingClientRect()
+              return (
               <div style={{
-                position: 'absolute', right: 0, top: '100%', marginTop: '4px',
+                position: 'fixed',
+                top: rect ? rect.bottom + 4 : 0,
+                right: rect ? window.innerWidth - rect.right : 0,
                 background: isLight ? '#fff' : '#1e222a',
                 border: '1px solid var(--glass-border)', borderRadius: '10px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.25)', zIndex: 100,
-                minWidth: '180px', padding: '6px', overflow: 'hidden'
+                boxShadow: '0 8px 24px rgba(0,0,0,0.25)', zIndex: 9999,
+                minWidth: '180px', padding: '6px'
               }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '4px 12px 2px' }}>Vessel Only</div>
                 {quotationTypes.map((qt: any) => (
                   <button
                     key={qt.id}
@@ -212,7 +233,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
                       color: 'var(--text-primary)', fontSize: '0.84rem',
                       cursor: 'pointer', textAlign: 'left'
                     }}
-                    onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--bg-hover)' }}
+                    onMouseEnter={(e) => { (e.target as HTMLElement).style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)' }}
                     onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent' }}
                   >
                     <span style={{
@@ -224,8 +245,38 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
                     {qt.name}
                   </button>
                 ))}
+                {vessel.fleetId && (
+                  <>
+                    <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+                    <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '4px 12px 2px' }}>Fleet</div>
+                    {quotationTypes.map((qt: any) => (
+                      <button
+                        key={`fleet-${qt.id}`}
+                        onClick={() => handleNewQuotation(qt.code, true)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          width: '100%', padding: '8px 12px', border: 'none',
+                          background: 'transparent', borderRadius: '6px',
+                          color: 'var(--text-primary)', fontSize: '0.84rem',
+                          cursor: 'pointer', textAlign: 'left'
+                        }}
+                        onMouseEnter={(e) => { (e.target as HTMLElement).style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)' }}
+                        onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent' }}
+                      >
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: '24px', height: '20px', borderRadius: '4px',
+                          fontSize: '0.7rem', fontWeight: 700,
+                          background: typeColor(qt.code) + '22', color: typeColor(qt.code)
+                        }}>{qt.code}</span>
+                        {qt.name}
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
-            )}
+              )
+            })()}
           </div>
           <button
             onClick={loadQuotations}
