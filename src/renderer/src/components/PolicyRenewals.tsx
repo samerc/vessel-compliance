@@ -397,6 +397,41 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                 })
             }
 
+            // Auto-load vessel assureds for each vessel
+            const allEntities = await window.api.getEntities()
+            const assuredRoles = await window.api.getAssuredRoles()
+            const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
+            const existingEntityIds = new Set<string>()
+            let assuredOrder = 0
+            for (let i = 0; i < vesselsToAdd.length; i++) {
+                const v = vesselsToAdd[i]
+                const vLabel = `V${i + 1}`
+                try {
+                    const vassureds = await window.api.getVesselAssureds(v.id)
+                    const toAdd = (Array.isArray(vassureds) ? vassureds : [])
+                        .filter((va: any) => !existingEntityIds.has(va.entityId))
+                        .sort((a: any, b: any) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+                    for (const va of toAdd) {
+                        const entity = allEntities.find((e: any) => e.id === va.entityId)
+                        if (!entity) continue
+                        // c/o role → set as broker
+                        if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
+                            if (!q.coName) await window.api.updateQuotation(q.id, { coName: entity.name } as any)
+                            continue
+                        }
+                        await window.api.addQuotationAssured({
+                            quotationId: q.id,
+                            entityId: va.entityId,
+                            name: entity.name,
+                            role: va.role || undefined,
+                            vesselLabel: vesselsToAdd.length > 1 ? vLabel : undefined,
+                            order: assuredOrder++
+                        })
+                        existingEntityIds.add(va.entityId)
+                    }
+                } catch {}
+            }
+
             showSuccess(`Renewal quotation ${q.referenceNumber || 'draft'} created`)
             onCreateRenewalQuotation?.(q.id)
         } catch (err: any) {
