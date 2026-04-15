@@ -273,7 +273,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
         const classNames = safeVcs.map((vc: any) => vc.classificationSocietyName || vc.abbreviation).filter(Boolean)
         if (classNames.length > 0) {
           vesselClassificationNames[qv.vesselId] = classNames.join(', ')
-          if (hasIacs) continue
+          continue // Junction table is authoritative — don't fall through to stale text field
         }
       } catch {}
     }
