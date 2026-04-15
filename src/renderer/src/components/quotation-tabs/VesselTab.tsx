@@ -21,23 +21,50 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
     const [availableFleets, setAvailableFleets] = useState<{ id: string; name: string; vesselCount: number }[]>([])
     const [fleetSearch, setFleetSearch] = useState('')
     const [addingFleet, setAddingFleet] = useState(false)
+    const [vesselClassNames, setVesselClassNames] = useState<Record<string, string>>({})
 
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
         const qv = await window.api.getQuotationVessels(quotation.id)
-        setQVessels(Array.isArray(qv) ? qv : [])
+        const safeQV = Array.isArray(qv) ? qv : []
+        setQVessels(safeQV)
         const [fs, cs, vt] = await Promise.all([
             window.api.getFlagStates().catch(() => []),
             window.api.getClassificationSocieties().catch(() => []),
             window.api.getVesselTypes().catch(() => [])
         ])
         setFlagStatesLocal(Array.isArray(fs) ? fs : [])
-        setClassSocietiesLocal(Array.isArray(cs) ? cs : [])
+        const safeCS = Array.isArray(cs) ? cs : []
+        setClassSocietiesLocal(safeCS)
         setVesselTypesLocal(Array.isArray(vt) ? vt : [])
+        // Resolve classification names from junction table for all linked vessels
+        const classMap: Record<string, string> = {}
+        for (const v of safeQV) {
+            if (!v.vesselId) continue
+            try {
+                const vcs = await window.api.getVesselClassifications(v.vesselId)
+                const names = (Array.isArray(vcs) ? vcs : [])
+                    .map((vc: any) => vc.classificationSocietyName || safeCS.find((c: any) => c.id === vc.classificationSocietyId)?.name)
+                    .filter(Boolean)
+                if (names.length > 0) classMap[v.vesselId] = names.join(', ')
+            } catch { /* ignore */ }
+        }
+        setVesselClassNames(classMap)
     }
 
     const nextLabel = (list: QuotationVessel[]) => `V${list.length + 1}`
+
+    const resolveClassification = async (vesselId: string): Promise<string> => {
+        try {
+            const vcs = await window.api.getVesselClassifications(vesselId)
+            const names = (Array.isArray(vcs) ? vcs : [])
+                .map((vc: any) => vc.classificationSocietyName || classSocietiesLocal.find((c: any) => c.id === vc.classificationSocietyId)?.name)
+                .filter(Boolean)
+            if (names.length > 0) return names.join(', ')
+        } catch { /* fallback to text field */ }
+        return ''
+    }
 
     const handleAddExisting = async () => {
         if (!selectedVesselId) return
@@ -46,6 +73,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             const v = vessels.find(vv => vv.id === selectedVesselId)
             const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
             const flagName = v?.flagStateId ? (flagStates.find((f: any) => f.id === v.flagStateId)?.name || '') : ''
+            const classifName = await resolveClassification(selectedVesselId) || v?.classificationSociety
             await window.api.addQuotationVessel({
                 quotationId: quotation.id,
                 vesselId: selectedVesselId,
@@ -58,7 +86,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 grossTonnage: v?.grossTonnage,
                 flag: flagName,
                 vesselType: v?.vesselType,
-                classification: v?.classificationSociety,
+                classification: classifName,
                 callSign: v?.callSign
             })
 
@@ -202,7 +230,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     grossTonnage: v.grossTonnage,
                     flag: flagName,
                     vesselType: v.vesselType,
-                    classification: v.classificationSociety,
+                    classification: await resolveClassification(v.id) || v.classificationSociety,
                     callSign: v.callSign
                 })
 
@@ -517,7 +545,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 const gt = reg?.grossTonnage || qv.grossTonnage
                 const flag = qv.flag
                 const vtype = reg?.vesselType || qv.vesselType
-                const classif = reg?.classificationSociety || qv.classification
+                const classif = (qv.vesselId && vesselClassNames[qv.vesselId]) || qv.classification
                 const callSign = reg?.callSign || qv.callSign
                 return (
                     <div key={qv.id} style={{ padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--table-border)', marginBottom: '10px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
