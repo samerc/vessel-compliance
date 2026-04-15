@@ -63,8 +63,9 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                     const vesselDocs = await window.api.getVesselDocuments(qv.vesselId!)
                     const vesselDocMap = new Map(vesselDocs.map((d: any) => [d.documentTypeId || d.document_type_id, d]))
 
-                    // Check all doc types — missing?
+                    // Check required doc types only — optional docs are excluded from auto-populate
                     for (const dt of dts) {
+                        if (!dt.required) continue
                         const doc = vesselDocMap.get(dt.id)
                         if (!doc || !doc.filePath) {
                             missingDocTypeIds.add(dt.id)
