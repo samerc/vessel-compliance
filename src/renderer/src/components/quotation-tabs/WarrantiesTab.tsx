@@ -47,6 +47,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         const safeAll = Array.isArray(all) ? all : []
         const safeTags = Array.isArray(allTags) ? allTags : []
         const safeSets = Array.isArray(sets) ? sets : []
+        const loadError = !Array.isArray(selectedRows) && selectedRows && (selectedRows as any).error
         const safeSelectedRows = Array.isArray(selectedRows) ? selectedRows : []
         const safeSelected = safeSelectedRows.map((r: any) => r.piWarrantyId)
         const scopes: Record<string, string[] | null> = {}
@@ -65,7 +66,8 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         setCustomWarranties(safeCustom)
 
         // Apply default-selected sets on first load if quotation has no warranties yet
-        if (!defaultsApplied.current && safeSelected.length === 0 && safeSets.length > 0) {
+        // Skip if load failed (error from safeHandle) to avoid destructive re-application
+        if (!defaultsApplied.current && !loadError && safeSelected.length === 0 && safeSets.length > 0) {
             defaultsApplied.current = true
             // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations
             const tc = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
@@ -78,6 +80,9 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                     }
                 }
             }
+            // Sort by master list order so warranties appear in the configured sequence
+            const masterOrder = new Map(safeAll.map((w, idx) => [w.id, idx]))
+            defaultIds.sort((a, b) => (masterOrder.get(a) ?? 999) - (masterOrder.get(b) ?? 999))
             if (defaultIds.length > 0) {
                 setSelectedIds(defaultIds)
                 await window.api.setQuotationWarranties(quotation.id, defaultIds)

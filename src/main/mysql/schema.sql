@@ -450,6 +450,7 @@ CREATE TABLE IF NOT EXISTS quotation_warranties (
   pi_warranty_id VARCHAR(36) NOT NULL,
   order_index INT DEFAULT 0,
   vessel_scope TEXT DEFAULT NULL,
+  alternative_id VARCHAR(36) DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
   FOREIGN KEY (pi_warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -460,6 +461,7 @@ CREATE TABLE IF NOT EXISTS quotation_custom_warranties (
   text TEXT NOT NULL,
   order_index INT DEFAULT 0,
   vessel_scope TEXT DEFAULT NULL,
+  alternative_id VARCHAR(36) DEFAULT NULL,
   FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
