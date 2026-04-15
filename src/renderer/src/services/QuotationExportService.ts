@@ -119,6 +119,12 @@ interface QuotationData {
 }
 
 async function gatherData(quotation: Quotation): Promise<QuotationData> {
+  // Reload quotation from DB to ensure all fields (especially quotationDate) are fresh
+  const freshQ = await window.api.getQuotation(quotation.id)
+  if (freshQ && !(freshQ as any).error) {
+    quotation = { ...quotation, ...freshQ }
+  }
+
   const [
     quotationVessels, allVessels, assureds, subLimits,
     clauseRows, allClauses, additionalClauses, allAdditionalClauses,
