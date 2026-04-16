@@ -3108,31 +3108,31 @@ export class MySQLAdapter {
         const values: any[] = []
 
         if (search) {
-            conditions.push('(name LIKE ? OR imo_number LIKE ? OR EXISTS (SELECT 1 FROM vessel_name_history vnh WHERE vnh.vessel_id = vessels.id AND vnh.previous_name LIKE ?))')
+            conditions.push('(vessels.name LIKE ? OR vessels.imo_number LIKE ? OR EXISTS (SELECT 1 FROM vessel_name_history vnh WHERE vnh.vessel_id = vessels.id AND vnh.previous_name LIKE ?))')
             values.push(`%${search}%`, `%${search}%`, `%${search}%`)
         }
 
         if (fleetId !== undefined && fleetId !== 'all') {
             if (fleetId === '') {
-                conditions.push('fleet_id IS NULL')
+                conditions.push('vessels.fleet_id IS NULL')
             } else {
-                conditions.push('fleet_id = ?')
+                conditions.push('vessels.fleet_id = ?')
                 values.push(fleetId)
             }
         }
 
         if (customerId !== undefined && customerId !== 'all') {
             if (customerId === '') {
-                conditions.push('customer_id IS NULL')
+                conditions.push('vessels.customer_id IS NULL')
             } else {
-                conditions.push('customer_id = ?')
+                conditions.push('vessels.customer_id = ?')
                 values.push(customerId)
             }
         }
 
         if (status && status !== 'all') {
-            if (status === 'active') conditions.push('is_active = 1')
-            if (status === 'inactive') conditions.push('is_active = 0')
+            if (status === 'active') conditions.push('vessels.is_active = 1')
+            if (status === 'inactive') conditions.push('vessels.is_active = 0')
         }
 
         if (conditions.length > 0) {
@@ -3142,7 +3142,7 @@ export class MySQLAdapter {
         }
 
         // Sorting
-        const allowedSortFields: Record<string, string> = { 'name': 'name', 'imoNumber': 'imo_number' }
+        const allowedSortFields: Record<string, string> = { 'name': 'vessels.name', 'imoNumber': 'vessels.imo_number' }
         const dbSortField = allowedSortFields[sortField] || 'name'
         const dbSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC'
 
