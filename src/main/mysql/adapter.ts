@@ -1113,11 +1113,15 @@ export class MySQLAdapter {
             }
 
             // Migration: Add customer_entity_id + customer_type to vessel_dynamic_policies
-            {
+            try {
                 const [custColVdp] = await this.pool.query("SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'customer_entity_id'") as any[]
                 if ((custColVdp as any[]).length === 0) {
                     await this.pool.query('ALTER TABLE vessel_dynamic_policies ADD COLUMN customer_entity_id VARCHAR(36) NULL')
-                    await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN customer_type VARCHAR(10) NULL")
+                    // Check if customer_type already exists before adding
+                    const [ctColVdp] = await this.pool.query("SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'customer_type'") as any[]
+                    if ((ctColVdp as any[]).length === 0) {
+                        await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN customer_type VARCHAR(10) NULL")
+                    }
                     // Migrate: copy broker_entity_id to customer_entity_id where broker is set
                     await this.pool.query("UPDATE vessel_dynamic_policies SET customer_entity_id = broker_entity_id, customer_type = 'broker' WHERE broker_entity_id IS NOT NULL AND customer_entity_id IS NULL")
                     // Migrate: copy vessel.customer_id to policies where no customer is set yet
@@ -1126,16 +1130,18 @@ export class MySQLAdapter {
                         SET vdp.customer_entity_id = v.customer_id, vdp.customer_type = v.customer_type
                         WHERE v.customer_id IS NOT NULL AND vdp.customer_entity_id IS NULL`)
                 }
-            }
+            } catch (e) { console.error('customer_entity_id migration:', e) }
 
             // Migration: Add description to vessel_types
-            const [vtDescCols] = await this.pool.query("SHOW COLUMNS FROM vessel_types LIKE 'description'")
-            if ((vtDescCols as any[]).length === 0) {
-                await this.pool.query("ALTER TABLE vessel_types ADD COLUMN description TEXT NULL AFTER name")
-            }
+            try {
+                const [vtDescCols] = await this.pool.query("SHOW COLUMNS FROM vessel_types LIKE 'description'")
+                if ((vtDescCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE vessel_types ADD COLUMN description TEXT NULL AFTER name")
+                }
+            } catch (e) { console.error('vessel_types description migration:', e) }
 
             // Migration: Add vessel_type_id FK to vessels (replaces vessel_type text field)
-            if (!vesselColNames.includes('vessel_type_id')) {
+            try { if (!vesselColNames.includes('vessel_type_id')) {
                 await this.pool.query('ALTER TABLE vessels ADD COLUMN vessel_type_id VARCHAR(36) NULL')
                 // Migrate existing text values to FK references
                 const [existingTypes] = await this.pool.query('SELECT id, name FROM vessel_types') as any[]
@@ -1155,7 +1161,7 @@ export class MySQLAdapter {
                     }
                     await this.pool.execute('UPDATE vessels SET vessel_type_id = ? WHERE id = ?', [typeId, v.id])
                 }
-            }
+            } } catch (e) { console.error('vessel_type_id migration:', e) }
 
             // Migration: Add completion + endorsement fields to condition_surveys
             const [csCompletedCols] = await this.pool.query("SHOW COLUMNS FROM condition_surveys LIKE 'completed_at'")
@@ -1564,7 +1570,7 @@ export class MySQLAdapter {
             }
 
             // Migration: document_type_policy_types junction table
-            {
+            try {
                 const [dtptTables] = await this.pool.query("SHOW TABLES LIKE 'document_type_policy_types'") as any[]
                 if ((dtptTables as any[]).length === 0) {
                     await this.pool.query(`CREATE TABLE IF NOT EXISTS document_type_policy_types (
@@ -1573,7 +1579,7 @@ export class MySQLAdapter {
                         PRIMARY KEY (document_type_id, policy_type_id)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 }
-            }
+            } catch (e) { console.error('document_type_policy_types migration:', e) }
 
             // Migration: Unify quotation_types into policy_types (add code column, seed missing types, migrate quotation_type_id)
             {
@@ -2976,11 +2982,13 @@ export class MySQLAdapter {
         const docs = (rows as any[]).map(r => ({ ...r, required: Boolean(r.required), annualRenewal: Boolean(r.annualRenewal), policyTypeIds: [] as string[] }))
         // Load policy type tags
         if (docs.length > 0) {
-            const [ptRows] = await this.pool.query('SELECT document_type_id, policy_type_id FROM document_type_policy_types')
-            for (const r of ptRows as any[]) {
-                const doc = docs.find(d => d.id === r.document_type_id)
-                if (doc) doc.policyTypeIds.push(r.policy_type_id)
-            }
+            try {
+                const [ptRows] = await this.pool.query('SELECT document_type_id, policy_type_id FROM document_type_policy_types')
+                for (const r of ptRows as any[]) {
+                    const doc = docs.find(d => d.id === r.document_type_id)
+                    if (doc) doc.policyTypeIds.push(r.policy_type_id)
+                }
+            } catch { /* table may not exist yet */ }
         }
         return docs
     }
@@ -3078,8 +3086,14 @@ export class MySQLAdapter {
     // --- Vessels ---
     async getVessels(): Promise<Vessel[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT v.id, v.name, v.imo_number as imoNumber, v.fleet_id as fleetId, v.ofac_checked_at as ofacCheckedAt, v.ofac_match_found as ofacMatchFound, v.ofac_status as ofacStatus, v.is_active as isActive, v.customer_id as customerId, v.customer_type as customerType, v.policy_expiry_date as policyExpiryDate, v.notes, v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage, COALESCE(vt.name, v.vessel_type) as vesselType, v.vessel_type_id as vesselTypeId, v.classification_society as classificationSociety, v.call_sign as callSign FROM vessels v LEFT JOIN vessel_types vt ON v.vessel_type_id = vt.id')
-        return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, rebuiltYear: r.rebuiltYear ? Number(r.rebuiltYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
+        try {
+            const [rows] = await this.pool.query('SELECT v.id, v.name, v.imo_number as imoNumber, v.fleet_id as fleetId, v.ofac_checked_at as ofacCheckedAt, v.ofac_match_found as ofacMatchFound, v.ofac_status as ofacStatus, v.is_active as isActive, v.customer_id as customerId, v.customer_type as customerType, v.policy_expiry_date as policyExpiryDate, v.notes, v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage, COALESCE(vt.name, v.vessel_type) as vesselType, v.vessel_type_id as vesselTypeId, v.classification_society as classificationSociety, v.call_sign as callSign FROM vessels v LEFT JOIN vessel_types vt ON v.vessel_type_id = vt.id')
+            return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, rebuiltYear: r.rebuiltYear ? Number(r.rebuiltYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
+        } catch {
+            // Fallback if vessel_type_id column doesn't exist yet
+            const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, rebuilt_year as rebuiltYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels')
+            return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, rebuiltYear: r.rebuiltYear ? Number(r.rebuiltYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
+        }
     }
 
     async getVesselsPaginated(params: VesselQueryParams): Promise<PaginatedResult<Vessel>> {
