@@ -19,7 +19,7 @@ import {
   UserMinus,
   ChevronsUpDown,
 } from 'lucide-react'
-import { Fleet, Vessel, Entity, FlagState } from '../../../shared/types'
+import { Fleet, Vessel, Entity, FlagState, VesselDynamicPolicy } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 import FleetDetail from './FleetDetail'
@@ -76,6 +76,7 @@ export default function FleetManager() {
   ]
   const { visibleColumns: fleetVisibleCols, setVisibleColumns: setFleetVisibleCols } = useColumnPrefs('fleets', FLEET_COLUMNS)
   const fleetVisibleSet = new Set(fleetVisibleCols)
+  const [allPolicies, setAllPolicies] = useState<VesselDynamicPolicy[]>([])
   const [customerSearch, setCustomerSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'broker' | 'direct'>('all')
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
@@ -88,16 +89,18 @@ export default function FleetManager() {
   }, [])
 
   const loadData = async (): Promise<Vessel[]> => {
-    const [fData, vData, eData, fsData] = await Promise.all([
+    const [fData, vData, eData, fsData, pData] = await Promise.all([
       window.api.getFleets(),
       window.api.getVessels(),
       window.api.getEntities(),
       window.api.getFlagStates(),
+      window.api.getAllVesselDynamicPolicies(),
     ])
     setFleets(Array.isArray(fData) ? fData : [])
     setVessels(Array.isArray(vData) ? vData : [])
     setEntities(Array.isArray(eData) ? eData : [])
     setFlagStates(Array.isArray(fsData) ? fsData : [])
+    setAllPolicies(Array.isArray(pData) ? pData : [])
     return Array.isArray(vData) ? vData : []
   }
 
@@ -225,37 +228,44 @@ export default function FleetManager() {
     const search = customerSearch.toLowerCase()
     const brokerMap = new Map<string, CustomerGroup>()
     const directMap = new Map<string, CustomerGroup>()
-    const unassignedList: Vessel[] = []
+    const assignedVesselIds = new Set<string>()
 
-    for (const vessel of vessels) {
+    // Derive customer groups from active policies
+    const activePolicies = allPolicies.filter(p => p.status === 'active' && p.customerEntityId)
+    for (const policy of activePolicies) {
+      const vessel = vessels.find(v => v.id === policy.vesselId)
+      if (!vessel) continue
+
+      if (typeFilter !== 'all' && policy.customerType !== typeFilter) continue
+
       if (search) {
-        const customerEntity = vessel.customerId
-          ? entities.find(e => e.id === vessel.customerId)
-          : null
-        const customerName = customerEntity?.name?.toLowerCase() || ''
-        const vesselMatch =
-          vessel.name.toLowerCase().includes(search) ||
-          vessel.imoNumber.toLowerCase().includes(search)
+        const customerName = policy.customerName?.toLowerCase() || ''
+        const vesselMatch = vessel.name.toLowerCase().includes(search) || vessel.imoNumber.toLowerCase().includes(search)
         if (!vesselMatch && !customerName.includes(search)) continue
       }
 
-      if (!vessel.customerId || !vessel.customerType) {
-        if (typeFilter === 'all' || typeFilter === 'direct') unassignedList.push(vessel)
-        continue
-      }
-
-      if (typeFilter !== 'all' && vessel.customerType !== typeFilter) continue
-
-      const map = vessel.customerType === 'broker' ? brokerMap : directMap
-      const existing = map.get(vessel.customerId)
+      const custId = policy.customerEntityId!
+      const map = policy.customerType === 'broker' ? brokerMap : directMap
+      const existing = map.get(custId)
       if (existing) {
-        existing.vessels.push(vessel)
+        if (!existing.vessels.some(v => v.id === vessel.id)) existing.vessels.push(vessel)
       } else {
-        const entity = entities.find(e => e.id === vessel.customerId)
-        if (entity) map.set(vessel.customerId, { entity, vessels: [vessel] })
-        else unassignedList.push(vessel)
+        const entity = entities.find(e => e.id === custId)
+        if (entity) map.set(custId, { entity, vessels: [vessel] })
       }
+      assignedVesselIds.add(vessel.id)
     }
+
+    // Unassigned: vessels with no customer on any active policy
+    const unassignedList = vessels.filter(v => {
+      if (assignedVesselIds.has(v.id)) return false
+      if (typeFilter !== 'all' && typeFilter !== 'direct') return false
+      if (search) {
+        const vesselMatch = v.name.toLowerCase().includes(search) || v.imoNumber.toLowerCase().includes(search)
+        if (!vesselMatch) return false
+      }
+      return true
+    })
 
     const sortGroups = (g: CustomerGroup[]) =>
       g.sort((a, b) => a.entity.name.localeCompare(b.entity.name))
@@ -265,7 +275,7 @@ export default function FleetManager() {
       directGroups: sortGroups(Array.from(directMap.values())),
       customerUnassigned: unassignedList,
     }
-  }, [vessels, entities, customerSearch, typeFilter])
+  }, [vessels, entities, allPolicies, customerSearch, typeFilter])
 
   // ------- Navigation -------
   if (selectedFleetDetail) {
