@@ -26,6 +26,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [newDescription, setNewDescription] = useState('')
     const [required, setRequired] = useState(false)
     const [annualRenewal, setAnnualRenewal] = useState(false)
+    const [newDocPolicyTypeIds, setNewDocPolicyTypeIds] = useState<string[]>([])
+    const [editDocPolicyTypeIds, setEditDocPolicyTypeIds] = useState<string[]>([])
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [newRole, setNewRole] = useState('')
     const [surveyTypes, setSurveyTypes] = useState<ConditionSurveyType[]>([])
@@ -912,11 +914,12 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const handleAddDocType = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newName.trim()) return
-        await window.api.addDocumentType({ name: newName, description: newDescription, required, annualRenewal, order: docTypes.length + 1 })
+        await window.api.addDocumentType({ name: newName, description: newDescription, required, annualRenewal, order: docTypes.length + 1, policyTypeIds: newDocPolicyTypeIds })
         setNewName('')
         setNewDescription('')
         setRequired(false)
         setAnnualRenewal(false)
+        setNewDocPolicyTypeIds([])
         await loadDocTypes()
     }
 
@@ -1046,11 +1049,12 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         setEditingDocId(doc.id)
         setEditDocName(doc.name)
         setEditDocDescription(doc.description || '')
+        setEditDocPolicyTypeIds(doc.policyTypeIds || [])
     }
 
     const saveDocEdit = async (id: string) => {
         if (!editDocName.trim()) return
-        await window.api.updateDocumentType(id, { name: editDocName, description: editDocDescription })
+        await window.api.updateDocumentType(id, { name: editDocName, description: editDocDescription, policyTypeIds: editDocPolicyTypeIds })
         setEditingDocId(null)
         await loadDocTypes()
     }
@@ -1458,6 +1462,18 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             <Plus size={18} /> Add Document Type
                         </button>
                     </div>
+                    {policyTypes.length > 0 && (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Policy Types:</span>
+                            {policyTypes.filter(pt => pt.code).map(pt => (
+                                <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', border: newDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newDocPolicyTypeIds.includes(pt.id) ? 'rgba(0,170,200,0.08)' : 'transparent', color: newDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                    <input type="checkbox" checked={newDocPolicyTypeIds.includes(pt.id)} onChange={e => { if (e.target.checked) setNewDocPolicyTypeIds(prev => [...prev, pt.id]); else setNewDocPolicyTypeIds(prev => prev.filter(id => id !== pt.id)) }} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
+                                    {pt.name}
+                                </label>
+                            ))}
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>(empty = all types)</span>
+                        </div>
+                    )}
                 </form>
 
                     <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
@@ -1511,6 +1527,17 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                         style={{ width: '100%', minHeight: '60px', borderRadius: '8px' }}
                                                         aria-label="Edit document type description"
                                                     />
+                                                    {policyTypes.filter(pt => pt.code).length > 0 && (
+                                                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Policy Types:</span>
+                                                            {policyTypes.filter(pt => pt.code).map(pt => (
+                                                                <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', fontSize: '0.75rem', padding: '1px 6px', borderRadius: '4px', border: editDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editDocPolicyTypeIds.includes(pt.id) ? 'rgba(0,170,200,0.08)' : 'transparent', color: editDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                                                    <input type="checkbox" checked={editDocPolicyTypeIds.includes(pt.id)} onChange={e => { if (e.target.checked) setEditDocPolicyTypeIds(prev => [...prev, pt.id]); else setEditDocPolicyTypeIds(prev => prev.filter(id => id !== pt.id)) }} style={{ width: '12px', height: '12px', accentColor: 'var(--accent-primary)' }} />
+                                                                    {pt.name}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                     <div style={{ display: 'flex', gap: '8px' }}>
                                                         <button onClick={() => saveDocEdit(doc.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
                                                         <button onClick={() => setEditingDocId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
@@ -1520,6 +1547,14 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                 <div onClick={() => startEditingDoc(doc)} style={{ cursor: 'pointer' }}>
                                                     <div style={{ fontWeight: '600' }}>{doc.name}</div>
                                                     {doc.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{doc.description}</div>}
+                                                    {doc.policyTypeIds && doc.policyTypeIds.length > 0 && (
+                                                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                                            {doc.policyTypeIds.map(ptId => {
+                                                                const pt = policyTypes.find(p => p.id === ptId)
+                                                                return pt ? <span key={ptId} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>{pt.name}</span> : null
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </td>

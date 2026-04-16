@@ -1547,6 +1547,18 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: document_type_policy_types junction table
+            {
+                const [dtptTables] = await this.pool.query("SHOW TABLES LIKE 'document_type_policy_types'") as any[]
+                if ((dtptTables as any[]).length === 0) {
+                    await this.pool.query(`CREATE TABLE IF NOT EXISTS document_type_policy_types (
+                        document_type_id VARCHAR(36) NOT NULL,
+                        policy_type_id VARCHAR(36) NOT NULL,
+                        PRIMARY KEY (document_type_id, policy_type_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                }
+            }
+
             // Migration: Unify quotation_types into policy_types (add code column, seed missing types, migrate quotation_type_id)
             {
                 const [ptCodeCol] = await this.pool.query("SHOW COLUMNS FROM policy_types LIKE 'code'") as any[]
@@ -2945,7 +2957,16 @@ export class MySQLAdapter {
     async getDocumentTypes(): Promise<DocumentType[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, name, description, required, annual_renewal as annualRenewal, order_index as `order` FROM document_types ORDER BY order_index ASC')
-        return (rows as any[]).map(r => ({ ...r, required: Boolean(r.required), annualRenewal: Boolean(r.annualRenewal) }))
+        const docs = (rows as any[]).map(r => ({ ...r, required: Boolean(r.required), annualRenewal: Boolean(r.annualRenewal), policyTypeIds: [] as string[] }))
+        // Load policy type tags
+        if (docs.length > 0) {
+            const [ptRows] = await this.pool.query('SELECT document_type_id, policy_type_id FROM document_type_policy_types')
+            for (const r of ptRows as any[]) {
+                const doc = docs.find(d => d.id === r.document_type_id)
+                if (doc) doc.policyTypeIds.push(r.policy_type_id)
+            }
+        }
+        return docs
     }
 
     async addDocumentType(docType: Omit<DocumentType, 'id'>): Promise<DocumentType> {
@@ -2955,6 +2976,12 @@ export class MySQLAdapter {
             'INSERT INTO document_types (id, name, description, required, annual_renewal, order_index) VALUES (?, ?, ?, ?, ?, ?)',
             [id, docType.name, docType.description || null, docType.required, docType.annualRenewal || false, docType.order]
         )
+        // Save policy type tags
+        if (docType.policyTypeIds && docType.policyTypeIds.length > 0) {
+            for (const ptId of docType.policyTypeIds) {
+                await this.pool.execute('INSERT INTO document_type_policy_types (document_type_id, policy_type_id) VALUES (?, ?)', [id, ptId])
+            }
+        }
         return { ...docType, id }
     }
 
@@ -2969,10 +2996,18 @@ export class MySQLAdapter {
         if (updates.annualRenewal !== undefined) { fields.push('annual_renewal = ?'); values.push(updates.annualRenewal) }
         if (updates.order !== undefined) { fields.push('order_index = ?'); values.push(updates.order) }
 
-        if (fields.length === 0) return
+        if (fields.length > 0) {
+            values.push(id)
+            await this.pool.execute(`UPDATE document_types SET ${fields.join(', ')} WHERE id = ?`, values)
+        }
 
-        values.push(id)
-        await this.pool.execute(`UPDATE document_types SET ${fields.join(', ')} WHERE id = ?`, values)
+        // Update policy type tags if provided
+        if (updates.policyTypeIds !== undefined) {
+            await this.pool.execute('DELETE FROM document_type_policy_types WHERE document_type_id = ?', [id])
+            for (const ptId of updates.policyTypeIds) {
+                await this.pool.execute('INSERT INTO document_type_policy_types (document_type_id, policy_type_id) VALUES (?, ?)', [id, ptId])
+            }
+        }
     }
 
     async deleteDocumentType(id: string): Promise<void> {

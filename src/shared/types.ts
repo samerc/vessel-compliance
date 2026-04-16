@@ -14,6 +14,7 @@ export interface DocumentType {
   annualRenewal?: boolean
   order: number
   description?: string
+  policyTypeIds?: string[]
 }
 
 export interface VesselCustomDocType {
