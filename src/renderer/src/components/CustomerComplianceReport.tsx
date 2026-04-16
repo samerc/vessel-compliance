@@ -572,7 +572,7 @@ export default function CustomerComplianceReport() {
           }
           const vDocs = await window.api.getVesselDocuments(vessel.id)
           const bytes = await ReportService.exportVesselToPDF(vessel, filteredDocTypes, Array.isArray(vDocs) ? vDocs : [], { returnBytes: true })
-          zip.file(`${vessel.name}_Compliance_Report.pdf`, bytes as Uint8Array)
+          zip.file(`${vessel.name}_Compliance_Report.pdf`, bytes as Uint8Array, { date: new Date() })
         } catch { failed++ }
       }
       const blob = await zip.generateAsync({ type: 'blob' })
