@@ -1404,6 +1404,9 @@ export interface VesselDynamicPolicy {
   currency: string
   brokerEntityId?: string
   brokerName?: string
+  customerEntityId?: string
+  customerType?: 'broker' | 'direct'
+  customerName?: string
   notes?: string
   createdAt?: string
   updatedAt?: string

@@ -1112,6 +1112,22 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN quotation_sent_date DATE NULL")
             }
 
+            // Migration: Add customer_entity_id + customer_type to vessel_dynamic_policies
+            {
+                const [custColVdp] = await this.pool.query("SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'customer_entity_id'") as any[]
+                if ((custColVdp as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE vessel_dynamic_policies ADD COLUMN customer_entity_id VARCHAR(36) NULL')
+                    await this.pool.query("ALTER TABLE vessel_dynamic_policies ADD COLUMN customer_type VARCHAR(10) NULL")
+                    // Migrate: copy broker_entity_id to customer_entity_id where broker is set
+                    await this.pool.query("UPDATE vessel_dynamic_policies SET customer_entity_id = broker_entity_id, customer_type = 'broker' WHERE broker_entity_id IS NOT NULL AND customer_entity_id IS NULL")
+                    // Migrate: copy vessel.customer_id to policies where no customer is set yet
+                    await this.pool.query(`UPDATE vessel_dynamic_policies vdp
+                        JOIN vessels v ON vdp.vessel_id = v.id
+                        SET vdp.customer_entity_id = v.customer_id, vdp.customer_type = v.customer_type
+                        WHERE v.customer_id IS NOT NULL AND vdp.customer_entity_id IS NULL`)
+                }
+            }
+
             // Migration: Add description to vessel_types
             const [vtDescCols] = await this.pool.query("SHOW COLUMNS FROM vessel_types LIKE 'description'")
             if ((vtDescCols as any[]).length === 0) {
@@ -9674,12 +9690,16 @@ export class MySQLAdapter {
                     pt.name as policyTypeName, vdp.policy_number as policyNumber,
                     vdp.condition_id as conditionId, ptc.name as conditionName,
                     vdp.status, vdp.currency, vdp.broker_entity_id as brokerEntityId,
-                    e.name as brokerName, vdp.notes,
+                    e.name as brokerName,
+                    vdp.customer_entity_id as customerEntityId, vdp.customer_type as customerType,
+                    ce.name as customerName,
+                    vdp.notes,
                     vdp.created_at as createdAt, vdp.updated_at as updatedAt
              FROM vessel_dynamic_policies vdp
              LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
              LEFT JOIN policy_type_conditions ptc ON vdp.condition_id = ptc.id
              LEFT JOIN entities e ON vdp.broker_entity_id = e.id
+             LEFT JOIN entities ce ON vdp.customer_entity_id = ce.id
              WHERE vdp.vessel_id = ?
              ORDER BY pt.order_index ASC, vdp.created_at DESC`,
             [vesselId]
@@ -9712,12 +9732,16 @@ export class MySQLAdapter {
                     pt.name as policyTypeName, vdp.policy_number as policyNumber,
                     vdp.condition_id as conditionId, ptc.name as conditionName,
                     vdp.status, vdp.currency, vdp.broker_entity_id as brokerEntityId,
-                    e.name as brokerName, vdp.notes,
+                    e.name as brokerName,
+                    vdp.customer_entity_id as customerEntityId, vdp.customer_type as customerType,
+                    ce.name as customerName,
+                    vdp.notes,
                     vdp.created_at as createdAt, vdp.updated_at as updatedAt
              FROM vessel_dynamic_policies vdp
              LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
              LEFT JOIN policy_type_conditions ptc ON vdp.condition_id = ptc.id
              LEFT JOIN entities e ON vdp.broker_entity_id = e.id
+             LEFT JOIN entities ce ON vdp.customer_entity_id = ce.id
              ORDER BY vdp.vessel_id, pt.order_index ASC`
         )
         const policies = rows as VesselDynamicPolicy[]
@@ -10329,14 +10353,15 @@ export class MySQLAdapter {
         return createdPolicies
     }
 
-    async addVesselDynamicPolicy(policy: Omit<VesselDynamicPolicy, 'id' | 'createdAt' | 'updatedAt' | 'policyTypeName' | 'conditionName' | 'brokerName' | 'values'>): Promise<string> {
+    async addVesselDynamicPolicy(policy: Omit<VesselDynamicPolicy, 'id' | 'createdAt' | 'updatedAt' | 'policyTypeName' | 'conditionName' | 'brokerName' | 'customerName' | 'values'>): Promise<string> {
         if (!this.pool) throw new Error('DB Not connected')
         const id = uuidv4()
         await this.pool.execute(
-            `INSERT INTO vessel_dynamic_policies (id, vessel_id, policy_type_id, policy_number, condition_id, status, currency, broker_entity_id, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO vessel_dynamic_policies (id, vessel_id, policy_type_id, policy_number, condition_id, status, currency, broker_entity_id, customer_entity_id, customer_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, policy.vesselId, policy.policyTypeId, policy.policyNumber || null, policy.conditionId || null,
-             policy.status || 'active', policy.currency || 'USD', policy.brokerEntityId || null, policy.notes || null]
+             policy.status || 'active', policy.currency || 'USD', policy.brokerEntityId || null,
+             policy.customerEntityId || null, policy.customerType || null, policy.notes || null]
         )
         return id
     }
@@ -10350,6 +10375,8 @@ export class MySQLAdapter {
         if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
         if (updates.currency !== undefined) { fields.push('currency = ?'); values.push(updates.currency) }
         if (updates.brokerEntityId !== undefined) { fields.push('broker_entity_id = ?'); values.push(updates.brokerEntityId || null) }
+        if (updates.customerEntityId !== undefined) { fields.push('customer_entity_id = ?'); values.push(updates.customerEntityId || null) }
+        if (updates.customerType !== undefined) { fields.push('customer_type = ?'); values.push(updates.customerType || null) }
         if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes || null) }
         if (fields.length === 0) return
         values.push(id)
