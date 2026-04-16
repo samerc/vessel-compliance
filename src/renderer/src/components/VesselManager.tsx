@@ -1021,7 +1021,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                 {fleetComboOpen === v.id && (
                                                     <>
                                                         <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setFleetComboOpen(null)} />
-                                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '240px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '360px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                                             <input
                                                                 type="text"
                                                                 value={fleetComboSearch}
