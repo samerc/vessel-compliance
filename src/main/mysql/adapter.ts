@@ -1152,6 +1152,17 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('quotation customer_entity_id migration:', e) }
 
+            // Migration: quotation_lol_options table for LOL alternatives
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_lol_options (
+                    id VARCHAR(36) PRIMARY KEY, quotation_id VARCHAR(36) NOT NULL,
+                    label VARCHAR(100) DEFAULT NULL, amount DECIMAL(15,2) NOT NULL,
+                    currency VARCHAR(10) DEFAULT 'USD', premium_amount DECIMAL(15,2) DEFAULT NULL,
+                    order_index INT DEFAULT 0,
+                    INDEX idx_qlo_quotation (quotation_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
             // Repeatable sync: ensure all policies with broker have customer_entity_id set
             try {
                 await this.pool.query("UPDATE vessel_dynamic_policies SET customer_entity_id = broker_entity_id, customer_type = 'broker' WHERE broker_entity_id IS NOT NULL AND customer_entity_id IS NULL")
@@ -8026,6 +8037,7 @@ export class MySQLAdapter {
             { table: 'quotation_cargo_clauses', cols: 'quotation_id, cargo_clause_id, text_override, order_index, section' },
             { table: 'quotation_cargo_custom_clauses', cols: 'quotation_id, text, section, order_index' },
             { table: 'quotation_agreed_value_options', cols: 'quotation_id, label, amount, currency, premium_amount, order_index' },
+            { table: 'quotation_lol_options', cols: 'quotation_id, label, amount, currency, premium_amount, order_index' },
         ]
 
         for (const { table, cols } of simpleTables) {
@@ -11062,6 +11074,47 @@ export class MySQLAdapter {
         for (let i = 0; i < ids.length; i++) {
             await this.pool.execute('UPDATE quotation_agreed_value_options SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
+    }
+
+    // ==================== Quotation LOL Options ====================
+
+    async getQuotationLolOptions(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, quotation_id as quotationId, label, amount, currency, premium_amount as premiumAmount, order_index as `order` FROM quotation_lol_options WHERE quotation_id = ? ORDER BY order_index ASC',
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null }))
+    }
+
+    async addQuotationLolOption(quotationId: string, amount: number, currency?: string, label?: string): Promise<any> {
+        if (!this.pool) return null
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_lol_options WHERE quotation_id = ?', [quotationId])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute(
+            'INSERT INTO quotation_lol_options (id, quotation_id, label, amount, currency, premium_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, quotationId, label || null, amount, currency || 'USD', null, order]
+        )
+        return { id, quotationId, label: label || null, amount, currency: currency || 'USD', premiumAmount: null, order }
+    }
+
+    async updateQuotationLolOption(id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.label !== undefined) { fields.push('label = ?'); values.push(updates.label || null) }
+        if (updates.amount !== undefined) { fields.push('amount = ?'); values.push(updates.amount) }
+        if (updates.currency !== undefined) { fields.push('currency = ?'); values.push(updates.currency) }
+        if (updates.premiumAmount !== undefined) { fields.push('premium_amount = ?'); values.push(updates.premiumAmount ?? null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_lol_options SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationLolOption(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_lol_options WHERE id = ?', [id])
     }
 
     // ==================== Quotation Hull Alternatives ====================

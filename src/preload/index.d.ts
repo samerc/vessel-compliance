@@ -303,6 +303,11 @@ export interface Api {
   hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => Promise<void>
   hullDeleteAgreedValueOption: (id: string) => Promise<void>
   hullReorderAgreedValueOptions: (ids: string[]) => Promise<void>
+  // LOL Options
+  lolGetOptions: (qId: string) => Promise<{ id: string; quotationId: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>
+  lolAddOption: (qId: string, amount: number, currency?: string, label?: string) => Promise<any>
+  lolUpdateOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => Promise<void>
+  lolDeleteOption: (id: string) => Promise<void>
   // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => Promise<QuotationHullAlternative[]>
   hullAddQuotationAlternative: (qId: string, hullClauseId?: string | null, label?: string, vesselScopeId?: string | null) => Promise<QuotationHullAlternative>

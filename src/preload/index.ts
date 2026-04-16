@@ -300,6 +300,11 @@ const api = {
   hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => ipcRenderer.invoke('hull:updateAgreedValueOption', id, updates),
   hullDeleteAgreedValueOption: (id: string) => ipcRenderer.invoke('hull:deleteAgreedValueOption', id),
   hullReorderAgreedValueOptions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAgreedValueOptions', ids),
+  // LOL Options
+  lolGetOptions: (qId: string) => ipcRenderer.invoke('lol:getOptions', qId),
+  lolAddOption: (qId: string, amount: number, currency?: string, label?: string) => ipcRenderer.invoke('lol:addOption', qId, amount, currency, label),
+  lolUpdateOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => ipcRenderer.invoke('lol:updateOption', id, updates),
+  lolDeleteOption: (id: string) => ipcRenderer.invoke('lol:deleteOption', id),
   // Hull Alternatives
   hullGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('hull:getQuotationAlternatives', qId),
   hullAddQuotationAlternative: (qId: string, hullClauseId?: string | null, label?: string, vesselScopeId?: string | null) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label, vesselScopeId),
