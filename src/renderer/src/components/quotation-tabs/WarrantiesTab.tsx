@@ -97,8 +97,14 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         await window.api.setQuotationWarranties(quotation.id, ids)
     }
 
+    // Sort warranty IDs by their position in the master list
+    const sortByMasterOrder = (ids: string[]) => {
+        const masterOrder = new Map(allWarranties.map((w, idx) => [w.id, idx]))
+        return [...ids].sort((a, b) => (masterOrder.get(a) ?? 999) - (masterOrder.get(b) ?? 999))
+    }
+
     const toggle = async (id: string) => {
-        const newIds = selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]
+        const newIds = selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : sortByMasterOrder([...selectedIds, id])
         await saveSelected(newIds)
     }
 
@@ -108,7 +114,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         for (const w of tabWarranties) {
             if (!newIds.includes(w.id)) newIds.push(w.id)
         }
-        await saveSelected(newIds)
+        await saveSelected(sortByMasterOrder(newIds))
     }
 
     const deselectAllInTab = async () => {
@@ -124,7 +130,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         for (const wid of ws.warrantyIds) {
             if (!newIds.includes(wid)) newIds.push(wid)
         }
-        await saveSelected(newIds)
+        await saveSelected(sortByMasterOrder(newIds))
         showSuccess(`Applied "${ws.name}"`)
     }
 
