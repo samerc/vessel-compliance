@@ -259,11 +259,15 @@ export default function CustomerComplianceReport() {
       const allAssureds = Array.isArray(allAssuredsRaw) ? allAssuredsRaw : []
       const policies = Array.isArray(policiesRaw) ? policiesRaw : []
 
-      // Build vessel → customer mapping from active policies
-      const vesselCustomerMap = new Map<string, { customerId: string; customerType: string | null }>()
+      // Build vessel → customers mapping from active policies (a vessel can have multiple customers)
+      const vesselCustomersMap = new Map<string, { customerId: string; customerType: string | null }[]>()
       for (const p of policies) {
-        if (p.status === 'active' && p.customerEntityId && !vesselCustomerMap.has(p.vesselId)) {
-          vesselCustomerMap.set(p.vesselId, { customerId: p.customerEntityId, customerType: p.customerType || null })
+        if (p.status === 'active' && p.customerEntityId) {
+          const existing = vesselCustomersMap.get(p.vesselId) || []
+          if (!existing.some(c => c.customerId === p.customerEntityId)) {
+            existing.push({ customerId: p.customerEntityId, customerType: p.customerType || null })
+            vesselCustomersMap.set(p.vesselId, existing)
+          }
         }
       }
 
@@ -271,8 +275,8 @@ export default function CustomerComplianceReport() {
       const filtered = selectedCustomerId === 'all'
         ? activeVessels
         : activeVessels.filter(v => {
-            const vc = vesselCustomerMap.get(v.id)
-            return vc?.customerId === selectedCustomerId
+            const vcs = vesselCustomersMap.get(v.id) || []
+            return vcs.some(vc => vc.customerId === selectedCustomerId)
           })
 
       const customDocResults = await Promise.all(
@@ -283,7 +287,13 @@ export default function CustomerComplianceReport() {
       const customerMap = new Map<string, CustomerGroup>()
 
       for (const vessel of filtered) {
-        const vc = vesselCustomerMap.get(vessel.id)
+        const vcs = vesselCustomersMap.get(vessel.id) || []
+        // If filtering by specific customer, use that; otherwise use first customer or unassigned
+        const relevantCustomers = selectedCustomerId !== 'all'
+          ? vcs.filter(vc => vc.customerId === selectedCustomerId)
+          : vcs.length > 0 ? vcs : [{ customerId: null as string | null, customerType: null }]
+
+        for (const vc of relevantCustomers) {
         const customerId = vc?.customerId || null
         const entity = customerId ? entities.find(e => e.id === customerId) : null
         const groupKey = customerId || '__unassigned__'
@@ -299,9 +309,12 @@ export default function CustomerComplianceReport() {
 
         const row = buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes)
         customerMap.get(groupKey)!.vessels.push(row)
+        }
       }
 
-      setGroups([...customerMap.values()].sort((a, b) => a.customerName.localeCompare(b.customerName)))
+      const sortedGroups = [...customerMap.values()].sort((a, b) => a.customerName.localeCompare(b.customerName))
+      for (const g of sortedGroups) g.vessels.sort((a, b) => (a.vesselName || '').localeCompare(b.vesselName || ''))
+      setGroups(sortedGroups)
     } finally {
       setLoading(false)
     }
