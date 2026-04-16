@@ -10,8 +10,6 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [piAlts, setPiAlts] = useState<QuotationPIAlternative[]>([])
     const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
-    const [newLolAmount, setNewLolAmount] = useState('')
-    const [newLolLabel, setNewLolLabel] = useState('')
     const [newText, setNewText] = useState('')
     const [newAmount, setNewAmount] = useState('')
     const [newCurrency, setNewCurrency] = useState('USD')
@@ -114,63 +112,76 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
             {/* LOL Alternatives */}
             {quotation.quotationTypeCode === 'P' && piAlts.length < 2 && (
                 <div style={{ marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '0.95rem', marginBottom: '10px' }}>LOL Alternatives</h3>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 10px' }}>
-                        Offer multiple limit of liability options. Each can have its own premium.
-                    </p>
-                    {lolOptions.map((opt, idx) => (
-                        <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${ALT_COLORS[idx % ALT_COLORS.length]}` }}>
-                            <input
-                                type="text"
-                                value={opt.label || ''}
-                                onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, label: e.target.value } : o))}
-                                onBlur={e => window.api.lolUpdateOption(opt.id, { label: e.target.value })}
-                                placeholder={`Option ${idx + 1}`}
-                                style={{ width: '120px', fontSize: '0.85rem', fontWeight: 600 }}
-                            />
-                            <input
-                                type="text"
-                                value={opt.currency}
-                                onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, currency: e.target.value } : o))}
-                                onBlur={e => window.api.lolUpdateOption(opt.id, { currency: e.target.value })}
-                                style={{ width: '55px', fontSize: '0.85rem', textAlign: 'center' }}
-                            />
-                            <input
-                                type="number"
-                                value={opt.amount || ''}
-                                onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: parseFloat(e.target.value) || 0 } : o))}
-                                onBlur={e => window.api.lolUpdateOption(opt.id, { amount: parseFloat(e.target.value) || 0 })}
-                                placeholder="Amount"
-                                style={{ width: '160px', fontSize: '0.85rem', textAlign: 'right' }}
-                            />
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Premium:</span>
-                            <input
-                                type="number"
-                                value={opt.premiumAmount ?? ''}
-                                onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
-                                onBlur={e => window.api.lolUpdateOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
-                                placeholder="—"
-                                style={{ width: '120px', fontSize: '0.85rem', textAlign: 'right' }}
-                            />
-                            <button onClick={async () => { await window.api.lolDeleteOption(opt.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
-                        </div>
-                    ))}
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
-                        <input type="text" value={newLolLabel} onChange={e => setNewLolLabel(e.target.value)} placeholder="Label (optional)" style={{ width: '120px', fontSize: '0.85rem' }} />
-                        <input type="number" value={newLolAmount} onChange={e => setNewLolAmount(e.target.value)} placeholder="Amount" style={{ width: '160px', fontSize: '0.85rem' }} />
+                    {lolOptions.length > 0 ? (
+                        <>
+                            {lolOptions.map((opt, idx) => (
+                                <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${ALT_COLORS[idx % ALT_COLORS.length]}` }}>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: ALT_COLORS[idx % ALT_COLORS.length], minWidth: '100px' }}>
+                                        {opt.label || `Alternative ${idx + 1}`}
+                                    </span>
+                                    <input
+                                        type="text"
+                                        value={opt.currency}
+                                        onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, currency: e.target.value } : o))}
+                                        onBlur={e => window.api.lolUpdateOption(opt.id, { currency: e.target.value })}
+                                        style={{ width: '55px', fontSize: '0.85rem', textAlign: 'center' }}
+                                    />
+                                    <input
+                                        type="number"
+                                        value={opt.amount || ''}
+                                        onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: parseFloat(e.target.value) || 0 } : o))}
+                                        onBlur={e => window.api.lolUpdateOption(opt.id, { amount: parseFloat(e.target.value) || 0 })}
+                                        placeholder="Amount"
+                                        style={{ flex: 1, maxWidth: '200px', fontSize: '0.85rem', textAlign: 'right' }}
+                                    />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Premium:</span>
+                                    <input
+                                        type="number"
+                                        value={opt.premiumAmount ?? ''}
+                                        onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
+                                        onBlur={e => window.api.lolUpdateOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
+                                        placeholder="—"
+                                        style={{ width: '120px', fontSize: '0.85rem', textAlign: 'right' }}
+                                    />
+                                    <button onClick={async () => {
+                                        await window.api.lolDeleteOption(opt.id)
+                                        // If only one remains after delete, remove it too and restore to primary LOL
+                                        const remaining = lolOptions.filter(o => o.id !== opt.id)
+                                        if (remaining.length === 1) {
+                                            updateField('limitOfLiabilityAmount', remaining[0].amount)
+                                            updateField('limitOfLiabilityCurrency', remaining[0].currency)
+                                            setQ(q => ({ ...q, limitOfLiabilityAmount: remaining[0].amount, limitOfLiabilityCurrency: remaining[0].currency }))
+                                            await window.api.lolDeleteOption(remaining[0].id)
+                                        }
+                                        loadData()
+                                    }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                                </div>
+                            ))}
+                            <button
+                                onClick={async () => {
+                                    await window.api.lolAddOption(quotation.id, 0, quotation.limitOfLiabilityCurrency || 'USD')
+                                    loadData()
+                                }}
+                                className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}
+                            >
+                                <Plus size={13} /> Add Alternative
+                            </button>
+                        </>
+                    ) : (
                         <button
                             onClick={async () => {
-                                if (!newLolAmount) return
-                                await window.api.lolAddOption(quotation.id, parseFloat(newLolAmount), quotation.limitOfLiabilityCurrency || 'USD', newLolLabel || undefined)
-                                setNewLolAmount(''); setNewLolLabel('')
+                                // Convert primary LOL to Alternative 1, create empty Alternative 2
+                                const currency = quotation.limitOfLiabilityCurrency || 'USD'
+                                const amount = quotation.limitOfLiabilityAmount || 0
+                                await window.api.lolAddOption(quotation.id, amount, currency, 'Alternative 1')
+                                await window.api.lolAddOption(quotation.id, 0, currency, 'Alternative 2')
                                 loadData()
-                                showSuccess('LOL option added')
                             }}
-                            className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                         >
-                            <Plus size={14} /> Add Option
+                            <Plus size={14} /> Add LOL Alternative
                         </button>
-                    </div>
+                    )}
                 </div>
             )}
 
