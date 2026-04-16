@@ -113,7 +113,7 @@ Vessel inspection tracking with defects management:
 - **Surveyors**: Directory of surveyor companies (`SurveyorDirectory.tsx`) — table + slide-in panel layout (see UI Pattern below). Stats strip: Total Surveyors / Total Surveys / Open Surveys. Slide-in panel shows per-surveyor survey history with OPEN / CLOSED / NO DEFECTS status computed from defects (open=0 → CLOSED, no defects → NO DEFECTS). Add/Edit via modal.
 - **Surveys**: Condition surveys attached to vessels (`ConditionSurveyManager.tsx`) with date, surveyor, type, location
 - **Survey List**: Cross-vessel survey overview (`ConditionSurveyList.tsx`) with search, navigates directly to vessel's survey section. Sortable columns (vessel, date, type, surveyor, location, defects); default sort: date desc.
-- **Defects**: Each survey can have multiple defects (`DefectManager.tsx`) with severity (optional), status (OPEN/CLOSED), due dates
+- **Defects**: Each survey can have multiple defects (`DefectManager.tsx`) with severity (optional), status (OPEN/CLOSED), due dates. Due date can be cleared (passes `null` to adapter, not `undefined` which skips the update).
 - **Defect Notes**: Notes button visible for all defects with notes (not just closed), shows both general notes and closure notes
 - **Attachments**: Multiple file attachments per survey (reports, photos, certificates)
 - **Survey Status**: Automatically shows "SURVEY CLOSED" when all defects are closed
@@ -130,15 +130,18 @@ Cross-vessel warranty and endorsement tracking system:
 - **IPC Handlers**: `survey_warranty:getByVessel`, `survey_warranty:getAll`, `survey_warranty:create`, `survey_warranty:update`, `survey_warranty:delete`, `survey_warranty:getReminders`, `survey_warranty:addReminder`, `survey_warranty:getEndorsementsDue`
 - **SQL alias rule**: All `sw.*` / `swr.*` wildcard selects must use explicit `column AS camelCaseName` aliases — MySQL returns raw snake_case, but TypeScript interfaces expect camelCase
 
-### Customer Assignment
+### Customer Assignment (Policy-Level)
 
-Vessels can be assigned to a customer entity with a customer type:
+Customer/broker is tracked at the **policy level**, not the vessel level. A vessel can have different customers per policy type (e.g., Hull via Broker A, P&I via Broker B).
 
-- **Fields**: `customer_id` (FK to entities, soft reference) and `customer_type` ('broker' or 'direct') on the `vessels` table
-- **Per-Vessel**: The same entity can be a broker for one vessel and a direct client for another
-- **Indexed**: `idx_vessels_customer` index on `customer_id`
-- **Orphan Cleanup**: Deleting an entity clears `customer_id`/`customer_type` on its vessels (no CASCADE)
-- **Audit Log**: Customer changes are stored as entity **names** (not UUIDs) in `vessel_audit_log`. The `updateVessel` adapter method resolves both old and new `customer_id` values to entity names via a SELECT before writing the audit entry. Legacy UUID entries (from before this fix) are resolved at render time in `VesselHistoryView` via a lazy `getEntities()` call.
+- **Fields**: `customer_entity_id` (FK to entities) and `customer_type` ('broker' or 'direct') on `vessel_dynamic_policies`
+- **Legacy**: `customer_id`/`customer_type` columns still exist on `vessels` table but are deprecated — all views read from policies
+- **Auto-sync**: When `broker_entity_id` is updated on a policy without explicit `customer_entity_id`, the adapter auto-syncs customer fields
+- **Multi-broker vessels**: A vessel appears under every customer that has an active policy on it. FleetManager "By Customer" view, CustomerComplianceReport, DAB, and analytics all derive customer from active policies
+- **Policy edit UI**: "Customer / Broker" field with broker/direct toggle buttons + entity search combobox in VesselDetail policy edit form
+- **Quotation customer**: `customer_entity_id` + `customer_type` on `quotations` table, set in InsuredTab with entity search and broker/direct toggle. Auto-copied from vessel's existing policy when adding a vessel. Synced to vessel dynamic policy on quotation-to-policy conversion.
+- **Document filtering**: Customer compliance reports only show document types tagged for the policy types the customer covers (e.g., Hull broker sees only Hull-tagged docs)
+- **Vessel list**: Customer column hidden by default (labeled "Legacy" in column selector)
 
 ### Fleet Management
 
@@ -409,17 +412,27 @@ Vessel compliance PDF (`src/renderer/src/services/ReportServiceV2.ts`), exported
   - `'doc'`: alternating white/bgLight (by `row.index % 2`), left padding 12mm, ON FILE (green) / MISSING (red) status pill
 - **`resolveEffectivePolicyExpiry`**: utility at `src/renderer/src/utils/policyUtils.ts` — extracts P&I end date from dynamic policies for annual doc expiry resolution
 
-### Quotation Types
+### Unified Policy / Quotation Types
 
-Multi-type quotation system with admin-managed types:
+Single `policy_types` table serves both vessel policies and quotations. The `code` column (P, H, W, F, L, C) drives quotation behavior (tab visibility, export format, warranty scoping).
 
-- **Table**: `quotation_types` (id, name, code, order_index) — seeded with P&I (P), H&M (H), War Risk (W), FDD (F), Loss of Hire (L)
-- **`quotation_type_id`** on `quotations` table — existing quotations migrated to P&I on first run
-- **Auto-reference**: `Q/{type_code}/{global_sequential}` generated on creation (e.g. `Q/P/1`, `Q/H/2`). Sequential number counts ALL quotations globally, not per-type
-- **QuotationList**: Type column (teal badge), type filter dropdown, "New Quotation" button opens dropdown to select type
-- **QuotationEditor**: Read-only type badge in header bar
-- **QuotationSettings**: "Quotation Types" tab (first tab) with add/edit/delete/reorder CRUD
-- **IPC**: `db:getQuotationTypes`, `db:addQuotationType`, `db:updateQuotationType`, `db:deleteQuotationType`, `db:reorderQuotationTypes`
+- **Table**: `policy_types` (id, name, code, order_index) — seeded with P&I (P), Hull (H), War Risk (W), FDD (F), Loss of Hire (L), Cargo (C)
+- **Unified**: `quotation_types` table is legacy — all CRUD methods (`getQuotationTypes`, `addQuotationType`, etc.) now read/write `policy_types` WHERE code IS NOT NULL
+- **`quotation_type_id`** on `quotations` table — now references `policy_types` rows (migrated from old `quotation_types` IDs)
+- **Auto-reference**: `Q/{type_code}/{global_sequential}` generated on creation (e.g. `Q/P/1`, `Q/H/2`)
+- **Admin Panel**: Policy Types section manages both policy and quotation types with name + code fields
+- **Renaming**: Renaming a type auto-reflects everywhere since all references are by UUID. The `code` field should NOT be renamed (drives application logic).
+- **IPC**: `db:getQuotationTypes`, `db:addQuotationType`, etc. delegate to `policy_types` table
+
+### Document Type Policy Tags
+
+Document types can be tagged with applicable policy types to control which documents appear in broker-specific compliance reports.
+
+- **Junction table**: `document_type_policy_types` (document_type_id, policy_type_id)
+- **Empty = all types**: A document with no tags is relevant to all policy types
+- **Admin Panel**: Policy type checkboxes (with "All" chip) in document type add/edit forms. Read-only display shows type badges or green "All Types" badge.
+- **Compliance filtering**: `buildVesselRow`, ZIP export, and Copy Missing all filter documents by the customer's active policy types for each vessel. Vessel-level exports (no customer filter) show all documents.
+- **`policyTypeIds`**: Optional `string[]` on `DocumentType` interface
 - **Lightweight list query**: `getQuotations()` returns only display fields (no MEDIUMTEXT blobs); `getQuotation(id)` loads full record for editor
 - **Vessel name in list**: Subquery on `quotation_vessels` with `COALESCE(v.name, qv.name)` to resolve fleet-linked or manually-entered vessel names; shows `+N` for multi-vessel quotations
 - **Shared tabs** (all types): insured, vessel, trading, period, premium, warranties, subjectivities. Type-specific tabs: P&I gets conditions/deductibles/exclusions/liability; H&M gets agreed value/hull conditions
@@ -890,6 +903,37 @@ Per-quotation P&I alternatives (similar to hull):
 - **Input Focus**: Accent border + glow ring
 - **Print CSS**: @media print styles for paper output
 - **Right-Click**: Context menu with Cut/Copy/Paste/Select All
+
+### Vessel Type (FK-based)
+
+Vessel type stored as FK reference, not text. Renaming a type in settings auto-reflects on all vessels.
+
+- **Field**: `vessel_type_id` (FK to `vessel_types`) on `vessels` table. Legacy `vessel_type` text column kept as fallback.
+- **Queries**: `getVessels`/`getVesselsPaginated` use `COALESCE(vt.name, v.vessel_type)` via LEFT JOIN
+- **Migration**: Auto-matches existing text values to `vessel_types` by name (case-insensitive), creates missing types
+- **VesselDetail**: Dropdown uses `vt.id` as value, not name
+- **Audit log**: Resolves vessel type IDs to names for readable history
+- **Excel import**: Resolves type names to IDs, auto-creates missing types
+
+### Quotation List View
+
+Redesigned quotation list with view tabs, month navigation, and chip filters:
+
+- **View tabs**: Active (default, excludes converted), Converted, All, plus saved custom views as tabs
+- **Month navigator**: Arrow-based single-month range, "Today" button to reset
+- **Search**: Bypasses all date/view filters to search ALL quotations. Shows "ALL" indicator when active.
+- **Chip filters**: Status and type as toggle chips with counts (not dropdowns)
+- **Compact stats**: Inline total count instead of large glass cards
+- **Backend**: `viewFilter` supports `'active'` (excludes converted) and `'converted'` in addition to all/registry/drafts
+
+### Fleet Dropdown (Vessel List)
+
+Per-vessel fleet assignment uses a searchable combobox:
+
+- **Search**: Type to filter fleets by name
+- **Sorted**: Fleets listed alphabetically
+- **Create inline**: "Create Fleet" button at bottom of dropdown, Enter to confirm
+- **Filter dropdown**: Fleet filter in toolbar also sorted alphabetically
 
 ### Key Tables
 
