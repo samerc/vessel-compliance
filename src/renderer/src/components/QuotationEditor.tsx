@@ -326,14 +326,28 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     if (Array.isArray(qv) && qv.some((v: any) => v.premiumAmount)) hasPremium = true
                 } catch {}
             }
+            if (!hasPremium && typeCode === 'P') {
+                // Check LOL alternative premiums
+                try {
+                    const lolOpts = await window.api.lolGetOptions(quotation.id)
+                    if (Array.isArray(lolOpts) && lolOpts.some((o: any) => o.premiumAmount)) hasPremium = true
+                } catch {}
+            }
             if (!hasPremium) {
                 warnings.push('Premium amount is not set')
             }
         }
 
-        // P&I: Limit of Liability
+        // P&I: Limit of Liability (skip if LOL alternatives are set)
         if (typeCode === 'P' && (quotation.limitOfLiabilityAmount == null || quotation.limitOfLiabilityAmount === 0)) {
-            warnings.push('Limit of Liability amount is not set')
+            try {
+                const lolOpts = await window.api.lolGetOptions(quotation.id)
+                if (!Array.isArray(lolOpts) || lolOpts.length === 0) {
+                    warnings.push('Limit of Liability amount is not set')
+                }
+            } catch {
+                warnings.push('Limit of Liability amount is not set')
+            }
         }
 
         // Hull: Agreed Value + per-alternative premiums
