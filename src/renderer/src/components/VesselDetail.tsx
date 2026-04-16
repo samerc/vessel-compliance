@@ -177,7 +177,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     'Expiry': getVal(expiryChar?.id),
                     'Premium': getVal(premiumChar?.id),
                     'Currency': p.currency || '',
-                    'Broker': p.brokerName || '',
+                    'Customer/Broker': p.customerName || p.brokerName || '',
                     'Deductible': getVal(deductibleChar?.id),
                     'Condition': p.conditionName || '',
                     'Notes': p.notes || '',
@@ -2613,7 +2613,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                             <AlertCircle size={10} /> NEEDS EDITING
                                         </span>
                                     )}
-                                    {p.brokerName && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>via {p.brokerName}</span>}
+                                    {(p.customerName || p.brokerName) && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{p.customerType === 'direct' ? '' : 'via '}{p.customerName || p.brokerName}{p.customerType ? ` (${p.customerType})` : ''}</span>}
                                 </div>
                                 {/* Body */}
                                 {!isCollapsed && (
