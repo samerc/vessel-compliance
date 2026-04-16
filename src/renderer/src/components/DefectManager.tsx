@@ -135,7 +135,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       defectNumber: editNumber,
       description: editDescription,
       severity: editSeverity ? (editSeverity as 'Critical' | 'Major' | 'Minor' | 'Observation') : undefined,
-      dueDate: editDueDate || undefined,
+      dueDate: editDueDate || null,
       notes: editNotes || undefined
     })
 

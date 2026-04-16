@@ -50,6 +50,12 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active')
 
+    // Fleet combobox state for per-vessel assignment
+    const [fleetComboOpen, setFleetComboOpen] = useState<string | null>(null) // vesselId of open combobox
+    const [fleetComboSearch, setFleetComboSearch] = useState('')
+    const [fleetComboCreating, setFleetComboCreating] = useState(false)
+    const [fleetComboNewName, setFleetComboNewName] = useState('')
+
     // Add Mode
     const [newVessel, setNewVessel] = useState({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' as '' | 'broker' | 'direct' })
     const [isAdding, setIsAdding] = useState(false)
@@ -633,7 +639,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     >
                         <option value="all">All Fleets</option>
                         <option value="">Standalone</option>
-                        {fleets.map(f => (
+                        {[...fleets].sort((a, b) => a.name.localeCompare(b.name)).map(f => (
                             <option key={f.id} value={f.id}>{f.name}</option>
                         ))}
                     </select>
@@ -1004,17 +1010,77 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                         )}
                                         {visibleSet.has('fleet') && (
                                         <td style={{ padding: '16px' }}>
-                                            <select
-                                                value={v.fleetId || ''}
-                                                onChange={e => handleUpdateFleet(v.id, e.target.value)}
-                                                style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit', width: '200px' }}
-                                                aria-label="Assign fleet"
-                                            >
-                                                <option value="">Standalone</option>
-                                                {fleets.map(f => (
-                                                    <option key={f.id} value={f.id}>{f.name}</option>
-                                                ))}
-                                            </select>
+                                            <div style={{ position: 'relative', width: '200px' }}>
+                                                <button
+                                                    onClick={() => { setFleetComboOpen(fleetComboOpen === v.id ? null : v.id); setFleetComboSearch(''); setFleetComboCreating(false); setFleetComboNewName('') }}
+                                                    style={{ width: '100%', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                                                >
+                                                    <span>{v.fleetId ? (fleets.find(f => f.id === v.fleetId)?.name || 'Unknown') : 'Standalone'}</span>
+                                                    <ChevronDown size={14} style={{ opacity: 0.5 }} />
+                                                </button>
+                                                {fleetComboOpen === v.id && (
+                                                    <>
+                                                        <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setFleetComboOpen(null)} />
+                                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '240px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                            <input
+                                                                type="text"
+                                                                value={fleetComboSearch}
+                                                                onChange={e => setFleetComboSearch(e.target.value)}
+                                                                placeholder="Search fleets..."
+                                                                autoFocus
+                                                                style={{ padding: '6px 10px', border: 'none', borderBottom: '1px solid var(--table-border)', fontSize: '0.82rem', background: 'transparent', color: 'var(--text-primary)', outline: 'none' }}
+                                                            />
+                                                            <div style={{ overflowY: 'auto', flex: 1 }}>
+                                                                <div
+                                                                    onClick={() => { handleUpdateFleet(v.id, ''); setFleetComboOpen(null) }}
+                                                                    style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: !v.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: !v.fleetId ? 600 : 400 }}
+                                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
+                                                                    onMouseLeave={e => (e.currentTarget.style.background = !v.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                                                >Standalone</div>
+                                                                {[...fleets].sort((a, b) => a.name.localeCompare(b.name)).filter(f => !fleetComboSearch || f.name.toLowerCase().includes(fleetComboSearch.toLowerCase())).map(f => (
+                                                                    <div
+                                                                        key={f.id}
+                                                                        onClick={() => { handleUpdateFleet(v.id, f.id); setFleetComboOpen(null) }}
+                                                                        style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: v.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: v.fleetId === f.id ? 600 : 400 }}
+                                                                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
+                                                                        onMouseLeave={e => (e.currentTarget.style.background = v.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                                                    >{f.name}</div>
+                                                                ))}
+                                                            </div>
+                                                            <div style={{ borderTop: '1px solid var(--table-border)', padding: '4px 6px' }}>
+                                                                {fleetComboCreating ? (
+                                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={fleetComboNewName}
+                                                                            onChange={e => setFleetComboNewName(e.target.value)}
+                                                                            placeholder="New fleet name..."
+                                                                            autoFocus
+                                                                            style={{ flex: 1, padding: '4px 8px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                                                                            onKeyDown={async e => {
+                                                                                if (e.key === 'Enter' && fleetComboNewName.trim()) {
+                                                                                    const newFleet = await window.api.addFleet({ name: fleetComboNewName.trim() })
+                                                                                    setFleets(prev => [...prev, newFleet])
+                                                                                    await handleUpdateFleet(v.id, newFleet.id)
+                                                                                    setFleetComboOpen(null)
+                                                                                }
+                                                                                if (e.key === 'Escape') setFleetComboCreating(false)
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => { setFleetComboCreating(true); setFleetComboNewName('') }}
+                                                                        style={{ width: '100%', padding: '4px 8px', fontSize: '0.78rem', background: 'transparent', border: '1px dashed var(--input-border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+                                                                    >
+                                                                        <Plus size={12} /> Create Fleet
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                         )}
                                         {visibleSet.has('actions') && (
