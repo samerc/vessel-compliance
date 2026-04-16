@@ -11,7 +11,7 @@ import {
   ChevronRight,
   RotateCw,
   Star,
-  Save,
+  // Save unused after toolbar redesign
   X,
   Loader2,
   Layers,
@@ -90,10 +90,15 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [renewalFilter, setRenewalFilter] = useState<string>('all')
-  const [viewFilter, setViewFilter] = useState<'all' | 'registry' | 'drafts'>('all')
+  const [viewFilter, setViewFilter] = useState<'all' | 'registry' | 'drafts' | 'active' | 'converted'>('active')
   const [createdByFilter, setCreatedByFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+
+  // Month navigation
+  const [navYear, setNavYear] = useState(() => new Date().getFullYear())
+  const [navMonth, setNavMonth] = useState(() => new Date().getMonth())
+  const [isSearchActive, setIsSearchActive] = useState(false)
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [page, setPage] = useState(0)
@@ -164,6 +169,24 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     return () => clearTimeout(timer)
   }, [search])
 
+  // Month navigation → auto-set dateFrom/dateTo (current month + next month)
+  useEffect(() => {
+    if (isSearchActive) return
+    const from = new Date(navYear, navMonth, 1)
+    const toEnd = new Date(navYear, navMonth + 2, 0) // last day of next month
+    setDateFrom(from.toISOString().split('T')[0])
+    setDateTo(toEnd.toISOString().split('T')[0])
+  }, [navYear, navMonth, isSearchActive])
+
+  // Search bypasses date/view filters
+  useEffect(() => {
+    if (debouncedSearch) {
+      setIsSearchActive(true)
+    } else {
+      setIsSearchActive(false)
+    }
+  }, [debouncedSearch])
+
   // Reset page when filters change
   useEffect(() => {
     setPage(0)
@@ -215,10 +238,10 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
         status: statusFilter !== 'all' ? statusFilter : undefined,
         typeCode,
         createdBy: createdByFilter !== 'all' ? createdByFilter : undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        dateFrom: isSearchActive ? undefined : (dateFrom || undefined),
+        dateTo: isSearchActive ? undefined : (dateTo || undefined),
         renewalFilter: renewalFilter !== 'all' ? renewalFilter : undefined,
-        viewFilter: viewFilter !== 'all' ? viewFilter : undefined,
+        viewFilter: isSearchActive ? undefined : (viewFilter !== 'all' ? viewFilter : undefined),
         groupId: activeGroupId || undefined,
         favoriteIds: showFavoritesOnly ? [...favorites] : undefined,
         sortField,
@@ -247,6 +270,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     dateTo,
     renewalFilter,
     viewFilter,
+    isSearchActive,
     activeGroupId,
     showFavoritesOnly,
     favorites,
@@ -427,13 +451,40 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     setStatusFilter('all')
     setTypeFilter('all')
     setRenewalFilter('all')
-    setViewFilter('all')
+    setViewFilter('active')
     setCreatedByFilter('all')
-    setDateFrom('')
-    setDateTo('')
+    setIsSearchActive(false)
+    const now = new Date()
+    setNavYear(now.getFullYear())
+    setNavMonth(now.getMonth())
     setShowFavoritesOnly(false)
     setActiveGroupId(null)
   }
+
+  const navigateMonth = (direction: -1 | 1) => {
+    setNavMonth(prev => {
+      const n = prev + direction
+      if (n < 0) { setNavYear(y => y - 1); return 11 }
+      if (n > 11) { setNavYear(y => y + 1); return 0 }
+      return n
+    })
+  }
+
+  const goToToday = () => {
+    const now = new Date()
+    setNavYear(now.getFullYear())
+    setNavMonth(now.getMonth())
+    setIsSearchActive(false)
+  }
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const navLabel = (() => {
+    const m1 = monthNames[navMonth]
+    const m2idx = (navMonth + 1) % 12
+    const m2 = monthNames[m2idx]
+    const y2 = navMonth === 11 ? navYear + 1 : navYear
+    return y2 !== navYear ? `${m1} ${navYear} – ${m2} ${y2}` : `${m1} – ${m2} ${navYear}`
+  })()
 
   const hasActiveFilters =
     statusFilter !== 'all' ||
@@ -971,8 +1022,135 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
 
   return (
     <div>
-      {/* Saved filters chips */}
-      {savedFilters.length > 0 && (
+      {/* ═══ View Tabs ═══ */}
+      <div style={{ display: 'flex', gap: '2px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {(['active', 'converted', 'all'] as const).map(vf => {
+          const labels: Record<string, string> = { active: 'Active', converted: 'Converted', all: 'All' }
+          const active = viewFilter === vf && !savedFilters.some(sf => sf.id === viewFilter)
+          return (
+            <button key={vf} onClick={() => { setViewFilter(vf); setActiveGroupId(null) }}
+              style={{ padding: '8px 16px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: active ? 700 : 400, background: active ? 'var(--bg-card)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent' }}>
+              {labels[vf]}
+            </button>
+          )
+        })}
+        {savedFilters.map(sf => (
+          <button key={sf.id} onClick={() => applyFilter(sf.filters)}
+            style={{ padding: '8px 12px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 400, background: 'transparent', color: 'var(--text-secondary)', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {sf.name}
+            <X size={12} style={{ opacity: 0.4 }} onClick={e => deleteSavedFilter(sf.id, e)} />
+          </button>
+        ))}
+        {hasActiveFilters && !showSaveFilterInput && (
+          <button onClick={() => setShowSaveFilterInput(true)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed var(--input-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Plus size={12} /> Save View
+          </button>
+        )}
+        {showSaveFilterInput && (
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <input type="text" value={newFilterName} onChange={e => setNewFilterName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveCurrentFilter(); if (e.key === 'Escape') { setShowSaveFilterInput(false); setNewFilterName('') } }} placeholder="View name..." style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', width: '140px' }} autoFocus />
+            <button onClick={saveCurrentFilter} className="btn-primary" style={{ padding: '5px 8px', fontSize: '0.75rem' }} disabled={!newFilterName.trim()}>Save</button>
+            <button onClick={() => { setShowSaveFilterInput(false); setNewFilterName('') }} className="btn-secondary" style={{ padding: '5px' }}><X size={12} /></button>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ Search + Month Nav ═══ */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+          <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={15} />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search all quotations..." style={{ width: '100%', paddingLeft: '36px', fontSize: '0.83rem' }} />
+          {loading && <Loader2 size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-primary)', animation: 'spin 1s linear infinite' }} />}
+          {isSearchActive && <span style={{ position: 'absolute', right: loading ? '30px' : '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>ALL</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isSearchActive ? 0.3 : 1, pointerEvents: isSearchActive ? 'none' : 'auto' }}>
+          <button onClick={() => navigateMonth(-1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronLeft size={16} /></button>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '140px', textAlign: 'center', whiteSpace: 'nowrap' }}>{navLabel}</span>
+          <button onClick={() => navigateMonth(1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronRight size={16} /></button>
+          <button onClick={goToToday} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}>Today</button>
+        </div>
+        <button onClick={loadData} className="btn-secondary" style={{ padding: '7px', flexShrink: 0 }} title="Refresh"><RotateCw size={16} /></button>
+        {hasPermission('quotations:create') && (
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowNewMenu(!showNewMenu)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+              <Plus size={16} /> New Quotation
+            </button>
+            {showNewMenu && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNewMenu(false)} />
+                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '10px', padding: '6px', minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                  {quotationTypes.map(qt => (
+                    <button key={qt.id} onClick={() => handleCreate(qt.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '20px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(0,170,200,0.12)', color: isLight ? '#007a91' : '#00aac8' }}>{qt.code}</span>
+                      {qt.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ═══ Compact Stats + Filter Chips ═══ */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Status chips */}
+        {[
+          { label: 'Draft', key: 'draft', color: '#999' },
+          { label: 'Sent', key: 'sent', color: '#0096ff' },
+          { label: 'Approved', key: 'approved', color: '#00c864' },
+          { label: 'Rejected', key: 'rejected', color: '#ff4d4d' },
+        ].map(s => {
+          const count = data.stats.byStatus?.[s.key] || 0
+          const active = statusFilter === s.key
+          return (
+            <button key={s.key} onClick={() => setStatusFilter(prev => prev === s.key ? 'all' : s.key)}
+              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', border: active ? `1.5px solid ${s.color}` : '1px solid var(--table-border)', background: active ? `${s.color}15` : 'transparent', color: active ? s.color : 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: active ? 600 : 400 }}>
+              {s.label}
+              {count > 0 && <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>{count}</span>}
+            </button>
+          )
+        })}
+        <span style={{ color: 'var(--table-border)', margin: '0 2px' }}>|</span>
+        {/* Type chips */}
+        {quotationTypes.map(qt => {
+          const active = typeFilter === qt.id
+          const count = (data.stats.byType as any[])?.find((t: any) => t.code === qt.code)?.count || 0
+          return (
+            <button key={qt.id} onClick={() => setTypeFilter(prev => prev === qt.id ? 'all' : qt.id)}
+              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', border: active ? '1.5px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: active ? 600 : 400 }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0 3px', borderRadius: '3px', background: 'rgba(0,170,200,0.12)', color: isLight ? '#007a91' : '#00aac8' }}>{qt.code}</span>
+              {qt.name}
+              {count > 0 && <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>{count}</span>}
+            </button>
+          )
+        })}
+        <span style={{ color: 'var(--table-border)', margin: '0 2px' }}>|</span>
+        {/* Renewal filter */}
+        <select value={renewalFilter} onChange={e => setRenewalFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem', padding: '4px 8px' }}>
+          <option value="all">All</option>
+          <option value="new">New</option>
+          <option value="renewal">Renewal</option>
+        </select>
+        {/* Created by */}
+        {creators.length > 1 && (
+          <select value={createdByFilter} onChange={e => setCreatedByFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem', padding: '4px 8px' }}>
+            <option value="all">All Users</option>
+            {creators.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        {/* Compact total */}
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
+          {data.total} quotation{data.total !== 1 ? 's' : ''}
+        </span>
+        {hasActiveFilters && (
+          <button onClick={clearAllFilters} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--danger)' }}>Clear</button>
+        )}
+      </div>
+
+      {/* ═══ Toolbar (group, favorites, select, bulk) ═══ */}
+      {/* Keep existing saved filters chips area for backward compat — now empty since moved to tabs */}
+      {false && savedFilters.length > 0 && (
         <div
           style={{
             display: 'flex',
@@ -1031,8 +1209,8 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
         </div>
       )}
 
-      {/* Stats strip */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      {/* Stats strip (replaced by compact chips above) */}
+      {false && <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {[
           { label: 'Total', value: data.stats.total || 0, color: '#00aac8', status: 'all' },
           {
@@ -1142,10 +1320,10 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
               <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>{t.count}</span>
             </div>
           ))}
-      </div>
+      </div>}
 
-      {/* Filter bar */}
-      <div
+      {/* Filter bar (replaced by compact chips + search above) */}
+      {false && <div
         style={{
           display: 'flex',
           gap: '8px',
@@ -1271,9 +1449,9 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
-      {/* Second toolbar row: grouping, favorites toggle, save filter, actions */}
+      {/* Second toolbar row: grouping, favorites toggle, select, actions */}
       <div
         style={{
           display: 'flex',
@@ -1327,71 +1505,6 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
             </span>
           )}
         </button>
-
-        {/* Save filter */}
-        {showSaveFilterInput ? (
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <input
-              type="text"
-              value={newFilterName}
-              onChange={(e) => setNewFilterName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && saveCurrentFilter()}
-              placeholder="Filter name..."
-              style={{ ...selectStyle, width: '140px', fontSize: '0.78rem' }}
-              autoFocus
-            />
-            <button
-              onClick={saveCurrentFilter}
-              className="btn-primary"
-              style={{ padding: '7px 10px', fontSize: '0.78rem' }}
-              disabled={!newFilterName.trim()}
-            >
-              Save
-            </button>
-            <button
-              onClick={() => {
-                setShowSaveFilterInput(false)
-                setNewFilterName('')
-              }}
-              className="btn-secondary"
-              style={{ padding: '7px' }}
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ) : (
-          hasActiveFilters && (
-            <button
-              onClick={() => setShowSaveFilterInput(true)}
-              className="btn-secondary"
-              style={{
-                padding: '7px 12px',
-                fontSize: '0.78rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-            >
-              <Save size={13} />
-              Save Filter
-            </button>
-          )
-        )}
-
-        {/* Clear filters */}
-        {hasActiveFilters && (
-          <button
-            onClick={clearAllFilters}
-            className="btn-secondary"
-            style={{
-              padding: '7px 12px',
-              fontSize: '0.78rem',
-              color: 'var(--danger)'
-            }}
-          >
-            Clear Filters
-          </button>
-        )}
 
         {/* Select mode toggle */}
         <button
@@ -1486,95 +1599,6 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
         )}
 
         <div style={{ flex: 1 }} />
-
-        <button
-          onClick={loadData}
-          className="btn-secondary"
-          style={{ padding: '7px', flexShrink: 0 }}
-          title="Refresh"
-        >
-          <RotateCw size={16} />
-        </button>
-        {hasPermission('quotations:create') && (
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowNewMenu(!showNewMenu)}
-              className="btn-primary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap',
-                fontSize: '0.85rem'
-              }}
-            >
-              <Plus size={16} /> New Quotation
-            </button>
-            {showNewMenu && (
-              <>
-                <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 99 }}
-                  onClick={() => setShowNewMenu(false)}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: 0,
-                    marginTop: '4px',
-                    background: isLight ? '#ffffff' : '#1a1d28',
-                    border: '1px solid var(--glass-border)',
-                    borderRadius: '10px',
-                    padding: '6px',
-                    zIndex: 100,
-                    minWidth: '180px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                  }}
-                >
-                  {quotationTypes.map((qt) => (
-                    <button
-                      key={qt.id}
-                      onClick={() => handleCreate(qt.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        width: '100%',
-                        padding: '10px 14px',
-                        border: 'none',
-                        borderRadius: '6px',
-                        background: 'transparent',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem',
-                        textAlign: 'left'
-                      }}
-                      className="hover-effect"
-                    >
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          background: 'var(--accent-primary)',
-                          color: '#fff',
-                          fontSize: '0.7rem',
-                          fontWeight: 700
-                        }}
-                      >
-                        {qt.code}
-                      </span>
-                      {qt.name}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Quotation groups chips */}

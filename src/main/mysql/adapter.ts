@@ -7048,7 +7048,7 @@ export class MySQLAdapter {
         dateFrom?: string
         dateTo?: string
         renewalFilter?: string
-        viewFilter?: 'all' | 'registry' | 'drafts'
+        viewFilter?: 'all' | 'registry' | 'drafts' | 'active' | 'converted'
         registryOnly?: boolean
         groupId?: string
         favoriteIds?: string[]
@@ -7116,6 +7116,10 @@ export class MySQLAdapter {
             conditions.push("q.reference_number NOT LIKE 'DRAFT-%'")
         } else if (params.viewFilter === 'drafts') {
             conditions.push("q.reference_number LIKE 'DRAFT-%'")
+        } else if (params.viewFilter === 'active') {
+            conditions.push("q.status != 'converted'")
+        } else if (params.viewFilter === 'converted') {
+            conditions.push("q.status = 'converted'")
         } else if (params.registryOnly) {
             conditions.push("q.reference_number NOT LIKE 'DRAFT-%'")
         }

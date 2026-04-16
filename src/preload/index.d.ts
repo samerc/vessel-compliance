@@ -541,7 +541,7 @@ export interface Api {
     dateFrom?: string
     dateTo?: string
     renewalFilter?: string
-    viewFilter?: 'all' | 'registry' | 'drafts'
+    viewFilter?: 'all' | 'registry' | 'drafts' | 'active' | 'converted'
     registryOnly?: boolean
     groupId?: string
     favoriteIds?: string[]
