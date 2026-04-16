@@ -2256,6 +2256,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
     const [formStatus, setFormStatus] = useState<'active' | 'expired' | 'cancelled' | 'inactive'>('active')
     const [formCurrency, setFormCurrency] = useState('USD')
     const [formBrokerId, setFormBrokerId] = useState('')
+    const [formCustomerType, setFormCustomerType] = useState<'broker' | 'direct' | ''>('')
     const [brokerSearch, setBrokerSearch] = useState('')
     const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false)
     const [formNotes, setFormNotes] = useState('')
@@ -2350,6 +2351,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
         setFormStatus('active')
         setFormCurrency('USD')
         setFormBrokerId('')
+        setFormCustomerType('')
         setFormNotes('')
         setFormValues({})
 
@@ -2365,7 +2367,8 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
         setFormConditionId(p.conditionId || '')
         setFormStatus(p.status)
         setFormCurrency(p.currency)
-        setFormBrokerId(p.brokerEntityId || '')
+        setFormBrokerId(p.customerEntityId || p.brokerEntityId || '')
+        setFormCustomerType(p.customerType || (p.brokerEntityId ? 'broker' : ''))
         setFormNotes(p.notes || '')
         const vals: Record<string, any> = {}
         if (p.values) {
@@ -2389,7 +2392,10 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                 await window.api.updateVesselDynamicPolicy(editingPolicyId, {
                     policyNumber: formNumber, conditionId: formConditionId || undefined,
                     status: formStatus, currency: formCurrency,
-                    brokerEntityId: formBrokerId || undefined, notes: formNotes
+                    brokerEntityId: formBrokerId || undefined,
+                    customerEntityId: formBrokerId || undefined,
+                    customerType: formCustomerType || undefined,
+                    notes: formNotes
                 })
                 const vals = typeChars.map(c => ({
                     characteristicId: c.id,
@@ -2404,7 +2410,10 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                 const newId = await window.api.addVesselDynamicPolicy({
                     vesselId, policyTypeId: formTypeId, policyNumber: formNumber,
                     conditionId: formConditionId || undefined, status: formStatus,
-                    currency: formCurrency, brokerEntityId: formBrokerId || undefined, notes: formNotes
+                    currency: formCurrency, brokerEntityId: formBrokerId || undefined,
+                    customerEntityId: formBrokerId || undefined,
+                    customerType: formCustomerType || undefined,
+                    notes: formNotes
                 })
                 const vals = typeChars.map(c => ({
                     characteristicId: c.id,
@@ -2710,11 +2719,19 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                     </div>
                                 )}
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Broker</label>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Customer / Broker</label>
+                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                        {(['broker', 'direct'] as const).map(ct => (
+                                            <button key={ct} type="button" onClick={() => setFormCustomerType(ct)}
+                                                style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: formCustomerType === ct ? 600 : 400, border: formCustomerType === ct ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)', background: formCustomerType === ct ? 'rgba(0,170,200,0.1)' : 'transparent', color: formCustomerType === ct ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', textTransform: 'capitalize' }}>
+                                                {ct}
+                                            </button>
+                                        ))}
+                                    </div>
                                     <div style={{ position: 'relative' }}>
                                         <input
                                             type="text"
-                                            placeholder="Search broker..."
+                                            placeholder={formCustomerType === 'direct' ? 'Search customer...' : 'Search broker...'}
                                             value={brokerDropdownOpen ? brokerSearch : (entities.find(e => e.id === formBrokerId)?.name || '')}
                                             onFocus={() => { setBrokerDropdownOpen(true); setBrokerSearch('') }}
                                             onChange={e => setBrokerSearch(e.target.value)}
@@ -2724,15 +2741,15 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                         {brokerDropdownOpen && (
                                             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                                                 <div
-                                                    onMouseDown={() => { setFormBrokerId(''); setBrokerDropdownOpen(false); setBrokerSearch('') }}
+                                                    onMouseDown={() => { setFormBrokerId(''); setFormCustomerType(''); setBrokerDropdownOpen(false); setBrokerSearch('') }}
                                                     style={{ padding: '8px 12px', cursor: 'pointer', color: formBrokerId === '' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.9rem' }}
                                                 >
-                                                    Direct (No broker)
+                                                    None
                                                 </div>
                                                 {entities.filter(e => e.name.toLowerCase().includes(brokerSearch.toLowerCase())).map(e => (
                                                     <div
                                                         key={e.id}
-                                                        onMouseDown={() => { setFormBrokerId(e.id); setBrokerDropdownOpen(false); setBrokerSearch('') }}
+                                                        onMouseDown={() => { setFormBrokerId(e.id); if (!formCustomerType) setFormCustomerType('broker'); setBrokerDropdownOpen(false); setBrokerSearch('') }}
                                                         style={{ padding: '8px 12px', cursor: 'pointer', color: e.id === formBrokerId ? 'var(--accent-primary)' : 'var(--text-primary)', background: e.id === formBrokerId ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)') : 'transparent', fontSize: '0.9rem' }}
                                                     >
                                                         {e.name}

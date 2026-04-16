@@ -82,7 +82,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
         { id: 'name', label: 'Vessel Name', defaultVisible: true },
         { id: 'imo', label: 'IMO Number', defaultVisible: true },
         { id: 'sanctions', label: 'Sanctions', defaultVisible: true },
-        { id: 'customer', label: 'Customer', defaultVisible: true },
+        { id: 'customer', label: 'Customer (Legacy)', defaultVisible: false },
         { id: 'fleet', label: 'Fleet', defaultVisible: true },
         { id: 'actions', label: 'Actions', defaultVisible: true }
     ]

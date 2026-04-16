@@ -173,7 +173,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   useEffect(() => {
     if (isSearchActive) return
     const from = new Date(navYear, navMonth, 1)
-    const toEnd = new Date(navYear, navMonth + 2, 0) // last day of next month
+    const toEnd = new Date(navYear, navMonth + 1, 0) // last day of current month
     setDateFrom(from.toISOString().split('T')[0])
     setDateTo(toEnd.toISOString().split('T')[0])
   }, [navYear, navMonth, isSearchActive])
@@ -478,13 +478,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   }
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const navLabel = (() => {
-    const m1 = monthNames[navMonth]
-    const m2idx = (navMonth + 1) % 12
-    const m2 = monthNames[m2idx]
-    const y2 = navMonth === 11 ? navYear + 1 : navYear
-    return y2 !== navYear ? `${m1} ${navYear} – ${m2} ${y2}` : `${m1} – ${m2} ${navYear}`
-  })()
+  const navLabel = `${monthNames[navMonth]} ${navYear}`
 
   const hasActiveFilters =
     statusFilter !== 'all' ||
