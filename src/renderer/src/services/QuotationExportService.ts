@@ -3696,7 +3696,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       premContent.push(np('per annum'))
       premContent.push(emptyP())
-    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId) || data.piAlternatives.length > 1 || (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null))) {
+    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId) || data.piAlternatives.length > 1 || (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null)) || (data.lolOptions.length > 0 && data.lolOptions.some(o => o.premiumAmount != null))) {
       const wMultiAlt = data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId)
       const wPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
       const wPiMultiAlt = data.piAlternatives.length > 1
