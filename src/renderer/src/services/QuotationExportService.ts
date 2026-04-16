@@ -820,6 +820,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     }
     // Clean up double spaces and leading spaces from empty replacements
     liabilityText = liabilityText.replace(/  +/g, ' ').trim()
+    // Remove leading space on each line (from empty {currency} replacement)
+    liabilityText = liabilityText.split('\n').map(l => l.trimStart()).join('\n')
 
     // LOL option lines — alternatives at top, shared "all claims..." text below
     if (hasLolOptions) {
@@ -2480,7 +2482,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     const dCurDisplay = dHasLolOptions ? '' : cur
     if (data.quotation.limitOfLiabilityText) {
-      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', dCurDisplay).replace(/  +/g, ' ').trim()
+      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', dCurDisplay).replace(/  +/g, ' ').split('\n').map(l => l.trimStart()).join('\n').trim()
       liabContent.push(...injectSubLimits(cleaned))
     } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || dHasLolOptions)) {
       const lolText = st(data, 'limitOfLiabilityDefaultText')
