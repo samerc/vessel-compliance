@@ -781,7 +781,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
     // Build the amount string for the template
     let amountDisplay: string
-    if (hasLolOptions || piAltLol) {
+    if (hasLolOptions) {
+      amountDisplay = ''
+    } else if (piAltLol) {
       amountDisplay = 'values as per below'
     } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
@@ -808,23 +810,23 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       liabilityText = data.quotation.limitOfLiabilityText
         .replace('{amount}', amountDisplay)
         .replace('{currency}', cur)
-    } else if (st(data, 'limitOfLiabilityDefaultText') && baseAmt != null) {
+    } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || hasLolOptions)) {
       liabilityText = stripHtml(st(data, 'limitOfLiabilityDefaultText'))
         .replace('{amount}', amountDisplay)
         .replace('{currency}', cur)
-    } else if (baseAmt != null) {
+    } else if (baseAmt != null || hasLolOptions) {
       liabilityText = `${amountDisplay} all claims in the aggregate.`
     }
+    // Clean up double spaces from empty amount replacement
+    liabilityText = liabilityText.replace(/  +/g, ' ').trim()
 
-    // LOL option lines
+    // LOL option lines — alternatives at top, shared "all claims..." text below
     if (hasLolOptions) {
       const lolLines = data.lolOptions.map((opt, idx) => {
         const optCur = opt.currency || cur
-        return `${opt.label || `Alternative ${idx + 1}`}: ${formatCurrency(opt.amount, optCur)} all claims in the aggregate`
+        return `${opt.label || `Alternative ${idx + 1}`}: ${formatCurrency(opt.amount, optCur)}`
       })
-      if (lolLines.length > 0) {
-        liabilityText = lolLines.join('\n') + (liabilityText ? '\n\n' + liabilityText : '')
-      }
+      liabilityText = lolLines.join('\n') + '\n\n' + liabilityText.trim()
     }
 
     // Per-alternative LOL lines
@@ -2435,7 +2437,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     // Build the amount string for the template
     let amountDisplay: string
-    if (dHasLolOptions || dPiAltLol) {
+    if (dHasLolOptions) {
+      amountDisplay = ''
+    } else if (dPiAltLol) {
       amountDisplay = 'values as per below'
     } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
@@ -2464,26 +2468,26 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       if (parts[1]?.trim()) out.push(...mp(parts[1].trim()))
       return out
     }
-    if (data.quotation.limitOfLiabilityText) {
-      liabContent.push(...injectSubLimits(
-        data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', cur)
-      ))
-    } else if (st(data, 'limitOfLiabilityDefaultText') && baseAmt != null) {
-      const lolText = st(data, 'limitOfLiabilityDefaultText')
-        .replace('{amount}', amountDisplay)
-        .replace('{currency}', cur)
-      liabContent.push(...injectSubLimits(lolText))
-    } else if (baseAmt != null) {
-      liabContent.push(np(`${amountDisplay} all claims in the aggregate.`))
-    }
-
-    // LOL option lines
+    // LOL option lines — alternatives first, then shared text
     if (dHasLolOptions) {
       for (const opt of data.lolOptions) {
         const optCur = opt.currency || cur
-        liabContent.push(np(`${opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`}: ${formatCurrency(opt.amount, optCur)} all claims in the aggregate`))
+        liabContent.push(np(`${opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`}: ${formatCurrency(opt.amount, optCur)}`))
       }
       liabContent.push(emptyP())
+    }
+
+    if (data.quotation.limitOfLiabilityText) {
+      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', cur).replace(/  +/g, ' ').trim()
+      liabContent.push(...injectSubLimits(cleaned))
+    } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || dHasLolOptions)) {
+      const lolText = st(data, 'limitOfLiabilityDefaultText')
+        .replace('{amount}', amountDisplay)
+        .replace('{currency}', cur)
+        .replace(/  +/g, ' ').trim()
+      liabContent.push(...injectSubLimits(lolText))
+    } else if (baseAmt != null || dHasLolOptions) {
+      liabContent.push(np(`${amountDisplay} all claims in the aggregate.`.replace(/  +/g, ' ').trim()))
     }
 
     // Per-alternative LOL lines
