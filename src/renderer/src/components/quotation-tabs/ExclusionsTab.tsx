@@ -24,6 +24,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     const [importText, setImportText] = useState('')
     const [allClauses, setAllClauses] = useState<PIClause[]>([])
     const [selectedClauseIds, setSelectedClauseIds] = useState<Set<string>>(new Set())
+    const [vesselTypes, setVesselTypes] = useState<{ id: string; name: string }[]>([])
     const autoApplied = useRef(false)
     const dragExcRef = useRef<number | null>(null)
     const dragCustomRef = useRef<number | null>(null)
@@ -33,15 +34,17 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     useEffect(() => { loadData() }, [])
 
     const loadData = async () => {
-        const [all, qe, qv, ce, clauses, qClauses, vesselList] = await Promise.all([
+        const [all, qe, qv, ce, clauses, qClauses, vesselList, vTypes] = await Promise.all([
             window.api.piGetExclusions(),
             window.api.getQuotationExclusions(quotation.id),
             window.api.getQuotationVessels(quotation.id),
             window.api.getQuotationCustomExclusions(quotation.id),
             window.api.piGetClauses(),
             window.api.getQuotationClauses(quotation.id),
-            window.api.getVessels()
+            window.api.getVessels(),
+            window.api.getVesselTypes()
         ])
+        setVesselTypes(Array.isArray(vTypes) ? vTypes : [])
         const safeAll = Array.isArray(all) ? all : []
         setAllExclusions(safeAll)
         const safeQe = Array.isArray(qe) ? qe : []
@@ -241,7 +244,10 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                                     <span style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{e.text}</span>
                                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
                                         {e.isCargoRelated && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
-                                        {(e.vesselTypeIds || []).length > 0 && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(160, 100, 255, 0.12)', color: '#a064ff' }}>Vessel Type</span>}
+                                        {(e.vesselTypeIds || []).map(vtId => {
+                                            const vt = vesselTypes.find(t => t.id === vtId)
+                                            return vt ? <span key={vtId} style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(160, 100, 255, 0.12)', color: '#a064ff' }}>{vt.name}</span> : null
+                                        })}
                                     </div>
                                 </div>
                             </label>
