@@ -806,18 +806,19 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     }
 
     let liabilityText = ''
+    const curDisplay = hasLolOptions ? '' : cur
     if (data.quotation.limitOfLiabilityText) {
       liabilityText = data.quotation.limitOfLiabilityText
         .replace('{amount}', amountDisplay)
-        .replace('{currency}', cur)
+        .replace('{currency}', curDisplay)
     } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || hasLolOptions)) {
       liabilityText = stripHtml(st(data, 'limitOfLiabilityDefaultText'))
         .replace('{amount}', amountDisplay)
-        .replace('{currency}', cur)
+        .replace('{currency}', curDisplay)
     } else if (baseAmt != null || hasLolOptions) {
       liabilityText = `${amountDisplay} all claims in the aggregate.`
     }
-    // Clean up double spaces from empty amount replacement
+    // Clean up double spaces and leading spaces from empty replacements
     liabilityText = liabilityText.replace(/  +/g, ' ').trim()
 
     // LOL option lines — alternatives at top, shared "all claims..." text below
@@ -2477,13 +2478,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       liabContent.push(emptyP())
     }
 
+    const dCurDisplay = dHasLolOptions ? '' : cur
     if (data.quotation.limitOfLiabilityText) {
-      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', cur).replace(/  +/g, ' ').trim()
+      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', dCurDisplay).replace(/  +/g, ' ').trim()
       liabContent.push(...injectSubLimits(cleaned))
     } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || dHasLolOptions)) {
       const lolText = st(data, 'limitOfLiabilityDefaultText')
         .replace('{amount}', amountDisplay)
-        .replace('{currency}', cur)
+        .replace('{currency}', dCurDisplay)
         .replace(/  +/g, ' ').trim()
       liabContent.push(...injectSubLimits(lolText))
     } else if (baseAmt != null || dHasLolOptions) {
