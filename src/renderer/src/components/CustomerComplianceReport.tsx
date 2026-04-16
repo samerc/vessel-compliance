@@ -54,12 +54,20 @@ function buildVesselRow(
   allVesselDocs: any[],
   allAssureds: any[],
   allCustomDocTypes: any[],
+  relevantPolicyTypeIds?: string[],
 ): CustomerVesselRow {
   const vesselDocs = allVesselDocs.filter(d => d.vesselId === vessel.id)
   const customTypes = allCustomDocTypes.filter(t => t.vesselId === vessel.id)
 
+  // Filter doc types by policy type tags if we know which policy types are relevant
+  const isDocRelevant = (dt: any) => {
+    if (!relevantPolicyTypeIds || relevantPolicyTypeIds.length === 0) return true
+    if (!dt.policyTypeIds || dt.policyTypeIds.length === 0) return true // no tags = all types
+    return dt.policyTypeIds.some((ptId: string) => relevantPolicyTypeIds.includes(ptId))
+  }
+
   const allTypes = [
-    ...docTypes.map((t: any) => {
+    ...docTypes.filter(isDocRelevant).map((t: any) => {
       const d = vesselDocs.find((v: any) => v.documentTypeId === t.id)
       return { name: t.name, required: d ? d.required : t.required, doc: d }
     }),
@@ -104,18 +112,30 @@ export async function exportCustomerCompliancePDF(
   customerName: string,
   customerType: string | null,
 ): Promise<void> {
-  const [vesselsRaw, docTypesRaw, allVesselDocsRaw, allAssuredsRaw] = await Promise.all([
+  const [vesselsRaw, docTypesRaw, allVesselDocsRaw, allAssuredsRaw, policiesRaw] = await Promise.all([
     window.api.getVessels(),
     window.api.getDocumentTypes(),
     window.api.getVesselDocuments(),
     window.api.getVesselAssureds(),
+    window.api.getAllVesselDynamicPolicies(),
   ])
   const vessels = Array.isArray(vesselsRaw) ? vesselsRaw : []
   const docTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
   const allVesselDocs = Array.isArray(allVesselDocsRaw) ? allVesselDocsRaw : []
   const allAssureds = Array.isArray(allAssuredsRaw) ? allAssuredsRaw : []
+  const policies = Array.isArray(policiesRaw) ? policiesRaw : []
 
-  const customerVessels = vessels.filter(v => v.isActive && v.customerId === customerId)
+  // Find vessels where this customer has active policies
+  const vesselPolicyTypes = new Map<string, string[]>() // vesselId → policyTypeIds for this customer
+  for (const p of policies) {
+    if (p.status === 'active' && p.customerEntityId === customerId) {
+      const existing = vesselPolicyTypes.get(p.vesselId) || []
+      if (p.policyTypeId && !existing.includes(p.policyTypeId)) existing.push(p.policyTypeId)
+      vesselPolicyTypes.set(p.vesselId, existing)
+    }
+  }
+
+  const customerVessels = vessels.filter(v => v.isActive && vesselPolicyTypes.has(v.id))
   if (customerVessels.length === 0) return
 
   const customDocResults = await Promise.all(
@@ -124,7 +144,7 @@ export async function exportCustomerCompliancePDF(
   const allCustomDocTypes = customDocResults.filter(Array.isArray).flat()
 
   const vesselRows: CustomerVesselRow[] = customerVessels.map(vessel =>
-    buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes)
+    buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes, vesselPolicyTypes.get(vessel.id))
   )
 
   const s = await getReportSettings()
@@ -307,7 +327,11 @@ export default function CustomerComplianceReport() {
           })
         }
 
-        const row = buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes)
+        // Get policy types this customer covers for this vessel
+        const relevantPtIds = customerId
+          ? policies.filter(p => p.status === 'active' && p.customerEntityId === customerId && p.vesselId === vessel.id && p.policyTypeId).map(p => p.policyTypeId)
+          : undefined
+        const row = buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes, relevantPtIds as string[] | undefined)
         customerMap.get(groupKey)!.vessels.push(row)
         }
       }
