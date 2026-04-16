@@ -23,35 +23,50 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
     }
 
     const handleRateChange = (rate: number | undefined) => {
-        setQ(q => ({ ...q, premiumRate: rate }))
+        setQ(q => {
+            const updated = { ...q, premiumRate: rate }
+            if (rate && q.agreedValue) {
+                updated.premiumAmount = Math.round(q.agreedValue * rate / 1000 * 100) / 100
+            }
+            return updated
+        })
         updateField('premiumRate', rate ?? null)
         if (rate && quotation.agreedValue) {
             const premium = Math.round(quotation.agreedValue * rate / 1000 * 100) / 100
-            setQ(q => ({ ...q, premiumAmount: premium }))
             updateField('premiumAmount', premium)
         }
     }
 
     const handlePremiumChange = (premium: number | undefined) => {
-        setQ(q => ({ ...q, premiumAmount: premium }))
+        setQ(q => {
+            const updated = { ...q, premiumAmount: premium }
+            if (premium && q.agreedValue) {
+                updated.premiumRate = Math.round(premium / q.agreedValue * 1000 * 10000) / 10000
+            }
+            return updated
+        })
         updateField('premiumAmount', premium ?? null)
         if (premium && quotation.agreedValue) {
             const rate = Math.round(premium / quotation.agreedValue * 1000 * 10000) / 10000
-            setQ(q => ({ ...q, premiumRate: rate }))
             updateField('premiumRate', rate)
         }
     }
 
     const handleSumInsuredChange = (val: number | undefined) => {
-        setQ(q => ({ ...q, agreedValue: val }))
-        updateField('agreedValue', val ?? null)
         const rate = getEffectiveRate()
+        setQ(q => {
+            const updated = { ...q, agreedValue: val }
+            if (val && rate) {
+                updated.premiumAmount = Math.round(val * rate / 1000 * 100) / 100
+                if (q.premiumRate == null) updated.premiumRate = rate
+            }
+            return updated
+        })
+        updateField('agreedValue', val ?? null)
         if (val && rate) {
             const premium = Math.round(val * rate / 1000 * 100) / 100
-            setQ(q => ({ ...q, premiumAmount: premium }))
             updateField('premiumAmount', premium)
             if (quotation.premiumRate == null) {
-                setQ(q => ({ ...q, premiumRate: rate }))
                 updateField('premiumRate', rate)
             }
         }

@@ -130,6 +130,23 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 assuredsAdded = addIdx
             }
 
+            // Auto-copy customer from existing vessel policy of the same type
+            if (!quotation.customerEntityId && selectedVesselId) {
+                try {
+                    const dynPolicies = await window.api.getVesselDynamicPolicies(selectedVesselId)
+                    const matching = (Array.isArray(dynPolicies) ? dynPolicies : []).find(
+                        (p: any) => p.status === 'active' && p.policyTypeId === quotation.quotationTypeId && p.customerEntityId
+                    )
+                    if (matching) {
+                        await window.api.updateQuotation(quotation.id, {
+                            customerEntityId: matching.customerEntityId,
+                            customerType: matching.customerType,
+                            coName: matching.customerName
+                        } as any)
+                    }
+                } catch { /* non-critical */ }
+            }
+
             setSelectedVesselId('')
             setVesselSearch('')
             setNewData(EMPTY_NEW_VESSEL)
