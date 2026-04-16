@@ -595,6 +595,11 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
             {/* Header — Row 1: Identity + Badges + Actions */}
             <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '20px', overflow: 'visible' }}>
+                {q.quotationTypeName && (
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: isLight ? '#007a91' : '#00aac8', marginBottom: '10px' }}>
+                        {q.quotationTypeName} Quotation
+                    </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                     {/* Reference number */}
                     <input

@@ -7508,28 +7508,36 @@ export class MySQLAdapter {
         } as Quotation
     }
 
-    /** Find the lowest available DRAFT-XXXX number (fills gaps from deleted drafts) */
-    private async nextDraftRef(): Promise<string> {
-        if (!this.pool) return 'DRAFT-0001'
+    /** Find the lowest available DRAFT-{code}-XXXX number (fills gaps from deleted drafts) */
+    private async nextDraftRef(typeCode?: string): Promise<string> {
+        if (!this.pool) return typeCode ? `DRAFT-${typeCode}-0001` : 'DRAFT-0001'
+        const prefix = typeCode ? `DRAFT-${typeCode}-` : 'DRAFT-'
         const [draftRows] = await this.pool.query(
-            "SELECT reference_number FROM quotations WHERE reference_number LIKE 'DRAFT-%' ORDER BY reference_number ASC"
+            "SELECT reference_number FROM quotations WHERE reference_number LIKE ? ORDER BY reference_number ASC",
+            [`${prefix}%`]
         )
+        const regex = typeCode ? new RegExp(`^DRAFT-${typeCode}-(\\d+)$`) : /^DRAFT-(\d+)$/
         const usedNums = new Set((draftRows as any[]).map(r => {
-            const m = String(r.reference_number).match(/^DRAFT-(\d+)$/)
+            const m = String(r.reference_number).match(regex)
             return m ? parseInt(m[1], 10) : 0
         }))
         let seq = 1
         while (usedNums.has(seq)) seq++
-        return `DRAFT-${String(seq).padStart(4, '0')}`
+        return `${prefix}${String(seq).padStart(4, '0')}`
     }
 
     async addQuotation(q: Partial<Quotation>): Promise<Quotation> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        // Auto-generate draft reference: DRAFT-XXXX (reuse gaps from deleted drafts)
+        // Auto-generate draft reference: DRAFT-{code}-XXXX (reuse gaps from deleted drafts)
         let referenceNumber = q.referenceNumber || null
         if (!referenceNumber) {
-            referenceNumber = await this.nextDraftRef()
+            let typeCode: string | undefined
+            if (q.quotationTypeId) {
+                const [tcRows] = await this.pool.query('SELECT code FROM policy_types WHERE id = ?', [q.quotationTypeId])
+                typeCode = (tcRows as any[])[0]?.code || undefined
+            }
+            referenceNumber = await this.nextDraftRef(typeCode)
         }
         await this.pool.execute(`
             INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number)
@@ -7788,7 +7796,8 @@ export class MySQLAdapter {
         const refSeq = parseInt(parts[2], 10)
         if (isNaN(refSeq)) {
             // Can't parse — just set to draft
-            const newDraftRef = await this.nextDraftRef()
+            const [tcRow] = await this.pool.query('SELECT pt.code FROM quotations q JOIN policy_types pt ON q.quotation_type_id = pt.id WHERE q.id = ?', [quotationId]) as any[]
+            const newDraftRef = await this.nextDraftRef((tcRow as any[])[0]?.code)
             await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [newDraftRef, quotationId])
             return
         }
@@ -7802,7 +7811,8 @@ export class MySQLAdapter {
             await this.setSetting('real_quotation_seq', String(currentMax - 1))
         }
         // In all cases, revert to a new draft number
-        const newDraftRef = await this.nextDraftRef()
+        const [tcRow2] = await this.pool.query('SELECT pt.code FROM quotations q JOIN policy_types pt ON q.quotation_type_id = pt.id WHERE q.id = ?', [quotationId]) as any[]
+        const newDraftRef = await this.nextDraftRef((tcRow2 as any[])[0]?.code)
         await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [newDraftRef, quotationId])
     }
 
@@ -8048,7 +8058,7 @@ export class MySQLAdapter {
         let newRef: string
         const sourceRef = source.referenceNumber || ''
         if (sourceRef.startsWith('DRAFT-')) {
-            newRef = await this.nextDraftRef()
+            newRef = await this.nextDraftRef(source.quotationTypeCode)
         } else {
             const baseRef = sourceRef.replace(/-R\d+$/, '')
             newRef = `${baseRef}-R${newRevisionNumber}`
@@ -8157,7 +8167,7 @@ export class MySQLAdapter {
         const newId = uuidv4()
 
         // Auto-generate new draft reference number (fills gaps from deleted drafts)
-        const newRef = await this.nextDraftRef()
+        const newRef = await this.nextDraftRef(source.quotationTypeCode)
 
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
@@ -8225,7 +8235,7 @@ export class MySQLAdapter {
         const newId = uuidv4()
 
         // Auto-generate new draft reference number (fills gaps from deleted drafts)
-        const newRef = await this.nextDraftRef()
+        const newRef = await this.nextDraftRef(source.quotationTypeCode)
 
         // Calculate new period: add 1 year to inception/expiry
         const addOneYear = (dateStr: string): string => {
