@@ -3626,7 +3626,7 @@ export class MySQLAdapter {
         }
 
         if (params.customersOnly) {
-            conditions.push('(id IN (SELECT DISTINCT customer_id FROM vessels WHERE customer_id IS NOT NULL) OR id IN (SELECT DISTINCT broker_entity_id FROM vessel_dynamic_policies WHERE broker_entity_id IS NOT NULL))')
+            conditions.push('id IN (SELECT DISTINCT customer_entity_id FROM vessel_dynamic_policies WHERE customer_entity_id IS NOT NULL AND status = \'active\')')
         }
 
         if (conditions.length > 0) {
@@ -5913,12 +5913,12 @@ export class MySQLAdapter {
 
         if (criteria.customerIds && criteria.customerIds.length > 0) {
             const placeholders = criteria.customerIds.map(() => '?').join(',')
-            conditions.push(`v.customer_id IN (${placeholders})`)
+            conditions.push(`v.id IN (SELECT DISTINCT vdp_c.vessel_id FROM vessel_dynamic_policies vdp_c WHERE vdp_c.customer_entity_id IN (${placeholders}) AND vdp_c.status = 'active')`)
             params.push(...criteria.customerIds)
         }
 
         if (criteria.customerType && criteria.customerType !== 'both') {
-            conditions.push(`v.customer_type = ?`)
+            conditions.push(`v.id IN (SELECT DISTINCT vdp_ct.vessel_id FROM vessel_dynamic_policies vdp_ct WHERE vdp_ct.customer_type = ? AND vdp_ct.status = 'active')`)
             params.push(criteria.customerType)
         }
 
@@ -5948,7 +5948,7 @@ export class MySQLAdapter {
             ORDER BY e.name
         `, params)
 
-        // Also include customer entities (those assigned directly to vessels, not via vessel_assureds)
+        // Also include customer entities (those assigned as customers on active policies)
         const [customerRows] = await this.pool.query(`
             SELECT DISTINCT
                 e.id as entityId,
@@ -5958,20 +5958,21 @@ export class MySQLAdapter {
                 e.phone,
                 GROUP_CONCAT(DISTINCT v.name ORDER BY v.name SEPARATOR ', ') as vesselNames
             FROM entities e
-            INNER JOIN vessels v ON v.customer_id = e.id
+            INNER JOIN vessel_dynamic_policies vdp_q ON vdp_q.customer_entity_id = e.id AND vdp_q.status = 'active'
+            INNER JOIN vessels v ON v.id = vdp_q.vessel_id
             WHERE ${statusFilter} AND (${whereClause})
             GROUP BY e.id, e.name, e.type, e.email, e.phone
             ORDER BY e.name
         `, params)
 
-        // Build set of customer entity IDs and broker entity IDs
+        // Build set of customer entity IDs from active policies
         const customerEntityIds = new Set<string>()
         const brokerEntityIds = new Set<string>()
         try {
-            const [custRows] = await this.pool.query('SELECT DISTINCT customer_id FROM vessels WHERE customer_id IS NOT NULL')
-            for (const r of (custRows as any[])) customerEntityIds.add(r.customer_id)
-            const [brokerRows] = await this.pool.query('SELECT DISTINCT broker_entity_id FROM vessel_dynamic_policies WHERE broker_entity_id IS NOT NULL')
-            for (const r of (brokerRows as any[])) brokerEntityIds.add(r.broker_entity_id)
+            const [custRows] = await this.pool.query('SELECT DISTINCT customer_entity_id FROM vessel_dynamic_policies WHERE customer_entity_id IS NOT NULL AND status = \'active\'')
+            for (const r of (custRows as any[])) customerEntityIds.add(r.customer_entity_id)
+            const [brokerRows] = await this.pool.query('SELECT DISTINCT customer_entity_id FROM vessel_dynamic_policies WHERE customer_entity_id IS NOT NULL AND customer_type = \'broker\' AND status = \'active\'')
+            for (const r of (brokerRows as any[])) brokerEntityIds.add(r.customer_entity_id)
         } catch { /* tables may not exist yet */ }
 
         // Merge results, deduplicating by entityId
@@ -10440,7 +10441,7 @@ export class MySQLAdapter {
             `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
                     pt.name as policyTypeName, pt.id as policyTypeId, vdp.policy_number as policyNumber,
                     vpv.value_date as endDate,
-                    e.name as customerName, v.customer_type as customerType,
+                    ce.name as customerName, vdp.customer_type as customerType,
                     f.name as fleetName,
                     vdp.currency as currency,
                     vdp.renewal_status_id as renewalStatusId,
@@ -10457,7 +10458,7 @@ export class MySQLAdapter {
              JOIN policy_types pt ON vdp.policy_type_id = pt.id
              JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
              JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
-             LEFT JOIN entities e ON v.customer_id = e.id
+             LEFT JOIN entities ce ON vdp.customer_entity_id = ce.id
              LEFT JOIN fleets f ON v.fleet_id = f.id
              LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
              LEFT JOIN (
@@ -11303,7 +11304,7 @@ export class MySQLAdapter {
             params.push(...filters.fleetIds)
         }
         if (filters.customerIds?.length) {
-            conditions.push(`v.customer_id IN (${filters.customerIds.map(() => '?').join(',')})`)
+            conditions.push(`v.id IN (SELECT DISTINCT vdp_af.vessel_id FROM vessel_dynamic_policies vdp_af WHERE vdp_af.customer_entity_id IN (${filters.customerIds.map(() => '?').join(',')}) AND vdp_af.status = 'active')`)
             params.push(...filters.customerIds)
         }
         if (filters.flagStateIds?.length) {
