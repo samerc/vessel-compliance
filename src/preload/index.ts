@@ -162,7 +162,7 @@ const api = {
 
   // Policy Types
   getPolicyTypes: () => ipcRenderer.invoke('db:getPolicyTypes'),
-  addPolicyType: (name: string) => ipcRenderer.invoke('db:addPolicyType', name),
+  addPolicyType: (name: string, code?: string) => ipcRenderer.invoke('db:addPolicyType', name, code),
   updatePolicyType: (id: string, updates: any) => ipcRenderer.invoke('db:updatePolicyType', id, updates),
   deletePolicyType: (id: string) => ipcRenderer.invoke('db:deletePolicyType', id),
   reorderPolicyTypes: (orderedIds: string[]) => ipcRenderer.invoke('db:reorderPolicyTypes', orderedIds),

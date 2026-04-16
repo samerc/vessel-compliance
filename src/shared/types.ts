@@ -568,6 +568,7 @@ export interface VesselReminder {
 export interface PolicyType {
   id: string
   name: string
+  code?: string
   order: number
 }
 

@@ -1200,7 +1200,7 @@ app.whenReady().then(() => {
 
   // Policy Types
   safeHandle('db:getPolicyTypes', (event) => { requireSession(event); return db.getPolicyTypes() })
-  safeHandle('db:addPolicyType', async (event, name) => { await requirePermission(event, 'admin:settings'); return db.addPolicyType(name) })
+  safeHandle('db:addPolicyType', async (event, name, code) => { await requirePermission(event, 'admin:settings'); return db.addPolicyType(name, code) })
   safeHandle('db:updatePolicyType', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updatePolicyType(id, updates) })
   safeHandle('db:deletePolicyType', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deletePolicyType(id) })
   safeHandle('db:reorderPolicyTypes', async (event, orderedIds) => { await requirePermission(event, 'admin:settings'); return db.reorderPolicyTypes(orderedIds) })

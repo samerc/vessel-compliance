@@ -1547,6 +1547,48 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: Unify quotation_types into policy_types (add code column, seed missing types, migrate quotation_type_id)
+            {
+                const [ptCodeCol] = await this.pool.query("SHOW COLUMNS FROM policy_types LIKE 'code'") as any[]
+                if ((ptCodeCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE policy_types ADD COLUMN code VARCHAR(10) NULL')
+                }
+                // Map existing policy types to codes by name (case-insensitive)
+                const ptCodeMappings: Record<string, string> = { 'p&i': 'P', 'pi': 'P', 'protection and indemnity': 'P', 'hull': 'H', 'hull & machinery': 'H', 'h&m': 'H', 'hull and machinery': 'H', 'war': 'W', 'war risk': 'W' }
+                const [ptRows] = await this.pool.query('SELECT id, name, code FROM policy_types') as any[]
+                for (const pt of ptRows as any[]) {
+                    if (!pt.code) {
+                        const mappedCode = ptCodeMappings[pt.name.toLowerCase().trim()]
+                        if (mappedCode) {
+                            await this.pool.execute('UPDATE policy_types SET code = ? WHERE id = ?', [mappedCode, pt.id])
+                        }
+                    }
+                }
+                // Seed missing types from quotation_types that don't exist in policy_types
+                const [qtAll] = await this.pool.query('SELECT id, name, code, order_index FROM quotation_types') as any[]
+                const [ptAll] = await this.pool.query('SELECT id, name, code FROM policy_types') as any[]
+                const ptCodes = new Set((ptAll as any[]).map(r => r.code).filter(Boolean))
+                const [ptMaxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM policy_types') as any[]
+                let ptNextOrder = (ptMaxRow as any[])[0].nextOrder
+                for (const qt of qtAll as any[]) {
+                    if (qt.code && !ptCodes.has(qt.code)) {
+                        await this.pool.execute('INSERT INTO policy_types (id, name, code, order_index) VALUES (?, ?, ?, ?)',
+                            [uuidv4(), qt.name, qt.code, ptNextOrder++])
+                        ptCodes.add(qt.code)
+                    }
+                }
+                // Migrate quotation_type_id: remap from quotation_types IDs to policy_types IDs
+                const [ptFresh] = await this.pool.query('SELECT id, code FROM policy_types WHERE code IS NOT NULL') as any[]
+                const codeToNewId = new Map<string, string>()
+                for (const pt of ptFresh as any[]) codeToNewId.set(pt.code, pt.id)
+                for (const qt of qtAll as any[]) {
+                    const newId = codeToNewId.get(qt.code)
+                    if (newId && newId !== qt.id) {
+                        await this.pool.execute('UPDATE quotations SET quotation_type_id = ? WHERE quotation_type_id = ?', [newId, qt.id])
+                    }
+                }
+            }
+
             // Final collation normalization pass — catches any tables created or altered
             // during migration blocks above (must run after all CREATE/ALTER Table statements).
             // Each table is converted independently so one failure never blocks the rest.
@@ -2713,10 +2755,15 @@ export class MySQLAdapter {
                 }
             } catch {}
 
-            // Seed Cargo quotation type if not exists
+            // Seed Cargo type if not exists (now in policy_types, legacy quotation_types kept for migration)
             try {
-                const [existingCargo] = await this.pool.query("SELECT id FROM quotation_types WHERE code = 'C'") as any[]
+                const [existingCargo] = await this.pool.query("SELECT id FROM policy_types WHERE code = 'C'") as any[]
                 if ((existingCargo as any[]).length === 0) {
+                    await this.pool.query("INSERT INTO policy_types (id, name, code, order_index) VALUES (UUID(), 'Cargo', 'C', 5)")
+                }
+                // Also seed in quotation_types for migration compatibility
+                const [existingCargoQt] = await this.pool.query("SELECT id FROM quotation_types WHERE code = 'C'") as any[]
+                if ((existingCargoQt as any[]).length === 0) {
                     await this.pool.query("INSERT INTO quotation_types (id, name, code, order_index) VALUES (UUID(), 'Cargo', 'C', 5)")
                 }
             } catch {}
@@ -5725,24 +5772,28 @@ export class MySQLAdapter {
     // --- Policy Types ---
     async getPolicyTypes(): Promise<PolicyType[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, order_index as `order` FROM policy_types ORDER BY order_index ASC')
+        const [rows] = await this.pool.query('SELECT id, name, code, order_index as `order` FROM policy_types ORDER BY order_index ASC')
         return rows as PolicyType[]
     }
 
-    async addPolicyType(name: string): Promise<PolicyType> {
+    async addPolicyType(name: string, code?: string): Promise<PolicyType> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         const [maxRow]: any[] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM policy_types')
         const order = maxRow[0].nextOrder
-        await this.pool.execute('INSERT INTO policy_types (id, name, order_index) VALUES (?, ?, ?)', [id, name, order])
-        return { id, name, order }
+        await this.pool.execute('INSERT INTO policy_types (id, name, code, order_index) VALUES (?, ?, ?, ?)', [id, name, code || null, order])
+        return { id, name, code: code || undefined, order }
     }
 
-    async updatePolicyType(id: string, updates: { name?: string }): Promise<void> {
+    async updatePolicyType(id: string, updates: { name?: string; code?: string }): Promise<void> {
         if (!this.pool) return
-        if (updates.name !== undefined) {
-            await this.pool.execute('UPDATE policy_types SET name = ? WHERE id = ?', [updates.name, id])
-        }
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.code !== undefined) { fields.push('code = ?'); values.push(updates.code || null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE policy_types SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
     async deletePolicyType(id: string): Promise<void> {
@@ -6742,10 +6793,11 @@ export class MySQLAdapter {
 
     // ==================== Quotation Types ====================
 
+    // Quotation types are now unified with policy_types — these methods delegate to policy_types table
     async getQuotationTypes(): Promise<QuotationType[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, name, code, order_index as orderIndex, created_at as createdAt FROM quotation_types ORDER BY order_index ASC'
+            'SELECT id, name, code, order_index as orderIndex FROM policy_types WHERE code IS NOT NULL ORDER BY order_index ASC'
         )
         return rows as QuotationType[]
     }
@@ -6753,10 +6805,10 @@ export class MySQLAdapter {
     async addQuotationType(data: { name: string; code: string }): Promise<QuotationType> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_types') as any[]
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM policy_types') as any[]
         const orderIndex = maxRow[0].nextOrder
         await this.pool.execute(
-            'INSERT INTO quotation_types (id, name, code, order_index) VALUES (?, ?, ?, ?)',
+            'INSERT INTO policy_types (id, name, code, order_index) VALUES (?, ?, ?, ?)',
             [id, data.name, data.code, orderIndex]
         )
         return { id, name: data.name, code: data.code, orderIndex }
@@ -6770,18 +6822,18 @@ export class MySQLAdapter {
         if (updates.code !== undefined) { fields.push('code = ?'); values.push(updates.code) }
         if (fields.length === 0) return
         values.push(id)
-        await this.pool.execute(`UPDATE quotation_types SET ${fields.join(', ')} WHERE id = ?`, values)
+        await this.pool.execute(`UPDATE policy_types SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
     async deleteQuotationType(id: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('DELETE FROM quotation_types WHERE id = ?', [id])
+        await this.pool.execute('DELETE FROM policy_types WHERE id = ?', [id])
     }
 
     async reorderQuotationTypes(ids: string[]): Promise<void> {
         if (!this.pool) return
         for (let i = 0; i < ids.length; i++) {
-            await this.pool.execute('UPDATE quotation_types SET order_index = ? WHERE id = ?', [i, ids[i]])
+            await this.pool.execute('UPDATE policy_types SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
     }
 
@@ -6812,7 +6864,7 @@ export class MySQLAdapter {
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor
             FROM quotations q
-            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
             LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
             ORDER BY q.created_at DESC
@@ -6862,7 +6914,7 @@ export class MySQLAdapter {
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId,
                 qws.name as workflowStepName, qws.color as workflowStepColor
             FROM quotations q
-            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
             INNER JOIN quotation_vessels qv ON qv.quotation_id = q.id
             WHERE qv.vessel_id = ?
@@ -7041,7 +7093,7 @@ export class MySQLAdapter {
         // Main query with vessel name subquery
         const baseQuery = `
             FROM quotations q
-            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
             LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
             LEFT JOIN (
@@ -7298,7 +7350,7 @@ export class MySQLAdapter {
                 q.cargo_clause_id as cargoClauseId,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
-            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
             LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
             WHERE q.id = ?
@@ -7605,7 +7657,7 @@ export class MySQLAdapter {
         // Get type code
         let typeCode = '?'
         if (row.quotation_type_id) {
-            const [typeRow] = await this.pool.query('SELECT code FROM quotation_types WHERE id = ?', [row.quotation_type_id])
+            const [typeRow] = await this.pool.query('SELECT code FROM policy_types WHERE id = ?', [row.quotation_type_id])
             typeCode = (typeRow as any[])[0]?.code || '?'
         }
 
@@ -7674,7 +7726,7 @@ export class MySQLAdapter {
         if (row.quotation_id) {
             const [qRows] = await this.pool.query(
                 `SELECT qt.code FROM quotations q
-                 JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                 JOIN policy_types qt ON q.quotation_type_id = qt.id
                  WHERE q.id = ?`, [row.quotation_id]
             )
             typeCode = (qRows as any[])[0]?.code || 'P'
@@ -8408,7 +8460,7 @@ export class MySQLAdapter {
                 q.status, q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
                 q.created_at as createdAt
             FROM quotations q
-            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
             WHERE q.revision_group_id = ?
             ORDER BY q.revision_number DESC
         `, [revisionGroupId])
@@ -9726,7 +9778,7 @@ export class MySQLAdapter {
              LEFT JOIN vessels v ON pd.vessel_id = v.id
              LEFT JOIN entities e ON v.customer_id = e.id
              LEFT JOIN quotations q ON pd.quotation_id = q.id
-             LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+             LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
              LEFT JOIN banks b ON pd.bank_id = b.id
              WHERE pd.revision_number = (
                 SELECT MAX(pd2.revision_number) FROM policy_documents pd2
@@ -9747,7 +9799,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(`
             SELECT pd.id FROM policy_documents pd
             JOIN quotations q ON pd.quotation_id = q.id
-            JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            JOIN policy_types qt ON q.quotation_type_id = qt.id
             WHERE pd.vessel_id = ? AND qt.code = ? AND pd.status = 'active'
             ORDER BY pd.created_at DESC LIMIT 1
         `, [vesselId, quotationTypeCode])
@@ -9769,7 +9821,7 @@ export class MySQLAdapter {
                    signer.username as signedByName
             FROM policy_documents pd
             LEFT JOIN quotations q ON pd.quotation_id = q.id
-            LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN vessels v ON pd.vessel_id = v.id
             LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
             LEFT JOIN entities e ON v.customer_id = e.id
@@ -12073,7 +12125,7 @@ export class MySQLAdapter {
                         q.quotation_date AS quotationDate,
                         qt.name AS quotationTypeName, qt.code AS quotationTypeCode
                  FROM quotations q
-                 LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                 LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
                  WHERE q.revision_number = (
                      SELECT MAX(q2.revision_number) FROM quotations q2
                      WHERE q2.revision_group_id = q.revision_group_id
@@ -12683,7 +12735,7 @@ export class MySQLAdapter {
             },
             quotations: {
                 baseQuery: `FROM quotations q
-                    LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                    LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
                     LEFT JOIN (
                         SELECT qv.quotation_id,
                                GROUP_CONCAT(COALESCE(v2.name, qv.name) SEPARATOR ', ') AS vesselNames
@@ -12722,7 +12774,7 @@ export class MySQLAdapter {
                 baseQuery: `FROM policy_documents pd
                     LEFT JOIN vessels v ON pd.vessel_id = v.id
                     LEFT JOIN quotations q ON pd.quotation_id = q.id
-                    LEFT JOIN quotation_types qt ON q.quotation_type_id = qt.id
+                    LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
                     LEFT JOIN entities e ON v.customer_id = e.id
                     LEFT JOIN banks b ON pd.bank_id = b.id`,
                 columnMap: {

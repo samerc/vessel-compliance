@@ -155,8 +155,8 @@ export interface Api {
 
   // Policy Types
   getPolicyTypes: () => Promise<PolicyType[]>
-  addPolicyType: (name: string) => Promise<PolicyType>
-  updatePolicyType: (id: string, updates: { name?: string }) => Promise<void>
+  addPolicyType: (name: string, code?: string) => Promise<PolicyType>
+  updatePolicyType: (id: string, updates: { name?: string; code?: string }) => Promise<void>
   deletePolicyType: (id: string) => Promise<void>
   reorderPolicyTypes: (orderedIds: string[]) => Promise<void>
 
