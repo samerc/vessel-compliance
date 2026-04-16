@@ -5256,7 +5256,7 @@ export class MySQLAdapter {
                 sw.condition_survey_id as conditionSurveyId,
                 sw.created_at as createdAt,
                 v.name as vesselName, v.imo_number as imoNumber,
-                e.name as customerName,
+                COALESCE(ce.name, e.name) as customerName,
                 f.name as fleetName,
                 pt.name as policyTypeName,
                 (SELECT COUNT(*) FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id) as reminderCount,
@@ -5264,9 +5264,10 @@ export class MySQLAdapter {
                 (SELECT swr3.next_reminder_date FROM survey_warranty_reminders swr3 WHERE swr3.warranty_id = sw.id ORDER BY swr3.created_at DESC LIMIT 1) as nextReminderDate
             FROM survey_warranties sw
             JOIN vessels v ON v.id = sw.vessel_id
+            LEFT JOIN vessel_dynamic_policies vdp ON vdp.id = sw.policy_id
+            LEFT JOIN entities ce ON ce.id = vdp.customer_entity_id
             LEFT JOIN entities e ON e.id = v.customer_id
             LEFT JOIN fleets f ON f.id = v.fleet_id
-            LEFT JOIN vessel_dynamic_policies vdp ON vdp.id = sw.policy_id
             LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
             ORDER BY sw.inception_date ASC
         `)
@@ -9848,7 +9849,7 @@ export class MySQLAdapter {
                     pd.created_at as createdAt,
                     pd.exported_at as exportedAt,
                     v.name as vesselName, v.imo_number as imoNumber,
-                    e.name as customerName,
+                    COALESCE(q.co_name, e.name) as customerName,
                     qt.code as quotationTypeCode, qt.name as quotationTypeName,
                     qt.id as policyTypeId, qt.name as policyTypeName,
                     b.name as brokerName
@@ -9890,9 +9891,9 @@ export class MySQLAdapter {
             SELECT pd.*, qt.code as quotationTypeCode, qt.name as quotationTypeName,
                    v.name as vesselName, v.imo_number as imoNumber, v.vessel_type as vesselType,
                    v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage,
-                   v.classification_society as classificationSociety, v.fleet_id as fleetId, v.customer_type as customerType, v.call_sign as callSign,
+                   v.classification_society as classificationSociety, v.fleet_id as fleetId, v.call_sign as callSign,
                    fs.name as flagStateName, fs.iso3_code as flagIso3Code,
-                   e.name as customerName,
+                   COALESCE(q.co_name, e.name) as customerName,
                    b.name as bankName, b.details as bankDetails,
                    f.name as fleetName,
                    u.username as createdByName,
@@ -10516,7 +10517,7 @@ export class MySQLAdapter {
                     vdp.status, vdp.renewal_status_id as renewalStatusId,
                     rst.name as renewalStatusName, rst.color as renewalStatusColor,
                     vpv.value_date as endDate,
-                    e.name as customerName, v.customer_type as customerType,
+                    ce.name as customerName, vdp.customer_type as customerType,
                     f.name as fleetName,
                     vdp.currency as currency,
                     (SELECT vpv2.value_amount FROM vessel_policy_values vpv2
@@ -10529,7 +10530,7 @@ export class MySQLAdapter {
              JOIN policy_types pt ON vdp.policy_type_id = pt.id
              JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
              JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
-             LEFT JOIN entities e ON v.customer_id = e.id
+             LEFT JOIN entities ce ON vdp.customer_entity_id = ce.id
              LEFT JOIN fleets f ON v.fleet_id = f.id
              LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
              WHERE v.is_active = TRUE AND vdp.status = 'active'
