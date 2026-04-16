@@ -114,6 +114,8 @@ interface QuotationData {
   cargoConditionCustom: QuotationCargoCustomClause[]
   cargoSpecialCustom: QuotationCargoCustomClause[]
   cargoLawCustom: QuotationCargoCustomClause[]
+  // LOL alternatives
+  lolOptions: { id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]
   // Resolved classification names per vessel ID (from junction table)
   vesselClassificationNames: Record<string, string>
 }
@@ -210,6 +212,11 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   // Fetch PI alternatives
   const piAlternativesRaw = quotation.quotationTypeCode === 'P'
     ? await window.api.piGetQuotationAlternatives(quotation.id)
+    : []
+
+  // Fetch LOL options
+  const lolOptionsRaw = quotation.quotationTypeCode === 'P'
+    ? await window.api.lolGetOptions(quotation.id).catch(() => [])
     : []
 
   // Fetch agreed value options
@@ -319,6 +326,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     selectedWarrantyIds, warrantyVesselScopes, warrantyAltIds,
     allWarranties: resolvedAllWarranties,
     piAlternatives: Array.isArray(piAlternativesRaw) ? piAlternativesRaw : [],
+    lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
     customWarranties,
     deductibles, textDeductibles,
     selectedExclusions,
@@ -760,8 +768,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const lolVA = data.quotation.limitOfLiabilityVesselAmounts
     const multiVessel = data.quotationVessels.length >= 2
 
-    // Per-alternative LOL (P&I with 2+ alternatives)
-    const piAltLol = data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
+    // Per-alternative LOL (P&I with 2+ alternatives) or LOL options
+    const hasLolOptions = data.lolOptions.length > 0
+    const piAltLol = !hasLolOptions && data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
 
     // Determine if per-vessel amounts differ
     let hasDifferentLol = false
@@ -772,7 +781,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
     // Build the amount string for the template
     let amountDisplay: string
-    if (piAltLol) {
+    if (hasLolOptions || piAltLol) {
       amountDisplay = 'values as per below'
     } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
@@ -805,6 +814,17 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         .replace('{currency}', cur)
     } else if (baseAmt != null) {
       liabilityText = `${amountDisplay} all claims in the aggregate.`
+    }
+
+    // LOL option lines
+    if (hasLolOptions) {
+      const lolLines = data.lolOptions.map((opt, idx) => {
+        const optCur = opt.currency || cur
+        return `${opt.label || `Alternative ${idx + 1}`}: ${formatCurrency(opt.amount, optCur)} all claims in the aggregate`
+      })
+      if (lolLines.length > 0) {
+        liabilityText = lolLines.join('\n') + (liabilityText ? '\n\n' + liabilityText : '')
+      }
     }
 
     // Per-alternative LOL lines
@@ -1699,6 +1719,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const alt = data.piAlternatives[ai]
         pdfPremLines.push({ label: alt.label || `Alternative ${ai + 1}`, tech: alt.premiumAmount || 0 })
       }
+    } else if (data.lolOptions.length > 0 && data.lolOptions.some(o => o.premiumAmount != null)) {
+      for (const opt of data.lolOptions) {
+        pdfPremLines.push({ label: opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`, tech: opt.premiumAmount || 0 })
+      }
     } else if (q.premiumAmount != null || hullMultiAlt || (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null))) {
       if (hullMultiAlt) {
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
@@ -2336,8 +2360,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       imo:   Math.round(BODY_W * 0.13),
       built: Math.round(BODY_W * 0.09),
       gt:    Math.round(BODY_W * 0.10),
-      flag:  Math.round(BODY_W * 0.08),
-      type:  Math.round(BODY_W * 0.13),
+      flag:  Math.round(BODY_W * 0.11),
+      type:  Math.round(BODY_W * 0.10),
     }
     const vClassW = BODY_W - (showVesselLabel ? vW.label : 0) - vW.name - vW.imo - vW.built - vW.gt - vW.flag - vW.type
     const vColWidths = showVesselLabel
@@ -2387,12 +2411,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const lolVA = data.quotation.limitOfLiabilityVesselAmounts
     const multiVessel = data.quotationVessels.length >= 2
 
-    // Per-alternative LOL (P&I with 2+ alternatives)
-    const dPiAltLol = data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
+    // Per-alternative LOL (P&I with 2+ alternatives) or LOL options
+    const dHasLolOptions = data.lolOptions.length > 0
+    const dPiAltLol = !dHasLolOptions && data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
 
     // Determine if per-vessel amounts differ
     let hasDifferentLol = false
-    if (!dPiAltLol && multiVessel && lolVA && Object.keys(lolVA).length > 0) {
+    if (!dPiAltLol && !dHasLolOptions && multiVessel && lolVA && Object.keys(lolVA).length > 0) {
       const amounts = data.quotationVessels.map(qv => lolVA[qv.id] ?? baseAmt)
       hasDifferentLol = amounts.some(a => a !== amounts[0])
     }
@@ -2410,7 +2435,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     // Build the amount string for the template
     let amountDisplay: string
-    if (dPiAltLol) {
+    if (dHasLolOptions || dPiAltLol) {
       amountDisplay = 'values as per below'
     } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
@@ -2450,6 +2475,15 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       liabContent.push(...injectSubLimits(lolText))
     } else if (baseAmt != null) {
       liabContent.push(np(`${amountDisplay} all claims in the aggregate.`))
+    }
+
+    // LOL option lines
+    if (dHasLolOptions) {
+      for (const opt of data.lolOptions) {
+        const optCur = opt.currency || cur
+        liabContent.push(np(`${opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`}: ${formatCurrency(opt.amount, optCur)} all claims in the aggregate`))
+      }
+      liabContent.push(emptyP())
     }
 
     // Per-alternative LOL lines
@@ -3689,6 +3723,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         for (let ai = 0; ai < data.piAlternatives.length; ai++) {
           const alt = data.piAlternatives[ai]
           lines.push({ label: alt.label || `Alternative ${ai + 1}`, tech: alt.premiumAmount || 0 })
+        }
+      } else if (data.lolOptions.length > 0 && data.lolOptions.some(o => o.premiumAmount != null)) {
+        for (const opt of data.lolOptions) {
+          lines.push({ label: opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`, tech: opt.premiumAmount || 0 })
         }
       } else if (wMultiAlt) {
         for (let ai = 0; ai < data.hullAlternatives.length; ai++) {
