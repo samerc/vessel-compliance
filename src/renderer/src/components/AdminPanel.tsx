@@ -1465,13 +1465,16 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     {policyTypes.length > 0 && (
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px', marginBottom: '8px' }}>
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Policy Types:</span>
+                            <button type="button" onClick={() => setNewDocPolicyTypeIds([])}
+                                style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', border: newDocPolicyTypeIds.length === 0 ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newDocPolicyTypeIds.length === 0 ? 'rgba(0,170,200,0.08)' : 'transparent', color: newDocPolicyTypeIds.length === 0 ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: newDocPolicyTypeIds.length === 0 ? 600 : 400 }}>
+                                All
+                            </button>
                             {policyTypes.filter(pt => pt.code).map(pt => (
                                 <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', border: newDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newDocPolicyTypeIds.includes(pt.id) ? 'rgba(0,170,200,0.08)' : 'transparent', color: newDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                     <input type="checkbox" checked={newDocPolicyTypeIds.includes(pt.id)} onChange={e => { if (e.target.checked) setNewDocPolicyTypeIds(prev => [...prev, pt.id]); else setNewDocPolicyTypeIds(prev => prev.filter(id => id !== pt.id)) }} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
                                     {pt.name}
                                 </label>
                             ))}
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>(empty = all types)</span>
                         </div>
                     )}
                 </form>
@@ -1530,6 +1533,10 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                     {policyTypes.filter(pt => pt.code).length > 0 && (
                                                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                                                             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Policy Types:</span>
+                                                            <button type="button" onClick={() => setEditDocPolicyTypeIds([])}
+                                                                style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', border: editDocPolicyTypeIds.length === 0 ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editDocPolicyTypeIds.length === 0 ? 'rgba(0,170,200,0.08)' : 'transparent', color: editDocPolicyTypeIds.length === 0 ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: editDocPolicyTypeIds.length === 0 ? 600 : 400 }}>
+                                                                All
+                                                            </button>
                                                             {policyTypes.filter(pt => pt.code).map(pt => (
                                                                 <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', fontSize: '0.75rem', padding: '1px 6px', borderRadius: '4px', border: editDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editDocPolicyTypeIds.includes(pt.id) ? 'rgba(0,170,200,0.08)' : 'transparent', color: editDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                                                     <input type="checkbox" checked={editDocPolicyTypeIds.includes(pt.id)} onChange={e => { if (e.target.checked) setEditDocPolicyTypeIds(prev => [...prev, pt.id]); else setEditDocPolicyTypeIds(prev => prev.filter(id => id !== pt.id)) }} style={{ width: '12px', height: '12px', accentColor: 'var(--accent-primary)' }} />
@@ -1547,14 +1554,15 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                 <div onClick={() => startEditingDoc(doc)} style={{ cursor: 'pointer' }}>
                                                     <div style={{ fontWeight: '600' }}>{doc.name}</div>
                                                     {doc.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{doc.description}</div>}
-                                                    {doc.policyTypeIds && doc.policyTypeIds.length > 0 && (
-                                                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                                            {doc.policyTypeIds.map(ptId => {
+                                                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                                        {(!doc.policyTypeIds || doc.policyTypeIds.length === 0)
+                                                            ? <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(0,200,100,0.1)', color: '#00c864' }}>All Types</span>
+                                                            : doc.policyTypeIds.map(ptId => {
                                                                 const pt = policyTypes.find(p => p.id === ptId)
                                                                 return pt ? <span key={ptId} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>{pt.name}</span> : null
-                                                            })}
-                                                        </div>
-                                                    )}
+                                                            })
+                                                        }
+                                                    </div>
                                                 </div>
                                             )}
                                         </td>
