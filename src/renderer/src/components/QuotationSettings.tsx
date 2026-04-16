@@ -23,7 +23,6 @@ const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
 
 const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; icon: any }[]> = {
     general: [
-        { id: 'quotationTypes', label: 'Quotation Types', icon: <Tag size={15} /> },
         { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
         { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
@@ -63,7 +62,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
 
 export default function QuotationSettings() {
     const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general')
-    const [activeTab, setActiveTab] = useState<SettingsTab>('quotationTypes')
+    const [activeTab, setActiveTab] = useState<SettingsTab>('subjectivities')
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()

@@ -286,6 +286,26 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 currentCount++
             }
 
+            // Auto-copy customer from fleet's most common policy customer
+            if (!quotation.customerEntityId) {
+                try {
+                    const allDynPolicies = await window.api.getAllVesselDynamicPolicies()
+                    const fleetVesselIds = new Set(newVessels.map(v => v.id))
+                    const customerCounts = new Map<string, { count: number; name: string; type: string | null }>()
+                    for (const p of (Array.isArray(allDynPolicies) ? allDynPolicies : [])) {
+                        if (p.status === 'active' && p.customerEntityId && fleetVesselIds.has(p.vesselId) && (!quotation.quotationTypeId || p.policyTypeId === quotation.quotationTypeId)) {
+                            const existing = customerCounts.get(p.customerEntityId) || { count: 0, name: p.customerName || '', type: p.customerType || null }
+                            existing.count++
+                            customerCounts.set(p.customerEntityId, existing)
+                        }
+                    }
+                    if (customerCounts.size > 0) {
+                        const [topId, top] = [...customerCounts.entries()].sort((a, b) => b[1].count - a[1].count)[0]
+                        await window.api.updateQuotation(quotation.id, { customerEntityId: topId, customerType: top.type, coName: top.name } as any)
+                    }
+                } catch { /* non-critical */ }
+            }
+
             setShowAddForm(false)
             setFleetSearch('')
             showSuccess(`Added ${newVessels.length} vessel${newVessels.length > 1 ? 's' : ''} from ${fleet.name}${totalAssuredsAdded > 0 ? ` — ${totalAssuredsAdded} assured(s) loaded` : ''}`)

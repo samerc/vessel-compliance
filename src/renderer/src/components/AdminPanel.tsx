@@ -61,8 +61,10 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
     const [newPolicyType, setNewPolicyType] = useState('')
+    const [newPolicyTypeCode, setNewPolicyTypeCode] = useState('')
     const [editingPolicyTypeId, setEditingPolicyTypeId] = useState<string | null>(null)
     const [editPolicyTypeName, setEditPolicyTypeName] = useState('')
+    const [editPolicyTypeCode, setEditPolicyTypeCode] = useState('')
 
     // Classification Societies
     const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
@@ -692,8 +694,9 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const handleAddPolicyType = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newPolicyType.trim()) return
-        await window.api.addPolicyType(newPolicyType.trim())
+        await window.api.addPolicyType(newPolicyType.trim(), newPolicyTypeCode.trim() || undefined)
         setNewPolicyType('')
+        setNewPolicyTypeCode('')
         loadPolicyTypes()
         showSuccess('Policy type added')
     }
@@ -708,11 +711,12 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const startEditingPolicyType = (pt: PolicyType) => {
         setEditingPolicyTypeId(pt.id)
         setEditPolicyTypeName(pt.name)
+        setEditPolicyTypeCode(pt.code || '')
     }
 
     const savePolicyTypeEdit = async (id: string) => {
         if (!editPolicyTypeName.trim()) return
-        await window.api.updatePolicyType(id, { name: editPolicyTypeName.trim() })
+        await window.api.updatePolicyType(id, { name: editPolicyTypeName.trim(), code: editPolicyTypeCode.trim() || undefined })
         setEditingPolicyTypeId(null)
         loadPolicyTypes()
         showSuccess('Policy type updated')
@@ -2798,7 +2802,16 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
                         Define policy types that can be assigned to vessels. Used by the Dynamic Address Book for building distribution lists.
                     </p>
-                    <form onSubmit={handleAddPolicyType} style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                    <form onSubmit={handleAddPolicyType} style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center' }}>
+                        <input
+                            type="text"
+                            value={newPolicyTypeCode}
+                            onChange={e => setNewPolicyTypeCode(e.target.value.toUpperCase())}
+                            style={{ width: '60px', textAlign: 'center', fontWeight: 700 }}
+                            placeholder="Code"
+                            maxLength={5}
+                            aria-label="Policy type code"
+                        />
                         <input
                             type="text"
                             value={newPolicyType}
@@ -2828,12 +2841,16 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                         <div style={{ flex: 1 }}>
                                             {editingPolicyTypeId === pt.id ? (
                                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <input type="text" value={editPolicyTypeCode} onChange={e => setEditPolicyTypeCode(e.target.value)} placeholder="Code" style={{ width: '50px', textAlign: 'center', fontWeight: 700 }} aria-label="Policy type code" />
                                                     <input type="text" value={editPolicyTypeName} onChange={e => setEditPolicyTypeName(e.target.value)} onKeyDown={e => e.key === 'Enter' && savePolicyTypeEdit(pt.id)} autoFocus style={{ flex: 1 }} aria-label="Edit policy type name" />
                                                     <button onClick={() => savePolicyTypeEdit(pt.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Save</button>
                                                     <button onClick={() => setEditingPolicyTypeId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Cancel</button>
                                                 </div>
                                             ) : (
-                                                <span onClick={() => toggleExpandPolicyType(pt.id)} style={{ cursor: 'pointer', fontWeight: '600' }}>{pt.name}</span>
+                                                <span onClick={() => toggleExpandPolicyType(pt.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {pt.code && <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,170,200,0.12)', color: 'var(--accent-primary)' }}>{pt.code}</span>}
+                                                    <span style={{ fontWeight: '600' }}>{pt.name}</span>
+                                                </span>
                                             )}
                                         </div>
                                         {expandedPolicyTypeId !== pt.id && (

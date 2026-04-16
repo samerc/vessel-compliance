@@ -1152,6 +1152,12 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('quotation customer_entity_id migration:', e) }
 
+            // Repeatable sync: ensure all policies with broker have customer_entity_id set
+            try {
+                await this.pool.query("UPDATE vessel_dynamic_policies SET customer_entity_id = broker_entity_id, customer_type = 'broker' WHERE broker_entity_id IS NOT NULL AND customer_entity_id IS NULL")
+                await this.pool.query(`UPDATE vessel_dynamic_policies vdp JOIN vessels v ON vdp.vessel_id = v.id SET vdp.customer_entity_id = v.customer_id, vdp.customer_type = COALESCE(v.customer_type, 'direct') WHERE v.customer_id IS NOT NULL AND vdp.customer_entity_id IS NULL`)
+            } catch { /* non-critical sync */ }
+
             // Migration: Add description to vessel_types
             try {
                 const [vtDescCols] = await this.pool.query("SHOW COLUMNS FROM vessel_types LIKE 'description'")
@@ -4848,7 +4854,9 @@ export class MySQLAdapter {
     async getDataQualityAlerts(): Promise<{ vesselsNoCustomer: number; entitiesNoEmail: number; entitiesNoPhone: number; policiesNoEndDate: number }> {
         if (!this.pool) return { vesselsNoCustomer: 0, entitiesNoEmail: 0, entitiesNoPhone: 0, policiesNoEndDate: 0 }
         const [[r1]] = await this.pool.query(
-            'SELECT COUNT(*) as cnt FROM vessels WHERE is_active = TRUE AND customer_id IS NULL'
+            `SELECT COUNT(*) as cnt FROM vessels v WHERE v.is_active = TRUE AND NOT EXISTS (
+                SELECT 1 FROM vessel_dynamic_policies vdp WHERE vdp.vessel_id = v.id AND vdp.status = 'active' AND vdp.customer_entity_id IS NOT NULL
+            )`
         ) as any
         const [[r2]] = await this.pool.query(
             "SELECT COUNT(*) as cnt FROM entities WHERE email IS NULL OR email = ''"
@@ -7152,7 +7160,7 @@ export class MySQLAdapter {
         } else if (params.viewFilter === 'drafts') {
             conditions.push("q.reference_number LIKE 'DRAFT-%'")
         } else if (params.viewFilter === 'active') {
-            conditions.push("q.status != 'converted'")
+            conditions.push("q.status NOT IN ('converted', 'rejected')")
         } else if (params.viewFilter === 'converted') {
             conditions.push("q.status = 'converted'")
         } else if (params.registryOnly) {
