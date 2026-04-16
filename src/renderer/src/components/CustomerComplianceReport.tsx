@@ -551,6 +551,8 @@ export default function CustomerComplianceReport() {
       const vessels = await window.api.getVessels()
       const docTypesRaw = await window.api.getDocumentTypes()
       const safeDocTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
+      const policiesRaw = await window.api.getAllVesselDynamicPolicies()
+      const allPolicies = Array.isArray(policiesRaw) ? policiesRaw : []
       let failed = 0
       for (let i = 0; i < selected.length; i++) {
         const sv = selected[i]
@@ -558,8 +560,18 @@ export default function CustomerComplianceReport() {
         try {
           const vessel = (Array.isArray(vessels) ? vessels : []).find((v: any) => v.id === sv.vesselId)
           if (!vessel) { failed++; continue }
+          // Filter doc types by customer's policy types for this vessel
+          let filteredDocTypes = safeDocTypes
+          if (selectedCustomerId && selectedCustomerId !== 'all') {
+            const vesselPtIds = allPolicies
+              .filter(p => p.status === 'active' && p.customerEntityId === selectedCustomerId && p.vesselId === vessel.id && p.policyTypeId)
+              .map(p => p.policyTypeId)
+            if (vesselPtIds.length > 0) {
+              filteredDocTypes = safeDocTypes.filter(dt => !dt.policyTypeIds || dt.policyTypeIds.length === 0 || dt.policyTypeIds.some((ptId: string) => vesselPtIds.includes(ptId)))
+            }
+          }
           const vDocs = await window.api.getVesselDocuments(vessel.id)
-          const bytes = await ReportService.exportVesselToPDF(vessel, safeDocTypes, Array.isArray(vDocs) ? vDocs : [], { returnBytes: true })
+          const bytes = await ReportService.exportVesselToPDF(vessel, filteredDocTypes, Array.isArray(vDocs) ? vDocs : [], { returnBytes: true })
           zip.file(`${vessel.name}_Compliance_Report.pdf`, bytes as Uint8Array)
         } catch { failed++ }
       }
@@ -613,6 +625,10 @@ export default function CustomerComplianceReport() {
       const customerName = selectedCustomerId === 'all' ? 'All Customers' : (customers.find(c => c.id === selectedCustomerId)?.name || 'Customer')
       const lines: string[] = [`${customerName} — Missing Documents`, '']
 
+      // Load policies for policy-type filtering
+      const copyPoliciesRaw = await window.api.getAllVesselDynamicPolicies()
+      const copyPolicies = Array.isArray(copyPoliciesRaw) ? copyPoliciesRaw : []
+
       const { resolveEffectivePolicyExpiry } = await import('../utils/policyUtils')
       const graceSetting = await window.api.getSetting('annual_grace_days')
       const graceDays = graceSetting ? parseInt(graceSetting) || 90 : 90
@@ -634,7 +650,17 @@ export default function CustomerComplianceReport() {
         // Vessel docs
         const vDocs = await window.api.getVesselDocuments(v.id)
         const customTypes = await window.api.getVesselCustomDocTypes(v.id)
-        const allTypes = [...safeDocTypes, ...(Array.isArray(customTypes) ? customTypes : []).map((c: any) => ({ id: c.id, name: c.name, annualRenewal: false }))]
+        // Filter doc types by customer's policy types for this vessel
+        let relevantDocTypes = safeDocTypes
+        if (selectedCustomerId && selectedCustomerId !== 'all') {
+          const ptIds = copyPolicies
+            .filter(p => p.status === 'active' && p.customerEntityId === selectedCustomerId && p.vesselId === v.id && p.policyTypeId)
+            .map(p => p.policyTypeId)
+          if (ptIds.length > 0) {
+            relevantDocTypes = safeDocTypes.filter(dt => !dt.policyTypeIds || dt.policyTypeIds.length === 0 || dt.policyTypeIds.some((ptId: string) => ptIds.includes(ptId)))
+          }
+        }
+        const allTypes = [...relevantDocTypes, ...(Array.isArray(customTypes) ? customTypes : []).map((c: any) => ({ id: c.id, name: c.name, annualRenewal: false }))]
         const safeVDocs = Array.isArray(vDocs) ? vDocs : []
         const issues: string[] = []
         for (const dt of allTypes) {
