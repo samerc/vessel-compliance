@@ -12730,7 +12730,7 @@ export class MySQLAdapter {
                     LEFT JOIN vessels v ON vdp.vessel_id = v.id
                     LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
                     LEFT JOIN fleets f ON v.fleet_id = f.id
-                    LEFT JOIN entities cust ON v.customer_id = cust.id
+                    LEFT JOIN entities cust ON vdp.customer_entity_id = cust.id
                     LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id
                     LEFT JOIN vessel_policy_values vpv_inc ON (
                         vpv_inc.policy_id = vdp.id
@@ -12824,7 +12824,7 @@ export class MySQLAdapter {
                     LEFT JOIN vessels v ON vdp.vessel_id = v.id
                     LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
                     LEFT JOIN fleets f ON v.fleet_id = f.id
-                    LEFT JOIN entities cust ON v.customer_id = cust.id
+                    LEFT JOIN entities cust ON vdp.customer_entity_id = cust.id
                     LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
                     LEFT JOIN vessel_policy_values vpv_end ON (
                         vpv_end.policy_id = vdp.id
@@ -12904,13 +12904,13 @@ export class MySQLAdapter {
                     LEFT JOIN vessels v ON pd.vessel_id = v.id
                     LEFT JOIN quotations q ON pd.quotation_id = q.id
                     LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
-                    LEFT JOIN entities e ON v.customer_id = e.id
+                    LEFT JOIN entities qce ON q.customer_entity_id = qce.id
                     LEFT JOIN banks b ON pd.bank_id = b.id`,
                 columnMap: {
                     policyNumber: 'pd.policy_number AS policyNumber',
                     typeName: 'COALESCE(qt.name, \'Unknown\') AS typeName',
                     vesselName: 'v.name AS vesselName',
-                    customerName: 'e.name AS customerName',
+                    customerName: 'COALESCE(qce.name, q.co_name) AS customerName',
                     inceptionDate: 'pd.inception_date AS inceptionDate',
                     expiryDate: 'pd.expiry_date AS expiryDate',
                     premiumAmount: 'pd.premium_amount AS premiumAmount',
