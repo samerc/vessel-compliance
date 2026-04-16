@@ -1077,6 +1077,9 @@ export interface Quotation {
   hullClauseId?: string
   ivClauseId?: string
   coName?: string
+  customerEntityId?: string
+  customerType?: 'broker' | 'direct'
+  customerName?: string
   title?: string
   sectionTextsOverride?: PISectionTexts
   sanctionsTextOverride?: string

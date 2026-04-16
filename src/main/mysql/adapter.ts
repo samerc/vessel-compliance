@@ -1132,6 +1132,26 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('customer_entity_id migration:', e) }
 
+            // Migration: Add customer_entity_id + customer_type to quotations
+            try {
+                const [qCustCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'customer_entity_id'") as any[]
+                if ((qCustCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE quotations ADD COLUMN customer_entity_id VARCHAR(36) NULL')
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN customer_type VARCHAR(10) NULL")
+                    // Migrate: try to match co_name text to an entity
+                    const [ents] = await this.pool.query('SELECT id, name FROM entities') as any[]
+                    const nameMap = new Map<string, string>()
+                    for (const e of ents as any[]) nameMap.set(e.name.toLowerCase().trim(), e.id)
+                    const [qRows] = await this.pool.query("SELECT id, co_name FROM quotations WHERE co_name IS NOT NULL AND co_name != '' AND customer_entity_id IS NULL") as any[]
+                    for (const q of qRows as any[]) {
+                        const matched = nameMap.get(q.co_name.toLowerCase().trim())
+                        if (matched) {
+                            await this.pool.execute('UPDATE quotations SET customer_entity_id = ?, customer_type = ? WHERE id = ?', [matched, 'broker', q.id])
+                        }
+                    }
+                }
+            } catch (e) { console.error('quotation customer_entity_id migration:', e) }
+
             // Migration: Add description to vessel_types
             try {
                 const [vtDescCols] = await this.pool.query("SHOW COLUMNS FROM vessel_types LIKE 'description'")
@@ -6926,7 +6946,7 @@ export class MySQLAdapter {
                 q.policy_type_id as policyTypeId, pt.name as policyTypeName,
                 q.is_renewal as isRenewal, q.status,
                 q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
-                q.co_name as coName, q.title as title,
+                q.co_name as coName, q.customer_entity_id as customerEntityId, q.customer_type as customerType, q.title as title,
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor
@@ -7210,7 +7230,7 @@ export class MySQLAdapter {
                 q.policy_type_id as policyTypeId, pt.name as policyTypeName,
                 q.is_renewal as isRenewal, q.status,
                 q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
-                q.co_name as coName, q.title as title,
+                q.co_name as coName, q.customer_entity_id as customerEntityId, q.customer_type as customerType, q.title as title,
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor,
@@ -7410,7 +7430,7 @@ export class MySQLAdapter {
                 q.agreed_value as agreedValue, q.agreed_value_currency as agreedValueCurrency,
                 q.iv_enabled as ivEnabled, q.iv_value as ivValue, q.iv_currency as ivCurrency, q.iv_premium_amount as ivPremiumAmount,
                 q.hull_clause_id as hullClauseId, q.iv_clause_id as ivClauseId,
-                q.co_name as coName, q.title as title,
+                q.co_name as coName, q.customer_entity_id as customerEntityId, q.customer_type as customerType, q.title as title,
                 q.section_texts_override as sectionTextsOverrideRaw, q.sanctions_text_override as sanctionsTextOverride, q.section_order as sectionOrderRaw,
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked, q.export_snapshot as exportSnapshotRaw,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor,
@@ -7534,7 +7554,7 @@ export class MySQLAdapter {
             agreedValue: 'agreed_value', agreedValueCurrency: 'agreed_value_currency',
             ivEnabled: 'iv_enabled', ivValue: 'iv_value', ivCurrency: 'iv_currency', ivPremiumAmount: 'iv_premium_amount',
             hullClauseId: 'hull_clause_id', ivClauseId: 'iv_clause_id',
-            coName: 'co_name', title: 'title',
+            coName: 'co_name', customerEntityId: 'customer_entity_id', customerType: 'customer_type', title: 'title',
             sanctionsTextOverride: 'sanctions_text_override',
             insuredValueAmount: 'insured_value_amount',
             insuredValueCurrency: 'insured_value_currency',
@@ -10347,6 +10367,24 @@ export class MySQLAdapter {
                         VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE)
                     `, [uuidv4(), policyId, cardType, cardNumber,
                         options.inceptionDate, options.expiryDate])
+                }
+            }
+
+            // Sync customer from quotation to the vessel's dynamic policy for this policy type
+            if (quotation.customerEntityId) {
+                const typeId = quotation.quotationTypeId
+                if (typeId) {
+                    // Find matching active dynamic policy
+                    const [dynPols] = await this.pool.query(
+                        'SELECT id FROM vessel_dynamic_policies WHERE vessel_id = ? AND policy_type_id = ? AND status = \'active\' LIMIT 1',
+                        [actualVesselId, typeId]
+                    )
+                    if ((dynPols as any[]).length > 0) {
+                        await this.pool.execute(
+                            'UPDATE vessel_dynamic_policies SET customer_entity_id = ?, customer_type = ?, broker_entity_id = COALESCE(broker_entity_id, ?) WHERE id = ?',
+                            [quotation.customerEntityId, quotation.customerType || 'broker', quotation.customerType === 'broker' ? quotation.customerEntityId : null, (dynPols as any[])[0].id]
+                        )
+                    }
                 }
             }
 

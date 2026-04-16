@@ -22,6 +22,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
     const [newGroupName, setNewGroupName] = useState('')
     const [coInputValue, setCoInputValue] = useState(quotation.coName || '')
     const [showCoDropdown, setShowCoDropdown] = useState(false)
+    const [customerType, setCustomerType] = useState<'broker' | 'direct' | ''>(quotation.customerType || '')
 
     useEffect(() => { loadData() }, [])
 
@@ -110,7 +111,17 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
         loadData()
     }
 
-    const saveCoName = (val: string) => updateField('coName', val || null)
+    const saveCoName = (val: string) => {
+        updateField('coName', val || null)
+        // Try to match to an entity for customerEntityId
+        const matched = entities.find(e => e.name.toLowerCase().trim() === val.toLowerCase().trim())
+        if (matched) {
+            updateField('customerEntityId', matched.id)
+            if (!customerType) { setCustomerType('broker'); updateField('customerType', 'broker') }
+        } else {
+            updateField('customerEntityId', null)
+        }
+    }
 
     const coFiltered = entities.filter(e =>
         coInputValue.length > 0 && e.name.toLowerCase().includes(coInputValue.toLowerCase())
@@ -153,8 +164,16 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
                 Define the insured parties. Set the C/O Broker if applicable, then add assureds in the order they should appear in the quotation.
             </p>
-            {/* c/o Broker */}
-            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>C/O (Broker)</h3>
+            {/* Customer / Broker */}
+            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Customer / Broker</h3>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                {(['broker', 'direct'] as const).map(ct => (
+                    <button key={ct} type="button" onClick={() => { setCustomerType(ct); updateField('customerType', ct) }}
+                        style={{ padding: '5px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: customerType === ct ? 600 : 400, border: customerType === ct ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)', background: customerType === ct ? 'rgba(0,170,200,0.1)' : 'transparent', color: customerType === ct ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', textTransform: 'capitalize' }}>
+                        {ct}
+                    </button>
+                ))}
+            </div>
             <div style={{ position: 'relative', maxWidth: '420px', marginBottom: '28px' }}>
                 <input
                     type="text"
@@ -162,7 +181,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                     onChange={e => { setCoInputValue(e.target.value); setShowCoDropdown(true) }}
                     onBlur={() => { setTimeout(() => setShowCoDropdown(false), 150); saveCoName(coInputValue) }}
                     onFocus={() => { if (coInputValue) setShowCoDropdown(true) }}
-                    placeholder="Broker / c/o — type to search entities or enter free text"
+                    placeholder={customerType === 'direct' ? 'Search customer or type a name...' : 'Search broker or type a name...'}
                     style={{ width: '100%', border: '1px solid var(--input-border)' }}
                 />
                 {showCoDropdown && coFiltered.length > 0 && (
@@ -170,7 +189,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                         {coFiltered.map(e => (
                             <div
                                 key={e.id}
-                                onMouseDown={() => { setCoInputValue(e.name); setShowCoDropdown(false); saveCoName(e.name) }}
+                                onMouseDown={() => { setCoInputValue(e.name); setShowCoDropdown(false); updateField('coName', e.name); updateField('customerEntityId', e.id); if (!customerType) { setCustomerType('broker'); updateField('customerType', 'broker') } }}
                                 style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
                                 onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.08)')}
                                 onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}
