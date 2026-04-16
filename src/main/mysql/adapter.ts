@@ -1118,6 +1118,29 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE vessel_types ADD COLUMN description TEXT NULL AFTER name")
             }
 
+            // Migration: Add vessel_type_id FK to vessels (replaces vessel_type text field)
+            if (!vesselColNames.includes('vessel_type_id')) {
+                await this.pool.query('ALTER TABLE vessels ADD COLUMN vessel_type_id VARCHAR(36) NULL')
+                // Migrate existing text values to FK references
+                const [existingTypes] = await this.pool.query('SELECT id, name FROM vessel_types') as any[]
+                const typeMap = new Map<string, string>()
+                for (const t of existingTypes as any[]) typeMap.set(t.name.toLowerCase().trim(), t.id)
+                const [vesselRows] = await this.pool.query('SELECT id, vessel_type FROM vessels WHERE vessel_type IS NOT NULL AND vessel_type != ""') as any[]
+                for (const v of vesselRows as any[]) {
+                    const key = (v.vessel_type || '').toLowerCase().trim()
+                    let typeId = typeMap.get(key)
+                    if (!typeId) {
+                        // Create missing vessel type
+                        const newId = uuidv4()
+                        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM vessel_types') as any[]
+                        await this.pool.execute('INSERT INTO vessel_types (id, name, order_index) VALUES (?, ?, ?)', [newId, v.vessel_type.trim(), (maxRow as any[])[0].nextOrder])
+                        typeMap.set(key, newId)
+                        typeId = newId
+                    }
+                    await this.pool.execute('UPDATE vessels SET vessel_type_id = ? WHERE id = ?', [typeId, v.id])
+                }
+            }
+
             // Migration: Add completion + endorsement fields to condition_surveys
             const [csCompletedCols] = await this.pool.query("SHOW COLUMNS FROM condition_surveys LIKE 'completed_at'")
             if ((csCompletedCols as any[]).length === 0) {
@@ -2957,7 +2980,7 @@ export class MySQLAdapter {
     // --- Vessels ---
     async getVessels(): Promise<Vessel[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, rebuilt_year as rebuiltYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels')
+        const [rows] = await this.pool.query('SELECT v.id, v.name, v.imo_number as imoNumber, v.fleet_id as fleetId, v.ofac_checked_at as ofacCheckedAt, v.ofac_match_found as ofacMatchFound, v.ofac_status as ofacStatus, v.is_active as isActive, v.customer_id as customerId, v.customer_type as customerType, v.policy_expiry_date as policyExpiryDate, v.notes, v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage, COALESCE(vt.name, v.vessel_type) as vesselType, v.vessel_type_id as vesselTypeId, v.classification_society as classificationSociety, v.call_sign as callSign FROM vessels v LEFT JOIN vessel_types vt ON v.vessel_type_id = vt.id')
         return (rows as any[]).map(r => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound), isActive: Boolean(r.isActive), builtYear: r.builtYear ? Number(r.builtYear) : undefined, rebuiltYear: r.rebuiltYear ? Number(r.rebuiltYear) : undefined, grossTonnage: r.grossTonnage ? Number(r.grossTonnage) : undefined }))
     }
 
@@ -2967,7 +2990,7 @@ export class MySQLAdapter {
         const { page = 1, limit = 10, search, fleetId, customerId, status, sortField = 'name', sortOrder = 'asc' } = params
         const offset = (page - 1) * limit
 
-        let query = 'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, rebuilt_year as rebuiltYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels'
+        let query = 'SELECT vessels.id, vessels.name, vessels.imo_number as imoNumber, vessels.fleet_id as fleetId, vessels.ofac_checked_at as ofacCheckedAt, vessels.ofac_match_found as ofacMatchFound, vessels.ofac_status as ofacStatus, vessels.is_active as isActive, vessels.customer_id as customerId, vessels.customer_type as customerType, vessels.policy_expiry_date as policyExpiryDate, vessels.notes, vessels.flag_state_id as flagStateId, vessels.built_year as builtYear, vessels.rebuilt_year as rebuiltYear, vessels.gross_tonnage as grossTonnage, COALESCE(vt.name, vessels.vessel_type) as vesselType, vessels.vessel_type_id as vesselTypeId, vessels.classification_society as classificationSociety, vessels.call_sign as callSign FROM vessels LEFT JOIN vessel_types vt ON vessels.vessel_type_id = vt.id'
         let countQuery = 'SELECT COUNT(*) as total FROM vessels'
         const conditions: string[] = []
         const values: any[] = []
@@ -3075,7 +3098,7 @@ export class MySQLAdapter {
             { updateKey: 'builtYear', dbCol: 'built_year', label: 'Built Year' },
             { updateKey: 'rebuiltYear', dbCol: 'rebuilt_year', label: 'Rebuilt Year' },
             { updateKey: 'grossTonnage', dbCol: 'gross_tonnage', label: 'Gross Tonnage' },
-            { updateKey: 'vesselType', dbCol: 'vessel_type', label: 'Vessel Type' },
+            { updateKey: 'vesselTypeId', dbCol: 'vessel_type_id', label: 'Vessel Type' },
             { updateKey: 'classificationSociety', dbCol: 'classification_society', label: 'Classification' },
             { updateKey: 'callSign', dbCol: 'call_sign', label: 'Call Sign' },
             { updateKey: 'isActive', dbCol: 'is_active', label: 'Status' },
@@ -3108,6 +3131,7 @@ export class MySQLAdapter {
         if (updates.rebuiltYear !== undefined) { fields.push('rebuilt_year = ?'); values.push(updates.rebuiltYear || null) }
         if (updates.grossTonnage !== undefined) { fields.push('gross_tonnage = ?'); values.push(updates.grossTonnage || null) }
         if (updates.vesselType !== undefined) { fields.push('vessel_type = ?'); values.push(updates.vesselType || null) }
+        if (updates.vesselTypeId !== undefined) { fields.push('vessel_type_id = ?'); values.push(updates.vesselTypeId || null) }
         if (updates.classificationSociety !== undefined) { fields.push('classification_society = ?'); values.push(updates.classificationSociety || null) }
         if (updates.callSign !== undefined) { fields.push('call_sign = ?'); values.push(updates.callSign || null) }
 
@@ -3123,6 +3147,26 @@ export class MySQLAdapter {
                 if (updates[af.updateKey] !== undefined) {
                     const oldVal = current[af.dbCol] != null ? String(current[af.dbCol]) : null
                     const newVal = updates[af.updateKey] != null ? String(updates[af.updateKey]) : null
+
+                    // Resolve vessel type IDs to names for the audit log
+                    if (af.updateKey === 'vesselTypeId') {
+                        const idsToResolve = [oldVal, newVal].filter(Boolean) as string[]
+                        const nameMap = new Map<string, string>()
+                        if (idsToResolve.length > 0) {
+                            const placeholders = idsToResolve.map(() => '?').join(',')
+                            const [nameRows] = await this.pool.query(
+                                `SELECT id, name FROM vessel_types WHERE id IN (${placeholders})`,
+                                idsToResolve
+                            )
+                            for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+                        }
+                        const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
+                        const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
+                        if (oldName !== newName) {
+                            await this.addVesselAuditEntry(id, af.label, oldName, newName, who)
+                        }
+                        continue
+                    }
 
                     // Resolve entity UUIDs to names for the Customer field
                     if (af.updateKey === 'customerId') {
@@ -8204,7 +8248,7 @@ export class MySQLAdapter {
                 rebuiltYear: v.rebuilt_year,
                 grossTonnage: v.gross_tonnage,
                 flag: flagName,
-                vesselType: v.vessel_type,
+                vesselType: v.vessel_type_id ? await (async () => { const [vtRows] = await this.pool!.query('SELECT name FROM vessel_types WHERE id = ?', [v.vessel_type_id]); return (vtRows as any[])[0]?.name || v.vessel_type })() : v.vessel_type,
                 classification: className,
                 callSign: v.call_sign
             })
@@ -11153,7 +11197,7 @@ export class MySQLAdapter {
             params.push(...filters.flagStateIds)
         }
         if (filters.vesselTypeIds?.length) {
-            conditions.push(`v.vessel_type IN (${filters.vesselTypeIds.map(() => '?').join(',')})`)
+            conditions.push(`v.vessel_type_id IN (${filters.vesselTypeIds.map(() => '?').join(',')})`)
             params.push(...filters.vesselTypeIds)
         }
         if (filters.policyTypeIds?.length) {
@@ -11166,10 +11210,11 @@ export class MySQLAdapter {
         // Main vessel query
         const [vessels] = await this.pool.execute(
             `SELECT v.id, v.name, v.imo_number AS imoNumber, v.fleet_id AS fleetId, v.flag_state_id AS flagStateId,
-                    v.built_year AS builtYear, v.rebuilt_year AS rebuiltYear, v.gross_tonnage AS grossTonnage, v.vessel_type AS vesselType,
+                    v.built_year AS builtYear, v.rebuilt_year AS rebuiltYear, v.gross_tonnage AS grossTonnage,
+                    COALESCE(avt.name, v.vessel_type) AS vesselType, v.vessel_type_id AS vesselTypeId,
                     v.is_active AS isActive, v.customer_id AS customerId, v.customer_type AS customerType,
                     v.ofac_status AS ofacStatus, v.classification_society AS classificationSociety
-             FROM vessels v ${where}`,
+             FROM vessels v LEFT JOIN vessel_types avt ON v.vessel_type_id = avt.id ${where}`,
             params
         )
 
@@ -12458,11 +12503,12 @@ export class MySQLAdapter {
                 baseQuery: `FROM vessels v
                     LEFT JOIN fleets f ON v.fleet_id = f.id
                     LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
-                    LEFT JOIN entities cust ON v.customer_id = cust.id`,
+                    LEFT JOIN entities cust ON v.customer_id = cust.id
+                    LEFT JOIN vessel_types rvt ON v.vessel_type_id = rvt.id`,
                 columnMap: {
                     name: 'v.name AS name',
                     imoNumber: 'v.imo_number AS imoNumber',
-                    vesselType: 'v.vessel_type AS vesselType',
+                    vesselType: 'COALESCE(rvt.name, v.vessel_type) AS vesselType',
                     flagState: 'fs.name AS flagState',
                     builtYear: 'v.built_year AS builtYear',
                     rebuiltYear: 'v.rebuilt_year AS rebuiltYear',
@@ -12484,7 +12530,7 @@ export class MySQLAdapter {
                     fleetId: (params, val) => { params.push(val); return 'v.fleet_id = ?' },
                     flagStateId: (params, val) => { params.push(val); return 'v.flag_state_id = ?' },
                     customerId: (params, val) => { params.push(val); return 'v.customer_id = ?' },
-                    vesselType: (params, val) => { params.push(val); return 'v.vessel_type = ?' },
+                    vesselType: (params, val) => { params.push(val); return 'v.vessel_type_id = ?' },
                     search: (params, val) => {
                         const s = `%${val}%`
                         params.push(s, s)
@@ -12494,7 +12540,7 @@ export class MySQLAdapter {
                 groupMap: {
                     customer: 'cust.name',
                     fleet: 'f.name',
-                    vesselType: 'v.vessel_type',
+                    vesselType: 'COALESCE(rvt.name, v.vessel_type)',
                     flagState: 'fs.name'
                 }
             },

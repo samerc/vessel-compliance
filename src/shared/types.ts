@@ -47,6 +47,7 @@ export interface Vessel {
   rebuiltYear?: number | null
   grossTonnage?: number
   vesselType?: string
+  vesselTypeId?: string
   classificationSociety?: string
   callSign?: string
 }

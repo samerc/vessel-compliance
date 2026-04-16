@@ -407,7 +407,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editRebuiltYear, setEditRebuiltYear] = useState(vessel.rebuiltYear?.toString() || '')
     const [showRebuiltYear, setShowRebuiltYear] = useState(!!vessel.rebuiltYear)
     const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
-    const [editVesselType, setEditVesselType] = useState(vessel.vesselType || '')
+    const [editVesselType, setEditVesselType] = useState(vessel.vesselTypeId || '')
     const [showAddVesselType, setShowAddVesselType] = useState(false)
     const [newVesselTypeName, setNewVesselTypeName] = useState('')
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
@@ -469,7 +469,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         try {
             const created = await window.api.addVesselType({ name: newVesselTypeName.trim(), order: vesselTypes.length })
             setVesselTypes(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
-            setEditVesselType(created.name)
+            setEditVesselType(created.id)
             setShowAddVesselType(false)
             setNewVesselTypeName('')
             showSuccess('Vessel type added')
@@ -547,7 +547,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             builtYear: editBuiltYear ? parseInt(editBuiltYear) : null,
             rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : null,
             grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : null,
-            vesselType: editVesselType || null,
+            vesselTypeId: editVesselType || null,
             classificationSociety: classText,
             callSign: editCallSign || null,
             flagStateId: selectedFlagStateId || null
@@ -557,7 +557,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         vessel.builtYear = editBuiltYear ? parseInt(editBuiltYear) : undefined
         vessel.rebuiltYear = editRebuiltYear ? parseInt(editRebuiltYear) : undefined
         vessel.grossTonnage = editGrossTonnage ? parseFloat(editGrossTonnage) : undefined
-        vessel.vesselType = editVesselType || undefined
+        vessel.vesselTypeId = editVesselType || undefined
+        vessel.vesselType = vesselTypes.find(vt => vt.id === editVesselType)?.name || undefined
         vessel.classificationSociety = editClassification || undefined
         vessel.callSign = editCallSign || undefined
         vessel.flagStateId = selectedFlagStateId || undefined
@@ -787,7 +788,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             >
                                                 <option value="">No type</option>
                                                 {vesselTypes.map(vt => (
-                                                    <option key={vt.id} value={vt.name}>
+                                                    <option key={vt.id} value={vt.id}>
                                                         {vt.description ? `${vt.name} – ${vt.description}` : vt.name}
                                                     </option>
                                                 ))}
@@ -956,7 +957,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     {[
                                         vessel.builtYear && (vessel.rebuiltYear ? `Built ${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}` : `Built ${vessel.builtYear}`),
                                         vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
-                                        vessel.vesselType && (() => { const vt = vesselTypes.find(t => t.name === vessel.vesselType); return vt?.description ? `${vt.name} (${vt.description})` : vt?.name || vessel.vesselType })(),
+                                        (vessel.vesselTypeId || vessel.vesselType) && (() => { const vt = vessel.vesselTypeId ? vesselTypes.find(t => t.id === vessel.vesselTypeId) : vesselTypes.find(t => t.name === vessel.vesselType); return vt?.description ? `${vt.name} (${vt.description})` : vt?.name || vessel.vesselType })(),
                                         vesselClassificationIds.size > 0
                                             ? `Class: ${classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(' / ')}`
                                             : (vessel.classificationSociety && `Class: ${vessel.classificationSociety}`),

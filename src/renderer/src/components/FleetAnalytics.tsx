@@ -1298,7 +1298,7 @@ export default function FleetAnalytics() {
         <CollapsibleFilter label="Vessel Types">
           <MultiSelectDropdown
             label="vessel types"
-            options={vesselTypes.map(vt => ({ id: vt.name, name: vt.name }))}
+            options={vesselTypes.map(vt => ({ id: vt.id, name: vt.name }))}
             selectedIds={filters.vesselTypeIds}
             onChange={ids => updateFilter('vesselTypeIds', ids)}
             isLight={isLight}

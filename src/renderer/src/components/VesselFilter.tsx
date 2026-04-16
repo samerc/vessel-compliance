@@ -473,7 +473,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                     (flagUnassigned && !v.flagStateId)
                 )
             }
-            if (selectedVesselTypes.length > 0) checks.push(selectedVesselTypes.includes(v.vesselType || ''))
+            if (selectedVesselTypes.length > 0) checks.push(selectedVesselTypes.includes(v.vesselTypeId || v.vesselType || ''))
             if (selectedCustomerId) checks.push(v.customerId === selectedCustomerId)
             if (customerType !== 'both') checks.push(v.customerType === customerType)
             if (yearFrom) checks.push(!!v.builtYear && v.builtYear >= parseInt(yearFrom))
@@ -647,7 +647,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                 <div>
                                     <SectionLabel>Vessel Type</SectionLabel>
                                     <MultiSelectDropdown
-                                        options={vesselTypes.map(vt => ({ id: vt.name, label: vt.name, sublabel: vt.description }))}
+                                        options={vesselTypes.map(vt => ({ id: vt.id, label: vt.name, sublabel: vt.description }))}
                                         selected={selectedVesselTypes}
                                         onChange={setSelectedVesselTypes}
                                         placeholder="Any vessel type"

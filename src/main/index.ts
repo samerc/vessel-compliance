@@ -2345,7 +2345,15 @@ app.whenReady().then(() => {
         const updates: Record<string, any> = {}
         if ((!vessel.grossTonnage || vessel.grossTonnage === 0) && row.grossTonnage) updates.grossTonnage = row.grossTonnage
         if ((!vessel.builtYear || vessel.builtYear === 0) && row.year) updates.builtYear = row.year
-        if (!vessel.vesselType && row.vesselType) updates.vesselType = row.vesselType
+        if (!vessel.vesselTypeId && row.vesselType) {
+          // Resolve vessel type name to ID
+          const vtypes = await db.getVesselTypes()
+          let vtMatch = vtypes.find(vt => vt.name.toLowerCase() === row.vesselType.toLowerCase())
+          if (!vtMatch) {
+            vtMatch = await db.addVesselType({ name: row.vesselType, order: vtypes.length })
+          }
+          updates.vesselTypeId = vtMatch.id
+        }
         if (!vessel.classificationSociety && row.classification) updates.classificationSociety = row.classification
         if (!vessel.flagStateId && row.flag) {
           const matchedFlagId = flagNameMap.get(row.flag.toLowerCase())
@@ -2463,9 +2471,9 @@ app.whenReady().then(() => {
     }
 
     const vesselTypes = await db.getVesselTypes()
-    const vtNameMap = new Map<string, string>()
+    const vtIdMap = new Map<string, string>()
     for (const vt of vesselTypes) {
-      vtNameMap.set(vt.name.toLowerCase(), vt.name)
+      vtIdMap.set(vt.name.toLowerCase(), vt.id)
     }
 
     let updated = 0
@@ -2501,16 +2509,16 @@ app.whenReady().then(() => {
         updates.classificationSociety = className
       }
 
-      // Vessel type - auto-create if missing
+      // Vessel type - auto-create if missing, store as FK
       if (row.vesselType) {
-        let typeName = vtNameMap.get(row.vesselType.toLowerCase())
-        if (!typeName) {
+        let typeId = vtIdMap.get(row.vesselType.toLowerCase())
+        if (!typeId) {
           const created = await db.addVesselType({ name: row.vesselType, order: vesselTypes.length + createdTypes })
-          typeName = created.name
-          vtNameMap.set(row.vesselType.toLowerCase(), typeName)
+          typeId = created.id
+          vtIdMap.set(row.vesselType.toLowerCase(), typeId)
           createdTypes++
         }
-        updates.vesselType = typeName
+        updates.vesselTypeId = typeId
       }
 
       if (Object.keys(updates).length > 0) {
