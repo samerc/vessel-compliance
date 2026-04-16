@@ -10393,7 +10393,16 @@ export class MySQLAdapter {
         if (updates.conditionId !== undefined) { fields.push('condition_id = ?'); values.push(updates.conditionId || null) }
         if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
         if (updates.currency !== undefined) { fields.push('currency = ?'); values.push(updates.currency) }
-        if (updates.brokerEntityId !== undefined) { fields.push('broker_entity_id = ?'); values.push(updates.brokerEntityId || null) }
+        if (updates.brokerEntityId !== undefined) {
+            fields.push('broker_entity_id = ?'); values.push(updates.brokerEntityId || null)
+            // Auto-sync customer fields when broker is set and customer not explicitly provided
+            if (updates.customerEntityId === undefined) {
+                fields.push('customer_entity_id = ?'); values.push(updates.brokerEntityId || null)
+                if (updates.customerType === undefined) {
+                    fields.push('customer_type = ?'); values.push(updates.brokerEntityId ? 'broker' : null)
+                }
+            }
+        }
         if (updates.customerEntityId !== undefined) { fields.push('customer_entity_id = ?'); values.push(updates.customerEntityId || null) }
         if (updates.customerType !== undefined) { fields.push('customer_type = ?'); values.push(updates.customerType || null) }
         if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes || null) }
