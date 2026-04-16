@@ -14,6 +14,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const [ncbTemplates, setNcbTemplates] = useState<PremiumTextTemplate[]>([])
     const [upccTemplates, setUpccTemplates] = useState<PremiumTextTemplate[]>([])
     const [valueOptions, setValueOptions] = useState<QuotationAgreedValueOption[]>([])
+    const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
 
     useEffect(() => {
         loadInstalments()
@@ -31,6 +32,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         }
         if (quotation.quotationTypeCode === 'P') {
             window.api.piGetQuotationAlternatives(quotation.id).then(a => setPiAlternatives(Array.isArray(a) ? a : []))
+            window.api.lolGetOptions(quotation.id).then(o => setLolOptions(Array.isArray(o) ? o : [])).catch(() => {})
         }
     }, [])
     const loadInstalments = async () => { setInstalments(await window.api.getQuotationInstalments(quotation.id)) }
@@ -163,6 +165,29 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         </label>
                                         <input type="number" value={alt.premiumAmount || ''} onChange={e => setPiAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updatePIAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    ) :
+                    /* P&I with LOL alternatives (no full PI alternatives): per-LOL-option premium */
+                    quotation.quotationTypeCode === 'P' && lolOptions.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                            {lolOptions.map((opt, idx) => {
+                                const accentColor = ALT_COLORS[idx % ALT_COLORS.length]
+                                return (
+                                    <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
+                                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: accentColor, minWidth: '140px', whiteSpace: 'nowrap' }}>
+                                            {opt.label || `Alternative ${idx + 1}`}
+                                            <span style={{ fontWeight: 400, color: 'var(--text-secondary)', fontSize: '0.72rem', marginLeft: '6px' }}>
+                                                ({opt.currency} {opt.amount?.toLocaleString()})
+                                            </span>
+                                        </label>
+                                        <input type="number" value={opt.premiumAmount ?? ''}
+                                            onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
+                                            onBlur={e => window.api.lolUpdateOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
+                                            placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{opt.currency || currency} p.a.</span>
                                     </div>
                                 )
                             })}
