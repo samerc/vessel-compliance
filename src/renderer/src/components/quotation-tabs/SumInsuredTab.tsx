@@ -137,9 +137,11 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                 </div>
             )}
 
-            <h3 style={{ marginTop: '28px', marginBottom: '14px', fontSize: '1rem' }}>Rate & Premium</h3>
+            <h3 style={{ marginTop: '28px', marginBottom: '14px', fontSize: '1rem' }}>{quotation.warExcessEnabled ? 'Section 1 Rate' : 'Rate & Premium'}</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
-                Editing either field will automatically recalculate the other based on the sum insured.
+                {quotation.warExcessEnabled
+                    ? 'Set the rate for Section 1 (Hull War). Premium is calculated per vessel in the Premium tab.'
+                    : 'Editing either field will automatically recalculate the other based on the sum insured.'}
                 {warSettings?.defaultRate && quotation.premiumRate == null
                     ? ` Default rate: ${warSettings.defaultRate}%`
                     : ''}
@@ -170,6 +172,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                         }}>%</span>
                     </div>
                 </div>
+                {!quotation.warExcessEnabled && (
                 <div style={{ flex: 1, maxWidth: '220px' }}>
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Premium</label>
                     <input
@@ -184,14 +187,15 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                         style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
                     />
                 </div>
-                <div style={{
+                )}
+                {!quotation.warExcessEnabled && <div style={{
                     padding: '8px 0',
                     fontSize: '0.88rem',
                     color: 'var(--text-secondary)',
                     whiteSpace: 'nowrap'
                 }}>
                     {quotation.premiumCurrency || quotation.agreedValueCurrency || 'USD'}
-                </div>
+                </div>}
             </div>
 
             {/* P&I Excess (Section 2) */}
