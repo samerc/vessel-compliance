@@ -120,7 +120,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                     {qVessels.map(v => (
                         <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                             <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '120px' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
                             <input
                                 type="number"
                                 value={v.agreedValue ?? ''}
@@ -262,7 +262,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                 {qVessels.map(v => (
                                     <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '120px' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
                                         <input
                                             type="number"
                                             value={v.warExcessAmount ?? ''}
