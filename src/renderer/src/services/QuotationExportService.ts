@@ -2403,8 +2403,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const showVesselLabel = data.quotationVessels.length > 1
     // Column widths: Vx narrow, then proportional for content
     const vW = {
-      label: Math.round(BODY_W * 0.05),  // ~4mm for V1-V9
-      name:  Math.round(BODY_W * 0.22),
+      label: Math.round(BODY_W * 0.06),  // ~5mm for V1-V9
+      name:  Math.round(BODY_W * 0.21),
       imo:   Math.round(BODY_W * 0.13),
       built: Math.round(BODY_W * 0.09),
       gt:    Math.round(BODY_W * 0.10),
