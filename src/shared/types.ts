@@ -615,7 +615,7 @@ export interface PIWarrantyTag {
   order: number
 }
 
-export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'cargo' | 'all'
+export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'cargo' | 'all' | string
 
 export interface PIWarranty {
   id: string

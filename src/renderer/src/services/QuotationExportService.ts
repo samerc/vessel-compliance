@@ -1502,7 +1502,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   {
     const wTypeCode = data.quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : data.quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
     const orderedWarranties = data.selectedWarrantyIds.map(id => data.allWarranties.find(w => w.id === id)).filter((w): w is NonNullable<typeof w> => !!w)
-        .filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === wTypeCode)
+        .filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(wTypeCode))
     const sortedCustom = [...data.customWarranties].sort((a, b) => a.order - b.order)
     if (orderedWarranties.length > 0 || sortedCustom.length > 0) {
       let warText = ''
@@ -1513,7 +1513,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         for (const wid of warIds) {
           const w = data.allWarranties.find(ww => ww.id === wid)
           if (!w) continue
-          if (w.typeScope && w.typeScope !== 'all' && w.typeScope !== wTypeCode) continue
+          if (w.typeScope && w.typeScope !== 'all' && !w.typeScope.split(',').includes(wTypeCode)) continue
           const wVesselScope = data.warrantyVesselScopes[wid]
           for (const entry of resolveIacsWarranty(w.text, wVesselScope, data)) {
             t += `- ${entry.text}${vesselScopeSuffix(entry.vesselScope, data.quotationVessels)}\n`

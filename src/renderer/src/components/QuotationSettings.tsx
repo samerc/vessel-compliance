@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck, GripVertical } from 'lucide-react'
-import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, QuotationTypeScope, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, TradingCustomText } from '../../../shared/types'
+import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -661,14 +661,14 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     const [newDefaultSelected, setNewDefaultSelected] = useState(false)
     const [newCargoRelated, setNewCargoRelated] = useState(false)
     const [newTagIds, setNewTagIds] = useState<string[]>([])
-    const [newTypeScope, setNewTypeScope] = useState<QuotationTypeScope>('all')
+    const [newTypeScope, setNewTypeScope] = useState<string>('all')
     const [warrantyTypeFilter, setWarrantyTypeFilter] = useState<'show_all' | 'pi' | 'hull' | 'war'>('show_all')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDefaultSelected, setEditDefaultSelected] = useState(false)
     const [editCargoRelated, setEditCargoRelated] = useState(false)
     const [editTagIds, setEditTagIds] = useState<string[]>([])
-    const [editTypeScope, setEditTypeScope] = useState<QuotationTypeScope>('all')
+    const [editTypeScope, setEditTypeScope] = useState<string>('all')
     // Tag management
     const [newTagName, setNewTagName] = useState('')
     const [editingTagId, setEditingTagId] = useState<string | null>(null)
@@ -823,7 +823,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
 
     const filteredWarranties = warrantyTypeFilter === 'show_all'
         ? warranties
-        : warranties.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === warrantyTypeFilter)
+        : warranties.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(warrantyTypeFilter))
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -956,15 +956,19 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             <input type="checkbox" checked={newCargoRelated} onChange={e => setNewCargoRelated(e.target.checked)} style={ckStyle} /> Cargo related
                         </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>Scope:</span>
-                            <select value={newTypeScope} onChange={e => setNewTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
-                                <option value="all">All</option>
-                                <option value="war">War</option>
-                                <option value="pi">P&I only</option>
-                                <option value="hull">Hull only</option>
-                                <option value="war">War only</option>
-                            </select>
+                            {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }].map(s => {
+                                const active = s.v === 'all' ? newTypeScope === 'all' : newTypeScope !== 'all' && newTypeScope.split(',').includes(s.v)
+                                return <button key={s.v} type="button" onClick={() => {
+                                    if (s.v === 'all') { setNewTypeScope('all') }
+                                    else {
+                                        const parts = newTypeScope === 'all' ? [] : newTypeScope.split(',').filter(Boolean)
+                                        const next = active ? parts.filter(p => p !== s.v) : [...parts, s.v]
+                                        setNewTypeScope(next.length === 0 ? 'all' : next.join(','))
+                                    }
+                                }} style={{ padding: '2px 8px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
+                            })}
                         </div>
                         {tags.length > 0 && (
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -990,13 +994,17 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer' }}>
                                         <input type="checkbox" checked={editCargoRelated} onChange={e => setEditCargoRelated(e.target.checked)} style={ckStyle} /> Cargo
                                     </label>
-                                    <select value={editTypeScope} onChange={e => setEditTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
-                                        <option value="all">All</option>
-                                <option value="war">War</option>
-                                        <option value="pi">P&I</option>
-                                        <option value="hull">Hull</option>
-                                        <option value="war">War</option>
-                                    </select>
+                                    {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }].map(s => {
+                                        const active = s.v === 'all' ? editTypeScope === 'all' : editTypeScope !== 'all' && editTypeScope.split(',').includes(s.v)
+                                        return <button key={s.v} type="button" onClick={() => {
+                                            if (s.v === 'all') { setEditTypeScope('all') }
+                                            else {
+                                                const parts = editTypeScope === 'all' ? [] : editTypeScope.split(',').filter(Boolean)
+                                                const next = active ? parts.filter(p => p !== s.v) : [...parts, s.v]
+                                                setEditTypeScope(next.length === 0 ? 'all' : next.join(','))
+                                            }
+                                        }} style={{ padding: '2px 6px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
+                                    })}
                                     {tags.length > 0 && tags.map(t => tagChip(t.id, editTagIds.includes(t.id), () => toggleTagId(t.id, editTagIds, setEditTagIds)))}
                                     <div style={{ flex: 1 }} />
                                     <button onClick={() => saveEdit(w.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Save</button>
@@ -2663,11 +2671,11 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newText, setNewText] = useState('')
     const [newDocTypeIds, setNewDocTypeIds] = useState<string[]>([])
-    const [newTypeScope, setNewTypeScope] = useState<QuotationTypeScope>('all')
+    const [newTypeScope, setNewTypeScope] = useState<string>('all')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
-    const [editTypeScope, setEditTypeScope] = useState<QuotationTypeScope>('all')
+    const [editTypeScope, setEditTypeScope] = useState<string>('all')
 
     useEffect(() => { loadData() }, [])
     const ENTITY_DOC_TYPES: DocumentType[] = [
@@ -2778,13 +2786,17 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
-                                    <select value={editTypeScope} onChange={e => setEditTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
-                                        <option value="all">All</option>
-                                <option value="war">War</option>
-                                        <option value="pi">P&I only</option>
-                                        <option value="hull">Hull only</option>
-                                <option value="war">War only</option>
-                                    </select>
+                                    {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }].map(s => {
+                                        const active = s.v === 'all' ? editTypeScope === 'all' : editTypeScope !== 'all' && editTypeScope.split(',').includes(s.v)
+                                        return <button key={s.v} type="button" onClick={() => {
+                                            if (s.v === 'all') { setEditTypeScope('all') }
+                                            else {
+                                                const parts = editTypeScope === 'all' ? [] : editTypeScope.split(',').filter(Boolean)
+                                                const next = active ? parts.filter(p => p !== s.v) : [...parts, s.v]
+                                                setEditTypeScope(next.length === 0 ? 'all' : next.join(','))
+                                            }
+                                        }} style={{ padding: '2px 6px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
+                                    })}
                                 </div>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                     <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.78rem' }}><Save size={12} /> Save</button>

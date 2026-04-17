@@ -71,7 +71,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
             defaultsApplied.current = true
             // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations
             const tc = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
-            const scopeValid = new Set(safeAll.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === tc).map(w => w.id))
+            const scopeValid = new Set(safeAll.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(tc)).map(w => w.id))
             const defaultIds: string[] = []
             for (const ws of safeSets) {
                 if (ws.defaultSelected && ws.warrantyIds) {
@@ -221,7 +221,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
 
     // Filter warranties by quotation type scope
     const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
-    const visibleWarranties = allWarranties.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope === typeCode)
+    const visibleWarranties = allWarranties.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(typeCode))
 
     const getTabWarranties = () => {
         if (activeTab === 'all') return visibleWarranties
