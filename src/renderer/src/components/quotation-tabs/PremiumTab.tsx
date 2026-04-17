@@ -315,8 +315,38 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 </div>
             )}
 
-            {/* Multi-vessel: per-vessel premium table */}
-            {isMultiVessel && (
+            {/* Multi-vessel: war excess per-vessel Section 1 + Section 2 */}
+            {isMultiVessel && quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                    {qVessels.map((v) => {
+                        const vName = (v.name || v.vesselLabel).toUpperCase()
+                        const s1Rate = quotation.premiumRate ?? warSettings?.defaultRate ?? 0
+                        const s2Rate = quotation.warExcessRate ?? warSettings?.defaultExcessRate ?? 0
+                        const s1Amount = v.agreedValue || quotation.agreedValue || 0
+                        const s2Amount = v.warExcessAmount ?? quotation.warExcessAmount ?? 0
+                        const s1Prem = v.warSection1Premium ?? Math.round(s1Amount * s1Rate / 100 * 100) / 100
+                        const s2Prem = v.warSection2Premium ?? Math.round(s2Amount * s2Rate / 100 * 100) / 100
+                        return (
+                            <div key={v.id} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '8px' }}>{vName}</div>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px' }}>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Section 1:</span>
+                                    <input type="number" value={v.warSection1Premium ?? (s1Prem || '')} onChange={e => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warSection1Premium: parseFloat(e.target.value) || undefined } : qv))} onBlur={e => window.api.updateQuotationVessel(v.id, { warSection1Premium: parseFloat(e.target.value) || null } as any)} placeholder={`Auto: ${s1Prem.toLocaleString()}`} style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }} />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Section 2:</span>
+                                    <input type="number" value={v.warSection2Premium ?? (s2Prem || '')} onChange={e => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warSection2Premium: parseFloat(e.target.value) || undefined } : qv))} onBlur={e => window.api.updateQuotationVessel(v.id, { warSection2Premium: parseFloat(e.target.value) || null } as any)} placeholder={`Auto: ${s2Prem.toLocaleString()}`} style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }} />
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Multi-vessel: per-vessel premium table (standard, non-war-excess) */}
+            {isMultiVessel && !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled) && (
                 <div style={{ marginBottom: '16px' }}>
                     <table style={{ borderCollapse: 'collapse', width: '100%', maxWidth: '600px', fontSize: '0.82rem' }}>
                         <thead>
