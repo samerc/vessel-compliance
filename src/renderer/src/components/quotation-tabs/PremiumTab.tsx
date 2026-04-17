@@ -263,7 +263,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 const s1Amount = v.agreedValue || quotation.agreedValue || 0
                                 const s2Amount = v.warExcessAmount ?? quotation.warExcessAmount ?? 0
                                 const s1Prem = v.warSection1Premium ?? Math.round(s1Amount * s1Rate / 100 * 100) / 100
-                                const s2Prem = v.warSection2Premium ?? Math.round(s2Amount * s2Rate / 100 * 100) / 100
+                                const s2Prem = v.warSection2Premium ?? Math.round((s2Amount - s1Amount) * s2Rate / 100 * 100) / 100
                                 return (
                                     <div key={v.id} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
                                         <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '8px' }}>{vName}</div>
@@ -341,7 +341,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         const s1Amount = v.agreedValue || quotation.agreedValue || 0
                         const s2Amount = v.warExcessAmount ?? quotation.warExcessAmount ?? 0
                         const s1Prem = v.warSection1Premium ?? Math.round(s1Amount * s1Rate / 100 * 100) / 100
-                        const s2Prem = v.warSection2Premium ?? Math.round(s2Amount * s2Rate / 100 * 100) / 100
+                        const s2Prem = v.warSection2Premium ?? Math.round((s2Amount - s1Amount) * s2Rate / 100 * 100) / 100
                         return (
                             <div key={v.id} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
                                 <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '8px' }}>{vName}</div>
