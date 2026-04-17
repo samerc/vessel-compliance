@@ -178,6 +178,18 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
       skipUpdate.current = true
       const html = e.getHTML()
       onChange(html === '<p></p>' ? '' : html)
+    },
+    editorProps: {
+      handlePaste: (view, event) => {
+        // Strip rich formatting on paste — insert as plain text to avoid foreign styles
+        const text = event.clipboardData?.getData('text/plain')
+        if (text) {
+          event.preventDefault()
+          view.dispatch(view.state.tr.insertText(text))
+          return true
+        }
+        return false
+      }
     }
   }, [extensions])
 
