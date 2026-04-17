@@ -31,13 +31,13 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         setQ(q => {
             const updated = { ...q, premiumRate: rate }
             if (rate && q.agreedValue) {
-                updated.premiumAmount = Math.round(q.agreedValue * rate / 1000 * 100) / 100
+                updated.premiumAmount = Math.round(q.agreedValue * rate / 100 * 100) / 100
             }
             return updated
         })
         updateField('premiumRate', rate ?? null)
         if (rate && quotation.agreedValue) {
-            const premium = Math.round(quotation.agreedValue * rate / 1000 * 100) / 100
+            const premium = Math.round(quotation.agreedValue * rate / 100 * 100) / 100
             updateField('premiumAmount', premium)
         }
     }
@@ -46,13 +46,13 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         setQ(q => {
             const updated = { ...q, premiumAmount: premium }
             if (premium && q.agreedValue) {
-                updated.premiumRate = Math.round(premium / q.agreedValue * 1000 * 10000) / 10000
+                updated.premiumRate = Math.round(premium / q.agreedValue * 100 * 10000) / 10000
             }
             return updated
         })
         updateField('premiumAmount', premium ?? null)
         if (premium && quotation.agreedValue) {
-            const rate = Math.round(premium / quotation.agreedValue * 1000 * 10000) / 10000
+            const rate = Math.round(premium / quotation.agreedValue * 100 * 10000) / 10000
             updateField('premiumRate', rate)
         }
     }
@@ -62,14 +62,14 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         setQ(q => {
             const updated = { ...q, agreedValue: val }
             if (val && rate) {
-                updated.premiumAmount = Math.round(val * rate / 1000 * 100) / 100
+                updated.premiumAmount = Math.round(val * rate / 100 * 100) / 100
                 if (q.premiumRate == null) updated.premiumRate = rate
             }
             return updated
         })
         updateField('agreedValue', val ?? null)
         if (val && rate) {
-            const premium = Math.round(val * rate / 1000 * 100) / 100
+            const premium = Math.round(val * rate / 100 * 100) / 100
             updateField('premiumAmount', premium)
             if (quotation.premiumRate == null) {
                 updateField('premiumRate', rate)
@@ -141,12 +141,12 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
                 Editing either field will automatically recalculate the other based on the sum insured.
                 {warSettings?.defaultRate && quotation.premiumRate == null
-                    ? ` Default rate: ${warSettings.defaultRate}‰`
+                    ? ` Default rate: ${warSettings.defaultRate}%`
                     : ''}
             </p>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
                 <div style={{ flex: 1, maxWidth: '180px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Rate (‰)</label>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Rate (%)</label>
                     <div style={{ position: 'relative' }}>
                         <input
                             type="number"
@@ -167,7 +167,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                             color: 'var(--text-secondary)',
                             fontSize: '0.85rem',
                             pointerEvents: 'none'
-                        }}>‰</span>
+                        }}>%</span>
                     </div>
                 </div>
                 <div style={{ flex: 1, maxWidth: '220px' }}>
@@ -234,7 +234,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                 />
                             </div>
                             <div style={{ flex: 1, maxWidth: '180px' }}>
-                                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Section 2 Rate (‰)</label>
+                                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Section 2 Rate (%)</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type="number"
@@ -248,7 +248,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                         placeholder="0.0075"
                                         style={{ width: '100%', fontSize: '0.9rem', padding: '8px 32px 8px 10px' }}
                                     />
-                                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '0.85rem', pointerEvents: 'none' }}>‰</span>
+                                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '0.85rem', pointerEvents: 'none' }}>%</span>
                                 </div>
                             </div>
                         </div>

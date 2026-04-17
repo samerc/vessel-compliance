@@ -1752,8 +1752,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const vi = getVesselInfo(v, data.allVessels, data.flagStates)
         const s1Amt = v.agreedValue ?? q.agreedValue ?? 0
         const s2Amt = (v as any).warExcessAmount ?? q.warExcessAmount ?? 0
-        const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 1000 * 100) / 100
-        const s2Prem = (v as any).warSection2Premium ?? Math.round(s2Amt * s2Rate / 1000 * 100) / 100
+        const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 100 * 100) / 100
+        const s2Prem = (v as any).warSection2Premium ?? Math.round(s2Amt * s2Rate / 100 * 100) / 100
         premText += `${vi.name}\n`
         premText += `Section 1: ${formatCurrency(s1Prem, wCur)} per annum\n`
         premText += `Section 2: ${formatCurrency(s2Prem, wCur)} per annum\n\n`
