@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Quotation, WarSettings } from '../../../../shared/types'
+import { Quotation, QuotationVessel, WarSettings } from '../../../../shared/types'
 
 export default function SumInsuredTab({ quotation, updateField, setQ }: {
     quotation: Quotation
@@ -7,12 +7,17 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
     setQ: (fn: (q: Quotation) => Quotation) => void
 }) {
     const [warSettings, setWarSettings] = useState<WarSettings | null>(null)
+    const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
 
     useEffect(() => {
         (async () => {
             try {
-                const s = await window.api.warGetSettings()
+                const [s, qv] = await Promise.all([
+                    window.api.warGetSettings(),
+                    window.api.getQuotationVessels(quotation.id)
+                ])
                 if (s && !(s as any).error) setWarSettings(s)
+                setQVessels(Array.isArray(qv) ? qv : [])
             } catch {}
         })()
     }, [])
@@ -105,6 +110,32 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                     />
                 </div>
             </div>
+
+            {/* Per-vessel hull values */}
+            {qVessels.length >= 2 && (
+                <div style={{ marginTop: '16px' }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+                        Per-Vessel Sum Insured (leave blank to use the amount above)
+                    </label>
+                    {qVessels.map(v => (
+                        <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                            <input
+                                type="number"
+                                value={v.agreedValue ?? ''}
+                                placeholder={quotation.agreedValue?.toLocaleString() || '0'}
+                                onChange={e => {
+                                    const val = e.target.value ? parseFloat(e.target.value) : undefined
+                                    setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv))
+                                }}
+                                onBlur={e => window.api.updateQuotationVessel(v.id, { agreedValue: e.target.value ? parseFloat(e.target.value) : null } as any)}
+                                style={{ width: '160px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <h3 style={{ marginTop: '28px', marginBottom: '14px', fontSize: '1rem' }}>Rate & Premium</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
@@ -221,6 +252,32 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Per-vessel Section 2 overrides */}
+                        {qVessels.length >= 2 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+                                    Per-Vessel Section 2 Override (leave blank to use the default above)
+                                </label>
+                                {qVessels.map(v => (
+                                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                                        <input
+                                            type="number"
+                                            value={v.warExcessAmount ?? ''}
+                                            placeholder={quotation.warExcessAmount?.toLocaleString() || '0'}
+                                            onChange={e => {
+                                                const val = e.target.value ? parseFloat(e.target.value) : undefined
+                                                setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warExcessAmount: val ?? null } : qv))
+                                            }}
+                                            onBlur={e => window.api.updateQuotationVessel(v.id, { warExcessAmount: e.target.value ? parseFloat(e.target.value) : null } as any)}
+                                            style={{ width: '160px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         <div style={{ marginBottom: '12px' }}>
                             <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Section 1 Description</label>
