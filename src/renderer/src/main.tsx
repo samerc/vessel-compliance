@@ -9,6 +9,13 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
 
 
+// Block keyboard up/down arrows on number inputs to prevent accidental value changes
+document.addEventListener('keydown', e => {
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.target as HTMLElement)?.tagName === 'INPUT' && (e.target as HTMLInputElement)?.type === 'number') {
+    e.preventDefault()
+  }
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>

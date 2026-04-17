@@ -412,7 +412,7 @@ table tbody tr:hover {
 }
 
 /* Spinner animation */
-/* Hide number input spinners (up/down arrows) to prevent accidental value changes */
+/* Hide number input spinners and disable keyboard up/down arrows */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
