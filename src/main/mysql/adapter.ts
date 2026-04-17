@@ -1163,6 +1163,14 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } catch {}
 
+            // Migration: widen type_scope columns to support comma-separated multi-type values
+            try {
+                await this.pool.query("ALTER TABLE pi_warranties MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
+                await this.pool.query("ALTER TABLE pi_warranty_tags MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
+                await this.pool.query("ALTER TABLE pi_subjectivities MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
+                await this.pool.query("ALTER TABLE pi_warranty_sets MODIFY COLUMN type_scope VARCHAR(50) DEFAULT NULL")
+            } catch {}
+
             // Migration: war excess fields on quotations + quotation_vessels
             try {
                 const [weCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'war_excess_enabled'") as any[]

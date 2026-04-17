@@ -958,7 +958,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                         </label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>Scope:</span>
-                            {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }].map(s => {
+                            {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }, { v: 'cargo', l: 'Cargo' }].map(s => {
                                 const active = s.v === 'all' ? newTypeScope === 'all' : newTypeScope !== 'all' && newTypeScope.split(',').includes(s.v)
                                 return <button key={s.v} type="button" onClick={() => {
                                     if (s.v === 'all') { setNewTypeScope('all') }
@@ -994,7 +994,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', cursor: 'pointer' }}>
                                         <input type="checkbox" checked={editCargoRelated} onChange={e => setEditCargoRelated(e.target.checked)} style={ckStyle} /> Cargo
                                     </label>
-                                    {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }].map(s => {
+                                    {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }, { v: 'cargo', l: 'Cargo' }].map(s => {
                                         const active = s.v === 'all' ? editTypeScope === 'all' : editTypeScope !== 'all' && editTypeScope.split(',').includes(s.v)
                                         return <button key={s.v} type="button" onClick={() => {
                                             if (s.v === 'all') { setEditTypeScope('all') }
@@ -1018,7 +1018,11 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                                         {w.defaultSelected && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864' }}>Default</span>}
                                         {w.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
-                                        {w.typeScope && w.typeScope !== 'all' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: w.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : w.typeScope === 'hull' ? 'rgba(255, 100, 200, 0.15)' : 'rgba(255, 176, 32, 0.15)', color: w.typeScope === 'pi' ? '#6464ff' : w.typeScope === 'hull' ? '#ff64c8' : '#ffb020' }}>{w.typeScope === 'pi' ? 'P&I' : w.typeScope === 'hull' ? 'Hull' : 'War'}</span>}
+                                        {w.typeScope && w.typeScope !== 'all' && w.typeScope.split(',').map(s => {
+                                            const colors: Record<string, { bg: string; fg: string; label: string }> = { pi: { bg: 'rgba(100,100,255,0.15)', fg: '#6464ff', label: 'P&I' }, hull: { bg: 'rgba(255,100,200,0.15)', fg: '#ff64c8', label: 'Hull' }, war: { bg: 'rgba(255,176,32,0.15)', fg: '#ffb020', label: 'War' }, cargo: { bg: 'rgba(50,184,134,0.15)', fg: '#32b886', label: 'Cargo' } }
+                                            const c = colors[s.trim()] || { bg: 'rgba(150,150,150,0.15)', fg: '#999', label: s.trim() }
+                                            return <span key={s} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: c.bg, color: c.fg }}>{c.label}</span>
+                                        })}
                                         {(w.tagIds || []).map(tid => {
                                             const tag = tags.find(t => t.id === tid)
                                             return tag ? <span key={tid} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
@@ -2786,7 +2790,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
-                                    {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }].map(s => {
+                                    {[{ v: 'all', l: 'All' }, { v: 'pi', l: 'P&I' }, { v: 'hull', l: 'Hull' }, { v: 'war', l: 'War' }, { v: 'cargo', l: 'Cargo' }].map(s => {
                                         const active = s.v === 'all' ? editTypeScope === 'all' : editTypeScope !== 'all' && editTypeScope.split(',').includes(s.v)
                                         return <button key={s.v} type="button" onClick={() => {
                                             if (s.v === 'all') { setEditTypeScope('all') }
