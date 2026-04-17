@@ -852,8 +852,16 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         liabilityText = liabilityText.replace(/\n*\{sub_limits\}\n*/g, '\n')
       }
     } else if (pdfSubLimitLines.length > 0) {
-      liabilityText += '\n\n' + pdfSubLimitLines.join('\n')
-      liabilityText += '\n\nUnder no circumstances is the Combined Single Limit detailed above to be exceeded.'
+      // Insert sub-limits before "Under no circumstances..." if present in the text
+      const underNoIdx = liabilityText.toLowerCase().indexOf('under no circumstances')
+      if (underNoIdx > 0) {
+        const before = liabilityText.substring(0, underNoIdx).trimEnd()
+        const after = liabilityText.substring(underNoIdx)
+        liabilityText = before + '\n\n' + pdfSubLimitLines.join('\n') + '\n\n' + after
+      } else {
+        liabilityText += '\n\n' + pdfSubLimitLines.join('\n')
+        liabilityText += '\n\nUnder no circumstances is the Combined Single Limit detailed above to be exceeded.'
+      }
     }
     if (liabilityText) sectionMap.set('liability', ['Limit of Liability', (perVesselHeader + liabilityText).trim()])
   }
@@ -2478,15 +2486,30 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
 
     const dCurDisplay = dHasLolOptions ? '' : cur
+    // Render LOL text, splitting at "Under no circumstances" to insert sub-limits before it
+    const renderLolTextWithSubLimits = (text: string) => {
+      const cleanText = text.replace(/  +/g, ' ').trim()
+      const underNoMatch = cleanText.match(/(Under\s+no\s+circumstances.*)/is)
+      if (underNoMatch && wordSubLimitParas.length > 0 && !cleanText.includes('{sub_limits}')) {
+        const beforeUnderNo = cleanText.substring(0, underNoMatch.index!).trim()
+        const underNoPart = underNoMatch[1].trim()
+        if (beforeUnderNo) liabContent.push(...injectSubLimits(beforeUnderNo))
+        liabContent.push(emptyP(), ...wordSubLimitParas, emptyP())
+        liabContent.push(...mp(underNoPart))
+        return true // sub-limits already inserted
+      }
+      liabContent.push(...injectSubLimits(cleanText))
+      return false
+    }
+    let dSubLimitsInserted = false
     if (data.quotation.limitOfLiabilityText) {
-      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', dCurDisplay).replace(/  +/g, ' ').split('\n').map(l => l.trimStart()).join('\n').trim()
-      liabContent.push(...injectSubLimits(cleaned))
+      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', dCurDisplay).split('\n').map(l => l.trimStart()).join('\n')
+      dSubLimitsInserted = renderLolTextWithSubLimits(cleaned)
     } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || dHasLolOptions)) {
       const lolText = st(data, 'limitOfLiabilityDefaultText')
         .replace('{amount}', amountDisplay)
         .replace('{currency}', dCurDisplay)
-        .replace(/  +/g, ' ').trim()
-      liabContent.push(...injectSubLimits(lolText))
+      dSubLimitsInserted = renderLolTextWithSubLimits(lolText)
     } else if (baseAmt != null || dHasLolOptions) {
       liabContent.push(np(`${amountDisplay} all claims in the aggregate.`.replace(/  +/g, ' ').trim()))
     }
@@ -2504,8 +2527,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
 
     const lolRawHasPlaceholder = (data.quotation.limitOfLiabilityText || st(data, 'limitOfLiabilityDefaultText') || '').includes('{sub_limits}')
-    if (!lolRawHasPlaceholder && wordSubLimitParas.length > 0) {
-      liabContent.push(...wordSubLimitParas)
+    if (!lolRawHasPlaceholder && !dSubLimitsInserted && wordSubLimitParas.length > 0) {
+      liabContent.push(emptyP(), ...wordSubLimitParas)
       liabContent.push(emptyP())
       liabContent.push(np('Under no circumstances is the Combined Single Limit detailed above to be exceeded.'))
     }
