@@ -412,6 +412,16 @@ table tbody tr:hover {
 }
 
 /* Spinner animation */
+/* Hide number input spinners (up/down arrows) to prevent accidental value changes */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .spinner {
   animation: spin 1s linear infinite;
 }
