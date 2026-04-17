@@ -1163,6 +1163,25 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } catch {}
 
+            // Migration: war excess fields on quotations + quotation_vessels
+            try {
+                const [weCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'war_excess_enabled'") as any[]
+                if ((weCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN war_excess_enabled BOOLEAN DEFAULT FALSE")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN war_excess_amount DECIMAL(15,2) NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN war_excess_rate DECIMAL(10,6) NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN war_section1_text TEXT NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN war_section2_text TEXT NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN war_combined_limit_text TEXT NULL")
+                }
+                const [weVCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'war_excess_amount'") as any[]
+                if ((weVCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN war_excess_amount DECIMAL(15,2) NULL")
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN war_section1_premium DECIMAL(15,2) NULL")
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN war_section2_premium DECIMAL(15,2) NULL")
+                }
+            } catch (e) { console.error('war excess migration:', e) }
+
             // Repeatable sync: ensure all policies with broker have customer_entity_id set
             try {
                 await this.pool.query("UPDATE vessel_dynamic_policies SET customer_entity_id = broker_entity_id, customer_type = 'broker' WHERE broker_entity_id IS NOT NULL AND customer_entity_id IS NULL")
@@ -6605,7 +6624,8 @@ export class MySQLAdapter {
                     COALESCE(v.classification_society, qv.classification) as classification,
                     COALESCE(v.call_sign, qv.call_sign) as callSign,
                     qv.premium_amount as premiumAmount,
-                    qv.agreed_value as agreedValue, qv.iv_value as ivValue
+                    qv.agreed_value as agreedValue, qv.iv_value as ivValue,
+                    qv.war_excess_amount as warExcessAmount, qv.war_section1_premium as warSection1Premium, qv.war_section2_premium as warSection2Premium
              FROM quotation_vessels qv
              LEFT JOIN vessels v ON qv.vessel_id = v.id
              LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
@@ -6620,7 +6640,10 @@ export class MySQLAdapter {
             grossTonnage: r.grossTonnage != null ? Number(r.grossTonnage) : undefined,
             premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined,
             agreedValue: r.agreedValue != null ? Number(r.agreedValue) : null,
-            ivValue: r.ivValue != null ? Number(r.ivValue) : null
+            ivValue: r.ivValue != null ? Number(r.ivValue) : null,
+            warExcessAmount: r.warExcessAmount != null ? Number(r.warExcessAmount) : null,
+            warSection1Premium: r.warSection1Premium != null ? Number(r.warSection1Premium) : null,
+            warSection2Premium: r.warSection2Premium != null ? Number(r.warSection2Premium) : null
         }))
     }
 
@@ -6639,7 +6662,7 @@ export class MySQLAdapter {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', orderIndex: 'order_index', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value' }
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', orderIndex: 'order_index', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value', warExcessAmount: 'war_excess_amount', warSection1Premium: 'war_section1_premium', warSection2Premium: 'war_section2_premium' }
         for (const [key, col] of Object.entries(colMap)) {
             if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
         }
@@ -7456,7 +7479,10 @@ export class MySQLAdapter {
                 q.renewed_from_policy_id as renewedFromPolicyId, q.renewed_from_policy_number as renewedFromPolicyNumber,
                 q.insured_value_amount, q.insured_value_currency, q.insured_value_text,
                 q.port_of_loading, q.port_of_destination, q.estimated_departure,
-                q.subject_matter, q.any_other_vessel, q.premium_rate, q.premium_type, q.voyage_text,
+                q.subject_matter, q.any_other_vessel, q.premium_rate, q.premium_type,
+                q.war_excess_enabled, q.war_excess_amount, q.war_excess_rate,
+                q.war_section1_text, q.war_section2_text, q.war_combined_limit_text,
+                q.voyage_text,
                 q.cargo_clause_id as cargoClauseId,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
@@ -7514,6 +7540,12 @@ export class MySQLAdapter {
             anyOtherVessel: Boolean(r.any_other_vessel),
             premiumRate: r.premium_rate != null ? Number(r.premium_rate) : null,
             premiumType: r.premium_type || 'amount',
+            warExcessEnabled: Boolean(r.war_excess_enabled),
+            warExcessAmount: r.war_excess_amount != null ? Number(r.war_excess_amount) : null,
+            warExcessRate: r.war_excess_rate != null ? Number(r.war_excess_rate) : null,
+            warSection1Text: r.war_section1_text || null,
+            warSection2Text: r.war_section2_text || null,
+            warCombinedLimitText: r.war_combined_limit_text || null,
             voyageText: r.voyage_text || null,
             cargoClauseId: r.cargoClauseId || null,
         } as Quotation
@@ -7593,6 +7625,12 @@ export class MySQLAdapter {
             anyOtherVessel: 'any_other_vessel',
             premiumRate: 'premium_rate',
             premiumType: 'premium_type',
+            warExcessEnabled: 'war_excess_enabled',
+            warExcessAmount: 'war_excess_amount',
+            warExcessRate: 'war_excess_rate',
+            warSection1Text: 'war_section1_text',
+            warSection2Text: 'war_section2_text',
+            warCombinedLimitText: 'war_combined_limit_text',
             voyageText: 'voyage_text',
             cargoClauseId: 'cargo_clause_id',
         }

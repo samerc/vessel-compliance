@@ -927,6 +927,10 @@ export interface WarSettings {
   tcText: string
   tradingWarrantyText: string
   defaultRate?: number
+  defaultExcessRate?: number
+  section1Text?: string
+  section2Text?: string
+  combinedLimitText?: string
 }
 
 // ==================== Cargo ====================
@@ -1104,6 +1108,12 @@ export interface Quotation {
   anyOtherVessel?: boolean
   premiumRate?: number
   premiumType?: 'amount' | 'rate'
+  warExcessEnabled?: boolean
+  warExcessAmount?: number
+  warExcessRate?: number
+  warSection1Text?: string
+  warSection2Text?: string
+  warCombinedLimitText?: string
   voyageText?: string
   cargoClauseId?: string
   createdAt?: string
@@ -1162,6 +1172,9 @@ export interface QuotationVessel {
   premiumAmount?: number
   agreedValue?: number | null
   ivValue?: number | null
+  warExcessAmount?: number | null
+  warSection1Premium?: number | null
+  warSection2Premium?: number | null
 }
 
 export interface QuotationSubLimit {
