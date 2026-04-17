@@ -84,6 +84,5 @@ export function fmtNiceDate(iso: string): string {
     if (!iso) return iso
     const [y, m, d] = iso.split('-').map(Number)
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-    const sfx = (n: number) => (n === 1 || n === 21 || n === 31 ? 'st' : n === 2 || n === 22 ? 'nd' : n === 3 || n === 23 ? 'rd' : 'th')
-    return `${d}${sfx(d)} ${months[m - 1]} ${y}`
+    return `${months[m - 1]} ${d}, ${y}`
 }
