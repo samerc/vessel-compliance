@@ -3297,13 +3297,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         bup('Section 2'), np(dS2Text)
       ]))
 
-      // Sum Insured / Limits
+      // Sum Insured / Limits — Section 1 as table
       const limContent: (Paragraph | Table)[] = [bup('Section 1')]
-      for (const qv of data.quotationVessels) {
+      const nameW = Math.round(BODY_W * 0.55)
+      const amtW = BODY_W - nameW
+      const s1Rows = data.quotationVessels.map(qv => {
         const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
         const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
-        limContent.push(np(`${vi.name} ${formatCurrency(s1Amt, dWCur)}`))
-      }
+        return new TableRow({ children: [
+          new TableCell({ borders: noBorders(), width: { size: nameW, type: WidthType.DXA }, children: [np(vi.name)] }),
+          new TableCell({ borders: noBorders(), width: { size: amtW, type: WidthType.DXA }, children: [np(formatCurrency(s1Amt, dWCur))] })
+        ]})
+      })
+      limContent.push(new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [nameW, amtW], layout: TableLayoutType.FIXED, rows: s1Rows }))
       limContent.push(emptyP(), bup('Section 2'))
       const dExcessAmt = data.quotation.warExcessAmount || 0
       limContent.push(np(formatCurrency(dExcessAmt, dWCur)))
@@ -3312,6 +3318,21 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         .replace('{amount}', formatCurrency(dExcessAmt, dWCur))
       limContent.push(np(dCombinedText))
       rowMap.set('sumInsured', makeRow('Sum Insured / Limits', limContent))
+    } else if (data.quotationVessels.length > 1) {
+      // Multi-vessel without excess — table of per-vessel amounts
+      const nameW = Math.round(BODY_W * 0.55)
+      const amtW = BODY_W - nameW
+      const siRows = data.quotationVessels.map(qv => {
+        const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+        const amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+        return new TableRow({ children: [
+          new TableCell({ borders: noBorders(), width: { size: nameW, type: WidthType.DXA }, children: [np(vi.name)] }),
+          new TableCell({ borders: noBorders(), width: { size: amtW, type: WidthType.DXA }, children: [np(formatCurrency(amt, dWCur))] })
+        ]})
+      })
+      rowMap.set('sumInsured', makeRow('Sum Insured', [
+        new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [nameW, amtW], layout: TableLayoutType.FIXED, rows: siRows })
+      ]))
     } else {
       rowMap.set('sumInsured', makeRow('Sum Insured', [
         bp(formatCurrency(data.quotation.agreedValue, dWCur))
