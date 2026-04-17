@@ -481,7 +481,15 @@ function resolveIacsWarranty(
 function vesselName(data: QuotationData): string {
   if (data.quotationVessels.length === 0) return 'Unknown Vessel'
   if (data.quotationVessels.length === 1) return getVesselInfo(data.quotationVessels[0], data.allVessels, data.flagStates).name
-  // Multiple vessels: use vessel names (not fleet name)
+  // Multiple vessels: use fleet name if all belong to the same fleet
+  const fleetIds = new Set(data.quotationVessels.map(qv => {
+    const rv = qv.vesselId ? data.allVessels.find(v => v.id === qv.vesselId) : null
+    return rv?.fleetId
+  }).filter(Boolean))
+  if (fleetIds.size === 1) {
+    const fleet = data.fleets?.find((f: any) => f.id === [...fleetIds][0])
+    if (fleet) return fleet.name
+  }
   return data.quotationVessels.map(qv => getVesselInfo(qv, data.allVessels, data.flagStates).name).join(' / ')
 }
 
