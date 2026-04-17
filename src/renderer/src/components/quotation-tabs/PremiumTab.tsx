@@ -300,20 +300,22 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         </div>
                     )}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
-                        <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
-                            onChange={e => {
-                                const v = parseInt(e.target.value) || 1
-                                setQ(p => ({ ...p, numInstalments: v }))
-                                updateField('numInstalments', v)
-                                handleSaveInstalments(v)
-                            }}
-                            style={{ width: '80px' }}
-                        />
-                    </div>
                 </div>
             )}
+
+            {/* Instalments (always visible) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
+                <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
+                    onChange={e => {
+                        const v = parseInt(e.target.value) || 1
+                        setQ(p => ({ ...p, numInstalments: v }))
+                        updateField('numInstalments', v)
+                        handleSaveInstalments(v)
+                    }}
+                    style={{ width: '80px' }}
+                />
+            </div>
 
             {/* Multi-vessel: war excess per-vessel Section 1 + Section 2 */}
             {isMultiVessel && quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled && (
