@@ -2355,24 +2355,64 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       } else {
         // Legacy — flat list with optional vessel labels
         const wordHasVesselLabels = data.quotationVessels.length > 1 && data.assureds.some(a => a.vesselLabel)
-        const wordSeenLabels = new Set<string>()
-        insuredContent.push(new Table({
-          width: { size: BODY_W, type: WidthType.DXA },
-          layout: TableLayoutType.FIXED,
-          rows: data.assureds.map(a => {
-            const labelKey = a.vesselLabel || ''
-            const isFirstOfLabel = !wordSeenLabels.has(labelKey)
-            wordSeenLabels.add(labelKey)
-            return new TableRow({
+        if (wordHasVesselLabels) {
+          // Group by vessel label, show vessel name as header
+          const vesselLabels = [...new Set(data.assureds.map(a => a.vesselLabel).filter(Boolean))] as string[]
+          for (const label of vesselLabels) {
+            const vessel = data.quotationVessels.find(qv => qv.vesselLabel === label)
+            const vesselName = vessel ? (vessel.name || vessel.vesselLabel).toUpperCase() : label
+            insuredContent.push(bp(vesselName))
+            const vesselAssureds = data.assureds.filter(a => a.vesselLabel === label)
+            insuredContent.push(new Table({
+              width: { size: BODY_W, type: WidthType.DXA },
+              layout: TableLayoutType.FIXED,
+              rows: vesselAssureds.map(a => new TableRow({
+                children: [
+                  new TableCell({
+                    borders: noBorders(),
+                    width: { size: Math.round(BODY_W * 0.60), type: WidthType.DXA },
+                    children: [new Paragraph({ children: [new TextRun({ text: a.name, size: 22, font: 'Arial', color: '000000' })] })]
+                  }),
+                  new TableCell({
+                    borders: noBorders(),
+                    width: { size: Math.round(BODY_W * 0.40), type: WidthType.DXA },
+                    children: [new Paragraph({ children: [new TextRun({ text: a.role ? `"as ${a.role}"` : '', size: 22, font: 'Arial', color: '000000' })] })]
+                  })
+                ]
+              }))
+            }))
+          }
+          // Assureds without a vessel label
+          const noLabel = data.assureds.filter(a => !a.vesselLabel)
+          if (noLabel.length > 0) {
+            insuredContent.push(new Table({
+              width: { size: BODY_W, type: WidthType.DXA },
+              layout: TableLayoutType.FIXED,
+              rows: noLabel.map(a => new TableRow({
+                children: [
+                  new TableCell({
+                    borders: noBorders(),
+                    width: { size: Math.round(BODY_W * 0.60), type: WidthType.DXA },
+                    children: [new Paragraph({ children: [new TextRun({ text: a.name, size: 22, font: 'Arial', color: '000000' })] })]
+                  }),
+                  new TableCell({
+                    borders: noBorders(),
+                    width: { size: Math.round(BODY_W * 0.40), type: WidthType.DXA },
+                    children: [new Paragraph({ children: [new TextRun({ text: a.role ? `"as ${a.role}"` : '', size: 22, font: 'Arial', color: '000000' })] })]
+                  })
+                ]
+              }))
+            }))
+          }
+        } else {
+          insuredContent.push(new Table({
+            width: { size: BODY_W, type: WidthType.DXA },
+            layout: TableLayoutType.FIXED,
+            rows: data.assureds.map(a => new TableRow({
               children: [
-                ...(wordHasVesselLabels ? [new TableCell({
-                  borders: noBorders(),
-                  width: { size: Math.round(BODY_W * 0.06), type: WidthType.DXA },
-                  children: [new Paragraph({ children: [new TextRun({ text: isFirstOfLabel ? labelKey : '', size: 22, font: 'Arial', color: '000000', bold: true })] })]
-                })] : []),
                 new TableCell({
                   borders: noBorders(),
-                  width: { size: Math.round(BODY_W * (wordHasVesselLabels ? 0.54 : 0.60)), type: WidthType.DXA },
+                  width: { size: Math.round(BODY_W * 0.60), type: WidthType.DXA },
                   children: [new Paragraph({ children: [new TextRun({ text: a.name, size: 22, font: 'Arial', color: '000000' })] })]
                 }),
                 new TableCell({
@@ -2381,9 +2421,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                   children: [new Paragraph({ children: [new TextRun({ text: a.role ? `"as ${a.role}"` : '', size: 22, font: 'Arial', color: '000000' })] })]
                 })
               ]
-            })
-          })
-        }))
+            }))
+          }))
+        }
       }
     }
     if (st(data, 'insuredFooter')) {
