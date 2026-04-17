@@ -39,7 +39,15 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
             window.api.warGetSettings().then(s => { if (s && !(s as any).error) setWarSettings(s) }).catch(() => {})
         }
     }, [])
-    const loadInstalments = async () => { setInstalments(await window.api.getQuotationInstalments(quotation.id)) }
+    const loadInstalments = async () => {
+        const insts = await window.api.getQuotationInstalments(quotation.id)
+        if (Array.isArray(insts) && insts.length === 0 && (quotation.numInstalments || 1) >= 1) {
+            // Auto-create instalment records on first load
+            await handleSaveInstalments(quotation.numInstalments || 1)
+            return
+        }
+        setInstalments(insts)
+    }
     const loadVessels = async () => { setQVessels(await window.api.getQuotationVessels(quotation.id)) }
 
     const updateAlternativePremium = async (altId: string, amount: number | null) => {
@@ -308,7 +316,9 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
                 <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
                     onChange={e => {
-                        const v = parseInt(e.target.value) || 1
+                        const raw = e.target.value
+                        if (raw === '') { setQ(p => ({ ...p, numInstalments: undefined as any })); return }
+                        const v = Math.max(1, Math.min(12, parseInt(raw) || 1))
                         setQ(p => ({ ...p, numInstalments: v }))
                         updateField('numInstalments', v)
                         handleSaveInstalments(v)
