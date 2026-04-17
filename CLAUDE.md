@@ -935,12 +935,63 @@ Per-vessel fleet assignment uses a searchable combobox:
 - **Create inline**: "Create Fleet" button at bottom of dropdown, Enter to confirm
 - **Filter dropdown**: Fleet filter in toolbar also sorted alphabetically
 
+### War P&I Excess (Section 2)
+
+Two-section war quotations: Section 1 (Hull War) + Section 2 (P&I in excess of Hull):
+
+- **Toggle**: `warExcessEnabled` boolean on `quotations` — enables Section 2 fields in SumInsuredTab
+- **Quotation fields**: `war_excess_amount`, `war_excess_rate`, `war_section1_text`, `war_section2_text`, `war_combined_limit_text`
+- **Per-vessel fields**: `war_excess_amount`, `war_section1_premium`, `war_section2_premium` on `quotation_vessels`
+- **Section 2 formula**: `(section2Amount - section1Amount) × rate` — the excess over Hull value
+- **Default rates**: Section 1 = 0.03%, Section 2 = 0.0075% (configurable in war settings)
+- **SumInsuredTab**: Per-vessel hull values (Section 1), Section 2 amount/rate, configurable section descriptions and combined limit text. Premium hidden when excess enabled (shown in PremiumTab instead).
+- **PremiumTab**: Per-vessel cards with Section 1 + Section 2 premium inputs (both single and multi-vessel)
+- **Export Interest section**: Section 1 + Section 2 descriptions
+- **Export Sum Insured/Limits**: Per-vessel Section 1 amounts as table + Section 2 amount + combined limit text
+- **Export Premium**: Per-vessel Section 1 + Section 2 premium lines
+- **War settings** (`war_settings` JSON): `defaultExcessRate`, `section1Text`, `section2Text`, `combinedLimitText`
+- **Section order**: `interest` added before `sumInsured` in WAR_SECTION_ORDER
+
+### LOL Alternatives (P&I)
+
+Multiple Limit of Liability options without full P&I alternatives:
+
+- **Table**: `quotation_lol_options` (id, quotation_id, label, amount, currency, premium_amount, order_index)
+- **UI**: Click "Add LOL Alternative" → primary LOL becomes Alternative 1, empty Alternative 2 created. Add more with "Add Alternative". Delete down to 1 reverts to primary.
+- **PremiumTab**: Per-alternative premium inputs when LOL options exist
+- **Export**: Alternatives listed at top of LOL section, shared text below. Per-alternative premium lines.
+- **Clone/duplicate**: LOL options copied to new quotation
+
+### Warranty & Subjectivity Multi-Type Scope
+
+Warranties and subjectivities can apply to multiple quotation types:
+
+- **`type_scope` column**: VARCHAR(50), stores comma-separated values (e.g., `'pi,war'`, `'hull,war'`)
+- **UI**: Toggle chips (All / P&I / Hull / War / Cargo) in QuotationSettings — multiple selectable
+- **Filtering**: `typeScope.split(',').includes(typeCode)` throughout WarrantiesTab, SubjectivitiesTab, exports
+- **Display**: Separate colored pills per type (P&I=blue, Hull=pink, War=amber, Cargo=teal)
+
+### Draft Reference Numbers
+
+Draft quotation references include the policy type code:
+
+- **Format**: `DRAFT-{code}-{sequential}` (e.g., `DRAFT-P-0001`, `DRAFT-H-0002`, `DRAFT-W-0003`)
+- **Applied to**: new quotations, duplicates, revisions, renewals
+- **Backward compatible**: `startsWith('DRAFT-')` checks work for both old and new formats
+
+### Number Input Behavior
+
+- **Spinners hidden**: CSS removes up/down arrow buttons from all `<input type="number">`
+- **Keyboard arrows blocked**: Global `keydown` handler prevents ArrowUp/ArrowDown on number inputs
+- **Rich text paste**: RichTextEditor strips formatting on paste (plain text only)
+
 ### Key Tables
 
 - `users` - User accounts with auth, theme, window preferences, sidebar state, sanctions threshold
 - `vessels`, `fleets` - Vessel registry and fleet grouping
 - `entities`, `vessel_assureds`, `entity_ubos` - Assured parties and beneficial owners
 - `document_types`, `vessel_documents` - Document requirements and uploads
+- `document_type_policy_types` - Junction table tagging doc types with applicable policy types
 - `vessel_custom_doc_types` - Per-vessel custom document types
 - `flag_states` - Vessel flag state registries
 - `policy_types`, `policy_type_characteristics` - Insurance policy type classifications and configurable fields
@@ -966,6 +1017,7 @@ Per-vessel fleet assignment uses a searchable combobox:
 - `hull_agreed_value_texts` - Hull agreed value template texts
 - `quotation_hull_alternatives` - Per-quotation hull clause alternatives with premium
 - `quotation_agreed_value_items`, `quotation_hull_conditions`, `quotation_hull_additional_conditions` - Per-quotation hull item selections (conditions support alternative_id)
+- `quotation_lol_options` - LOL alternative options for P&I quotations
 - `trading_warranty_templates` - Reusable trading warranty intro text templates
 - `renewal_status_types` - Custom renewal status labels for policies
 - `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, section_order_defaults_{typeCode}, etc.)
