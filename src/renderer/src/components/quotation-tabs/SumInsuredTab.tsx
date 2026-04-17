@@ -249,7 +249,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                             setQ(q => ({ ...q, warExcessRate: val }))
                                             updateField('warExcessRate', val ?? null)
                                         }}
-                                        placeholder="0.0075"
+                                        placeholder=""
                                         style={{ width: '100%', fontSize: '0.9rem', padding: '8px 32px 8px 10px' }}
                                     />
                                     <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '0.85rem', pointerEvents: 'none' }}>%</span>
