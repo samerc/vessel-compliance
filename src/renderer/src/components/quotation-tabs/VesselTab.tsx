@@ -230,7 +230,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             let currentCount = qVessels.length
             let totalAssuredsAdded = 0
             let currentAssuredCount = existingQAssureds.length
-            const existingEntityIds = new Set(existingQAssureds.map(a => a.entityId).filter(Boolean))
+            const existingEntityIds = new Set(existingQAssureds.map(a => `${a.entityId}:${a.vesselLabel || ''}`).filter(Boolean))
 
             for (const v of newVessels) {
                 const vLabel = `V${currentCount + 1}`
@@ -255,7 +255,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 if (!skipAssureds) {
                     const vassureds = await window.api.getVesselAssureds(v.id).catch(() => [])
                     const toAdd = (Array.isArray(vassureds) ? vassureds : [])
-                        .filter(va => !existingEntityIds.has(va.entityId))
+                        .filter(va => !existingEntityIds.has(`${va.entityId}:${vLabel}`))
                         .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
                     let fleetAddIdx = 0
                     for (let i = 0; i < toAdd.length; i++) {
@@ -277,7 +277,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                             vesselLabel: vLabel,
                             order: currentAssuredCount + fleetAddIdx
                         })
-                        existingEntityIds.add(va.entityId)
+                        existingEntityIds.add(`${va.entityId}:${vLabel}`)
                         totalAssuredsAdded++
                         fleetAddIdx++
                     }
