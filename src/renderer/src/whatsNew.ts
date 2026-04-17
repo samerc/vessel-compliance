@@ -17,6 +17,25 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '7.3.0',
+    date: '2026-04-17',
+    items: [
+      { tag: 'New', text: 'Customer/broker set per policy — a vessel can have different brokers for Hull and P&I' },
+      { tag: 'New', text: 'Document types tagged by policy type — compliance reports filter by broker coverage' },
+      { tag: 'New', text: 'LOL alternatives — offer multiple Limit of Liability options with per-option premiums' },
+      { tag: 'New', text: 'Quotation list redesigned with view tabs, month navigator, and chip filters' },
+      { tag: 'New', text: 'Draft numbers include type letter (e.g., DRAFT-P-0001)' },
+      { tag: 'Improved', text: 'Policy types and quotation types unified in one place (Admin Panel)' },
+      { tag: 'Improved', text: 'Vessel types use FK references — renaming updates all vessels instantly' },
+      { tag: 'Improved', text: 'Fleet dropdown is searchable with inline fleet creation' },
+      { tag: 'Improved', text: 'Warranty ordering respects master list order' },
+      { tag: 'Fixed', text: 'Classification always reflects current class, not previous one' },
+      { tag: 'Fixed', text: 'War quotation premium auto-calculates from insured value and rate' },
+      { tag: 'Fixed', text: 'Survey defect due dates can now be cleared' },
+      { tag: 'Fixed', text: 'Export date always appears in quotation documents' },
+    ]
+  },
+  {
     version: '7.0.0',
     date: 'March 2026',
     items: [
