@@ -3949,8 +3949,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
         premContent.push(np('per annum'))
         premContent.push(emptyP())
-      } else {
-        // Single premium, no discount — plain bold text
+      } else if (!dWarExcessPrem) {
+        // Single premium, no discount — plain bold text (skip if war excess already rendered)
         const premChanged = origData && origData.quotation.premiumAmount !== wq.premiumAmount
         premContent.push(bp(`${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`, premChanged ? RED : undefined))
         premContent.push(emptyP())
