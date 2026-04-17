@@ -227,8 +227,8 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                     onChange={e => {
                                         const val = e.target.value ? parseFloat(e.target.value) : undefined
                                         setQ(q => ({ ...q, warExcessAmount: val }))
+                                        updateField('warExcessAmount', val ?? null)
                                     }}
-                                    onBlur={e => updateField('warExcessAmount', parseFloat(e.target.value) || null)}
                                     placeholder="e.g., 25000000"
                                     style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
                                 />
@@ -243,8 +243,8 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                         onChange={e => {
                                             const val = e.target.value ? parseFloat(e.target.value) : undefined
                                             setQ(q => ({ ...q, warExcessRate: val }))
+                                            updateField('warExcessRate', val ?? null)
                                         }}
-                                        onBlur={e => updateField('warExcessRate', parseFloat(e.target.value) || null)}
                                         placeholder="0.0075"
                                         style={{ width: '100%', fontSize: '0.9rem', padding: '8px 32px 8px 10px' }}
                                     />
