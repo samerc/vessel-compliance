@@ -481,19 +481,8 @@ function resolveIacsWarranty(
 function vesselName(data: QuotationData): string {
   if (data.quotationVessels.length === 0) return 'Unknown Vessel'
   if (data.quotationVessels.length === 1) return getVesselInfo(data.quotationVessels[0], data.allVessels, data.flagStates).name
-  // Check if all vessels belong to the same fleet
-  if (data.quotationVessels.length > 1) {
-    const fleetIds = new Set(data.quotationVessels.map(qv => {
-      const rv = qv.vesselId ? data.allVessels.find(v => v.id === qv.vesselId) : null
-      return rv?.fleetId
-    }).filter(Boolean))
-    if (fleetIds.size === 1) {
-      const fId = [...fleetIds][0]
-      const fleet = data.fleets?.find((f: any) => f.id === fId)
-      if (fleet) return fleet.name
-    }
-  }
-  return data.quotationVessels.map(qv => `${qv.vesselLabel} ${getVesselInfo(qv, data.allVessels, data.flagStates).name}`).join(' / ')
+  // Multiple vessels: use vessel names (not fleet name)
+  return data.quotationVessels.map(qv => getVesselInfo(qv, data.allVessels, data.flagStates).name).join(' / ')
 }
 
 function getFileName(data: QuotationData, ext: string): string {
