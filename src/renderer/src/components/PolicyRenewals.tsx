@@ -786,7 +786,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                     >
                         <MessageSquare size={14} />
                         {r.noteCount > 0 && (
-                            <span style={{ position: 'absolute', top: '1px', right: '2px', width: '6px', height: '6px', borderRadius: '3px', background: 'var(--accent-primary)' }} />
+                            <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.6rem', fontWeight: 700, minWidth: '14px', height: '14px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{r.noteCount}</span>
                         )}
                     </button>
                     {/* Renew */}
