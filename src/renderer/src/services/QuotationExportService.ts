@@ -1386,9 +1386,31 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     }
   }
 
-  // Sum Insured (War)
+  // Sum Insured / Limits (War)
   if (data.quotation.quotationTypeCode === 'W' && data.quotation.agreedValue != null) {
-    sectionMap.set('sumInsured', ['Sum Insured', formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD')])
+    const wCur = data.quotation.agreedValueCurrency || 'USD'
+    if (data.quotation.warExcessEnabled) {
+      // Interest section
+      const s1Text = data.quotation.warSection1Text || 'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
+      const s2Text = data.quotation.warSection2Text || 'War Protection and Indemnity in excess of the Hull, Material, Machinery and Outfit'
+      sectionMap.set('interest', ['Interest', `Section 1\n${s1Text}\n\nSection 2\n${s2Text}`])
+
+      // Sum Insured / Limits
+      let limitsText = 'Section 1\n'
+      for (const qv of data.quotationVessels) {
+        const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+        const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+        limitsText += `${vi.name} ${formatCurrency(s1Amt, wCur)}\n`
+      }
+      const excessAmt = data.quotation.warExcessAmount || 0
+      limitsText += `\nSection 2\n${formatCurrency(excessAmt, wCur)}\n`
+      const combinedText = (data.quotation.warCombinedLimitText || 'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.')
+        .replace('{amount}', formatCurrency(excessAmt, wCur))
+      limitsText += `\n${combinedText}`
+      sectionMap.set('sumInsured', ['Sum Insured / Limits', limitsText.trim()])
+    } else {
+      sectionMap.set('sumInsured', ['Sum Insured', formatCurrency(data.quotation.agreedValue, wCur)])
+    }
   }
 
   // War Conditions
@@ -1720,7 +1742,23 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const hullPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
     const piMultiAltPrem = data.piAlternatives.length > 1
 
-    if (hasVesselPremiums) {
+    // War P&I Excess: per-vessel Section 1 + Section 2 premiums
+    const warExcessPrem = q.quotationTypeCode === 'W' && q.warExcessEnabled
+    if (warExcessPrem) {
+      const s1Rate = q.premiumRate || 0
+      const s2Rate = q.warExcessRate || 0
+      const wCur = q.premiumCurrency || q.agreedValueCurrency || 'USD'
+      for (const v of data.quotationVessels) {
+        const vi = getVesselInfo(v, data.allVessels, data.flagStates)
+        const s1Amt = v.agreedValue ?? q.agreedValue ?? 0
+        const s2Amt = (v as any).warExcessAmount ?? q.warExcessAmount ?? 0
+        const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 1000 * 100) / 100
+        const s2Prem = (v as any).warSection2Premium ?? Math.round(s2Amt * s2Rate / 1000 * 100) / 100
+        premText += `${vi.name}\n`
+        premText += `Section 1: ${formatCurrency(s1Prem, wCur)} per annum\n`
+        premText += `Section 2: ${formatCurrency(s2Prem, wCur)} per annum\n\n`
+      }
+    } else if (hasVesselPremiums) {
       for (const v of data.quotationVessels) {
         pdfPremLines.push({ label: (v.name || v.vesselLabel).toUpperCase(), tech: v.premiumAmount || 0 })
       }
@@ -3207,11 +3245,38 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
   }
 
-  // ---- Sum Insured (War) ----
+  // ---- Sum Insured / Interest (War) ----
   if (data.quotation.quotationTypeCode === 'W' && data.quotation.agreedValue != null) {
-    rowMap.set('sumInsured', makeRow('Sum Insured', [
-      bp(formatCurrency(data.quotation.agreedValue, data.quotation.agreedValueCurrency || 'USD'))
-    ]))
+    const dWCur = data.quotation.agreedValueCurrency || 'USD'
+    if (data.quotation.warExcessEnabled) {
+      // Interest section
+      const dS1Text = data.quotation.warSection1Text || 'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
+      const dS2Text = data.quotation.warSection2Text || 'War Protection and Indemnity in excess of the Hull, Material, Machinery and Outfit'
+      rowMap.set('interest', makeRow('Interest', [
+        bup('Section 1'), np(dS1Text), emptyP(),
+        bup('Section 2'), np(dS2Text)
+      ]))
+
+      // Sum Insured / Limits
+      const limContent: (Paragraph | Table)[] = [bup('Section 1')]
+      for (const qv of data.quotationVessels) {
+        const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+        const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+        limContent.push(np(`${vi.name} ${formatCurrency(s1Amt, dWCur)}`))
+      }
+      limContent.push(emptyP(), bup('Section 2'))
+      const dExcessAmt = data.quotation.warExcessAmount || 0
+      limContent.push(np(formatCurrency(dExcessAmt, dWCur)))
+      limContent.push(emptyP())
+      const dCombinedText = (data.quotation.warCombinedLimitText || 'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.')
+        .replace('{amount}', formatCurrency(dExcessAmt, dWCur))
+      limContent.push(np(dCombinedText))
+      rowMap.set('sumInsured', makeRow('Sum Insured / Limits', limContent))
+    } else {
+      rowMap.set('sumInsured', makeRow('Sum Insured', [
+        bp(formatCurrency(data.quotation.agreedValue, dWCur))
+      ]))
+    }
   }
 
   // ---- War Conditions ----
@@ -3720,7 +3785,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       premContent.push(np('per annum'))
       premContent.push(emptyP())
-    } else if (wq.premiumAmount != null || data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId) || data.piAlternatives.length > 1 || (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null)) || (data.lolOptions.length > 0 && data.lolOptions.some(o => o.premiumAmount != null))) {
+    } else if (wq.premiumAmount != null || wq.warExcessEnabled || data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId) || data.piAlternatives.length > 1 || (data.agreedValueOptions.length > 0 && data.agreedValueOptions.some(o => o.premiumAmount != null)) || (data.lolOptions.length > 0 && data.lolOptions.some(o => o.premiumAmount != null))) {
       const wMultiAlt = data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId)
       const wPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
       const wPiMultiAlt = data.piAlternatives.length > 1
@@ -3747,7 +3812,23 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       // Build premium line items: { label, tech, payable? }
       type PremLine = { label: string; tech: number }
       const lines: PremLine[] = []
-      if (wPiMultiAlt) {
+      // War P&I Excess: per-vessel Section 1 + Section 2 premiums
+      const dWarExcessPrem = wq.quotationTypeCode === 'W' && wq.warExcessEnabled
+      if (dWarExcessPrem) {
+        const dS1Rate = wq.premiumRate || 0
+        const dS2Rate = wq.warExcessRate || 0
+        for (const v of data.quotationVessels) {
+          const vi = getVesselInfo(v, data.allVessels, data.flagStates)
+          const s1Amt = v.agreedValue ?? wq.agreedValue ?? 0
+          const s2Amt = (v as any).warExcessAmount ?? wq.warExcessAmount ?? 0
+          const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * dS1Rate / 1000 * 100) / 100
+          const s2Prem = (v as any).warSection2Premium ?? Math.round(s2Amt * dS2Rate / 1000 * 100) / 100
+          premContent.push(bp(vi.name))
+          premContent.push(np(`Section 1: ${formatCurrency(s1Prem, wq.premiumCurrency)} per annum`))
+          premContent.push(np(`Section 2: ${formatCurrency(s2Prem, wq.premiumCurrency)} per annum`))
+          premContent.push(emptyP())
+        }
+      } else if (wPiMultiAlt) {
         for (let ai = 0; ai < data.piAlternatives.length; ai++) {
           const alt = data.piAlternatives[ai]
           lines.push({ label: alt.label || `Alternative ${ai + 1}`, tech: alt.premiumAmount || 0 })

@@ -20,7 +20,7 @@ export const HULL_SECTION_ORDER: string[] = [
 ]
 
 export const WAR_SECTION_ORDER: string[] = [
-    'insured', 'vessel', 'sumInsured', 'period', 'warConditions',
+    'insured', 'vessel', 'interest', 'sumInsured', 'period', 'warConditions',
     'warTrading', 'warranties',
     'ncb', 'upcc', 'premium', 'information'
 ]
