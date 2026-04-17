@@ -317,6 +317,20 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 />
             </div>
 
+            {/* Instalment Schedule (right after count) */}
+            {instalments.length > 0 && (
+                <div style={{ marginBottom: '16px', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <h4 style={{ fontSize: '0.9rem', marginBottom: '8px' }}>Instalment Schedule</h4>
+                    {instalments.map((inst, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, width: '30px' }}>#{inst.instalmentNumber}</span>
+                            <input type="number" value={inst.daysFromInception} onChange={e => updateInstalment(i, 'daysFromInception', parseInt(e.target.value) || 0)} style={{ width: '80px', padding: '4px 6px' }} />
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>days from inception</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {/* Multi-vessel: war excess per-vessel Section 1 + Section 2 */}
             {isMultiVessel && quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
@@ -599,19 +613,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 </div>
             </div>
 
-            {/* Instalment Schedule */}
-            {instalments.length > 0 && (
-                <div style={{ marginBottom: '20px', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                    <h4 style={{ fontSize: '0.9rem', marginBottom: '8px' }}>Instalment Schedule</h4>
-                    {instalments.map((inst, i) => (
-                        <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 600, width: '30px' }}>#{inst.instalmentNumber}</span>
-                            <input type="number" value={inst.daysFromInception} onChange={e => updateInstalment(i, 'daysFromInception', parseInt(e.target.value) || 0)} style={{ width: '80px', padding: '4px 6px' }} />
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>days from inception</span>
-                        </div>
-                    ))}
-                </div>
-            )}
+            {/* Instalment Schedule moved up — right after count input */}
 
             {/* Non-refundable option — below instalment schedule */}
             <div style={{ marginBottom: '20px', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
