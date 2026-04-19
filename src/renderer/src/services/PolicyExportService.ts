@@ -230,9 +230,8 @@ function buildBbcWrcPage(
   const ref = `${data.policyNumber}/${cardType}`
   const inceptionFmt = bcFormatDate(data.inceptionDate)
   const expiryFmt = bcFormatDate(data.expiryDate)
-  const gt = typeof data.grossTonnage === 'number'
-    ? data.grossTonnage.toLocaleString('en-US')
-    : data.grossTonnage
+  const gtNum = typeof data.grossTonnage === 'number' ? data.grossTonnage : parseFloat(String(data.grossTonnage))
+  const gt = !isNaN(gtNum) ? gtNum.toLocaleString('en-US', { maximumFractionDigits: gtNum % 1 === 0 ? 0 : 2 }) : String(data.grossTonnage || '')
   const portOfRegistry = data.portOfRegistry || data.flagState || ''
   const today = bcFormatDate(new Date().toISOString())
   const city = data.closingCity || ''
