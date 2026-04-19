@@ -109,6 +109,9 @@ interface PolicyRecord {
   signedAt: string | null
   signedByName: string | null
   exportSnapshot: string | null
+  sectionOrder: string[] | null
+  selectedLolOptionId: string | null
+  selectedAgreedValueOptionId: string | null
 }
 
 interface Instalment {
@@ -251,6 +254,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [coverageExclusions, setCoverageExclusions] = useState<any[]>([])
   const [coverageClauses, setCoverageClauses] = useState<any[]>([])
   const [coverageSubjectivities, setCoverageSubjectivities] = useState<any[]>([])
+  const [coverageCustomSections, setCoverageCustomSections] = useState<any[]>([])
+  const [coverageLolOptions, setCoverageLolOptions] = useState<any[]>([])
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageExpanded, setCoverageExpanded] = useState<Record<string, boolean>>({})
 
@@ -588,6 +593,15 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         const master = masterSubjMap.get(s.piSubjectivityId)
         return { ...s, text: master?.text || s.text || '' }
       }))
+      // Load custom sections and LOL options
+      try {
+        const [cs, lol] = await Promise.all([
+          window.api.getQuotationCustomSections(policy.quotationId),
+          policy.quotationTypeCode === 'P' || q?.quotationTypeCode === 'P' ? window.api.lolGetOptions(policy.quotationId) : Promise.resolve([])
+        ])
+        setCoverageCustomSections(Array.isArray(cs) ? cs : [])
+        setCoverageLolOptions(Array.isArray(lol) ? lol : [])
+      } catch { /* non-critical */ }
     } catch {
       // Non-critical
     } finally {
@@ -1988,7 +2002,73 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     </div>
                   )}
 
-                  {coverageWarranties.length === 0 && coverageCustomWarranties.length === 0 && coverageDeductibles.length === 0 && coverageExclusions.length === 0 && coverageClauses.length === 0 && coverageSubjectivities.length === 0 && (
+                  {/* LOL Alternatives */}
+                  {coverageLolOptions.length > 0 && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.lolOptions ? '10px' : 0 }}
+                        onClick={() => setCoverageExpanded(prev => ({ ...prev, lolOptions: !prev.lolOptions }))}
+                      >
+                        <ChevronRight size={16} style={{ transform: coverageExpanded.lolOptions ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>LOL Alternatives</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                          {coverageLolOptions.length}
+                        </span>
+                      </div>
+                      {coverageExpanded.lolOptions && (
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {coverageLolOptions.map((opt: any, i: number) => (
+                            <div key={opt.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 600 }}>{opt.label || `Alternative ${i + 1}`}</span>
+                              <span>{opt.currency || 'USD'} {Number(opt.amount || 0).toLocaleString()}</span>
+                              {opt.premiumAmount != null && <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Premium: {Number(opt.premiumAmount).toLocaleString()}</span>}
+                              {policy.selectedLolOptionId === opt.id && <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: isLight ? '#166534' : '#86efac', fontWeight: 600 }}>Selected</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Custom Sections */}
+                  {coverageCustomSections.length > 0 && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.customSections ? '10px' : 0 }}
+                        onClick={() => setCoverageExpanded(prev => ({ ...prev, customSections: !prev.customSections }))}
+                      >
+                        <ChevronRight size={16} style={{ transform: coverageExpanded.customSections ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Custom Sections</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                          {coverageCustomSections.length}
+                        </span>
+                      </div>
+                      {coverageExpanded.customSections && (
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {coverageCustomSections.map((cs: any, i: number) => (
+                            <div key={cs.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                              {cs.title && <div style={{ fontWeight: 600, marginBottom: '2px' }}>{cs.title}</div>}
+                              {cs.text && <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'pre-wrap' }}>{cs.text}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* War Excess Info */}
+                  {quotationData?.warExcessEnabled && (
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(255,176,32,0.06)' : 'rgba(255,176,32,0.08)', border: '1px solid var(--glass-border)' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '8px' }}>War P&I Excess</div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {quotationData.warSection1Text && <div>Section 1: {quotationData.warSection1Text}</div>}
+                        {quotationData.warSection2Text && <div>Section 2: {quotationData.warSection2Text}</div>}
+                        {quotationData.warCombinedLimitText && <div style={{ marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{quotationData.warCombinedLimitText}</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {coverageWarranties.length === 0 && coverageCustomWarranties.length === 0 && coverageDeductibles.length === 0 && coverageExclusions.length === 0 && coverageClauses.length === 0 && coverageSubjectivities.length === 0 && coverageCustomSections.length === 0 && (
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                       No coverage items found in the linked quotation
                     </div>
