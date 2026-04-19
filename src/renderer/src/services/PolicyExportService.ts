@@ -617,7 +617,7 @@ export async function exportBlueCardDocx(
     const headerHtml = sectionTexts?.docHeader
     if (headerHtml) {
       const hSpacing = (sectionTexts as any).docHeaderSpacing || undefined
-      headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hSpacing }))
+      headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hSpacing, spacingAfter: 0 }))
     }
   } catch { /* no header */ }
   // Add policy number + vessel name line
@@ -1231,16 +1231,7 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&gt;/g, '>')
 }
 
-function polGetTypeLabel(typeCode: string | undefined): string {
-  switch (typeCode) {
-    case 'P': return 'PROTECTION AND INDEMNITY'
-    case 'H': return 'HULL AND MACHINERY'
-    case 'W': return 'WAR / PIRACY'
-    case 'F': return 'FDD'
-    case 'L': return 'LOSS OF HIRE'
-    default: return 'PROTECTION AND INDEMNITY'
-  }
-}
+// polGetTypeLabel removed — replaced by configurable headerTitles
 
 function polGetSanctionsText(data: PolicyExportData): string {
   if (data.quotation.sanctionsTextOverride) return data.quotation.sanctionsTextOverride
@@ -2571,7 +2562,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   const headerHtml = polSt(data, 'docHeader')
   const headerSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
   const headerParas = headerHtml
-    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing })
+    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing, spacingAfter: 0 })
     : []
   // Load policy export settings
   let footerText = ''
@@ -2795,34 +2786,6 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
 // ==================== Shared DA/CA Helpers ====================
 
 /** Build the same header paragraphs used by the policy export (company details + title line) */
-async function polBuildAdviceHeader(
-  data: PolicyExportData,
-  titleLine: string
-): Promise<Paragraph[]> {
-  const headerParas: Paragraph[] = []
-  const headerHtml = polSt(data, 'docHeader')
-  const headerSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
-  if (headerHtml) {
-    headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing }))
-  }
-  headerParas.push(new Paragraph({ spacing: { after: 80 }, children: [] }))
-  headerParas.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0 },
-    children: [new TextRun({ text: titleLine, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
-  const vesselName = data.vesselInfo?.name || ''
-  if (vesselName) {
-    headerParas.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0 },
-      children: [new TextRun({ text: `M/V ${vesselName.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-    }))
-  }
-  headerParas.push(new Paragraph({ spacing: { after: 60 }, children: [] }))
-  return headerParas
-}
-
 /** Build footer for DA/CA — footer text only, NO page number */
 async function polBuildAdviceFooter(
   sigBuf: Uint8Array | null
@@ -2966,28 +2929,6 @@ async function polLoadSignature(policyId: string, snapshotSig?: any): Promise<{ 
 }
 
 /** Build the DA/CA instalment table (3-col: label, date, amount) */
-function polBuildInstalmentTable(
-  instalments: PolicyInstalment[],
-  amountFn: (inst: PolicyInstalment) => number,
-  currency: string
-): Table {
-  const labelW = Math.round(POL_BODY_W * 0.40)
-  const dateW = Math.round(POL_BODY_W * 0.35)
-  const amtW = POL_BODY_W - labelW - dateW
-  return new Table({
-    width: { size: POL_BODY_W, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
-    columnWidths: [labelW, dateW, amtW],
-    rows: instalments.map(inst => new TableRow({
-      children: [
-        new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-        new TableCell({ width: { size: dateW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatDateUS(inst.dueDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-        new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(amountFn(inst), currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
-      ]
-    }))
-  })
-}
-
 // ==================== Debit Advice Export ====================
 
 export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
@@ -3198,7 +3139,6 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
-  const typeName = data.quotation.quotationTypeName || polGetTypeLabel(typeCode)
   const currency = data.quotation.premiumCurrency || 'USD'
 
   // Load header title setting
@@ -3219,8 +3159,13 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   // Load signature
   const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
-  // Build header + footer
-  const headerParas = await polBuildAdviceHeader(data, `${headerTitle} ${data.policy.policyNumber}`)
+  // Build header (company details only) + footer
+  const caHeaderParas: Paragraph[] = []
+  const caHeaderHtml = polSt(data, 'docHeader')
+  const caHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  if (caHeaderHtml) {
+    caHeaderParas.push(...parseHtmlToParagraphs(caHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: caHeaderSpacing, spacingAfter: 0 }))
+  }
   const adviceFooter = await polBuildAdviceFooter(sigBuf)
 
   const children: (Paragraph | Table)[] = []
@@ -3236,7 +3181,6 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
         if (line.trim()) children.push(polNp(line.trim()))
       }
     }
-    // Phone / email from entity
     const brokerEntity = data.assureds.find(a => a.role?.toLowerCase().includes('broker'))
     if (brokerEntity) {
       if ((brokerEntity as any).phone) children.push(polNp(`Phone: ${(brokerEntity as any).phone}`))
@@ -3245,17 +3189,17 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
     children.push(polEmptyP())
   }
 
-  // Title block — centered
+  // Title block — centered, compact spacing
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 200, after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'CREDIT ADVICE', size: 28, font: 'Arial', color: '000000', bold: true, underline: {} })]
+    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: 'CREDIT ADVICE', size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
   }))
-  children.push(polCenteredP('In connection with'))
-  children.push(polCenteredP(`${typeName} Certificate ${data.policy.policyNumber}`))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { after: 200, line: 240, lineRule: 'auto' as any },
+    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   }))
 
@@ -3293,13 +3237,18 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const insuredContent = polBuildInsuredSection(data)
   if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
 
-  // CREDIT AMOUNT
-  const totalPremium = data.instalments.reduce((sum, i) => sum + (i.premiumAmount || i.amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
+  // CREDIT AMOUNT — amount + words on same line
+  const totalPremium = data.instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
   const commissionPercent = data.policy.commissionPercent || 0
   const commissionAmount = totalPremium * commissionPercent / 100
   const creditContent: (Paragraph | Table)[] = [
-    polBp(polFormatCurrency(commissionAmount, currency)),
-    polNp(`(${numberToWords(commissionAmount, currency)})`)
+    new Paragraph({
+      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({ text: polFormatCurrency(Math.round(commissionAmount * 100) / 100, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+        new TextRun({ text: ` (${numberToWords(Math.round(commissionAmount * 100) / 100, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+      ]
+    })
   ]
   rows.push(makeRow('Credit Amount', creditContent))
 
@@ -3311,17 +3260,25 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   if (data.instalments.length > 0) {
     const numInst = data.instalments.length
     if (numInst === 1) {
-      detailsContent.push(polNp('Commission payable in a single instalment.'))
+      detailsContent.push(polNp(`Commission payable on ${polFormatDateUS(data.instalments[0].dueDate)}.`))
     } else {
       detailsContent.push(polNp(`Commission payable in ${numInst} instalments:`))
     }
-    detailsContent.push(polEmptyP())
-
-    detailsContent.push(polBuildInstalmentTable(
-      data.instalments,
-      (inst) => inst.commissionAmount != null ? inst.commissionAmount : ((inst.premiumAmount || inst.amount || 0) * commissionPercent / 100),
-      currency
-    ))
+    if (numInst > 1) {
+      detailsContent.push(polEmptyP())
+      const caInstDescW = Math.round(POL_BODY_W * 0.55)
+      const caInstAmtW = POL_BODY_W - caInstDescW
+      const caInstRows = data.instalments.map(inst => {
+        const commAmt = inst.commissionAmount != null ? inst.commissionAmount : Math.round(((inst as any).premiumAmount || (inst as any).amount || 0) * commissionPercent / 100 * 100) / 100
+        return new TableRow({
+          children: [
+            new TableCell({ width: { size: caInstDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: caInstAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(commAmt, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          ]
+        })
+      })
+      detailsContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
+    }
   }
   rows.push(makeRow('Details', detailsContent))
 
@@ -3347,7 +3304,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
     numbering: polMakeDocxNumbering(),
     sections: [{
       properties: polMakePageProperties(),
-      headers: { default: new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] }) },
+      headers: { default: new Header({ children: caHeaderParas.length > 0 ? caHeaderParas : [polEmptyP()] }) },
       footers: { default: adviceFooter },
       children: children as any[]
     }]
