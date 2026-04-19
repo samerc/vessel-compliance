@@ -672,13 +672,19 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
   // Build owner options from vessel assureds
   const ownerOptions = useMemo(() => {
-    const opts: Array<{ id: string; name: string; address?: string }> = []
+    const opts: Array<{ id: string; name: string; address?: string; role?: string }> = []
     for (const va of vesselAssureds) {
       const entity = assuredEntities.find((e) => e.id === va.entityId)
       if (entity) {
-        opts.push(entity)
+        opts.push({ ...entity, role: va.role })
       }
     }
+    // Sort: "Registered Owner" roles first
+    opts.sort((a, b) => {
+      const aIsOwner = a.role?.toLowerCase().includes('registered owner') ? 0 : 1
+      const bIsOwner = b.role?.toLowerCase().includes('registered owner') ? 0 : 1
+      return aIsOwner - bIsOwner
+    })
     return opts
   }, [vesselAssureds, assuredEntities])
 

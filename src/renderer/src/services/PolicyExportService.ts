@@ -635,8 +635,8 @@ export async function exportBlueCardDocx(
           margin: {
             top: 1200,
             bottom: 1000,
-            left: 1200,
-            right: 1200,
+            left: 900,
+            right: 900,
           },
         },
       },
