@@ -1594,10 +1594,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
             }
           }
         } else {
-          t += `${formatCurrency(d.amount, d.currency)}  \u2014  ${mainDesc}${dScope}\n`
+          const dedPrevSuffix = d.previousAmount != null && d.previousAmount !== d.amount ? ` (previously ${formatCurrency(d.previousAmount, d.currency)})` : ''
+          t += `${formatCurrency(d.amount, d.currency)}${dedPrevSuffix}  \u2014  ${mainDesc}${dScope}\n`
           if (d.secondaryDescription) {
             const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, d.secondaryAmount)
-            t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}  \u2014  ${secDesc}\n`
+            const secPrevSuffix = d.previousSecondaryAmount != null && d.previousSecondaryAmount !== (d.secondaryAmount ?? 0) ? ` (previously ${formatCurrency(d.previousSecondaryAmount, d.currency)})` : ''
+            t += `${d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : ''}${secPrevSuffix}  \u2014  ${secDesc}\n`
           }
         }
       }
@@ -1736,7 +1738,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const hasVesselPremiums = isMultiVessel && data.quotationVessels.some(v => v.premiumAmount)
 
     // Build premium line items
-    type PDFPremLine = { label: string; tech: number }
+    type PDFPremLine = { label: string; tech: number; prev?: number }
     const pdfPremLines: PDFPremLine[] = []
     const hullMultiAlt = data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId)
     const hullPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
@@ -1755,12 +1757,14 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 100 * 100) / 100
         const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * s2Rate / 100 * 100) / 100
         premText += `${vi.name}\n`
-        premText += `Section 1: ${formatCurrency(s1Prem, wCur)} per annum\n`
-        premText += `Section 2: ${formatCurrency(s2Prem, wCur)} per annum\n\n`
+        const prevS1 = v.previousSection1Premium
+        const prevS2 = v.previousSection2Premium
+        premText += `Section 1: ${formatCurrency(s1Prem, wCur)} per annum${prevS1 != null && prevS1 !== s1Prem ? ` (previously ${formatCurrency(prevS1, wCur)})` : ''}\n`
+        premText += `Section 2: ${formatCurrency(s2Prem, wCur)} per annum${prevS2 != null && prevS2 !== s2Prem ? ` (previously ${formatCurrency(prevS2, wCur)})` : ''}\n\n`
       }
     } else if (hasVesselPremiums) {
       for (const v of data.quotationVessels) {
-        pdfPremLines.push({ label: (v.name || v.vesselLabel).toUpperCase(), tech: v.premiumAmount || 0 })
+        pdfPremLines.push({ label: (v.name || v.vesselLabel).toUpperCase(), tech: v.premiumAmount || 0, prev: v.previousPremium ?? undefined })
       }
     } else if (piMultiAltPrem) {
       for (let ai = 0; ai < data.piAlternatives.length; ai++) {
@@ -1799,6 +1803,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
     }
 
+    // Helper: append "(previously USD X)" when previous value exists and differs
+    const prevSuffix = (l: PDFPremLine) => l.prev != null && l.prev !== l.tech ? ` (previously ${formatCurrency(l.prev, q.premiumCurrency)})` : ''
+    const prevQSuffix = q.previousPremiumAmount != null && q.previousPremiumAmount !== (q.premiumAmount || 0) ? ` (previously ${formatCurrency(q.previousPremiumAmount, q.premiumCurrency)})` : ''
+
     const useTable = pdfPremLines.length > 1 || (pdfPremLines.length === 1 && hasDiscount)
     if (useTable) {
       const fc = (n: number) => formatCurrency(n, q.premiumCurrency)
@@ -1807,7 +1815,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         if (hasVesselPremiums) {
           premText += 'Technical Premium\n'
           for (const l of pdfPremLines) {
-            premText += `${l.label}    ${fc(l.tech)}${pa}\n`
+            premText += `${l.label}    ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
           }
           const totalTech = pdfPremLines.reduce((s, l) => s + l.tech, 0)
           premText += `Total    ${fc(totalTech)}${pa}\n`
@@ -1820,7 +1828,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         } else {
           if (pdfPremLines.length > 1) premText += 'Technical Premium\n'
           for (const l of pdfPremLines) {
-            premText += `${l.label || 'Technical Premium'}  ${fc(l.tech)}${pa}\n`
+            premText += `${l.label || 'Technical Premium'}  ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
           }
           if (pdfPremLines.length > 1) premText += '\nPayable Premium\n'
           for (const l of pdfPremLines) {
@@ -1830,19 +1838,19 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       } else {
         if (hasVesselPremiums) {
           for (const l of pdfPremLines) {
-            premText += `${l.label}  :  ${fc(l.tech)}${pa}\n`
+            premText += `${l.label}  :  ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
           }
           const totalTech = pdfPremLines.reduce((s, l) => s + l.tech, 0)
           premText += `Total  :  ${fc(totalTech)}${pa}\n`
         } else {
           for (const l of pdfPremLines) {
-            premText += `${l.label}  ${fc(l.tech)}${pa}\n`
+            premText += `${l.label}  ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
           }
         }
       }
       premText += '\n'
     } else if (pdfPremLines.length === 1) {
-      premText += `${formatCurrency(pdfPremLines[0].tech, q.premiumCurrency)} per annum\n\n`
+      premText += `${formatCurrency(pdfPremLines[0].tech, q.premiumCurrency)} per annum${prevSuffix(pdfPremLines[0]) || prevQSuffix}\n\n`
     }
     const numInst = q.numInstalments || 1
     const firstInstDays = data.instalments.length > 0 ? data.instalments[0].daysFromInception : 0
@@ -3589,17 +3597,25 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             }
           }
         } else {
+          const dedAmtRuns: TextRun[] = [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: dedColor })]
+          if (d.previousAmount != null && d.previousAmount !== d.amount) {
+            dedAmtRuns.push(new TextRun({ text: ` (previously ${formatCurrency(d.previousAmount, d.currency)})`, size: 20, font: 'Arial', color: RED }))
+          }
           dedRows.push(new TableRow({
             children: [
-              new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(d.amount, d.currency), size: 22, font: 'Arial', color: dedColor })] })] }),
+              new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: dedAmtRuns })] }),
               new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: mainDesc + dScope, size: 22, font: 'Arial', color: dedColor })] })] })
             ]
           }))
           if (d.secondaryDescription) {
             const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, d.secondaryAmount)
+            const secAmtRuns: TextRun[] = [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: dedColor })]
+            if (d.previousSecondaryAmount != null && d.previousSecondaryAmount !== (d.secondaryAmount ?? 0)) {
+              secAmtRuns.push(new TextRun({ text: ` (previously ${formatCurrency(d.previousSecondaryAmount, d.currency)})`, size: 20, font: 'Arial', color: RED }))
+            }
             dedRows.push(new TableRow({
               children: [
-                new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: dedColor })] })] }),
+                new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: secAmtRuns })] }),
                 new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: 22, font: 'Arial', color: dedColor })] })] })
               ]
             }))
@@ -3814,13 +3830,27 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         ]
       })
 
+      // Helper: build previous premium annotation in red for per-vessel DOCX
+      const vpPrevRun = (v: QuotationVessel) => {
+        if (v.previousPremium != null && v.previousPremium !== (v.premiumAmount || 0)) {
+          return new TextRun({ text: ` (previously ${formatCurrency(v.previousPremium, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED })
+        }
+        return null
+      }
+
       if (wHasDiscount) {
         const discRows: TableRow[] = []
         discRows.push(new TableRow({ children: [
           new TableCell({ borders: noBorders(), columnSpan: 2, width: { size: BODY_W, type: WidthType.DXA }, children: [bp('Technical Premium')] })
         ] }))
         for (const v of data.quotationVessels) {
-          discRows.push(vpRow2((v.name || v.vesselLabel).toUpperCase(), formatCurrency(v.premiumAmount || 0, wq.premiumCurrency)))
+          const prevR = vpPrevRun(v)
+          const amtRuns: TextRun[] = [new TextRun({ text: formatCurrency(v.premiumAmount || 0, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })]
+          if (prevR) amtRuns.push(prevR)
+          discRows.push(new TableRow({ children: [
+            vpCell((v.name || v.vesselLabel).toUpperCase(), true, vpNameW),
+            new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [new Paragraph({ children: amtRuns })] })
+          ] }))
         }
         const totalTech = data.quotationVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
         discRows.push(vpRow2('Total', formatCurrency(totalTech, wq.premiumCurrency)))
@@ -3838,7 +3868,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       } else {
         const simpleRows: TableRow[] = []
         for (const v of data.quotationVessels) {
-          simpleRows.push(vpRow3((v.name || v.vesselLabel).toUpperCase(), formatCurrency(v.premiumAmount || 0, wq.premiumCurrency)))
+          const prevR = vpPrevRun(v)
+          if (prevR) {
+            // Custom row with red previous text
+            const amtRuns: TextRun[] = [new TextRun({ text: formatCurrency(v.premiumAmount || 0, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' }), prevR]
+            simpleRows.push(new TableRow({ children: [
+              vpCell((v.name || v.vesselLabel).toUpperCase(), true, vpNameW),
+              vpCell(':', false, vpColonW),
+              new TableCell({ borders: noBorders(), width: { size: vpAmtW, type: WidthType.DXA }, children: [new Paragraph({ children: amtRuns })] })
+            ] }))
+          } else {
+            simpleRows.push(vpRow3((v.name || v.vesselLabel).toUpperCase(), formatCurrency(v.premiumAmount || 0, wq.premiumCurrency)))
+          }
         }
         const totalTech = data.quotationVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
         simpleRows.push(vpRow3('Total', formatCurrency(totalTech, wq.premiumCurrency)))
@@ -3870,8 +3911,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         rows
       })
 
-      // Build premium line items: { label, tech, payable? }
-      type PremLine = { label: string; tech: number }
+      // Build premium line items: { label, tech, prev? }
+      type PremLine = { label: string; tech: number; prev?: number }
       const lines: PremLine[] = []
       // War P&I Excess: per-vessel Section 1 + Section 2 premiums
       const dWarExcessPrem = wq.quotationTypeCode === 'W' && wq.warExcessEnabled
@@ -3885,8 +3926,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * dS1Rate / 100 * 100) / 100
           const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * dS2Rate / 100 * 100) / 100
           premContent.push(bp(vi.name))
-          premContent.push(np(`Section 1: ${formatCurrency(s1Prem, wq.premiumCurrency)} per annum`))
-          premContent.push(np(`Section 2: ${formatCurrency(s2Prem, wq.premiumCurrency)} per annum`))
+          const dPrevS1 = v.previousSection1Premium
+          const dPrevS2 = v.previousSection2Premium
+          const s1Runs: TextRun[] = [new TextRun({ text: `Section 1: ${formatCurrency(s1Prem, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial' })]
+          if (dPrevS1 != null && dPrevS1 !== s1Prem) s1Runs.push(new TextRun({ text: ` (previously ${formatCurrency(dPrevS1, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+          premContent.push(new Paragraph({ children: s1Runs }))
+          const s2Runs: TextRun[] = [new TextRun({ text: `Section 2: ${formatCurrency(s2Prem, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial' })]
+          if (dPrevS2 != null && dPrevS2 !== s2Prem) s2Runs.push(new TextRun({ text: ` (previously ${formatCurrency(dPrevS2, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+          premContent.push(new Paragraph({ children: s2Runs }))
           premContent.push(emptyP())
         }
       } else if (wPiMultiAlt) {
@@ -3952,7 +3999,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       } else if (!dWarExcessPrem) {
         // Single premium, no discount — plain bold text (skip if war excess already rendered)
         const premChanged = origData && origData.quotation.premiumAmount !== wq.premiumAmount
-        premContent.push(bp(`${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`, premChanged ? RED : undefined))
+        const singlePremRuns: TextRun[] = [new TextRun({ text: `${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: premChanged ? RED : '000000' })]
+        if (wq.previousPremiumAmount != null && wq.previousPremiumAmount !== (wq.premiumAmount || 0)) {
+          singlePremRuns.push(new TextRun({ text: ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+        }
+        premContent.push(new Paragraph({ children: singlePremRuns }))
         premContent.push(emptyP())
       }
     }

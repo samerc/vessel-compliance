@@ -279,11 +279,13 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Section 1:</span>
                                             <input type="number" value={v.warSection1Premium ?? (s1Prem || '')} onChange={e => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warSection1Premium: parseFloat(e.target.value) || undefined } : qv))} onBlur={e => window.api.updateQuotationVessel(v.id, { warSection1Premium: parseFloat(e.target.value) || null } as any)} placeholder={`Auto: ${s1Prem.toLocaleString()}`} style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }} />
                                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                            {v.previousSection1Premium != null && <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>Previous: {currency} {v.previousSection1Premium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                                         </div>
                                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Section 2:</span>
                                             <input type="number" value={v.warSection2Premium ?? (s2Prem || '')} onChange={e => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warSection2Premium: parseFloat(e.target.value) || undefined } : qv))} onBlur={e => window.api.updateQuotationVessel(v.id, { warSection2Premium: parseFloat(e.target.value) || null } as any)} placeholder={`Auto: ${s2Prem.toLocaleString()}`} style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }} />
                                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                            {v.previousSection2Premium != null && <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>Previous: {currency} {v.previousSection2Premium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                                         </div>
                                     </div>
                                 )
@@ -297,6 +299,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 </label>
                                 <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
                                 <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                {quotation.previousPremiumAmount != null && <span style={{ fontSize: '0.72rem', color: 'var(--danger)', marginLeft: '4px' }}>Previous: {currency} {quotation.previousPremiumAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                             </div>
                             {quotation.quotationTypeCode === 'H' && quotation.ivEnabled && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
@@ -359,11 +362,13 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Section 1:</span>
                                     <input type="number" value={v.warSection1Premium ?? (s1Prem || '')} onChange={e => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warSection1Premium: parseFloat(e.target.value) || undefined } : qv))} onBlur={e => window.api.updateQuotationVessel(v.id, { warSection1Premium: parseFloat(e.target.value) || null } as any)} placeholder={`Auto: ${s1Prem.toLocaleString()}`} style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }} />
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                    {v.previousSection1Premium != null && <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>Previous: {currency} {v.previousSection1Premium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>Section 2:</span>
                                     <input type="number" value={v.warSection2Premium ?? (s2Prem || '')} onChange={e => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warSection2Premium: parseFloat(e.target.value) || undefined } : qv))} onBlur={e => window.api.updateQuotationVessel(v.id, { warSection2Premium: parseFloat(e.target.value) || null } as any)} placeholder={`Auto: ${s2Prem.toLocaleString()}`} style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }} />
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                    {v.previousSection2Premium != null && <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>Previous: {currency} {v.previousSection2Premium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                                 </div>
                             </div>
                         )
@@ -372,13 +377,16 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
             )}
 
             {/* Multi-vessel: per-vessel premium table (standard, non-war-excess) */}
-            {isMultiVessel && !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled) && (
+            {isMultiVessel && !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled) && (() => {
+                const hasPrevPremiums = qVessels.some(v => v.previousPremium != null)
+                return (
                 <div style={{ marginBottom: '16px' }}>
-                    <table style={{ borderCollapse: 'collapse', width: '100%', maxWidth: '600px', fontSize: '0.82rem' }}>
+                    <table style={{ borderCollapse: 'collapse', width: '100%', maxWidth: '700px', fontSize: '0.82rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
                                 <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 500 }}>Vessel</th>
                                 <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 500 }}>{premiumLabel} ({currency})</th>
+                                {hasPrevPremiums && <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--danger)', fontWeight: 500 }}>Previous</th>}
                                 {hasDiscount && <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 500 }}>Payable ({currency})</th>}
                             </tr>
                         </thead>
@@ -395,6 +403,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                                             <input type="number" value={v.premiumAmount || ''} onChange={e => setQVessels(prev => prev.map(pv => pv.id === v.id ? { ...pv, premiumAmount: parseFloat(e.target.value) || undefined } : pv))} onBlur={e => updateVesselPremium(v.id, parseFloat(e.target.value) || null)} style={{ width: '130px', padding: '3px 6px', textAlign: 'right' }} />
                                         </td>
+                                        {hasPrevPremiums && <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '0.78rem', color: 'var(--danger)' }}>{v.previousPremium != null ? v.previousPremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>}
                                         {hasDiscount && <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>{vPrem > 0 ? vPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>}
                                     </tr>
                                 )
@@ -402,6 +411,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                             <tr style={{ fontWeight: 700 }}>
                                 <td style={{ padding: '8px 10px' }}>Total</td>
                                 <td style={{ padding: '8px 10px', textAlign: 'right' }}>{technicalPremium > 0 ? technicalPremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+                                {hasPrevPremiums && <td />}
                                 {hasDiscount && <td style={{ padding: '8px 10px', textAlign: 'right' }}>{technicalPremium > 0 ? payablePremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>}
                             </tr>
                         </tbody>
@@ -419,7 +429,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         />
                     </div>
                 </div>
-            )}
+            )})()}
 
             {/* Payable Premium summary (single vessel only) */}
             {!isMultiVessel && hasDiscount && technicalPremium > 0 && (() => {

@@ -2979,6 +2979,31 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: previous_* columns for renewal comparison
+            try {
+                const [pvCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'previous_premium'") as any[]
+                if ((pvCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN previous_premium DECIMAL(15,2) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN previous_section1_premium DECIMAL(15,2) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN previous_section2_premium DECIMAL(15,2) DEFAULT NULL")
+                }
+            } catch {}
+
+            try {
+                const [pqCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'previous_premium_amount'") as any[]
+                if ((pqCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN previous_premium_amount DECIMAL(15,2) DEFAULT NULL")
+                }
+            } catch {}
+
+            try {
+                const [pdCol] = await this.pool.query("SHOW COLUMNS FROM quotation_deductibles LIKE 'previous_amount'") as any[]
+                if ((pdCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_deductibles ADD COLUMN previous_amount DECIMAL(15,2) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotation_deductibles ADD COLUMN previous_secondary_amount DECIMAL(15,2) DEFAULT NULL")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -6633,7 +6658,8 @@ export class MySQLAdapter {
                     COALESCE(v.call_sign, qv.call_sign) as callSign,
                     qv.premium_amount as premiumAmount,
                     qv.agreed_value as agreedValue, qv.iv_value as ivValue,
-                    qv.war_excess_amount as warExcessAmount, qv.war_section1_premium as warSection1Premium, qv.war_section2_premium as warSection2Premium
+                    qv.war_excess_amount as warExcessAmount, qv.war_section1_premium as warSection1Premium, qv.war_section2_premium as warSection2Premium,
+                    qv.previous_premium as previousPremium, qv.previous_section1_premium as previousSection1Premium, qv.previous_section2_premium as previousSection2Premium
              FROM quotation_vessels qv
              LEFT JOIN vessels v ON qv.vessel_id = v.id
              LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
@@ -6651,7 +6677,10 @@ export class MySQLAdapter {
             ivValue: r.ivValue != null ? Number(r.ivValue) : null,
             warExcessAmount: r.warExcessAmount != null ? Number(r.warExcessAmount) : null,
             warSection1Premium: r.warSection1Premium != null ? Number(r.warSection1Premium) : null,
-            warSection2Premium: r.warSection2Premium != null ? Number(r.warSection2Premium) : null
+            warSection2Premium: r.warSection2Premium != null ? Number(r.warSection2Premium) : null,
+            previousPremium: r.previousPremium != null ? Number(r.previousPremium) : null,
+            previousSection1Premium: r.previousSection1Premium != null ? Number(r.previousSection1Premium) : null,
+            previousSection2Premium: r.previousSection2Premium != null ? Number(r.previousSection2Premium) : null
         }))
     }
 
@@ -6670,7 +6699,7 @@ export class MySQLAdapter {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', orderIndex: 'order_index', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value', warExcessAmount: 'war_excess_amount', warSection1Premium: 'war_section1_premium', warSection2Premium: 'war_section2_premium' }
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', orderIndex: 'order_index', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value', warExcessAmount: 'war_excess_amount', warSection1Premium: 'war_section1_premium', warSection2Premium: 'war_section2_premium', previousPremium: 'previous_premium', previousSection1Premium: 'previous_section1_premium', previousSection2Premium: 'previous_section2_premium' }
         for (const [key, col] of Object.entries(colMap)) {
             if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
         }
@@ -7492,6 +7521,7 @@ export class MySQLAdapter {
                 q.war_section1_text, q.war_section2_text, q.war_combined_limit_text,
                 q.voyage_text,
                 q.cargo_clause_id as cargoClauseId,
+                q.previous_premium_amount as previousPremiumAmount,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
@@ -7516,6 +7546,7 @@ export class MySQLAdapter {
             limitOfLiabilityVesselAmounts: r.limitOfLiabilityVesselAmountsRaw ? (() => { try { return JSON.parse(r.limitOfLiabilityVesselAmountsRaw) } catch { return null } })() : null,
             limitOfLiabilityVesselAmountsRaw: undefined,
             premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
+            previousPremiumAmount: r.previousPremiumAmount != null ? Number(r.previousPremiumAmount) : null,
             ncbDiscountType: r.ncbDiscountType || 'percentage',
             ncbDiscountPercent: r.ncbDiscountPercent ? Number(r.ncbDiscountPercent) : undefined,
             ncbDiscountAmount: r.ncbDiscountAmount ? Number(r.ncbDiscountAmount) : undefined,
@@ -7641,6 +7672,7 @@ export class MySQLAdapter {
             warCombinedLimitText: 'war_combined_limit_text',
             voyageText: 'voyage_text',
             cargoClauseId: 'cargo_clause_id',
+            previousPremiumAmount: 'previous_premium_amount',
         }
         const fields: string[] = []
         const values: any[] = []
@@ -8332,7 +8364,7 @@ export class MySQLAdapter {
                     insured_value_amount, insured_value_currency, insured_value_text,
                     port_of_loading, port_of_destination, estimated_departure,
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id
+                    cargo_clause_id, previous_premium_amount
                 )
                 SELECT
                     ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
@@ -8353,14 +8385,29 @@ export class MySQLAdapter {
                     insured_value_amount, insured_value_currency, insured_value_text,
                     port_of_loading, port_of_destination, estimated_departure,
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id
+                    cargo_clause_id, premium_amount
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newPeriodText, newId, createdBy, policyId, policy.policyNumber || null, source.id])
 
             // 4. Clone all junction tables
             await this.cloneQuotationJunctions(source.id, newId)
 
-            // 5. Refresh vessel details from current DB data
+            // 5. Copy current per-vessel premiums as previous values for renewal comparison
+            await this.pool.execute(
+                `UPDATE quotation_vessels SET
+                    previous_premium = premium_amount,
+                    previous_section1_premium = war_section1_premium,
+                    previous_section2_premium = war_section2_premium
+                 WHERE quotation_id = ?`, [newId])
+
+            // 6. Copy current deductible amounts as previous values for renewal comparison
+            await this.pool.execute(
+                `UPDATE quotation_deductibles SET
+                    previous_amount = amount,
+                    previous_secondary_amount = secondary_amount
+                 WHERE quotation_id = ?`, [newId])
+
+            // 7. Refresh vessel details from current DB data
             const [qVessels] = await this.pool.query(
                 'SELECT id, vessel_id FROM quotation_vessels WHERE quotation_id = ?', [newId]
             )
@@ -8999,9 +9046,10 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_deductible_id as piDeductibleId, title, description, amount, currency,
-                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId, vessel_amounts as vesselAmounts
+                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId, vessel_amounts as vesselAmounts,
+                previous_amount as previousAmount, previous_secondary_amount as previousSecondaryAmount
              FROM quotation_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null }))
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, previousAmount: r.previousAmount != null ? Number(r.previousAmount) : null, previousSecondaryAmount: r.previousSecondaryAmount != null ? Number(r.previousSecondaryAmount) : null }))
     }
 
     async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[]; vesselAmounts?: Record<string, number> | null }): Promise<any> {
@@ -9013,7 +9061,7 @@ export class MySQLAdapter {
         return { id, ...data }
     }
 
-    async updateQuotationDeductible(id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null; vesselAmounts?: Record<string, number> | null }): Promise<void> {
+    async updateQuotationDeductible(id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null; vesselAmounts?: Record<string, number> | null; previousAmount?: number | null; previousSecondaryAmount?: number | null }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
@@ -9025,6 +9073,8 @@ export class MySQLAdapter {
         if (updates.secondaryDescription !== undefined) { fields.push('secondary_description = ?'); values.push(updates.secondaryDescription) }
         if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
         if (updates.vesselAmounts !== undefined) { fields.push('vessel_amounts = ?'); values.push(updates.vesselAmounts ? JSON.stringify(updates.vesselAmounts) : null) }
+        if (updates.previousAmount !== undefined) { fields.push('previous_amount = ?'); values.push(updates.previousAmount) }
+        if (updates.previousSecondaryAmount !== undefined) { fields.push('previous_secondary_amount = ?'); values.push(updates.previousSecondaryAmount) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_deductibles SET ${fields.join(', ')} WHERE id = ?`, values)

@@ -194,10 +194,12 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         {!(qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts)) && (
                             <input type="number" defaultValue={d.amount} onBlur={e => handleUpdate(d.id, { amount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         )}
+                        {d.previousAmount != null && <span style={{ fontSize: '0.68rem', color: 'var(--danger)' }}>Prev: {d.currency} {d.previousAmount.toLocaleString()}</span>}
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
                                 <input type="number" defaultValue={d.secondaryAmount || 0} onBlur={e => handleUpdate(d.id, { secondaryAmount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                                {d.previousSecondaryAmount != null && <span style={{ fontSize: '0.68rem', color: 'var(--danger)' }}>Prev: {d.currency} {d.previousSecondaryAmount.toLocaleString()}</span>}
                             </>
                         )}
                         {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>custom</span>}

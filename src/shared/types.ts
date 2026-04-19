@@ -1116,6 +1116,7 @@ export interface Quotation {
   warCombinedLimitText?: string
   voyageText?: string
   cargoClauseId?: string
+  previousPremiumAmount?: number | null
   createdAt?: string
   updatedAt?: string
   createdBy?: string
@@ -1175,6 +1176,9 @@ export interface QuotationVessel {
   warExcessAmount?: number | null
   warSection1Premium?: number | null
   warSection2Premium?: number | null
+  previousPremium?: number | null
+  previousSection1Premium?: number | null
+  previousSection2Premium?: number | null
 }
 
 export interface QuotationSubLimit {
@@ -1199,6 +1203,8 @@ export interface QuotationDeductible {
   vesselScope?: string[] | null
   alternativeId?: string | null
   vesselAmounts?: Record<string, number> | null
+  previousAmount?: number | null
+  previousSecondaryAmount?: number | null
 }
 
 export interface PITextDeductible {
