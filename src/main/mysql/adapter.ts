@@ -10519,7 +10519,8 @@ export class MySQLAdapter {
         const quotation = await this.getQuotation(quotationId)
         if (!quotation) throw new Error('Quotation not found')
 
-        // Generate POL-DRAFT numbers for new policies — real numbers assigned on signing
+        // Generate POL-DRAFT-{code}-XXXX numbers — real numbers assigned on signing
+        const typeCode = quotation.quotationTypeCode || ''
         const polDraftSeqVal = await this.getSetting('draft_policy_seq')
         let polDraftSeq = (parseInt(polDraftSeqVal || '0', 10) || 0)
 
@@ -10531,7 +10532,7 @@ export class MySQLAdapter {
             // Resolve actual vessel_id (vid might be quotation_vessels junction ID or actual vessel ID)
             const actualVesselId = vessel?.vesselId || vid
             polDraftSeq++
-            const policyNumber = `POL-DRAFT-${String(polDraftSeq).padStart(4, '0')}`
+            const policyNumber = typeCode ? `POL-DRAFT-${typeCode}-${String(polDraftSeq).padStart(4, '0')}` : `POL-DRAFT-${String(polDraftSeq).padStart(4, '0')}`
             const policyId = uuidv4()
 
             // Get payable premium: sum of instalments (most accurate) or vessel premium or quotation premium
