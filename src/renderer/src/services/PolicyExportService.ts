@@ -962,6 +962,15 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
           if (names.length > 0) vesselClassificationNames[qv.id] = names.join(' / ')
         }
       } catch {}
+      // Fallback: if junction table empty, resolve classificationSociety ID from vessel
+      if (!vesselClassificationNames[qv.id] && qv.vesselId) {
+        const realV = (Array.isArray(quotationVessels) ? quotationVessels : []).find(v => v.id === qv.id)
+        const classId = realV?.classification || (safeQV.find(v => v.id === qv.id) as any)?.classification
+        if (classId) {
+          const cs = classSocieties.find((s: any) => s.id === classId || s.name === classId || s.abbreviation === classId)
+          if (cs) vesselClassificationNames[qv.id] = cs.abbreviation ? `${cs.name} (${cs.abbreviation})` : cs.name
+        }
+      }
     }
   } catch {}
 
@@ -2076,9 +2085,7 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
     }))
   }
   if (data.textDeductibles.length > 0) {
-    content.push(polEmptyP())
     for (const td of data.textDeductibles) {
-      if (td.title) content.push(polBp(td.title))
       content.push(...polMp(td.text))
     }
   }
@@ -2457,20 +2464,42 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
   }
 
-  // QR Verification reference — P&I only
+  // QR Verification — P&I only: QR code image + URL with IMO number
   try {
     const qrBase = data.quotation.quotationTypeCode === 'P' ? await window.api.getSetting('qr_verification_url') : null
-    if (qrBase) {
-      const qrFullUrl = `${qrBase}${encodeURIComponent(data.policy.policyNumber)}`
-      children.push(polEmptyP())
-      children.push(new Paragraph({
-        spacing: { before: 0, after: 60 },
-        children: [
-          new TextRun({ text: 'Verify: ', size: POL_FONT_SIZE - 2, font: 'Arial', color: '666666', italics: true }),
-          new TextRun({ text: qrFullUrl, size: POL_FONT_SIZE - 2, font: 'Arial', color: '0066CC', italics: true })
-        ]
-      }))
-      children.push(polEmptyP())
+    if (qrBase && data.vesselInfo.imo) {
+      const qrFullUrl = `${qrBase}${data.vesselInfo.imo}`
+      // Generate QR code as PNG buffer
+      try {
+        const QRCode = await import('qrcode')
+        const qrDataUrl = await QRCode.toDataURL(qrFullUrl, { width: 120, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+        const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '')
+        const qrBuffer = Uint8Array.from(atob(qrBase64), c => c.charCodeAt(0))
+        children.push(polEmptyP())
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 40 },
+          children: [new ImageRun({ data: qrBuffer, transformation: { width: 80, height: 80 }, type: 'png' })]
+        }))
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 60 },
+          children: [new TextRun({ text: qrFullUrl, size: POL_FONT_SIZE - 4, font: 'Arial', color: '666666', italics: true })]
+        }))
+        children.push(polEmptyP())
+      } catch {
+        // Fallback: just show URL text if QR generation fails
+        children.push(polEmptyP())
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 60 },
+          children: [
+            new TextRun({ text: 'Verify: ', size: POL_FONT_SIZE - 2, font: 'Arial', color: '666666', italics: true }),
+            new TextRun({ text: qrFullUrl, size: POL_FONT_SIZE - 2, font: 'Arial', color: '0066CC', italics: true })
+          ]
+        }))
+        children.push(polEmptyP())
+      }
     }
   } catch { /* no QR url configured */ }
 

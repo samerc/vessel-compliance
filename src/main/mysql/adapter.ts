@@ -3033,6 +3033,14 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } catch {}
 
+            // Migration: order column on policy_doc_addresses
+            try {
+                const [oCols] = await this.pool.query("SHOW COLUMNS FROM policy_doc_addresses LIKE 'order'") as any[]
+                if ((oCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_doc_addresses ADD COLUMN `order` INT DEFAULT 0")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -10214,6 +10222,7 @@ export class MySQLAdapter {
             FROM policy_doc_addresses pda
             LEFT JOIN entities e ON pda.entity_id = e.id
             WHERE pda.policy_doc_id = ?
+            ORDER BY pda.\`order\` ASC, pda.id ASC
         `, [policyId])
         return rows as any[]
     }
@@ -10565,21 +10574,47 @@ export class MySQLAdapter {
                     inst.commissionAmount, inst.isNonRefundable])
             }
 
-            // Create addresses from vessel assureds
-            const [assureds] = await this.pool.query(`
-                SELECT va.entity_id, va.role, e.name as entityName,
-                    COALESCE(ea.address_line1, '') as addressText
-                FROM vessel_assureds va
-                JOIN entities e ON va.entity_id = e.id
-                LEFT JOIN entity_addresses ea ON va.address_id = ea.id
-                WHERE va.vessel_id = ?
-                ORDER BY va.id
-            `, [actualVesselId])
-            for (const assured of assureds as any[]) {
-                await this.pool.execute(`
-                    INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
-                    VALUES (?, ?, ?, ?, ?)
-                `, [uuidv4(), policyId, assured.entity_id, assured.role, assured.addressText || ''])
+            // Create addresses from quotation assureds (preserves order) with vessel assured fallback
+            const qAssureds = await this.getQuotationAssureds(quotationId)
+            const safeQAssureds = Array.isArray(qAssureds) ? qAssureds : []
+            // Filter to assureds relevant to this vessel (by vesselLabel or no scope)
+            const vesselQV = vessels.find(v => v.vesselId === actualVesselId || v.id === actualVesselId)
+            const relevantAssureds = safeQAssureds.filter((a: any) => {
+                if (!a.vesselLabel && !a.groupId) return true // global assured
+                if (vesselQV && a.vesselLabel === vesselQV.vesselLabel) return true
+                return true // include all for safety
+            })
+            if (relevantAssureds.length > 0) {
+                for (let ai = 0; ai < relevantAssureds.length; ai++) {
+                    const a = relevantAssureds[ai] as any
+                    // Look up address from entity_addresses if available
+                    let addrText = ''
+                    if (a.entityId) {
+                        const [addrRows] = await this.pool.query('SELECT address_text FROM entity_addresses WHERE entity_id = ? LIMIT 1', [a.entityId])
+                        if ((addrRows as any[]).length > 0) addrText = (addrRows as any[])[0].address_text || ''
+                    }
+                    await this.pool.execute(`
+                        INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text, \`order\`)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `, [uuidv4(), policyId, a.entityId || null, a.role || '', addrText, ai])
+                }
+            } else {
+                // Fallback: use vessel_assureds
+                const [assureds] = await this.pool.query(`
+                    SELECT va.entity_id, va.role, e.name as entityName,
+                        COALESCE(ea.address_line1, '') as addressText
+                    FROM vessel_assureds va
+                    JOIN entities e ON va.entity_id = e.id
+                    LEFT JOIN entity_addresses ea ON va.address_id = ea.id
+                    WHERE va.vessel_id = ?
+                    ORDER BY va.id
+                `, [actualVesselId])
+                for (const assured of assureds as any[]) {
+                    await this.pool.execute(`
+                        INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
+                        VALUES (?, ?, ?, ?, ?)
+                    `, [uuidv4(), policyId, assured.entity_id, assured.role, assured.addressText || ''])
+                }
             }
 
             // Create blue cards (P&I only)
