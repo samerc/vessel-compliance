@@ -1440,11 +1440,11 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
       const leftChildren: Paragraph[] = []
       const nameRuns: TextRun[] = [new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
       if (addr.country) nameRuns.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' }))
-      leftChildren.push(new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: nameRuns }))
+      leftChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: nameRuns }))
 
       // Right: role + address lines
       const rightChildren: Paragraph[] = []
-      if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `As ${addr.role}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+      if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `As ${addr.role}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
       const addrText = addr.addressText || addr.address || ''
       if (addrText) {
         for (const line of addrText.split('\n')) {
@@ -1464,8 +1464,8 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
     for (const a of data.assureds) {
       tableRows.push(new TableRow({
         children: [
-          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.name, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `As ${a.role}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.name, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `As ${a.role}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       }))
     }
