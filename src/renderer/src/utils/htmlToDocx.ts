@@ -46,13 +46,14 @@ function parseLineHeight(css: string | null | undefined, fallbackMultiplier?: nu
 
 export function parseHtmlToParagraphs(
   html: string,
-  opts?: { size?: number; font?: string; color?: string; alignment?: typeof AlignmentType[keyof typeof AlignmentType]; lineSpacing?: number }
+  opts?: { size?: number; font?: string; color?: string; alignment?: typeof AlignmentType[keyof typeof AlignmentType]; lineSpacing?: number; spacingAfter?: number }
 ): Paragraph[] {
   if (!html || html.trim() === '') return []
 
   const size = opts?.size ?? 22
   const font = opts?.font ?? 'Arial'
   const color = opts?.color ?? '000000'
+  const spacingAfter = opts?.spacingAfter ?? 80
   const defaultLineSpacing = parseLineHeight(null, opts?.lineSpacing)
 
   // If no HTML tags, treat as plain text with line breaks
@@ -60,7 +61,7 @@ export function parseHtmlToParagraphs(
     return html.split('\n').map(line =>
       line.trim()
         ? new Paragraph({
-            spacing: { after: 80, ...(defaultLineSpacing ? { line: defaultLineSpacing, lineRule: 'auto' as any } : {}) },
+            spacing: { after: spacingAfter, ...(defaultLineSpacing ? { line: defaultLineSpacing, lineRule: 'auto' as any } : {}) },
             alignment: opts?.alignment,
             children: [new TextRun({ text: line, size, font, color })]
           })
@@ -132,7 +133,7 @@ export function parseHtmlToParagraphs(
 
     const effectiveLineSpacing = lineSpacingTwips || defaultLineSpacing
     return new Paragraph({
-      spacing: { after: 80, ...(effectiveLineSpacing ? { line: effectiveLineSpacing, lineRule: 'auto' as any } : {}) },
+      spacing: { after: spacingAfter, ...(effectiveLineSpacing ? { line: effectiveLineSpacing, lineRule: 'auto' as any } : {}) },
       alignment: alignment || opts?.alignment,
       bidirectional: bidirectional || undefined,
       ...(listPrefix ? { indent: { left: 140, hanging: 140 } } : {}),
@@ -153,7 +154,7 @@ export function parseHtmlToParagraphs(
           const rtl = hasRtl(text)
           const effectiveLs = defaultLineSpacing
           paragraphs.push(new Paragraph({
-            spacing: { after: 80, ...(effectiveLs ? { line: effectiveLs, lineRule: 'auto' as any } : {}) },
+            spacing: { after: spacingAfter, ...(effectiveLs ? { line: effectiveLs, lineRule: 'auto' as any } : {}) },
             alignment: rtl ? AlignmentType.RIGHT : opts?.alignment,
             bidirectional: rtl || undefined,
             children: [new TextRun({ text, size, font, color, rightToLeft: rtl || undefined } as any)]
