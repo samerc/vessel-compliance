@@ -600,12 +600,15 @@ export async function exportBlueCardDocx(
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed.footerText) {
-        for (const line of parsed.footerText.split('\n')) {
-          footerParas.push(new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: line, size: 14, font: BC_FONT, color: '999999', italics: true })],
-          }))
+        const plainFt = parsed.footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+        for (const line of plainFt.split('\n')) {
+          if (line.trim()) {
+            footerParas.push(new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 0 },
+              children: [new TextRun({ text: line.trim(), size: 18, font: BC_FONT, color: '999999', italics: true })],
+            }))
+          }
         }
       }
     }
@@ -2590,14 +2593,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }))
   }
   if (footerText) {
-    if (polIsHtml(footerText)) {
-      footerChildren.push(...parseHtmlToParagraphs(footerText, { size: 14, font: 'Arial', color: '999999', alignment: AlignmentType.CENTER, spacingAfter: 0 }))
-    } else {
-      for (const line of footerText.split('\n')) {
+    // Strip HTML tags, split by <br> and newlines, render each as a line
+    const plainFooter = footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    for (const line of plainFooter.split('\n')) {
+      if (line.trim()) {
         footerChildren.push(new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: line, size: 14, font: 'Arial', color: '999999' })]
+          children: [new TextRun({ text: line.trim(), size: 18, font: 'Arial', color: '999999', italics: true })]
         }))
       }
     }
@@ -2766,14 +2769,14 @@ async function polBuildAdviceFooter(
   } catch { /* ignore */ }
 
   if (footerText) {
-    if (polIsHtml(footerText)) {
-      footerChildren.push(...parseHtmlToParagraphs(footerText, { size: 14, font: 'Arial', color: '999999', alignment: AlignmentType.CENTER, spacingAfter: 0 }))
-    } else {
-      for (const line of footerText.split('\n')) {
+    // Strip HTML tags, split by <br> and newlines, render each as a line
+    const plainFooter = footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    for (const line of plainFooter.split('\n')) {
+      if (line.trim()) {
         footerChildren.push(new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: line, size: 14, font: 'Arial', color: '999999' })]
+          children: [new TextRun({ text: line.trim(), size: 18, font: 'Arial', color: '999999', italics: true })]
         }))
       }
     }
