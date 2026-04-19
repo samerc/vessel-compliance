@@ -1377,10 +1377,8 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
     // Sort addresses: by explicit order field first, then by quotation assured order
     const assuredOrder = data.assureds.map((a: any) => a.entityId || a.entity_id)
     const sortedAddrs = [...data.addresses].sort((a, b) => {
-      // If addresses have explicit order, use that first
-      if (a.order != null && b.order != null) return a.order - b.order
-      if (a.order != null) return -1
-      if (b.order != null) return 1
+      // If addresses have distinct explicit order, use that
+      if (a.order != null && b.order != null && a.order !== b.order) return a.order - b.order
       // Fall back to quotation assured order
       const aIdx = assuredOrder.indexOf(a.entityId)
       const bIdx = assuredOrder.indexOf(b.entityId)

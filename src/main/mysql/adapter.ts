@@ -10215,16 +10215,30 @@ export class MySQLAdapter {
 
     async getPolicyAddresses(policyId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query(`
-            SELECT pda.id, pda.policy_doc_id as policyDocId, pda.entity_id as entityId,
-                   pda.role, pda.address_text as addressText,
-                   e.name as entityName
-            FROM policy_doc_addresses pda
-            LEFT JOIN entities e ON pda.entity_id = e.id
-            WHERE pda.policy_doc_id = ?
-            ORDER BY pda.\`order\` ASC, pda.id ASC
-        `, [policyId])
-        return rows as any[]
+        try {
+            const [rows] = await this.pool.query(`
+                SELECT pda.id, pda.policy_doc_id as policyDocId, pda.entity_id as entityId,
+                       pda.role, pda.address_text as addressText,
+                       e.name as entityName, pda.\`order\` as \`order\`
+                FROM policy_doc_addresses pda
+                LEFT JOIN entities e ON pda.entity_id = e.id
+                WHERE pda.policy_doc_id = ?
+                ORDER BY pda.\`order\` ASC, pda.id ASC
+            `, [policyId])
+            return rows as any[]
+        } catch {
+            // Fallback if order column doesn't exist yet
+            const [rows] = await this.pool.query(`
+                SELECT pda.id, pda.policy_doc_id as policyDocId, pda.entity_id as entityId,
+                       pda.role, pda.address_text as addressText,
+                       e.name as entityName
+                FROM policy_doc_addresses pda
+                LEFT JOIN entities e ON pda.entity_id = e.id
+                WHERE pda.policy_doc_id = ?
+                ORDER BY pda.id ASC
+            `, [policyId])
+            return rows as any[]
+        }
     }
 
     async getPolicyRevisions(policyNumber: string): Promise<any[]> {
