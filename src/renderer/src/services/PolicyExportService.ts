@@ -3017,9 +3017,17 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   // Build header (company details only, no certificate title) + footer
   const daHeaderParas: Paragraph[] = []
   const daHeaderHtml = polSt(data, 'docHeader')
-  const daHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
+  const daHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
   if (daHeaderHtml) {
-    daHeaderParas.push(...parseHtmlToParagraphs(daHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: daHeaderSpacing }))
+    const rawParas = parseHtmlToParagraphs(daHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: daHeaderSpacing })
+    // Override spacing on all header paragraphs to be compact
+    for (const p of rawParas) {
+      if ((p as any).properties?.spacing) {
+        (p as any).properties.spacing.after = 0
+        (p as any).properties.spacing.before = 0
+      }
+    }
+    daHeaderParas.push(...rawParas)
   }
   const adviceFooter = await polBuildAdviceFooter(sigBuf)
 
