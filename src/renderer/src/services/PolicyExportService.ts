@@ -1415,8 +1415,6 @@ async function polLoadLogoAsBuffer(logoPath: string): Promise<{ buffer: ArrayBuf
 
 function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
-  const nameW = Math.round(POL_BODY_W * 0.45)
-  const roleW = Math.round(POL_BODY_W * 0.55)
 
   // Build insured rows as a borderless table: Name (+ country) | As Role + Address
   const tableRows: TableRow[] = []
@@ -1457,8 +1455,8 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
 
       tableRows.push(new TableRow({
         children: [
-          new TableCell({ width: { size: nameW, type: WidthType.DXA }, borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: leftChildren }),
-          new TableCell({ width: { size: roleW, type: WidthType.DXA }, borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: rightChildren })
+          new TableCell({ borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: leftChildren }),
+          new TableCell({ borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: rightChildren })
         ]
       }))
     }
@@ -1466,8 +1464,8 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
     for (const a of data.assureds) {
       tableRows.push(new TableRow({
         children: [
-          new TableCell({ width: { size: nameW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.name, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: roleW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `As ${a.role}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.name, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `As ${a.role}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       }))
     }
@@ -1476,8 +1474,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   if (tableRows.length > 0) {
     content.push(new Table({
       width: { size: POL_BODY_W, type: WidthType.DXA },
-      layout: TableLayoutType.FIXED,
-      columnWidths: [nameW, roleW],
+      layout: TableLayoutType.AUTOFIT,
       rows: tableRows
     }))
   }
@@ -3032,17 +3029,17 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
 
   const children: (Paragraph | Table)[] = []
 
-  // Title block — centered
+  // Title block — centered, compact spacing
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 200, after: 80, line: 240, lineRule: 'auto' as any },
+    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: 'DEBIT ADVICE', size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
   }))
-  children.push(polCenteredP('In connection with'))
-  children.push(polCenteredP(`${headerTitle} ${data.policy.policyNumber}`))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { after: 200, line: 240, lineRule: 'auto' as any },
+    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   }))
 
