@@ -150,12 +150,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       setHullAlts(safeHullAlts)
 
       // Load LOL options and agreed value options
+      let safeLolOptions: typeof lolOptions = []
       try {
         const [lolRes, avRes] = await Promise.all([
           window.api.lolGetOptions(quotationId),
           window.api.hullGetAgreedValueOptions(quotationId)
         ])
-        if (Array.isArray(lolRes)) setLolOptions(lolRes)
+        if (Array.isArray(lolRes)) { safeLolOptions = lolRes; setLolOptions(lolRes) }
         if (Array.isArray(avRes)) setAgreedValueOptions(avRes)
       } catch { /* ignore */ }
 
@@ -198,6 +199,14 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       }
       const allAltsLocal = [...safePiAlts, ...safeHullAlts]
       let firstAltId = ''
+      let firstLolId = ''
+      // LOL options: use first option's premium if available
+      if (safeLolOptions.length > 0 && safeLolOptions.some(o => o.premiumAmount != null)) {
+        firstLolId = safeLolOptions[0].id
+        const lolPrem = safeLolOptions[0].premiumAmount
+        if (lolPrem != null && lolPrem > 0) techPremium = lolPrem
+      }
+      // P&I/Hull alternatives: use first alternative's premium
       if (allAltsLocal.length > 1) {
         firstAltId = allAltsLocal[0].id
         const firstAlt = allAltsLocal[0]
@@ -269,6 +278,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         ...prev,
         selectedVesselIds: vessels.map(v => v.vesselId || v.id),
         selectedAltId: firstAltId,
+        selectedLolOptionId: firstLolId,
         inceptionDate: inception,
         expiryDate: expiry,
         totalPremium: payable,
@@ -345,6 +355,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       case 0: // Vessel & Alternative
         if (data.selectedVesselIds.length === 0) return 'Select at least one vessel'
         if (hasAlts && !data.selectedAltId) return 'Please select an alternative'
+        if (lolOptions.length > 1 && !data.selectedLolOptionId) return 'Please select a limit of liability option'
         return null
       case 1: // Period & Premium
         if (!data.inceptionDate) return 'Inception date is required'
@@ -578,7 +589,22 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
               })
             }}
             onSelectAlt={handleAltChange}
-            onSelectLolOption={(id) => updateData({ selectedLolOptionId: id })}
+            onSelectLolOption={(id) => {
+              const opt = lolOptions.find(o => o.id === id)
+              if (opt?.premiumAmount != null && quotation) {
+                const tech = opt.premiumAmount
+                const pay = computePayable(tech)
+                const count = data.instalmentAmounts.length
+                let newAmounts = data.instalmentAmounts
+                if (count > 0) {
+                  const perInstalment = Math.round((pay / count) * 100) / 100
+                  newAmounts = data.instalmentAmounts.map((_, i) => i === 0 ? Math.round((pay - perInstalment * (count - 1)) * 100) / 100 : perInstalment)
+                }
+                updateData({ selectedLolOptionId: id, totalPremium: pay, instalmentAmounts: newAmounts })
+              } else {
+                updateData({ selectedLolOptionId: id })
+              }
+            }}
             onSelectAgreedValueOption={(id) => updateData({ selectedAgreedValueOptionId: id })}
             labelStyle={labelStyle}
           />
