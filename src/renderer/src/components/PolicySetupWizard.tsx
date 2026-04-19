@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ArrowLeft, ArrowRight, Check, Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, AlertTriangle, Pencil, Loader2 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAlternative, QuotationInstalment, FlagState } from '../../../shared/types'
+import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAlternative, QuotationInstalment, FlagState, QuotationAgreedValueOption } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 
 interface PolicySetupWizardProps {
@@ -47,6 +47,9 @@ interface WizardData {
   blueCards: string[]
   blueCardNone: boolean
   blueCardAddressedTo: Record<string, string>
+  // LOL / Agreed Value Option selection
+  selectedLolOptionId: string
+  selectedAgreedValueOptionId: string
 }
 
 export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
@@ -88,8 +91,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     exchangeRate: 1,
     blueCards: [],
     blueCardNone: false,
-    blueCardAddressedTo: {}
+    blueCardAddressedTo: {},
+    selectedLolOptionId: '',
+    selectedAgreedValueOptionId: ''
   })
+
+  const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
+  const [agreedValueOptions, setAgreedValueOptions] = useState<QuotationAgreedValueOption[]>([])
 
   const isPI = quotation?.quotationTypeCode === 'P'
   const allAlts = useMemo(() => [...piAlts, ...hullAlts], [piAlts, hullAlts])
@@ -141,6 +149,16 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       setPiAlts(safePiAlts)
       setHullAlts(safeHullAlts)
 
+      // Load LOL options and agreed value options
+      try {
+        const [lolRes, avRes] = await Promise.all([
+          window.api.lolGetOptions(quotationId),
+          window.api.hullGetAgreedValueOptions(quotationId)
+        ])
+        if (Array.isArray(lolRes)) setLolOptions(lolRes)
+        if (Array.isArray(avRes)) setAgreedValueOptions(avRes)
+      } catch { /* ignore */ }
+
       // Load custom timezones
       try {
         const tzSetting = await window.api.getSetting('policy_timezones')
@@ -159,7 +177,18 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       // Calculate payable premium — use per-vessel premium when multi-vessel
       const quot = q as Quotation
       let techPremium = quot.premiumAmount || 0
-      if (vessels.length > 1) {
+
+      // War excess: premium = Section 1 + Section 2 for the vessel
+      if (quot.quotationTypeCode === 'W' && quot.warExcessEnabled && vessels.length > 0) {
+        const v = vessels[0]
+        const s1Rate = quot.premiumRate || 0
+        const s2Rate = quot.warExcessRate || 0
+        const s1Amt = v.agreedValue ?? quot.agreedValue ?? 0
+        const s2Amt = (v as any).warExcessAmount ?? quot.warExcessAmount ?? 0
+        const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 100 * 100) / 100
+        const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * s2Rate / 100 * 100) / 100
+        techPremium = s1Prem + s2Prem
+      } else if (vessels.length > 1) {
         // Multi-vessel: use first vessel's premium (each vessel gets its own policy)
         const firstVesselPrem = vessels[0]?.premiumAmount || 0
         if (firstVesselPrem > 0) techPremium = firstVesselPrem
@@ -383,7 +412,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         showAddresses: data.showAddresses,
         blueCards: data.blueCardNone ? [] : data.blueCards,
         selectedAlternativeId: data.selectedAltId || null,
-        exchangeRate: data.exchangeRate || 1
+        exchangeRate: data.exchangeRate || 1,
+        selectedLolOptionId: data.selectedLolOptionId || null,
+        selectedAgreedValueOptionId: data.selectedAgreedValueOptionId || null
       })
       if ((result as any)?.error) {
         showError((result as any).message || 'Conversion failed')
@@ -525,6 +556,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             data={data}
             quotation={quotation}
             isLight={isLight}
+            lolOptions={lolOptions}
+            agreedValueOptions={agreedValueOptions}
             onToggleVessel={(id) => {
               updateData({
                 selectedVesselIds: data.selectedVesselIds.includes(id)
@@ -533,6 +566,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
               })
             }}
             onSelectAlt={handleAltChange}
+            onSelectLolOption={(id) => updateData({ selectedLolOptionId: id })}
+            onSelectAgreedValueOption={(id) => updateData({ selectedAgreedValueOptionId: id })}
             labelStyle={labelStyle}
           />
         )}
@@ -639,7 +674,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
 // ==================== Step Components ====================
 
-function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data, quotation, isLight, onToggleVessel, onSelectAlt, labelStyle }: {
+function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data, quotation, isLight, lolOptions, agreedValueOptions, onToggleVessel, onSelectAlt, onSelectLolOption, onSelectAgreedValueOption, labelStyle }: {
   qVessels: QuotationVessel[]
   allAlts: (QuotationPIAlternative | QuotationHullAlternative)[]
   hasAlts: boolean
@@ -647,8 +682,12 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
   data: WizardData
   quotation: Quotation
   isLight: boolean
+  lolOptions: { id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]
+  agreedValueOptions: QuotationAgreedValueOption[]
   onToggleVessel: (id: string) => void
   onSelectAlt: (id: string) => void
+  onSelectLolOption: (id: string) => void
+  onSelectAgreedValueOption: (id: string) => void
   labelStyle: React.CSSProperties
 }) {
   return (
@@ -733,6 +772,54 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
               {quotation.upccEnabled && <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '6px', background: 'rgba(59,130,246,0.1)', color: isLight ? '#1e40af' : '#93c5fd', fontWeight: 600 }}>UPCC {quotation.upccDiscountPercent}%</span>}
             </div>
           )}
+        </div>
+      )}
+
+      {/* LOL Option selection (P&I only, when multiple LOL options exist) */}
+      {lolOptions.length > 1 && (
+        <div style={{ marginTop: '24px' }}>
+          <label style={labelStyle}>Select Limit of Liability</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {lolOptions.map((opt, idx) => (
+              <button
+                key={opt.id}
+                onClick={() => onSelectLolOption(opt.id)}
+                style={{
+                  padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
+                  border: data.selectedLolOptionId === opt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                  background: data.selectedLolOptionId === opt.id ? 'rgba(0,170,200,0.1)' : 'transparent',
+                  color: data.selectedLolOptionId === opt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  cursor: 'pointer', transition: 'all 0.15s'
+                }}
+              >
+                {opt.label || `LOL ${idx + 1}`} — {opt.currency} {opt.amount?.toLocaleString()}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Agreed Value Option selection (Hull, when multiple options exist) */}
+      {agreedValueOptions.length > 1 && (
+        <div style={{ marginTop: '24px' }}>
+          <label style={labelStyle}>Select Agreed Value Option</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {agreedValueOptions.map((opt, idx) => (
+              <button
+                key={opt.id}
+                onClick={() => onSelectAgreedValueOption(opt.id)}
+                style={{
+                  padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
+                  border: data.selectedAgreedValueOptionId === opt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                  background: data.selectedAgreedValueOptionId === opt.id ? 'rgba(0,170,200,0.1)' : 'transparent',
+                  color: data.selectedAgreedValueOptionId === opt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  cursor: 'pointer', transition: 'all 0.15s'
+                }}
+              >
+                {opt.label || `Option ${idx + 1}`} — {opt.currency || 'USD'} {opt.amount?.toLocaleString()}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

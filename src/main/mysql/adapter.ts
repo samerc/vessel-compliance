@@ -3004,6 +3004,16 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: policy_documents section_order + LOL/agreed value option IDs
+            try {
+                const [polCols] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'section_order'") as any[]
+                if ((polCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN section_order TEXT DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN selected_lol_option_id VARCHAR(36) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN selected_agreed_value_option_id VARCHAR(36) DEFAULT NULL")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -10095,6 +10105,9 @@ export class MySQLAdapter {
             signedAt: r.signed_at || null,
             signedByName: r.signedByName || null,
             exportSnapshot: r.export_snapshot || null,
+            sectionOrder: r.section_order ? (() => { try { return JSON.parse(r.section_order) } catch { return null } })() : null,
+            selectedLolOptionId: r.selected_lol_option_id || null,
+            selectedAgreedValueOptionId: r.selected_agreed_value_option_id || null,
         }
     }
 
@@ -10272,13 +10285,18 @@ export class MySQLAdapter {
             exportedAt: 'exported_at',
             exchangeRate: 'exchange_rate',
             exportSnapshot: 'export_snapshot',
+            sectionOrder: 'section_order',
+            selectedLolOptionId: 'selected_lol_option_id',
+            selectedAgreedValueOptionId: 'selected_agreed_value_option_id',
         }
         const sets: string[] = []
         const vals: any[] = []
         for (const [key, col] of Object.entries(fieldMap)) {
             if (key in fields) {
+                let val = fields[key] ?? null
+                if (key === 'sectionOrder') val = val ? JSON.stringify(val) : null
                 sets.push(`${col} = ?`)
-                vals.push(fields[key] ?? null)
+                vals.push(val)
             }
         }
         if (sets.length === 0) return
@@ -10448,12 +10466,16 @@ export class MySQLAdapter {
                 INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
                     revision_number, inception_date, inception_time, expiry_date, expiry_time,
                     timezone, commission_percent, show_addresses, bank_id, pro_rata,
-                    per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?)
+                    per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate,
+                    section_order, selected_lol_option_id, selected_agreed_value_option_id)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
-                premiumAmount, options.selectedAlternativeId || null, options.createdBy, options.exchangeRate || 1])
+                premiumAmount, options.selectedAlternativeId || null, options.createdBy, options.exchangeRate || 1,
+                quotation.sectionOrder ? JSON.stringify(quotation.sectionOrder) : null,
+                (options as any).selectedLolOptionId || null,
+                (options as any).selectedAgreedValueOptionId || null])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {

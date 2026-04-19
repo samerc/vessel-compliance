@@ -823,6 +823,8 @@ export interface Api {
     blueCards: string[]
     selectedAlternativeId?: string | null
     exchangeRate?: number
+    selectedLolOptionId?: string | null
+    selectedAgreedValueOptionId?: string | null
   }) => Promise<any[]>
   policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => Promise<string | null>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>

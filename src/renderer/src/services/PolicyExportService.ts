@@ -13,7 +13,8 @@ import {
   HullClause, HullClauseCondition, HullAdditionalCondition,
   QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition,
   QuotationHullAlternative,
-  QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings
+  QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings,
+  QuotationAssuredGroup, QuotationAgreedValueOption
 } from '../../../shared/types'
 import { DEFAULT_SECTION_TEXTS } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
@@ -731,6 +732,9 @@ interface PolicyDocRecord {
   quotationTypeName?: string
   createdAt?: string
   exportSnapshot?: string | null
+  sectionOrder?: string[] | null
+  selectedLolOptionId?: string | null
+  selectedAgreedValueOptionId?: string | null
 }
 
 interface PolicyInstalment {
@@ -814,6 +818,12 @@ interface PolicyExportData {
   warSettings: WarSettings | null
   surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   companyName: string
+  assuredGroups: QuotationAssuredGroup[]
+  customSections: { id: string; title: string; text?: string; order: number }[]
+  lolOptions: { id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]
+  agreedValueOptions: QuotationAgreedValueOption[]
+  fleets: { id: string; name: string }[]
+  vesselClassificationNames: Record<string, string>
 }
 
 interface PolVesselInfo {
@@ -863,7 +873,8 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
     hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw,
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
-    flagStatesRaw, surveyWarrantiesRaw, banks
+    flagStatesRaw, surveyWarrantiesRaw, banks,
+    assuredGroupsRaw, customSectionsRaw, agreedValueOptionsRaw, fleetsRaw
   ] = await Promise.all([
     window.api.policyGetInstalments(policyId),
     window.api.policyGetAddresses(policyId),
@@ -901,7 +912,11 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     window.api.warGetSettings(),
     window.api.getFlagStates(),
     window.api.quotationSurveyWarrantyGetAll(policy.quotationId),
-    window.api.bankGetAll()
+    window.api.bankGetAll(),
+    window.api.getQuotationAssuredGroups(policy.quotationId),
+    window.api.getQuotationCustomSections(policy.quotationId),
+    window.api.hullGetAgreedValueOptions(policy.quotationId),
+    window.api.getFleets()
   ])
 
   // Filter by selected alternative if policy has one
@@ -923,6 +938,27 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   const piAlternativesRaw = quotation.quotationTypeCode === 'P'
     ? await window.api.piGetQuotationAlternatives(policy.quotationId)
     : []
+
+  const lolOptionsRaw = quotation.quotationTypeCode === 'P'
+    ? await window.api.lolGetOptions(policy.quotationId)
+    : []
+
+  // Resolve IACS classification from junction table
+  let vesselClassificationNames: Record<string, string> = {}
+  try {
+    const [classSocieties] = await Promise.all([window.api.getClassificationSocieties()])
+    const safeQV = Array.isArray(quotationVessels) ? quotationVessels : []
+    for (const qv of safeQV) {
+      if (!qv.vesselId) continue
+      try {
+        const classIds = await window.api.getVesselClassifications(qv.vesselId)
+        if (Array.isArray(classIds) && classIds.length > 0) {
+          const names = classIds.map((c: any) => { const cid = typeof c === 'string' ? c : c.classificationSocietyId; return classSocieties.find((cs: any) => cs.id === cid)?.name }).filter(Boolean)
+          if (names.length > 0) vesselClassificationNames[qv.id] = names.join(' / ')
+        }
+      } catch {}
+    }
+  } catch {}
 
   const mergedTexts: PISectionTexts = { ...DEFAULT_SECTION_TEXTS, ...(sectionTexts || {}), ...(quotation.sectionTextsOverride || {}) }
 
@@ -1002,7 +1038,13 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
     warSettings: (warSettingsRaw && !(warSettingsRaw as any).error) ? warSettingsRaw : null,
     surveyWarranties: Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) : [],
-    companyName: reportSettings.companyName || 'Insurance Company'
+    companyName: reportSettings.companyName || 'Insurance Company',
+    assuredGroups: Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : [],
+    customSections: Array.isArray(customSectionsRaw) ? customSectionsRaw : [],
+    lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
+    agreedValueOptions: Array.isArray(agreedValueOptionsRaw) ? agreedValueOptionsRaw : [],
+    fleets: Array.isArray(fleetsRaw) ? fleetsRaw : [],
+    vesselClassificationNames
   }
 }
 
@@ -1444,7 +1486,7 @@ function polBuildVesselTable(data: PolicyExportData): Table {
     ['Year Built', vi.built ? (vi.rebuilt ? `${vi.built} - Rebuilt: ${vi.rebuilt}` : String(vi.built)) : '-'],
     ['GT', vi.gt ? Number(vi.gt).toLocaleString() : '-'],
     ['IMO Number', vi.imo || '-'],
-    ['Classification', vi.classification || '-']
+    ['Classification', (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || '-']
   ]
   if (vi.callSign) rows.push(['Call Sign', vi.callSign])
 
@@ -1780,15 +1822,34 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
 
   if (typeCode === 'P') {
+    // Resolve LOL amount: selected LOL option → selected PI alternative → quotation
+    let resolvedLolAmount = data.quotation.limitOfLiabilityAmount
+    let resolvedLolCurrency = data.quotation.limitOfLiabilityCurrency || 'USD'
+    if (data.policy.selectedLolOptionId && data.lolOptions.length > 0) {
+      const selLol = data.lolOptions.find(o => o.id === data.policy.selectedLolOptionId)
+      if (selLol) {
+        resolvedLolAmount = selLol.amount
+        resolvedLolCurrency = selLol.currency || resolvedLolCurrency
+      }
+    } else if (data.piAlternatives.length > 0 && data.policy.selectedAlternativeId) {
+      const selAlt = data.piAlternatives.find(a => a.id === data.policy.selectedAlternativeId)
+      if (selAlt && (selAlt as any).lolAmount != null) {
+        resolvedLolAmount = (selAlt as any).lolAmount
+        if ((selAlt as any).lolCurrency) resolvedLolCurrency = (selAlt as any).lolCurrency
+      }
+    }
+
     let lolText = ''
     if (data.quotation.limitOfLiabilityText) {
       lolText = data.quotation.limitOfLiabilityText
-    } else if (polSt(data, 'limitOfLiabilityDefaultText') && data.quotation.limitOfLiabilityAmount != null) {
+        .replace(/\{amount\}/g, resolvedLolAmount != null ? polFormatAmountOnly(resolvedLolAmount) : '___')
+        .replace(/\{currency\}/g, resolvedLolCurrency)
+    } else if (polSt(data, 'limitOfLiabilityDefaultText') && resolvedLolAmount != null) {
       lolText = htmlToPlainText(polSt(data, 'limitOfLiabilityDefaultText'))
-        .replace(/\{amount\}/g, polFormatAmountOnly(data.quotation.limitOfLiabilityAmount))
-        .replace(/\{currency\}/g, data.quotation.limitOfLiabilityCurrency || 'USD')
-    } else if (data.quotation.limitOfLiabilityAmount != null) {
-      lolText = `${polFormatCurrency(data.quotation.limitOfLiabilityAmount, data.quotation.limitOfLiabilityCurrency)} all claims in the aggregate.`
+        .replace(/\{amount\}/g, polFormatAmountOnly(resolvedLolAmount))
+        .replace(/\{currency\}/g, resolvedLolCurrency)
+    } else if (resolvedLolAmount != null) {
+      lolText = `${polFormatCurrency(resolvedLolAmount, resolvedLolCurrency)} all claims in the aggregate.`
     }
     // Handle sub-limits
     const subLimitLines = data.subLimits.map(sl =>
@@ -1841,8 +1902,18 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       }
     }
   } else if (typeCode === 'W') {
-    if (data.quotation.agreedValue != null) {
-      const wCurrency = data.quotation.agreedValueCurrency || 'USD'
+    const wCurrency = data.quotation.agreedValueCurrency || 'USD'
+    if (data.quotation.warExcessEnabled) {
+      // War P&I Excess: Section 1 (Hull) + Section 2 (P&I in excess)
+      const vesselAV = data.vessel?.agreedValue ?? data.quotation.agreedValue ?? 0
+      const sec2Amt = (data.vessel as any)?.warExcessAmount ?? data.quotation.warExcessAmount ?? 0
+      content.push(polBp(`Section 1: ${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
+      content.push(polBp(`Section 2: ${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
+      if (data.quotation.warCombinedLimitText) {
+        content.push(polEmptyP())
+        content.push(polNp(data.quotation.warCombinedLimitText))
+      }
+    } else if (data.quotation.agreedValue != null) {
       content.push(polBp(`${polFormatCurrency(data.quotation.agreedValue, wCurrency)} (${numberToWords(data.quotation.agreedValue, wCurrency)})`))
     }
   }
@@ -2023,6 +2094,19 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   const totalPremium = instalmentSum > 0 ? instalmentSum : (data.policy.premiumAmount != null && data.policy.premiumAmount > 0 ? data.policy.premiumAmount : (wq.premiumAmount || 0))
   const timezone = data.policy.timezone || ''
 
+  // War P&I Excess: show Section 1 + Section 2 premium breakdown before intro
+  if (wq.quotationTypeCode === 'W' && wq.warExcessEnabled && data.vessel) {
+    const s1Rate = wq.premiumRate || 0
+    const s2Rate = wq.warExcessRate || 0
+    const s1Amt = data.vessel.agreedValue ?? wq.agreedValue ?? 0
+    const s2Amt = (data.vessel as any).warExcessAmount ?? wq.warExcessAmount ?? 0
+    const s1Prem = (data.vessel as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 100 * 100) / 100
+    const s2Prem = (data.vessel as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * s2Rate / 100 * 100) / 100
+    content.push(polNp(`Section 1: ${polFormatCurrency(s1Prem, currency)} per annum`))
+    content.push(polNp(`Section 2: ${polFormatCurrency(s2Prem, currency)} per annum`))
+    content.push(polEmptyP())
+  }
+
   // 1. Premium intro with amount — use configurable template
   let premIntroTemplate = 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
   try {
@@ -2180,6 +2264,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       if (polVesselAv != null) avContent.push(polNp(`Section A: ${polFormatCurrency(polVesselAv, hmCurrency)} (${numberToWords(polVesselAv, hmCurrency)})`))
       avContent.push(polNp(`Section B: ${polFormatCurrency(polVesselIv, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(polVesselIv, data.quotation.ivCurrency || hmCurrency)})`))
       rows.push(makeRow('Agreed Insured\nValue', avContent))
+    } else if (typeCode === 'W' && data.quotation.warExcessEnabled) {
+      // War P&I Excess: Interest section (Section 1/2 descriptions) + Sum Insured (amounts)
+      const intContent: (Paragraph | Table)[] = []
+      if (data.quotation.warSection1Text) intContent.push(polNp(`Section 1: ${data.quotation.warSection1Text}`))
+      if (data.quotation.warSection2Text) intContent.push(polNp(`Section 2: ${data.quotation.warSection2Text}`))
+      if (intContent.length > 0) rows.push(makeRow('Interest', intContent))
+      const valueContent = polBuildValueSection(data)
+      if (valueContent.length > 0) rows.push(makeRow('Sum Insured / Limits', valueContent))
     } else {
       const valueContent = polBuildValueSection(data)
       if (valueContent.length > 0) rows.push(makeRow(polGetValueSectionTitle(typeCode), valueContent))
@@ -2195,7 +2287,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   if (conditionsContent.length > 0) rows.push(makeRow('Conditions', conditionsContent))
 
   // CLASSIFICATION
-  if (data.vesselInfo.classification) rows.push(makeRow('Classification', [polNp(data.vesselInfo.classification)]))
+  const resolvedClassification = (data.vessel && data.vesselClassificationNames[data.vessel.id]) || data.vesselInfo.classification
+  if (resolvedClassification) rows.push(makeRow('Classification', [polNp(resolvedClassification)]))
 
   // TRADING WARRANTY
   if (typeCode !== 'W') {
@@ -2236,6 +2329,13 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     exclusionsContent.push(polBulletP(decodeHtmlEntities(ce.text)))
   }
   if (exclusionsContent.length > 0) rows.push(makeRow('Exclusions', exclusionsContent))
+
+  // CUSTOM SECTIONS
+  for (const cs of data.customSections) {
+    if (cs.text) {
+      rows.push(makeRow(cs.title || 'Additional', polMp(cs.text)))
+    }
+  }
 
   // SUBJECTIVITIES
   if (data.subjectivities.length > 0) {
