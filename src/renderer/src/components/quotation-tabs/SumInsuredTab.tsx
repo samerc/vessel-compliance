@@ -1,6 +1,57 @@
 import { useState, useEffect } from 'react'
 import { Quotation, QuotationVessel, WarSettings } from '../../../../shared/types'
 
+/** Format a number with thousand separators for display in text inputs */
+function fmtNum(val: number | undefined | null): string {
+    if (val == null || val === 0) return ''
+    return val.toLocaleString('en-US', { maximumFractionDigits: 2 })
+}
+
+/** Parse a formatted number string (with commas) back to a number */
+function parseNum(str: string): number | undefined {
+    const cleaned = str.replace(/,/g, '')
+    if (!cleaned) return undefined
+    const n = parseFloat(cleaned)
+    return isNaN(n) ? undefined : n
+}
+
+/** Number input that shows commas when not focused, raw number while editing */
+function MoneyInput({ value, placeholder, onChange, onBlur, style }: {
+    value: number | undefined | null
+    placeholder?: string
+    onChange: (val: number | undefined) => void
+    onBlur?: (val: number | undefined) => void
+    style?: React.CSSProperties
+}) {
+    const [editing, setEditing] = useState(false)
+    const [raw, setRaw] = useState('')
+
+    const displayVal = editing ? raw : fmtNum(value)
+
+    return (
+        <input
+            type="text"
+            value={displayVal}
+            placeholder={placeholder}
+            onFocus={() => {
+                setEditing(true)
+                setRaw(value != null && value !== 0 ? String(value) : '')
+            }}
+            onChange={e => {
+                const v = e.target.value.replace(/[^0-9.,\-]/g, '')
+                setRaw(v)
+                onChange(parseNum(v))
+            }}
+            onBlur={() => {
+                setEditing(false)
+                const parsed = parseNum(raw)
+                if (onBlur) onBlur(parsed)
+            }}
+            style={style}
+        />
+    )
+}
+
 export default function SumInsuredTab({ quotation, updateField, setQ }: {
     quotation: Quotation
     updateField: (field: string, value: any) => void
@@ -86,14 +137,10 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
                 <div style={{ flex: 1, maxWidth: '260px' }}>
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Amount</label>
-                    <input
-                        type="number"
-                        value={quotation.agreedValue || ''}
-                        onChange={e => {
-                            const val = e.target.value ? parseFloat(e.target.value) : undefined
-                            handleSumInsuredChange(val)
-                        }}
-                        placeholder="e.g., 800000"
+                    <MoneyInput
+                        value={quotation.agreedValue}
+                        onChange={val => handleSumInsuredChange(val)}
+                        placeholder="e.g., 800,000"
                         style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
                     />
                 </div>
@@ -121,15 +168,11 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                         <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                             <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '120px' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
-                            <input
-                                type="number"
-                                value={v.agreedValue ?? ''}
-                                placeholder={quotation.agreedValue?.toLocaleString() || '0'}
-                                onChange={e => {
-                                    const val = e.target.value ? parseFloat(e.target.value) : undefined
-                                    setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv))
-                                }}
-                                onBlur={e => window.api.updateQuotationVessel(v.id, { agreedValue: e.target.value ? parseFloat(e.target.value) : null } as any)}
+                            <MoneyInput
+                                value={v.agreedValue}
+                                placeholder={fmtNum(quotation.agreedValue) || '0'}
+                                onChange={val => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv))}
+                                onBlur={val => window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null } as any)}
                                 style={{ width: '160px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
                             />
                         </div>
@@ -175,14 +218,9 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                 {!quotation.warExcessEnabled && (
                 <div style={{ flex: 1, maxWidth: '220px' }}>
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Premium</label>
-                    <input
-                        type="number"
-                        step="0.01"
-                        value={quotation.premiumAmount || ''}
-                        onChange={e => {
-                            const val = e.target.value ? parseFloat(e.target.value) : undefined
-                            handlePremiumChange(val)
-                        }}
+                    <MoneyInput
+                        value={quotation.premiumAmount}
+                        onChange={val => handlePremiumChange(val)}
                         placeholder="Auto-calculated"
                         style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
                     />
@@ -225,15 +263,11 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '16px' }}>
                             <div style={{ flex: 1, maxWidth: '260px' }}>
                                 <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Section 2 Amount (default for all vessels)</label>
-                                <input
-                                    type="number"
-                                    value={quotation.warExcessAmount || ''}
-                                    onChange={e => {
-                                        const val = e.target.value ? parseFloat(e.target.value) : undefined
-                                        setQ(q => ({ ...q, warExcessAmount: val }))
-                                        updateField('warExcessAmount', val ?? null)
-                                    }}
-                                    placeholder="e.g., 25000000"
+                                <MoneyInput
+                                    value={quotation.warExcessAmount}
+                                    onChange={val => setQ(q => ({ ...q, warExcessAmount: val }))}
+                                    onBlur={val => updateField('warExcessAmount', val ?? null)}
+                                    placeholder="e.g., 25,000,000"
                                     style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
                                 />
                             </div>
@@ -267,15 +301,11 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                     <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '120px' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
-                                        <input
-                                            type="number"
-                                            value={v.warExcessAmount ?? ''}
-                                            placeholder={quotation.warExcessAmount?.toLocaleString() || '0'}
-                                            onChange={e => {
-                                                const val = e.target.value ? parseFloat(e.target.value) : undefined
-                                                setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warExcessAmount: val ?? null } : qv))
-                                            }}
-                                            onBlur={e => window.api.updateQuotationVessel(v.id, { warExcessAmount: e.target.value ? parseFloat(e.target.value) : null } as any)}
+                                        <MoneyInput
+                                            value={v.warExcessAmount}
+                                            placeholder={fmtNum(quotation.warExcessAmount) || '0'}
+                                            onChange={val => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, warExcessAmount: val ?? null } : qv))}
+                                            onBlur={val => window.api.updateQuotationVessel(v.id, { warExcessAmount: val ?? null } as any)}
                                             style={{ width: '160px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
                                         />
                                     </div>
