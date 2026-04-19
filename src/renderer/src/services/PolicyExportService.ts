@@ -3158,9 +3158,9 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   // BANK DETAILS
   if (data.bank) {
     const bankContent: (Paragraph | Table)[] = []
-    bankContent.push(polBp(data.bank.name))
-    for (const line of data.bank.details.split('\n')) {
-      if (line.trim()) bankContent.push(polNp(line.trim()))
+    const allBankLines = [data.bank.name, ...data.bank.details.split('\n')].filter(l => l.trim())
+    for (const line of allBankLines) {
+      bankContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
     }
     rows.push(makeRow('Bank Details', bankContent))
   }
