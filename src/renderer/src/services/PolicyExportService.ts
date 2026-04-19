@@ -172,9 +172,9 @@ function bcSpacer(twips: number = 200): Paragraph {
 
 /** Borderless key : value row for vessel detail tables — 3 columns */
 function bcDetailRow(label: string, value: string): TableRow {
-  const LABEL_W = 4600
+  const LABEL_W = 4000
   const SEP_W = 200
-  const VALUE_W = 5200
+  const VALUE_W = 5800
   return new TableRow({
     children: [
       new TableCell({
@@ -327,10 +327,10 @@ function buildBbcWrcPage(
   // 8. Period of Insurance
   children.push(bcParagraph('Period of Insurance:', { bold: true, spacingAfter: 80 }))
 
-  // Period table: 3 columns — From/To | Date | Time + Timezone (matching DA proportions)
-  const pLabelW = 1200
-  const pDateW = 3300
-  const pTimeTzW = 5500
+  // Period table: 3 columns — From/To | Date | Time + Timezone
+  const pLabelW = 700
+  const pDateW = 3500
+  const pTimeTzW = 5800
 
   const bcPeriodCell = (text: string, w: number) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: bcNoBorders(),
