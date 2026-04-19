@@ -1197,6 +1197,19 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelSty
 
         {/* Card options */}
         {!data.blueCardNone && (
+          <div>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+            <button
+              onClick={() => { const all = ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2']; onUpdate({ blueCards: all, blueCardNone: false }) }}
+              className="btn-secondary"
+              style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+            >Select All</button>
+            <button
+              onClick={() => onUpdate({ blueCards: [] })}
+              className="btn-secondary"
+              style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+            >Clear</button>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'].map(card => (
               <label key={card} style={{
@@ -1215,6 +1228,7 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelSty
                 <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{card}</span>
               </label>
             ))}
+          </div>
           </div>
         )}
       </div>
