@@ -3041,6 +3041,14 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: our_share on policy_documents for war declarations
+            try {
+                const [osCols] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'our_share'") as any[]
+                if ((osCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN our_share DECIMAL(5,2) DEFAULT NULL")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -10192,6 +10200,7 @@ export class MySQLAdapter {
             sectionOrder: r.section_order ? (() => { try { return JSON.parse(r.section_order) } catch { return null } })() : null,
             selectedLolOptionId: r.selected_lol_option_id || null,
             selectedAgreedValueOptionId: r.selected_agreed_value_option_id || null,
+            ourShare: r.our_share != null ? Number(r.our_share) : null,
         }
     }
 
@@ -10387,6 +10396,7 @@ export class MySQLAdapter {
             sectionOrder: 'section_order',
             selectedLolOptionId: 'selected_lol_option_id',
             selectedAgreedValueOptionId: 'selected_agreed_value_option_id',
+            ourShare: 'our_share',
         }
         const sets: string[] = []
         const vals: any[] = []

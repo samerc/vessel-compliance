@@ -703,6 +703,7 @@ interface PolicyDocRecord {
   sectionOrder?: string[] | null
   selectedLolOptionId?: string | null
   selectedAgreedValueOptionId?: string | null
+  ourShare?: number | null
 }
 
 interface PolicyInstalment {
@@ -3284,4 +3285,231 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const caVName = data.vesselInfo?.name || ''
   const caRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   polDownloadBlob(blob, `${data.policy.policyNumber} - ${caVName} - Credit Advice${caRevSuffix}.docx`)
+}
+
+// ==================== War Declaration Export ====================
+
+export interface DeclarationFields {
+  yearOfAccount: string
+  umr: string
+  reinsured: string
+  assuredText: string
+  vesselName: string
+  vesselImo: string
+  vesselSumInsured: string
+  vesselSumInsuredIV: string
+  vesselTotalValue: string
+  vesselBuilt: string
+  vesselGT: string
+  vesselType: string
+  vesselClass: string
+  periodFrom: string
+  periodTo: string
+  wording: string
+  warranties: string
+  annualRate: string
+  ourShare: string
+  trading: string
+  riskCode: string
+  amlinRef: string
+}
+
+export async function loadDeclarationFields(policyId: string): Promise<DeclarationFields> {
+  const data = await loadPolicyExportData(policyId)
+  const q = data.quotation
+  const currency = q.agreedValueCurrency || q.premiumCurrency || 'USD'
+  const curSymbol = currency === 'USD' ? 'US$' : currency
+
+  // Year from inception
+  const year = data.policy.inceptionDate ? data.policy.inceptionDate.split('-')[0] : String(new Date().getFullYear())
+
+  // Load declaration settings
+  let umr = ''
+  let amlinRef = ''
+  let riskCode = '"W" in respect of War Risks Premium\t\t"WB" in respect of War Breach Premium'
+  try {
+    const raw = await window.api.getSetting('declaration_settings')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      const yearSettings = parsed[year] || {}
+      umr = yearSettings.umr || ''
+      amlinRef = yearSettings.amlinRef || ''
+      if (yearSettings.riskCode) riskCode = yearSettings.riskCode
+    }
+  } catch {}
+
+  // Assured text
+  const assuredLines: string[] = []
+  for (const a of data.assureds) {
+    const role = a.role ? a.role.toUpperCase() : ''
+    assuredLines.push(`${role}:  ${a.name}`)
+  }
+
+  // Vessel details
+  const vi = data.vesselInfo
+  const vesselAV = data.vessel?.agreedValue ?? q.agreedValue ?? 0
+  const vesselIV = data.vessel?.ivValue ?? q.ivValue
+  const hasIV = q.ivEnabled && vesselIV != null && vesselIV > 0
+  const totalValue = hasIV ? vesselAV + vesselIV : vesselAV
+
+  // Classification
+  const classification = (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || ''
+
+  // Period
+  const periodFrom = `${polFormatDateUS(data.policy.inceptionDate)}\t\t${polFormatTime(data.policy.inceptionTime)} ${data.policy.timezone || ''}`
+  const periodTo = `${polFormatDateUS(data.policy.expiryDate)}\t\t${polFormatTime(data.policy.expiryTime)} ${data.policy.timezone || ''}`
+
+  // Wording from war conditions
+  const wordingLines: string[] = []
+  for (const wc of data.warConditions) {
+    const def = data.allWarConditions.find(c => c.id === wc.warConditionId)
+    if (def) wordingLines.push(wc.textOverride || def.text)
+  }
+
+  // Warranties
+  const warrantyLines: string[] = []
+  for (const wid of data.selectedWarrantyIds) {
+    const w = data.allWarranties.find(aw => aw.id === wid)
+    if (w) warrantyLines.push(w.text || (w as any).name)
+  }
+  for (const cw of data.customWarranties) warrantyLines.push(cw.text)
+
+  // Trading
+  let tradingText = ''
+  if (q.tradingWarrantyIntro) tradingText = stripHtml(q.tradingWarrantyIntro)
+
+  return {
+    yearOfAccount: year,
+    umr,
+    reinsured: data.companyName + ', LEBANON.',
+    assuredText: assuredLines.join('\n'),
+    vesselName: vi.name,
+    vesselImo: vi.imo || '',
+    vesselSumInsured: hasIV ? `A)\tAgreed Insured Value\t\t${curSymbol} ${vesselAV.toLocaleString()}` : `${curSymbol} ${vesselAV.toLocaleString()}`,
+    vesselSumInsuredIV: hasIV ? `B)\tAgreed Increased Value\t\t${curSymbol} ${vesselIV!.toLocaleString()}` : '',
+    vesselTotalValue: hasIV ? `${curSymbol} ${totalValue.toLocaleString()}` : '',
+    vesselBuilt: vi.built ? String(vi.built) : '',
+    vesselGT: vi.gt ? vi.gt.toLocaleString() : '',
+    vesselType: vi.type || '',
+    vesselClass: classification,
+    periodFrom,
+    periodTo,
+    wording: wordingLines.join('\n\n'),
+    warranties: warrantyLines.join('\n\n'),
+    annualRate: q.premiumRate != null ? `${q.premiumRate} %` : '',
+    ourShare: data.policy.ourShare != null ? `${data.policy.ourShare} %` : '',
+    trading: tradingText,
+    riskCode,
+    amlinRef
+  }
+}
+
+export async function exportDeclarationDocx(policyId: string, fields: DeclarationFields): Promise<void> {
+  const data = await loadPolicyExportData(policyId)
+
+  const FONT = 'Arial'
+  const SIZE = 20 // 10pt
+
+  const emptyP = () => new Paragraph({ spacing: { after: 0 }, children: [] })
+
+  const LABEL_W = 1800
+  const VALUE_W = 8200
+
+  const labelCell = (text: string) => new TableCell({
+    width: { size: LABEL_W, type: WidthType.DXA },
+    borders: polNoBorders(),
+    verticalAlign: VerticalAlign.TOP,
+    children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text, size: SIZE, font: FONT, bold: true })] })]
+  })
+
+  const valueCell = (lines: string[]) => new TableCell({
+    width: { size: VALUE_W, type: WidthType.DXA },
+    borders: polNoBorders(),
+    verticalAlign: VerticalAlign.TOP,
+    children: lines.length > 0 ? lines.map(l => new Paragraph({
+      spacing: { after: 60, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({ text: l, size: SIZE, font: FONT })]
+    })) : [emptyP()]
+  })
+
+  const makeRow = (label: string, lines: string[]) => new TableRow({
+    children: [labelCell(label), valueCell(lines)]
+  })
+
+  const children: (Paragraph | Table)[] = []
+
+  // Title
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 200 },
+    children: [new TextRun({ text: `${data.companyName.toUpperCase()} WAR COVER \u2013 DECLARATION`, size: SIZE, font: FONT, bold: true })]
+  }))
+  children.push(emptyP())
+
+  // Main table
+  const rows: TableRow[] = []
+
+  rows.push(makeRow('YEAR OF\nACCOUNT:', [fields.yearOfAccount]))
+  rows.push(makeRow('UMR:', [fields.umr]))
+  rows.push(makeRow('REINSURED:', [fields.reinsured]))
+  rows.push(makeRow('ASSURED:', fields.assuredText.split('\n')))
+
+  // Vessel block
+  const vesselLines = [`NAME: ${fields.vesselName}`, `IMO: ${fields.vesselImo}`]
+  if (fields.vesselSumInsuredIV) {
+    vesselLines.push(`SUM INSURED:  ${fields.vesselSumInsured}`)
+    vesselLines.push(`\t\t${fields.vesselSumInsuredIV}`)
+    vesselLines.push('')
+    vesselLines.push(`\t\tTotal Value:\t\t${fields.vesselTotalValue}`)
+  } else {
+    vesselLines.push(`INSURED VALUE: ${fields.vesselSumInsured}`)
+  }
+  vesselLines.push(`BUILT: ${fields.vesselBuilt}`)
+  vesselLines.push(`GT:  ${fields.vesselGT}`)
+  vesselLines.push(`TYPE: ${fields.vesselType}`)
+  vesselLines.push(`CLASS: ${fields.vesselClass}`)
+  rows.push(makeRow('VESSEL(S):', vesselLines))
+
+  // Period
+  rows.push(makeRow('PERIOD:', [`From ${fields.periodFrom}`, '', `To     ${fields.periodTo}`]))
+
+  // Wording
+  rows.push(makeRow('WORDING', fields.wording.split('\n').filter(l => l.trim())))
+
+  // Warranties
+  rows.push(makeRow('WARRANTIES', fields.warranties.split('\n').filter(l => l.trim())))
+
+  // Annual Rate
+  rows.push(makeRow('ANNUAL\nRATE:', [fields.annualRate]))
+
+  // Our Share
+  rows.push(makeRow('OUR\nSHARE:', [fields.ourShare]))
+
+  // Trading
+  rows.push(makeRow('TRADING:', fields.trading.split('\n').filter(l => l.trim())))
+
+  // Risk Code
+  rows.push(makeRow('RISK CODE:', fields.riskCode.split('\n').filter(l => l.trim())))
+
+  // Amlin Ref
+  rows.push(makeRow('AMLIN\nREF:', [fields.amlinRef]))
+
+  children.push(new Table({
+    width: { size: 10000, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [LABEL_W, VALUE_W],
+    borders: { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } },
+    rows
+  }))
+
+  const document = new Document({
+    sections: [{
+      properties: { page: { margin: { top: 900, bottom: 900, left: 900, right: 900 } } },
+      children: children as any[]
+    }]
+  })
+
+  const blob = await Packer.toBlob(document)
+  const vName = data.vesselInfo?.name || ''
+  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Declaration).docx`)
 }

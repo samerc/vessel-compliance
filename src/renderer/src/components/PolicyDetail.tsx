@@ -37,7 +37,10 @@ import {
   exportCreditAdviceDocx,
   exportBlueCardDocx,
   exportPolicyPdfWithTC,
-  capturePolicyExportSnapshot
+  capturePolicyExportSnapshot,
+  loadDeclarationFields,
+  exportDeclarationDocx,
+  DeclarationFields
 } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
@@ -218,6 +221,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [, setExportingBC] = useState(false)
   const [exportingQB, setExportingQB] = useState(false)
   const [exportingPdfTC, setExportingPdfTC] = useState(false)
+  const [showDeclarationModal, setShowDeclarationModal] = useState(false)
+  const [declarationFields, setDeclarationFields] = useState<DeclarationFields | null>(null)
   const [showActionsMenu, setShowActionsMenu] = useState(false)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
   const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
@@ -1396,6 +1401,18 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {commissionAmount != null && commissionAmount > 0 && (
                         <button onClick={() => { setShowActionsMenu(false); handleExportCA() }} disabled={exportingCA} style={actionItemStyle} className="hover-effect">
                           <Download size={15} /> Export Credit Advice
+                        </button>
+                      )}
+                      {policy.quotationTypeCode === 'W' && (
+                        <button onClick={async () => {
+                          setShowActionsMenu(false)
+                          try {
+                            const fields = await loadDeclarationFields(policyId)
+                            setDeclarationFields(fields)
+                            setShowDeclarationModal(true)
+                          } catch (err: any) { showError(err.message || 'Failed to load declaration') }
+                        }} style={actionItemStyle} className="hover-effect">
+                          <Download size={15} /> Export Declaration
                         </button>
                       )}
                       {isPIType && blueCards.filter(bc => bc.status === 'active').length > 0 && (
@@ -3285,6 +3302,82 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           onConfirm={confirmation.onConfirm}
           onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
         />
+      )}
+
+      {/* War Declaration Modal */}
+      {showDeclarationModal && declarationFields && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowDeclarationModal(false)} />
+          <div style={{ position: 'relative', width: '700px', maxHeight: '85vh', overflowY: 'auto', borderRadius: '14px', padding: '28px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.1rem' }}>War Declaration</h2>
+              <button onClick={() => setShowDeclarationModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+            </div>
+            {(() => {
+              const f = declarationFields
+              const update = (key: keyof DeclarationFields, val: string) => setDeclarationFields(prev => prev ? { ...prev, [key]: val } : prev)
+              const fieldRow = (label: string, key: keyof DeclarationFields, rows?: number) => (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>{label}</label>
+                  {(rows && rows > 1) ? (
+                    <textarea value={f[key]} onChange={e => update(key, e.target.value)} rows={rows} style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }} />
+                  ) : (
+                    <input value={f[key]} onChange={e => update(key, e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                  )}
+                </div>
+              )
+              return (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                    {fieldRow('Year of Account', 'yearOfAccount')}
+                    {fieldRow('UMR', 'umr')}
+                  </div>
+                  {fieldRow('Reinsured', 'reinsured')}
+                  {fieldRow('Assured', 'assuredText', 3)}
+                  <div style={{ borderTop: '1px solid var(--glass-border)', margin: '16px 0', paddingTop: '12px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>Vessel</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                      {fieldRow('Name', 'vesselName')}
+                      {fieldRow('IMO', 'vesselImo')}
+                      {fieldRow('Sum Insured', 'vesselSumInsured')}
+                      {fieldRow('IV (if applicable)', 'vesselSumInsuredIV')}
+                      {fieldRow('Total Value', 'vesselTotalValue')}
+                      {fieldRow('Built', 'vesselBuilt')}
+                      {fieldRow('GT', 'vesselGT')}
+                      {fieldRow('Type', 'vesselType')}
+                    </div>
+                    {fieldRow('Class', 'vesselClass')}
+                  </div>
+                  <div style={{ borderTop: '1px solid var(--glass-border)', margin: '16px 0', paddingTop: '12px' }}>
+                    {fieldRow('Period From', 'periodFrom')}
+                    {fieldRow('Period To', 'periodTo')}
+                  </div>
+                  {fieldRow('Wording', 'wording', 8)}
+                  {fieldRow('Warranties', 'warranties', 3)}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                    {fieldRow('Annual Rate', 'annualRate')}
+                    {fieldRow('Our Share', 'ourShare')}
+                  </div>
+                  {fieldRow('Trading', 'trading', 3)}
+                  {fieldRow('Risk Code', 'riskCode')}
+                  {fieldRow('Amlin Ref', 'amlinRef')}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                    <button onClick={() => setShowDeclarationModal(false)} className="btn-secondary" style={{ padding: '8px 20px' }}>Cancel</button>
+                    <button onClick={async () => {
+                      try {
+                        await exportDeclarationDocx(policyId, f)
+                        showSuccess('Declaration exported')
+                        setShowDeclarationModal(false)
+                      } catch (err: any) { showError(err.message || 'Export failed') }
+                    }} className="btn-primary" style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Download size={14} /> Export
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
       )}
     </div>
   )

@@ -57,6 +57,7 @@ type PolicySettingsTab =
   | 'signatures'
   | 'qrVerification'
   | 'commissions'
+  | 'declaration'
 
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
@@ -80,6 +81,7 @@ const CATEGORY_TABS: Record<PolicySettingsCategory, { id: PolicySettingsTab; lab
     { id: 'signatures', label: 'Signatures', icon: <PenTool size={15} /> },
     { id: 'qrVerification', label: 'QR Verification', icon: <QrCode size={15} /> },
     { id: 'commissions', label: 'Commissions', icon: <Percent size={15} /> },
+    { id: 'declaration', label: 'Declaration', icon: <FileText size={15} /> },
   ],
   pi: [
     { id: 'piOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
@@ -198,6 +200,7 @@ export default function PolicySettings() {
         {activeTab === 'signatures' && <SignaturesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'qrVerification' && <QrVerificationTab showSuccess={showSuccess} />}
         {activeTab === 'commissions' && <CommissionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+        {activeTab === 'declaration' && <DeclarationSettingsTab showSuccess={showSuccess} />}
         {activeTab === 'piOpening' && <RichTextSettingTab settingKey="policy_text_P_openingClause" label="P&I Opening Clause" description="The opening clause text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piClosing' && <RichTextSettingTab settingKey="policy_text_P_closingText" label="P&I Closing Text" description="The closing section text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piNotice' && <RichTextSettingTab settingKey="policy_text_P_importantNotice" label="P&I Important Notice" description="The important notice section for P&I policy documents." showSuccess={showSuccess} />}
@@ -1646,6 +1649,81 @@ function CommissionsTab({ showSuccess, showError, isLight }: { showSuccess: (m: 
         </div>
         <button className="btn-primary" onClick={handleAddOverride} disabled={!newEntityId} style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Plus size={14} /> Add Customer</button>
       </div>
+    </div>
+  )
+}
+
+// ==================== Declaration Settings Tab ====================
+
+function DeclarationSettingsTab({ showSuccess }: { showSuccess: (m: string) => void }) {
+  const [year, setYear] = useState(String(new Date().getFullYear()))
+  const [umr, setUmr] = useState('')
+  const [amlinRef, setAmlinRef] = useState('')
+  const [riskCode, setRiskCode] = useState('"W" in respect of War Risks Premium\t\t"WB" in respect of War Breach Premium')
+  const [loading, setLoading] = useState(true)
+
+  const loadYear = async (y: string) => {
+    setLoading(true)
+    try {
+      const raw = await window.api.getSetting('declaration_settings')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        const ys = parsed[y] || {}
+        setUmr(ys.umr || '')
+        setAmlinRef(ys.amlinRef || '')
+        if (ys.riskCode) setRiskCode(ys.riskCode)
+      }
+    } catch {}
+    setLoading(false)
+  }
+
+  useEffect(() => { loadYear(year) }, [year])
+
+  const handleSave = async () => {
+    try {
+      const raw = await window.api.getSetting('declaration_settings')
+      const existing = raw ? JSON.parse(raw) : {}
+      existing[year] = { umr, amlinRef, riskCode }
+      await window.api.setSetting('declaration_settings', JSON.stringify(existing))
+      showSuccess(`Declaration settings saved for ${year}`)
+    } catch {
+      await window.api.setSetting('declaration_settings', JSON.stringify({ [year]: { umr, amlinRef, riskCode } }))
+      showSuccess(`Declaration settings saved for ${year}`)
+    }
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+  return (
+    <div>
+      <h3 style={{ fontSize: '1rem', margin: '0 0 4px' }}>War Declaration Settings</h3>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
+        Configure per-year values for war declaration exports (UMR, Amlin Ref, Risk Code).
+      </p>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Year of Account</label>
+        <input type="number" value={year} onChange={e => setYear(e.target.value)} style={{ width: '120px', padding: '6px 10px', fontSize: '0.9rem' }} />
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>UMR</label>
+        <input value={umr} onChange={e => setUmr(e.target.value)} placeholder="e.g., B0572MA255259" style={{ width: '100%', maxWidth: '400px', padding: '6px 10px', fontSize: '0.85rem' }} />
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Amlin Ref</label>
+        <input value={amlinRef} onChange={e => setAmlinRef(e.target.value)} placeholder="e.g., WHW1753225RQ" style={{ width: '100%', maxWidth: '400px', padding: '6px 10px', fontSize: '0.85rem' }} />
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Risk Code</label>
+        <input value={riskCode} onChange={e => setRiskCode(e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem' }} />
+      </div>
+
+      <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Save size={14} /> Save
+      </button>
     </div>
   )
 }
