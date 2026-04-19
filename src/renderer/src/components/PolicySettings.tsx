@@ -771,6 +771,7 @@ function CancelReplaceTab({ showSuccess }: { showSuccess: (msg: string) => void 
 // ==================== Premium Intro Tab ====================
 function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
   const [premiumIntroText, setPremiumIntroText] = useState('Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:')
+  const [premiumIntroSingleText, setPremiumIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -780,6 +781,7 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
         if (raw) {
           const parsed = JSON.parse(raw)
           if (parsed.premiumIntroText) setPremiumIntroText(parsed.premiumIntroText)
+          if (parsed.premiumIntroSingleText) setPremiumIntroSingleText(parsed.premiumIntroSingleText)
         }
       } catch { /* default */ }
       finally { setLoading(false) }
@@ -790,10 +792,10 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText }))
       showSuccess('Premium intro text saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText }))
       showSuccess('Premium intro text saved')
     }
   }
@@ -802,16 +804,28 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
 
   return (
     <div>
-      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Premium Intro Text</h4>
-      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-        Placeholders: {'{currency}'}, {'{amount}'}, {'{instalments}'}, {'{time}'}, {'{timezone}'}
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Multiple Instalments</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+        Used when 2+ instalments. Placeholders: {'{currency}'}, {'{amount}'}, {'{instalments}'}, {'{time}'}, {'{timezone}'}
       </p>
       <textarea
         value={premiumIntroText}
         onChange={e => setPremiumIntroText(e.target.value)}
         rows={3}
+        style={{ width: '100%', marginBottom: '20px', resize: 'vertical' }}
+      />
+
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Single Instalment</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+        Used when 1 instalment. Placeholders: {'{currency}'}, {'{amount}'}, {'{date}'}, {'{time}'}, {'{timezone}'}
+      </p>
+      <textarea
+        value={premiumIntroSingleText}
+        onChange={e => setPremiumIntroSingleText(e.target.value)}
+        rows={3}
         style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
       />
+
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Save size={14} /> Save
       </button>
