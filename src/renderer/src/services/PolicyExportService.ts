@@ -170,9 +170,9 @@ function bcSpacer(twips: number = 200): Paragraph {
   return new Paragraph({ spacing: { before: twips }, children: [] })
 }
 
-const BC_LABEL_W = 3200
-const BC_SEP_W = 150
-const BC_VALUE_W = 6650
+const BC_LABEL_W = 3800
+const BC_SEP_W = 300
+const BC_VALUE_W = 5900
 
 /** Borderless key : value row for vessel detail tables — 3 columns */
 function bcDetailRow(label: string, value: string): TableRow {
@@ -331,9 +331,9 @@ function buildBbcWrcPage(
   children.push(bcParagraph('Period of Insurance:', { bold: true, spacingAfter: 80 }))
 
   // Period table: 3 columns — From/To | Date | Time + Timezone
-  const pLabelW = 550
-  const pDateW = 3600
-  const pTimeTzW = 5850
+  const pLabelW = 700
+  const pDateW = 3500
+  const pTimeTzW = 5800
 
   const bcPeriodCell = (text: string, w: number) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: bcNoBorders(),
