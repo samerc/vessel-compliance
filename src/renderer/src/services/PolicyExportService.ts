@@ -328,12 +328,12 @@ function buildBbcWrcPage(
   )
 
   // 8. Period of Insurance
-  children.push(bcParagraph('Period of Insurance:', { bold: true, spacingAfter: 80 }))
+  children.push(bcParagraph('Period of Insurance:', { bold: false, spacingAfter: 80 }))
 
   // Period table: 3 columns — From/To | Date | Time + Timezone
   const pLabelW = 900
-  const pDateW = 3400
-  const pTimeTzW = 5700
+  const pDateW = 2800
+  const pTimeTzW = 6300
 
   const bcPeriodCell = (text: string, w: number) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: bcNoBorders(),
