@@ -277,7 +277,7 @@ function buildBbcWrcPage(
     }))
   })
 
-  // 5. Vessel details table (borderless key:value)
+  // 5. Vessel details table (3 col fixed: label | : | value bold)
   const vesselRows = [
     bcDetailRow('NAME OF SHIP', data.vesselName),
   ]
@@ -292,6 +292,8 @@ function buildBbcWrcPage(
 
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [LABEL_W, SEP_W, VALUE_W],
     rows: vesselRows,
   }) as unknown as Paragraph)
 
@@ -339,6 +341,8 @@ function buildBbcWrcPage(
 
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [pLabelW, pDateW, pTimeTzW],
     rows: [
       new TableRow({ children: [bcPeriodCell('From', pLabelW), bcPeriodCell(inceptionFmt, pDateW), bcPeriodCell(`${polFormatTime(data.inceptionTime)} ${data.timezone || ''}`.trim(), pTimeTzW)] }),
       new TableRow({ children: [bcPeriodCell('To', pLabelW), bcPeriodCell(expiryFmt, pDateW), bcPeriodCell(`${polFormatTime(data.expiryTime)} ${data.timezone || ''}`.trim(), pTimeTzW)] })
