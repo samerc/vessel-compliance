@@ -604,7 +604,7 @@ export async function exportBlueCardDocx(
         for (const line of plainFt.split('\n')) {
           if (line.trim()) {
             footerParas.push(new Paragraph({
-              alignment: AlignmentType.CENTER,
+              alignment: AlignmentType.LEFT,
               spacing: { before: 0, after: 0 },
               children: [new TextRun({ text: line.trim(), size: 18, font: BC_FONT, color: '999999' })],
             }))
@@ -2598,7 +2598,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     for (const line of plainFooter.split('\n')) {
       if (line.trim()) {
         footerChildren.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
+          alignment: AlignmentType.LEFT,
           spacing: { before: 0, after: 0 },
           children: [new TextRun({ text: line.trim(), size: 18, font: 'Arial', color: '999999' })]
         }))
@@ -2774,7 +2774,7 @@ async function polBuildAdviceFooter(
     for (const line of plainFooter.split('\n')) {
       if (line.trim()) {
         footerChildren.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
+          alignment: AlignmentType.LEFT,
           spacing: { before: 0, after: 0 },
           children: [new TextRun({ text: line.trim(), size: 18, font: 'Arial', color: '999999' })]
         }))
