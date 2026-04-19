@@ -600,11 +600,13 @@ export async function exportBlueCardDocx(
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed.footerText) {
-        footerParas.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: parsed.footerText, size: 14, font: BC_FONT, color: '999999', italics: true })],
-        }))
+        for (const line of parsed.footerText.split('\n')) {
+          footerParas.push(new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 0 },
+            children: [new TextRun({ text: line, size: 14, font: BC_FONT, color: '999999', italics: true })],
+          }))
+        }
       }
     }
   } catch { /* no footer */ }
@@ -2589,13 +2591,15 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   }
   if (footerText) {
     if (polIsHtml(footerText)) {
-      footerChildren.push(...parseHtmlToParagraphs(footerText, { size: 14, font: 'Arial', color: '999999', alignment: AlignmentType.CENTER }))
+      footerChildren.push(...parseHtmlToParagraphs(footerText, { size: 14, font: 'Arial', color: '999999', alignment: AlignmentType.CENTER, spacingAfter: 0 }))
     } else {
-      footerChildren.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 20 },
-        children: [new TextRun({ text: footerText, size: 14, font: 'Arial', color: '999999' })]
-      }))
+      for (const line of footerText.split('\n')) {
+        footerChildren.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 0 },
+          children: [new TextRun({ text: line, size: 14, font: 'Arial', color: '999999' })]
+        }))
+      }
     }
   }
   // Footer layout: left=empty/text, center=page number, right=signature
@@ -2763,13 +2767,15 @@ async function polBuildAdviceFooter(
 
   if (footerText) {
     if (polIsHtml(footerText)) {
-      footerChildren.push(...parseHtmlToParagraphs(footerText, { size: 14, font: 'Arial', color: '999999', alignment: AlignmentType.CENTER }))
+      footerChildren.push(...parseHtmlToParagraphs(footerText, { size: 14, font: 'Arial', color: '999999', alignment: AlignmentType.CENTER, spacingAfter: 0 }))
     } else {
-      footerChildren.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 20 },
-        children: [new TextRun({ text: footerText, size: 14, font: 'Arial', color: '999999' })]
-      }))
+      for (const line of footerText.split('\n')) {
+        footerChildren.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 0 },
+          children: [new TextRun({ text: line, size: 14, font: 'Arial', color: '999999' })]
+        }))
+      }
     }
   }
 
