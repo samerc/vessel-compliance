@@ -953,7 +953,12 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       try {
         const classIds = await window.api.getVesselClassifications(qv.vesselId)
         if (Array.isArray(classIds) && classIds.length > 0) {
-          const names = classIds.map((c: any) => { const cid = typeof c === 'string' ? c : c.classificationSocietyId; return classSocieties.find((cs: any) => cs.id === cid)?.name }).filter(Boolean)
+          const names = classIds.map((c: any) => {
+            const cid = typeof c === 'string' ? c : c.classificationSocietyId
+            const cs = classSocieties.find((s: any) => s.id === cid)
+            if (!cs) return null
+            return cs.abbreviation ? `${cs.name} (${cs.abbreviation})` : cs.name
+          }).filter(Boolean)
           if (names.length > 0) vesselClassificationNames[qv.id] = names.join(' / ')
         }
       } catch {}
@@ -1408,9 +1413,14 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   const tableRows: TableRow[] = []
 
   if (data.addresses.length > 0) {
-    // Sort addresses to match quotation assured order
+    // Sort addresses: by explicit order field first, then by quotation assured order
     const assuredOrder = data.assureds.map((a: any) => a.entityId || a.entity_id)
     const sortedAddrs = [...data.addresses].sort((a, b) => {
+      // If addresses have explicit order, use that first
+      if (a.order != null && b.order != null) return a.order - b.order
+      if (a.order != null) return -1
+      if (b.order != null) return 1
+      // Fall back to quotation assured order
       const aIdx = assuredOrder.indexOf(a.entityId)
       const bIdx = assuredOrder.indexOf(b.entityId)
       if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
@@ -1907,8 +1917,8 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       // War P&I Excess: Section 1 (Hull) + Section 2 (P&I in excess)
       const vesselAV = data.vessel?.agreedValue ?? data.quotation.agreedValue ?? 0
       const sec2Amt = (data.vessel as any)?.warExcessAmount ?? data.quotation.warExcessAmount ?? 0
-      content.push(polBp(`Section 1: ${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
-      content.push(polBp(`Section 2: ${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
+      content.push(polNp(`Section 1: ${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
+      content.push(polNp(`Section 2: ${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
       if (data.quotation.warCombinedLimitText) {
         content.push(polEmptyP())
         content.push(polNp(data.quotation.warCombinedLimitText))
@@ -2094,52 +2104,67 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   const totalPremium = instalmentSum > 0 ? instalmentSum : (data.policy.premiumAmount != null && data.policy.premiumAmount > 0 ? data.policy.premiumAmount : (wq.premiumAmount || 0))
   const timezone = data.policy.timezone || ''
 
-  // War P&I Excess: show Section 1 + Section 2 premium breakdown before intro
-  if (wq.quotationTypeCode === 'W' && wq.warExcessEnabled && data.vessel) {
-    const s1Rate = wq.premiumRate || 0
-    const s2Rate = wq.warExcessRate || 0
-    const s1Amt = data.vessel.agreedValue ?? wq.agreedValue ?? 0
-    const s2Amt = (data.vessel as any).warExcessAmount ?? wq.warExcessAmount ?? 0
-    const s1Prem = (data.vessel as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 100 * 100) / 100
-    const s2Prem = (data.vessel as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * s2Rate / 100 * 100) / 100
-    content.push(polNp(`Section 1: ${polFormatCurrency(s1Prem, currency)} per annum`))
-    content.push(polNp(`Section 2: ${polFormatCurrency(s2Prem, currency)} per annum`))
-    content.push(polEmptyP())
-  }
-
-  // 1. Premium intro with amount — use configurable template
-  let premIntroTemplate = 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
+  // Load policy export settings
+  let premIntroTemplate = ''
+  let premIntroSingleTemplate = ''
   try {
     const s = await window.api.getSetting('policyExportSettings')
     if (s) {
       const p = JSON.parse(s)
       if (p.premiumIntroText) premIntroTemplate = p.premiumIntroText
+      if (p.premiumIntroSingleText) premIntroSingleTemplate = p.premiumIntroSingleText
     }
   } catch { /* default */ }
-  const premIntro = premIntroTemplate
-    .replace(/\{currency\}/g, currency)
-    .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-    .replace(/\{instalments\}/g, String(numInst))
-    .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
-    .replace(/\{timezone\}/g, timezone)
-  content.push(polNp(premIntro))
-  content.push(polEmptyP())
 
-  // 2. Instalment lines — plain text paragraphs
-  if (instalments.length > 0) {
-    const isFirstInstNr = wq.nonRefundableType === 'first_instalment'
-    for (const inst of instalments) {
-      let line = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
-      if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
-        line += ' (non-refundable in case of cancellation, whether before or after inception)'
-      }
-      content.push(polNp(line))
-    }
+  if (numInst === 1 && instalments.length === 1) {
+    // Single instalment: "Premium of {currency} {amount} shall be payable on {date}..."
+    const singleTemplate = premIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.'
+    const singleIntro = singleTemplate
+      .replace(/\{currency\}/g, currency)
+      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
+      .replace(/\{date\}/g, polFormatDateUS(instalments[0].dueDate))
+      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
+      .replace(/\{timezone\}/g, timezone)
+    content.push(polNp(singleIntro))
     content.push(polEmptyP())
 
+    // Non-refundable text for single instalment
+    if (wq.nonRefundableType === 'first_instalment' || (instalments[0].isNonRefundable)) {
+      content.push(polNp('Non-refundable in case of cancellation, whether before or after inception.'))
+      content.push(polEmptyP())
+    }
     if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
       const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
       if (nrText) { content.push(polNp(nrText)); content.push(polEmptyP()) }
+    }
+  } else {
+    // Multiple instalments
+    const multiTemplate = premIntroTemplate || 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
+    const premIntro = multiTemplate
+      .replace(/\{currency\}/g, currency)
+      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
+      .replace(/\{instalments\}/g, String(numInst))
+      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
+      .replace(/\{timezone\}/g, timezone)
+    content.push(polNp(premIntro))
+    content.push(polEmptyP())
+
+    // Instalment lines
+    if (instalments.length > 0) {
+      const isFirstInstNr = wq.nonRefundableType === 'first_instalment'
+      for (const inst of instalments) {
+        let line = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
+        if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
+          line += ' (non-refundable in case of cancellation, whether before or after inception)'
+        }
+        content.push(polNp(line))
+      }
+      content.push(polEmptyP())
+
+      if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
+        const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
+        if (nrText) { content.push(polNp(nrText)); content.push(polEmptyP()) }
+      }
     }
   }
 
@@ -2267,8 +2292,10 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     } else if (typeCode === 'W' && data.quotation.warExcessEnabled) {
       // War P&I Excess: Interest section (Section 1/2 descriptions) + Sum Insured (amounts)
       const intContent: (Paragraph | Table)[] = []
-      if (data.quotation.warSection1Text) intContent.push(polNp(`Section 1: ${data.quotation.warSection1Text}`))
-      if (data.quotation.warSection2Text) intContent.push(polNp(`Section 2: ${data.quotation.warSection2Text}`))
+      const sec1Text = data.quotation.warSection1Text || data.warSettings?.section1Text || 'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
+      const sec2Text = data.quotation.warSection2Text || data.warSettings?.section2Text || 'War P&I in excess of Hull value'
+      intContent.push(polNp(`Section 1: ${sec1Text}`))
+      intContent.push(polNp(`Section 2: ${sec2Text}`))
       if (intContent.length > 0) rows.push(makeRow('Interest', intContent))
       const valueContent = polBuildValueSection(data)
       if (valueContent.length > 0) rows.push(makeRow('Sum Insured / Limits', valueContent))
@@ -2286,9 +2313,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   const conditionsContent = polBuildConditionsSection(data)
   if (conditionsContent.length > 0) rows.push(makeRow('Conditions', conditionsContent))
 
-  // CLASSIFICATION
-  const resolvedClassification = (data.vessel && data.vesselClassificationNames[data.vessel.id]) || data.vesselInfo.classification
-  if (resolvedClassification) rows.push(makeRow('Classification', [polNp(resolvedClassification)]))
+  // CLASSIFICATION — shown in vessel table, not as separate section
 
   // TRADING WARRANTY
   if (typeCode !== 'W') {
@@ -2554,8 +2579,6 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
   }
 
-  // Add spacing between company details and policy title
-  headerParas.push(new Paragraph({ spacing: { after: 80 }, children: [] }))
   // Add policy title (configurable per type)
   const headerTitle = headerTitles[typeCode] || 'Certificate'
   const vesselName = data.vesselInfo?.name || ''
