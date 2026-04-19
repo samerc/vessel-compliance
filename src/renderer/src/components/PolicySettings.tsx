@@ -772,6 +772,8 @@ function CancelReplaceTab({ showSuccess }: { showSuccess: (msg: string) => void 
 function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
   const [premiumIntroText, setPremiumIntroText] = useState('Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:')
   const [premiumIntroSingleText, setPremiumIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
+  const [daIntroText, setDaIntroText] = useState('Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:')
+  const [daIntroSingleText, setDaIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -782,6 +784,8 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
           const parsed = JSON.parse(raw)
           if (parsed.premiumIntroText) setPremiumIntroText(parsed.premiumIntroText)
           if (parsed.premiumIntroSingleText) setPremiumIntroSingleText(parsed.premiumIntroSingleText)
+          if (parsed.debitAdviceIntroText) setDaIntroText(parsed.debitAdviceIntroText)
+          if (parsed.debitAdviceIntroSingleText) setDaIntroSingleText(parsed.debitAdviceIntroSingleText)
         }
       } catch { /* default */ }
       finally { setLoading(false) }
@@ -792,10 +796,10 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText }))
       showSuccess('Premium intro text saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText }))
       showSuccess('Premium intro text saved')
     }
   }
@@ -825,6 +829,17 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
         rows={3}
         style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
       />
+
+      <div style={{ borderTop: '1px solid var(--table-border)', marginTop: '24px', paddingTop: '20px' }}>
+        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Debit Advice</h4>
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>Premium intro text for the Debit Advice document.</p>
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Multiple Instalments — Placeholders: {'{currency}'}, {'{amount}'}, {'{instalments}'}, {'{time}'}, {'{timezone}'}</label>
+        <textarea value={daIntroText} onChange={e => setDaIntroText(e.target.value)} rows={3} style={{ width: '100%', marginBottom: '14px', resize: 'vertical' }} />
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Single Instalment — Placeholders: {'{currency}'}, {'{amount}'}, {'{date}'}, {'{time}'}, {'{timezone}'}</label>
+        <textarea value={daIntroSingleText} onChange={e => setDaIntroSingleText(e.target.value)} rows={3} style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }} />
+      </div>
 
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Save size={14} /> Save

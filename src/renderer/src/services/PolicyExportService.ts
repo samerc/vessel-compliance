@@ -1563,7 +1563,8 @@ function polBuildPeriodParagraphs(data: PolicyExportData): Paragraph[] {
       children: [
         new TextRun({ text: 'From  ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
         new TextRun({ text: polFormatDateUS(inceptionDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: `  ${polFormatTime(inceptionTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+        new TextRun({ text: '\t', size: POL_FONT_SIZE, font: 'Arial' }),
+        new TextRun({ text: `${polFormatTime(inceptionTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     }),
     new Paragraph({
@@ -1571,7 +1572,8 @@ function polBuildPeriodParagraphs(data: PolicyExportData): Paragraph[] {
       children: [
         new TextRun({ text: 'To      ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
         new TextRun({ text: polFormatDateUS(expiryDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: `  ${polFormatTime(expiryTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+        new TextRun({ text: '\t', size: POL_FONT_SIZE, font: 'Arial' }),
+        new TextRun({ text: `${polFormatTime(expiryTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     })
   ]
@@ -2999,7 +3001,6 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
-  const typeName = data.quotation.quotationTypeName || polGetTypeLabel(typeCode)
   const currency = data.quotation.premiumCurrency || 'USD'
 
   // Load header title setting
@@ -3020,8 +3021,13 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   // Load signature
   const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
-  // Build header + footer
-  const headerParas = await polBuildAdviceHeader(data, `${headerTitle} ${data.policy.policyNumber}`)
+  // Build header (company details only, no certificate title) + footer
+  const daHeaderParas: Paragraph[] = []
+  const daHeaderHtml = polSt(data, 'docHeader')
+  const daHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
+  if (daHeaderHtml) {
+    daHeaderParas.push(...parseHtmlToParagraphs(daHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: daHeaderSpacing }))
+  }
   const adviceFooter = await polBuildAdviceFooter(sigBuf)
 
   const children: (Paragraph | Table)[] = []
@@ -3030,10 +3036,10 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 200, after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'DEBIT ADVICE', size: 28, font: 'Arial', color: '000000', bold: true, underline: {} })]
+    children: [new TextRun({ text: 'DEBIT ADVICE', size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
   }))
   children.push(polCenteredP('In connection with'))
-  children.push(polCenteredP(`${typeName} Certificate ${data.policy.policyNumber}`))
+  children.push(polCenteredP(`${headerTitle} ${data.policy.policyNumber}`))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 200, line: 240, lineRule: 'auto' as any },
@@ -3074,42 +3080,77 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   const insuredContent = polBuildInsuredSection(data)
   if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
 
-  // PREMIUM
-  const totalPremium = data.instalments.reduce((sum, i) => sum + (i.premiumAmount || i.amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
+  // PREMIUM — amount bold + words on same line: "USD 45,000 (US Dollars Forty-Five Thousand Only)"
+  const totalPremium = data.instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
   const premiumContent: (Paragraph | Table)[] = [
-    polBp(polFormatCurrency(totalPremium, currency)),
-    polNp(`(${numberToWords(totalPremium, currency)})`)
+    new Paragraph({
+      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({ text: polFormatCurrency(totalPremium, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+        new TextRun({ text: ` (${numberToWords(totalPremium, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+      ]
+    })
   ]
   rows.push(makeRow('Premium', premiumContent))
 
   // PREMIUM PAYMENT CONDITION PRECEDENT
   const ppcpContent: (Paragraph | Table)[] = []
   const numInst = data.instalments.length || 1
-  if (numInst === 1) {
-    ppcpContent.push(polNp('Premium shall be payable in a single instalment.'))
+
+  // Configurable intro text for debit advice (from settings)
+  let daIntroTemplate = ''
+  let daIntroSingleTemplate = ''
+  try {
+    const s = await window.api.getSetting('policyExportSettings')
+    if (s) {
+      const p = JSON.parse(s)
+      if (p.debitAdviceIntroText) daIntroTemplate = p.debitAdviceIntroText
+      if (p.debitAdviceIntroSingleText) daIntroSingleTemplate = p.debitAdviceIntroSingleText
+    }
+  } catch {}
+
+  const daTimezone = data.policy.timezone || ''
+  if (numInst === 1 && data.instalments.length === 1) {
+    const singleTpl = daIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.'
+    ppcpContent.push(polNp(singleTpl
+      .replace(/\{currency\}/g, currency)
+      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
+      .replace(/\{date\}/g, polFormatDateUS(data.instalments[0].dueDate))
+      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
+      .replace(/\{timezone\}/g, daTimezone)))
   } else {
-    ppcpContent.push(polNp(`Premium payable in ${numInst} instalments:`))
+    const multiTpl = daIntroTemplate || 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
+    ppcpContent.push(polNp(multiTpl
+      .replace(/\{currency\}/g, currency)
+      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
+      .replace(/\{instalments\}/g, String(numInst))
+      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
+      .replace(/\{timezone\}/g, daTimezone)))
   }
   ppcpContent.push(polEmptyP())
 
+  // Instalment table — 2 columns: "Xth Instalment due {date} (non-refundable)" | amount
   if (data.instalments.length > 0) {
-    ppcpContent.push(polBuildInstalmentTable(
-      data.instalments,
-      (inst) => inst.premiumAmount || inst.amount || 0,
-      currency
-    ))
+    const isFirstInstNr = data.quotation.nonRefundableType === 'first_instalment'
+    const instDescW = Math.round(POL_BODY_W * 0.65)
+    const instAmtW = POL_BODY_W - instDescW
+    const instRows = data.instalments.map(inst => {
+      let label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
+      if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) label += ' (non-refundable)'
+      return new TableRow({
+        children: [
+          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, alignment: AlignmentType.RIGHT, children: [new TextRun({ text: polFormatCurrency((inst as any).premiumAmount || (inst as any).amount || 0, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
+        ]
+      })
+    })
+    ppcpContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
     ppcpContent.push(polEmptyP())
   }
 
-  // Non-refundable note
-  if (data.quotation.nonRefundableType) {
-    let nrText = ''
-    if (data.quotation.nonRefundableType === 'first_instalment') {
-      nrText = 'The first instalment is deemed to be non-refundable.'
-    } else if (data.quotation.nonRefundableType === 'percentage' && data.quotation.nonRefundablePercent) {
-      nrText = `${polFmtPct(data.quotation.nonRefundablePercent)}% of premium is non-refundable.`
-    }
-    if (nrText) ppcpContent.push(polNp(nrText))
+  // Non-refundable percentage note (only for percentage type)
+  if (data.quotation.nonRefundableType === 'percentage' && data.quotation.nonRefundablePercent) {
+    ppcpContent.push(polNp(`${polFmtPct(data.quotation.nonRefundablePercent)}% of premium is non-refundable.`))
   }
 
   rows.push(makeRow('Premium\nPayment\nCondition\nPrecedent', ppcpContent))
@@ -3146,7 +3187,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
     numbering: polMakeDocxNumbering(),
     sections: [{
       properties: polMakePageProperties(),
-      headers: { default: new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] }) },
+      headers: { default: new Header({ children: daHeaderParas.length > 0 ? daHeaderParas : [polEmptyP()] }) },
       footers: { default: adviceFooter },
       children: children as any[]
     }]
