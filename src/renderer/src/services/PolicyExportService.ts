@@ -170,31 +170,27 @@ function bcSpacer(twips: number = 200): Paragraph {
   return new Paragraph({ spacing: { before: twips }, children: [] })
 }
 
-/** Borderless key : value row for vessel detail tables */
+/** Borderless key : value row for vessel detail tables — 3 columns */
 function bcDetailRow(label: string, value: string): TableRow {
   const LABEL_W = 4200
-  const VALUE_W = 5800
+  const SEP_W = 400
+  const VALUE_W = 5400
   return new TableRow({
     children: [
       new TableCell({
         width: { size: LABEL_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [
-          new Paragraph({
-            spacing: { before: 60, after: 60 },
-            children: [bcText(label, { caps: true })],
-          }),
-        ],
+        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(label, { caps: true })] })],
+      }),
+      new TableCell({
+        width: { size: SEP_W, type: WidthType.DXA },
+        borders: bcNoBorders(),
+        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(':')] })],
       }),
       new TableCell({
         width: { size: VALUE_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [
-          new Paragraph({
-            spacing: { before: 60, after: 60 },
-            children: [bcText(`: ${value}`)],
-          }),
-        ],
+        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(value, { bold: true })] })],
       }),
     ],
   })
@@ -290,7 +286,7 @@ function buildBbcWrcPage(
   }
   vesselRows.push(
     bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
-    bcDetailRow('PORT OF REGISTRY', portOfRegistry),
+    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
     bcDetailRow('IMO NUMBER', data.imoNumber),
   )
 
@@ -302,33 +298,22 @@ function buildBbcWrcPage(
   children.push(bcSpacer(240))
 
   // 6. Owner block
-  // 6+7. Owner block in a bordered box
-  const ownerParas: Paragraph[] = []
-  ownerParas.push(new Paragraph({
-    spacing: { after: 80 },
-    children: [bcText('NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:')]
-  }))
+  // 6+7. Owner block — no border
+  children.push(bcParagraph(
+    'NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:',
+    { bold: false, spacingAfter: 80 }
+  ))
   if (data.ownerName) {
-    ownerParas.push(new Paragraph({ spacing: { after: 20 }, children: [bcText(data.ownerName.toUpperCase(), { bold: true })] }))
+    children.push(bcParagraph(data.ownerName.toUpperCase(), { bold: true, spacingAfter: 20 }))
   }
   if (data.ownerAddress) {
-    for (const line of data.ownerAddress.split('\n')) {
-      if (line.trim()) ownerParas.push(new Paragraph({ spacing: { after: 0 }, children: [bcText(line.trim().toUpperCase(), { bold: true })] }))
+    const addrLines = data.ownerAddress.split('\n').filter(l => l.trim())
+    for (let i = 0; i < addrLines.length; i++) {
+      children.push(bcParagraph(addrLines[i].trim().toUpperCase(), { bold: true, spacingAfter: i === addrLines.length - 1 ? 240 : 0 }))
     }
+  } else {
+    children.push(bcSpacer(240))
   }
-  const bcThinBorder = { style: BorderStyle.SINGLE, size: 1, color: '000000' }
-  children.push(new Table({
-    width: { size: 10000, type: WidthType.DXA },
-    rows: [new TableRow({
-      children: [new TableCell({
-        width: { size: 10000, type: WidthType.DXA },
-        borders: { top: bcThinBorder, bottom: bcThinBorder, left: bcThinBorder, right: bcThinBorder },
-        margins: { top: 80, bottom: 80, left: 120, right: 120 },
-        children: ownerParas
-      })]
-    })]
-  }) as unknown as Paragraph)
-  children.push(bcSpacer(200))
 
   // 7. Certification paragraph — justified (from settings)
   children.push(
@@ -342,11 +327,10 @@ function buildBbcWrcPage(
   // 8. Period of Insurance
   children.push(bcParagraph('Period of Insurance:', { bold: true, spacingAfter: 80 }))
 
-  // Period table: 4 columns — From/To | Date | Time | Timezone
-  const pLabelW = 800
-  const pDateW = 3200
-  const pTimeW = 1200
-  const pTzW = 4800
+  // Period table: 3 columns — From/To | Date | Time + Timezone (using polFormatTime for noon)
+  const pLabelW = 1000
+  const pDateW = 3600
+  const pTimeTzW = 5400
 
   const bcPeriodCell = (text: string, w: number) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: bcNoBorders(),
@@ -356,8 +340,8 @@ function buildBbcWrcPage(
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
     rows: [
-      new TableRow({ children: [bcPeriodCell('From', pLabelW), bcPeriodCell(inceptionFmt, pDateW), bcPeriodCell(data.inceptionTime || '', pTimeW), bcPeriodCell(data.timezone || '', pTzW)] }),
-      new TableRow({ children: [bcPeriodCell('To', pLabelW), bcPeriodCell(expiryFmt, pDateW), bcPeriodCell(data.expiryTime || '', pTimeW), bcPeriodCell(data.timezone || '', pTzW)] })
+      new TableRow({ children: [bcPeriodCell('From', pLabelW), bcPeriodCell(inceptionFmt, pDateW), bcPeriodCell(`${polFormatTime(data.inceptionTime)} ${data.timezone || ''}`.trim(), pTimeTzW)] }),
+      new TableRow({ children: [bcPeriodCell('To', pLabelW), bcPeriodCell(expiryFmt, pDateW), bcPeriodCell(`${polFormatTime(data.expiryTime)} ${data.timezone || ''}`.trim(), pTimeTzW)] })
     ],
   }) as unknown as Paragraph)
 
@@ -377,7 +361,7 @@ function buildBbcWrcPage(
     new Paragraph({
       spacing: { after: 0 },
       children: [
-        bcText('PLACE & DATE:  '),
+        bcText('PLACE & DATE: '),
         bcText(`${city}${city ? ', ' : ''}${today}`),
       ],
     })
@@ -558,7 +542,7 @@ function buildMlcPage(
     new Paragraph({
       spacing: { after: 0 },
       children: [
-        bcText('PLACE & DATE:  '),
+        bcText('PLACE & DATE: '),
         bcText(`${city}${city ? ', ' : ''}${today}`),
       ],
     })
