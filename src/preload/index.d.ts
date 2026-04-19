@@ -795,6 +795,14 @@ export interface Api {
   bankDelete: (id: string) => Promise<void>
   bankReorder: (ids: string[]) => Promise<void>
 
+  // Commission defaults & overrides
+  commissionGetDefaults: () => Promise<{ policyTypeId: string; commissionPercent: number }[]>
+  commissionSetDefault: (policyTypeId: string, commissionPercent: number) => Promise<void>
+  commissionGetOverrides: (entityId?: string) => Promise<{ id: string; entityId: string; policyTypeId: string; commissionPercent: number; entityName?: string }[]>
+  commissionSetOverride: (entityId: string, policyTypeId: string, commissionPercent: number) => Promise<void>
+  commissionDeleteOverride: (entityId: string, policyTypeId: string) => Promise<void>
+  commissionResolve: (entityId: string | null, policyTypeId: string) => Promise<number | null>
+
   // Policy document methods
   policyGetById: (id: string) => Promise<any>
   policyGetInstalments: (policyId: string) => Promise<any[]>

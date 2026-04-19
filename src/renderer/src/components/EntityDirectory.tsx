@@ -75,6 +75,9 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [viewingVessel, setViewingVessel] = useState<Vessel | null>(null)
   const [entityAddresses, setEntityAddresses] = useState<EntityAddress[]>([])
+  const [entityCommissions, setEntityCommissions] = useState<{ policyTypeId: string; commissionPercent: number }[]>([])
+  const [policyTypesForComm, setPolicyTypesForComm] = useState<{ id: string; name: string; code: string }[]>([])
+  const [commDefaults, setCommDefaults] = useState<Record<string, number>>({})
   const [showAddAddress, setShowAddAddress] = useState(false)
   const [editingAddress, setEditingAddress] = useState<EntityAddress | null>(null)
   const [addrForm, setAddrForm] = useState({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
@@ -692,12 +695,26 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const associatedVessels = selectedEntity ? getAssociatedVessels(selectedEntity.id) : []
   const parentCompanies = selectedEntity?.type === 'person' ? getParentCompanies(selectedEntity.id) : []
 
-  // Load addresses when entity is selected
+  // Load addresses and commissions when entity is selected
   useEffect(() => {
     if (selectedEntity) {
       window.api.getEntityAddresses(selectedEntity.id).then(addrs => {
         setEntityAddresses(Array.isArray(addrs) ? addrs : [])
       })
+      // Load commission overrides for this entity
+      Promise.all([
+        window.api.commissionGetOverrides(selectedEntity.id),
+        window.api.getQuotationTypes(),
+        window.api.commissionGetDefaults()
+      ]).then(([co, pt, cd]) => {
+        setEntityCommissions(Array.isArray(co) ? co.map((o: any) => ({ policyTypeId: o.policyTypeId, commissionPercent: o.commissionPercent })) : [])
+        if (Array.isArray(pt)) setPolicyTypesForComm(pt.map((t: any) => ({ id: t.id, name: t.name, code: t.code })))
+        if (Array.isArray(cd)) {
+          const map: Record<string, number> = {}
+          for (const d of cd as any[]) map[d.policyTypeId] = d.commissionPercent
+          setCommDefaults(map)
+        }
+      }).catch(() => {})
       setShowAddAddress(false)
       setEditingAddress(null)
       // Track recent item view
@@ -706,6 +723,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       }).catch(() => {})
     } else {
       setEntityAddresses([])
+      setEntityCommissions([])
     }
   }, [selectedEntity?.id])
 
@@ -1231,6 +1249,54 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 )}
               </div>
             </div>
+
+            {/* Commission overrides section */}
+            {policyTypesForComm.length > 0 && (
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
+              <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '10px' }}>Commission Rates</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {policyTypesForComm.map(pt => {
+                  const override = entityCommissions.find(c => c.policyTypeId === pt.id)
+                  const defaultVal = commDefaults[pt.id]
+                  return (
+                    <div key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>{pt.code || pt.name}</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={override?.commissionPercent ?? ''}
+                        placeholder={defaultVal != null ? `${defaultVal}%` : '—'}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value)
+                          if (!isNaN(val)) {
+                            setEntityCommissions(prev => {
+                              const existing = prev.find(c => c.policyTypeId === pt.id)
+                              if (existing) return prev.map(c => c.policyTypeId === pt.id ? { ...c, commissionPercent: val } : c)
+                              return [...prev, { policyTypeId: pt.id, commissionPercent: val }]
+                            })
+                          }
+                        }}
+                        onBlur={e => {
+                          const val = parseFloat(e.target.value)
+                          if (!isNaN(val) && selectedEntity) {
+                            window.api.commissionSetOverride(selectedEntity.id, pt.id, val).catch(() => {})
+                          } else if (e.target.value === '' && selectedEntity && override) {
+                            window.api.commissionDeleteOverride(selectedEntity.id, pt.id).then(() => {
+                              setEntityCommissions(prev => prev.filter(c => c.policyTypeId !== pt.id))
+                            }).catch(() => {})
+                          }
+                        }}
+                        style={{ width: '70px', padding: '4px 6px', textAlign: 'right', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
+                      />
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>%</span>
+                      {override && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>override</span>}
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '6px', marginBottom: 0 }}>Clear a field to use the default rate. Set a value to override for this customer.</p>
+            </div>
+            )}
 
             {/* Addresses section */}
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>

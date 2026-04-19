@@ -2624,6 +2624,14 @@ app.whenReady().then(() => {
   safeHandle('bank:delete', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteBank(id) })
   safeHandle('bank:reorder', async (event, ids) => { await requirePermission(event, 'admin:settings'); return db.reorderBanks(ids) })
 
+  // Commission defaults & overrides
+  safeHandle('commission:getDefaults', (event) => { requireSession(event); return db.getCommissionDefaults() })
+  safeHandle('commission:setDefault', async (event, policyTypeId, commissionPercent) => { await requirePermission(event, 'admin:settings'); return db.setCommissionDefault(policyTypeId, commissionPercent) })
+  safeHandle('commission:getOverrides', (event, entityId) => { requireSession(event); return db.getEntityCommissionOverrides(entityId || undefined) })
+  safeHandle('commission:setOverride', async (event, entityId, policyTypeId, commissionPercent) => { await requirePermission(event, 'admin:settings'); return db.setEntityCommissionOverride(entityId, policyTypeId, commissionPercent) })
+  safeHandle('commission:deleteOverride', async (event, entityId, policyTypeId) => { await requirePermission(event, 'admin:settings'); return db.deleteEntityCommissionOverride(entityId, policyTypeId) })
+  safeHandle('commission:resolve', (event, entityId, policyTypeId) => { requireSession(event); return db.resolveCommission(entityId, policyTypeId) })
+
   // Policy Document methods
   safeHandle('policy:getById', (event, id) => { requireSession(event); return db.getPolicyDocumentById(id) })
   safeHandle('policy:getInstalments', (event, policyId) => { requireSession(event); return db.getPolicyInstalments(policyId) })

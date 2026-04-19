@@ -768,6 +768,14 @@ const api = {
   bankDelete: (id: string) => ipcRenderer.invoke('bank:delete', id),
   bankReorder: (ids: string[]) => ipcRenderer.invoke('bank:reorder', ids),
 
+  // Commission defaults & overrides
+  commissionGetDefaults: () => ipcRenderer.invoke('commission:getDefaults'),
+  commissionSetDefault: (policyTypeId: string, commissionPercent: number) => ipcRenderer.invoke('commission:setDefault', policyTypeId, commissionPercent),
+  commissionGetOverrides: (entityId?: string) => ipcRenderer.invoke('commission:getOverrides', entityId || null),
+  commissionSetOverride: (entityId: string, policyTypeId: string, commissionPercent: number) => ipcRenderer.invoke('commission:setOverride', entityId, policyTypeId, commissionPercent),
+  commissionDeleteOverride: (entityId: string, policyTypeId: string) => ipcRenderer.invoke('commission:deleteOverride', entityId, policyTypeId),
+  commissionResolve: (entityId: string | null, policyTypeId: string) => ipcRenderer.invoke('commission:resolve', entityId, policyTypeId),
+
   // Policy document methods
   policyGetById: (id: string) => ipcRenderer.invoke('policy:getById', id),
   policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),

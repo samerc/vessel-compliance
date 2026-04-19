@@ -254,6 +254,17 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         })
       }
 
+      // Resolve commission from hierarchy: customer override → policy type default
+      let resolvedCommission: number | '' = ''
+      try {
+        const customerId = quot.customerEntityId || null
+        const policyTypeId = quot.policyTypeId
+        if (policyTypeId) {
+          const comm = await window.api.commissionResolve(customerId, policyTypeId)
+          if (comm != null) resolvedCommission = comm
+        }
+      } catch { /* ignore */ }
+
       setData(prev => ({
         ...prev,
         selectedVesselIds: vessels.map(v => v.vesselId || v.id),
@@ -263,7 +274,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         totalPremium: payable,
         instalmentDates: initDates,
         instalmentAmounts: initAmounts,
-        instalmentNonRefundable: initNR
+        instalmentNonRefundable: initNR,
+        commissionPercent: resolvedCommission
       }))
     } catch (err: any) {
       showError(err.message || 'Failed to load data')

@@ -20,7 +20,8 @@ import {
   FileCheck,
   Loader2,
   PenTool,
-  QrCode
+  QrCode,
+  Percent
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -55,6 +56,7 @@ type PolicySettingsTab =
   | 'tcTemplates'
   | 'signatures'
   | 'qrVerification'
+  | 'commissions'
 
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
@@ -77,6 +79,7 @@ const CATEGORY_TABS: Record<PolicySettingsCategory, { id: PolicySettingsTab; lab
     { id: 'tcTemplates', label: 'T&C Templates', icon: <FileCheck size={15} /> },
     { id: 'signatures', label: 'Signatures', icon: <PenTool size={15} /> },
     { id: 'qrVerification', label: 'QR Verification', icon: <QrCode size={15} /> },
+    { id: 'commissions', label: 'Commissions', icon: <Percent size={15} /> },
   ],
   pi: [
     { id: 'piOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
@@ -194,6 +197,7 @@ export default function PolicySettings() {
         {activeTab === 'tcTemplates' && <TcTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'signatures' && <SignaturesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'qrVerification' && <QrVerificationTab showSuccess={showSuccess} />}
+        {activeTab === 'commissions' && <CommissionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'piOpening' && <RichTextSettingTab settingKey="policy_text_P_openingClause" label="P&I Opening Clause" description="The opening clause text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piClosing' && <RichTextSettingTab settingKey="policy_text_P_closingText" label="P&I Closing Text" description="The closing section text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piNotice' && <RichTextSettingTab settingKey="policy_text_P_importantNotice" label="P&I Important Notice" description="The important notice section for P&I policy documents." showSuccess={showSuccess} />}
@@ -1465,6 +1469,150 @@ function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Save size={14} /> Save
       </button>
+    </div>
+  )
+}
+
+// ==================== Commissions Tab ====================
+
+function CommissionsTab({ showSuccess, showError, isLight }: { showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+  const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string; code: string }[]>([])
+  const [defaults, setDefaults] = useState<Record<string, number>>({})
+  const [overrides, setOverrides] = useState<{ id: string; entityId: string; policyTypeId: string; commissionPercent: number; entityName?: string }[]>([])
+  const [entities, setEntities] = useState<{ id: string; name: string }[]>([])
+  const [newEntityId, setNewEntityId] = useState('')
+  const [entitySearch, setEntitySearch] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [pt, cd, co, ents] = await Promise.all([
+        window.api.getQuotationTypes(),
+        window.api.commissionGetDefaults(),
+        window.api.commissionGetOverrides(),
+        window.api.getEntities()
+      ])
+      if (Array.isArray(pt)) setPolicyTypes(pt.map((t: any) => ({ id: t.id, name: t.name, code: t.code })))
+      if (Array.isArray(cd)) {
+        const map: Record<string, number> = {}
+        for (const d of cd) map[d.policyTypeId] = d.commissionPercent
+        setDefaults(map)
+      }
+      if (Array.isArray(co)) setOverrides(co)
+      if (Array.isArray(ents)) setEntities(ents.map((e: any) => ({ id: e.id, name: e.name })))
+    } catch { showError('Failed to load commission data') }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  const handleDefaultChange = async (policyTypeId: string, value: string) => {
+    const pct = parseFloat(value)
+    if (isNaN(pct)) return
+    setDefaults(prev => ({ ...prev, [policyTypeId]: pct }))
+    try {
+      await window.api.commissionSetDefault(policyTypeId, pct)
+      showSuccess('Default commission saved')
+    } catch { showError('Failed to save') }
+  }
+
+  const handleAddOverride = async () => {
+    if (!newEntityId) return
+    try {
+      for (const pt of policyTypes) {
+        const exists = overrides.find(o => o.entityId === newEntityId && o.policyTypeId === pt.id)
+        if (!exists) await window.api.commissionSetOverride(newEntityId, pt.id, defaults[pt.id] || 0)
+      }
+      showSuccess('Customer added')
+      setNewEntityId('')
+      setEntitySearch('')
+      loadData()
+    } catch { showError('Failed to add customer override') }
+  }
+
+  const handleOverrideChange = async (entityId: string, policyTypeId: string, value: string) => {
+    const pct = parseFloat(value)
+    if (isNaN(pct)) return
+    setOverrides(prev => prev.map(o => o.entityId === entityId && o.policyTypeId === policyTypeId ? { ...o, commissionPercent: pct } : o))
+    try { await window.api.commissionSetOverride(entityId, policyTypeId, pct) } catch { showError('Failed to save') }
+  }
+
+  const handleDeleteCustomer = async (entityId: string) => {
+    try {
+      for (const pt of policyTypes) await window.api.commissionDeleteOverride(entityId, pt.id)
+      showSuccess('Customer override removed')
+      loadData()
+    } catch { showError('Failed to delete') }
+  }
+
+  if (loading) return <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>
+
+  const entityGroups = new Map<string, { entityId: string; entityName: string; rates: Record<string, number> }>()
+  for (const o of overrides) {
+    if (!entityGroups.has(o.entityId)) entityGroups.set(o.entityId, { entityId: o.entityId, entityName: o.entityName || 'Unknown', rates: {} })
+    entityGroups.get(o.entityId)!.rates[o.policyTypeId] = o.commissionPercent
+  }
+
+  const filteredEntities = entities.filter(e => !entityGroups.has(e.id) && e.name.toLowerCase().includes(entitySearch.toLowerCase()))
+
+  return (
+    <div>
+      <h3 style={{ fontSize: '1rem', margin: '0 0 4px' }}>Commission Rates</h3>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>Default commission percentages per policy type. Customer-specific overrides below.</p>
+
+      <div style={{ marginBottom: '28px' }}>
+        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>Default Rates</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          {policyTypes.map(pt => (
+            <div key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--input-border)', minWidth: '180px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>{pt.name}</span>
+              <input type="number" step="0.01" value={defaults[pt.id] ?? ''} onChange={e => setDefaults(prev => ({ ...prev, [pt.id]: parseFloat(e.target.value) || 0 }))} onBlur={e => handleDefaultChange(pt.id, e.target.value)} style={{ width: '70px', padding: '4px 6px', textAlign: 'right', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} placeholder="0" />
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>Customer Overrides</label>
+      {entityGroups.size > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', marginBottom: '16px' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
+              <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 500 }}>Customer</th>
+              {policyTypes.map(pt => (<th key={pt.id} style={{ textAlign: 'center', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 500 }}>{pt.code || pt.name}</th>))}
+              <th style={{ width: '40px' }} />
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from(entityGroups.values()).map(eg => (
+              <tr key={eg.entityId} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                <td style={{ padding: '6px 10px', fontWeight: 600 }}>{eg.entityName}</td>
+                {policyTypes.map(pt => (
+                  <td key={pt.id} style={{ padding: '6px 10px', textAlign: 'center' }}>
+                    <input type="number" step="0.01" value={eg.rates[pt.id] ?? ''} onChange={e => handleOverrideChange(eg.entityId, pt.id, e.target.value)} onBlur={e => handleOverrideChange(eg.entityId, pt.id, e.target.value)} style={{ width: '60px', padding: '3px 6px', textAlign: 'right', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} placeholder={String(defaults[pt.id] || 0)} />
+                  </td>
+                ))}
+                <td style={{ padding: '6px 4px', textAlign: 'center' }}><button onClick={() => handleDeleteCustomer(eg.entityId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
+          <input type="text" value={entitySearch} onChange={e => { setEntitySearch(e.target.value); setNewEntityId('') }} placeholder="Search customer to add..." style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem' }} />
+          {entitySearch && filteredEntities.length > 0 && !newEntityId && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, maxHeight: '200px', overflowY: 'auto', background: isLight ? '#fff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '6px', marginTop: '2px' }}>
+              {filteredEntities.slice(0, 10).map(e => (
+                <div key={e.id} onClick={() => { setNewEntityId(e.id); setEntitySearch(e.name) }} style={{ padding: '6px 10px', cursor: 'pointer', fontSize: '0.82rem' }} onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,170,200,0.1)')} onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>{e.name}</div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button className="btn-primary" onClick={handleAddOverride} disabled={!newEntityId} style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Plus size={14} /> Add Customer</button>
+      </div>
     </div>
   )
 }

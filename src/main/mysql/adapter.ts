@@ -3014,6 +3014,25 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: commission defaults and customer overrides
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_type_commissions (
+                    id VARCHAR(36) PRIMARY KEY,
+                    policy_type_id VARCHAR(36) NOT NULL,
+                    commission_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
+                    UNIQUE KEY uq_ptc_type (policy_type_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS entity_commission_overrides (
+                    id VARCHAR(36) PRIMARY KEY,
+                    entity_id VARCHAR(36) NOT NULL,
+                    policy_type_id VARCHAR(36) NOT NULL,
+                    commission_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
+                    UNIQUE KEY uq_eco_entity_type (entity_id, policy_type_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -9988,6 +10007,63 @@ export class MySQLAdapter {
         for (let i = 0; i < ids.length; i++) {
             await this.pool.execute('UPDATE banks SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
+    }
+
+    // ==================== Commission Defaults & Overrides ====================
+
+    async getCommissionDefaults(): Promise<{ policyTypeId: string; commissionPercent: number }[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query('SELECT policy_type_id as policyTypeId, commission_percent as commissionPercent FROM policy_type_commissions')
+        return (rows as any[]).map(r => ({ ...r, commissionPercent: Number(r.commissionPercent) }))
+    }
+
+    async setCommissionDefault(policyTypeId: string, commissionPercent: number): Promise<void> {
+        if (!this.pool) return
+        const [existing] = await this.pool.query('SELECT id FROM policy_type_commissions WHERE policy_type_id = ?', [policyTypeId])
+        if ((existing as any[]).length > 0) {
+            await this.pool.execute('UPDATE policy_type_commissions SET commission_percent = ? WHERE policy_type_id = ?', [commissionPercent, policyTypeId])
+        } else {
+            await this.pool.execute('INSERT INTO policy_type_commissions (id, policy_type_id, commission_percent) VALUES (?, ?, ?)', [uuidv4(), policyTypeId, commissionPercent])
+        }
+    }
+
+    async getEntityCommissionOverrides(entityId?: string): Promise<{ id: string; entityId: string; policyTypeId: string; commissionPercent: number; entityName?: string }[]> {
+        if (!this.pool) return []
+        let query = `SELECT eco.id, eco.entity_id as entityId, eco.policy_type_id as policyTypeId, eco.commission_percent as commissionPercent, e.name as entityName
+            FROM entity_commission_overrides eco LEFT JOIN entities e ON eco.entity_id = e.id`
+        const params: any[] = []
+        if (entityId) { query += ' WHERE eco.entity_id = ?'; params.push(entityId) }
+        query += ' ORDER BY e.name, eco.policy_type_id'
+        const [rows] = await this.pool.query(query, params)
+        return (rows as any[]).map(r => ({ ...r, commissionPercent: Number(r.commissionPercent) }))
+    }
+
+    async setEntityCommissionOverride(entityId: string, policyTypeId: string, commissionPercent: number): Promise<void> {
+        if (!this.pool) return
+        const [existing] = await this.pool.query('SELECT id FROM entity_commission_overrides WHERE entity_id = ? AND policy_type_id = ?', [entityId, policyTypeId])
+        if ((existing as any[]).length > 0) {
+            await this.pool.execute('UPDATE entity_commission_overrides SET commission_percent = ? WHERE entity_id = ? AND policy_type_id = ?', [commissionPercent, entityId, policyTypeId])
+        } else {
+            await this.pool.execute('INSERT INTO entity_commission_overrides (id, entity_id, policy_type_id, commission_percent) VALUES (?, ?, ?, ?)', [uuidv4(), entityId, policyTypeId, commissionPercent])
+        }
+    }
+
+    async deleteEntityCommissionOverride(entityId: string, policyTypeId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM entity_commission_overrides WHERE entity_id = ? AND policy_type_id = ?', [entityId, policyTypeId])
+    }
+
+    async resolveCommission(entityId: string | null, policyTypeId: string): Promise<number | null> {
+        if (!this.pool) return null
+        // 1. Check customer override
+        if (entityId) {
+            const [overrides] = await this.pool.query('SELECT commission_percent FROM entity_commission_overrides WHERE entity_id = ? AND policy_type_id = ?', [entityId, policyTypeId])
+            if ((overrides as any[]).length > 0) return Number((overrides as any[])[0].commission_percent)
+        }
+        // 2. Fall back to policy type default
+        const [defaults] = await this.pool.query('SELECT commission_percent FROM policy_type_commissions WHERE policy_type_id = ?', [policyTypeId])
+        if ((defaults as any[]).length > 0) return Number((defaults as any[])[0].commission_percent)
+        return null
     }
 
     // ==================== Policy Documents ====================
