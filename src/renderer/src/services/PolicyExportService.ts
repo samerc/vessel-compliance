@@ -170,25 +170,26 @@ function bcSpacer(twips: number = 200): Paragraph {
   return new Paragraph({ spacing: { before: twips }, children: [] })
 }
 
+const BC_LABEL_W = 3200
+const BC_SEP_W = 150
+const BC_VALUE_W = 6650
+
 /** Borderless key : value row for vessel detail tables — 3 columns */
 function bcDetailRow(label: string, value: string): TableRow {
-  const LABEL_W = 3200
-  const SEP_W = 150
-  const VALUE_W = 6650
   return new TableRow({
     children: [
       new TableCell({
-        width: { size: LABEL_W, type: WidthType.DXA },
+        width: { size: BC_LABEL_W, type: WidthType.DXA },
         borders: bcNoBorders(),
         children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(label, { caps: true })] })],
       }),
       new TableCell({
-        width: { size: SEP_W, type: WidthType.DXA },
+        width: { size: BC_SEP_W, type: WidthType.DXA },
         borders: bcNoBorders(),
         children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(':')] })],
       }),
       new TableCell({
-        width: { size: VALUE_W, type: WidthType.DXA },
+        width: { size: BC_VALUE_W, type: WidthType.DXA },
         borders: bcNoBorders(),
         children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(value, { bold: true })] })],
       }),
@@ -293,7 +294,7 @@ function buildBbcWrcPage(
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
-    columnWidths: [LABEL_W, SEP_W, VALUE_W],
+    columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
     rows: vesselRows,
   }) as unknown as Paragraph)
 
