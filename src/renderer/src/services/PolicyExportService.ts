@@ -1554,8 +1554,8 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
 
 function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[] {
   const { inceptionDate, inceptionTime, expiryDate, expiryTime, timezone } = data.policy
-  const labelW = Math.round(POL_BODY_W * 0.08)
-  const dateW = Math.round(POL_BODY_W * 0.35)
+  const labelW = Math.round(POL_BODY_W * 0.12)
+  const dateW = Math.round(POL_BODY_W * 0.33)
   const timeW = POL_BODY_W - labelW - dateW
   const pCell = (text: string, w: number) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: polNoBorders(),
@@ -3152,12 +3152,11 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   // PERIOD
   rows.push(makeRow('Period', polBuildPeriodParagraphs(data)))
 
-  // BANK DETAILS
+  // BANK DETAILS — bank name is internal, only show details
   if (data.bank) {
     const bankContent: (Paragraph | Table)[] = []
-    const allBankLines = [data.bank.name, ...data.bank.details.split('\n')].filter(l => l.trim())
-    for (const line of allBankLines) {
-      bankContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+    for (const line of data.bank.details.split('\n')) {
+      if (line.trim()) bankContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
     }
     rows.push(makeRow('Bank Details', bankContent))
   }
