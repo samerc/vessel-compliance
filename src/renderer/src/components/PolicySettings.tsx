@@ -1487,21 +1487,25 @@ function CommissionsTab({ showSuccess, showError, isLight }: { showSuccess: (m: 
   const loadData = async () => {
     setLoading(true)
     try {
-      const [pt, cd, co, ents] = await Promise.all([
-        window.api.getQuotationTypes(),
-        window.api.commissionGetDefaults(),
-        window.api.commissionGetOverrides(),
-        window.api.getEntities()
-      ])
+      const pt = await window.api.getQuotationTypes()
       if (Array.isArray(pt)) setPolicyTypes(pt.map((t: any) => ({ id: t.id, name: t.name, code: t.code })))
+    } catch {}
+    try {
+      const cd = await window.api.commissionGetDefaults()
       if (Array.isArray(cd)) {
         const map: Record<string, number> = {}
         for (const d of cd) map[d.policyTypeId] = d.commissionPercent
         setDefaults(map)
       }
+    } catch {}
+    try {
+      const co = await window.api.commissionGetOverrides()
       if (Array.isArray(co)) setOverrides(co)
+    } catch {}
+    try {
+      const ents = await window.api.getEntities()
       if (Array.isArray(ents)) setEntities(ents.map((e: any) => ({ id: e.id, name: e.name })))
-    } catch { showError('Failed to load commission data') }
+    } catch {}
     setLoading(false)
   }
 
