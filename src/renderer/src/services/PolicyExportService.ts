@@ -1552,28 +1552,24 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   })]
 }
 
-function polBuildPeriodParagraphs(data: PolicyExportData): Paragraph[] {
+function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[] {
   const { inceptionDate, inceptionTime, expiryDate, expiryTime, timezone } = data.policy
-  return [
-    new Paragraph({
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
-      children: [
-        new TextRun({ text: 'From  ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: polFormatDateUS(inceptionDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: '\t', size: POL_FONT_SIZE, font: 'Arial' }),
-        new TextRun({ text: `${polFormatTime(inceptionTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
-      ]
-    }),
-    new Paragraph({
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
-      children: [
-        new TextRun({ text: 'To      ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: polFormatDateUS(expiryDate), size: POL_FONT_SIZE, font: 'Arial', color: '000000' }),
-        new TextRun({ text: '\t', size: POL_FONT_SIZE, font: 'Arial' }),
-        new TextRun({ text: `${polFormatTime(expiryTime)}  ${timezone || ''}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
-      ]
-    })
-  ]
+  const labelW = Math.round(POL_BODY_W * 0.08)
+  const dateW = Math.round(POL_BODY_W * 0.35)
+  const timeW = POL_BODY_W - labelW - dateW
+  const pCell = (text: string, w: number) => new TableCell({
+    width: { size: w, type: WidthType.DXA }, borders: polNoBorders(),
+    children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
+  })
+  return [new Table({
+    width: { size: POL_BODY_W, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [labelW, dateW, timeW],
+    rows: [
+      new TableRow({ children: [pCell('From', labelW), pCell(polFormatDateUS(inceptionDate), dateW), pCell(`${polFormatTime(inceptionTime)}  ${timezone || ''}`, timeW)] }),
+      new TableRow({ children: [pCell('To', labelW), pCell(polFormatDateUS(expiryDate), dateW), pCell(`${polFormatTime(expiryTime)}  ${timezone || ''}`, timeW)] })
+    ]
+  })]
 }
 
 function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[] {
@@ -3138,7 +3134,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
       return new TableRow({
         children: [
           new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
+          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       })
     })
