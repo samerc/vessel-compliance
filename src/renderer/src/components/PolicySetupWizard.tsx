@@ -267,12 +267,12 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       let resolvedCommission: number | '' = ''
       try {
         const customerId = quot.customerEntityId || null
-        const policyTypeId = quot.policyTypeId
-        if (policyTypeId) {
-          const comm = await window.api.commissionResolve(customerId, policyTypeId)
+        const typeId = quot.policyTypeId || quot.quotationTypeId
+        if (typeId) {
+          const comm = await window.api.commissionResolve(customerId, typeId)
           if (comm != null) resolvedCommission = comm
         }
-      } catch { /* ignore */ }
+      } catch (err) { console.warn('[PolicyWizard] Commission resolve failed:', err) }
 
       setData(prev => ({
         ...prev,
