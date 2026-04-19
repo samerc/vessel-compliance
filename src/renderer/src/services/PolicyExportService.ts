@@ -246,13 +246,13 @@ function buildBbcWrcPage(
 
   const children: Paragraph[] = []
 
-  // 1+2. REF (left) + NOT TRANSFERABLE (right) on same line
+  // 1+2. NOT TRANSFERABLE (left) + REF (right) on same line
   children.push(new Paragraph({
     spacing: { after: 300 },
     children: [
-      bcText(`REF: ${ref}`, { bold: true }),
-      new TextRun({ text: '\t', font: BC_FONT, size: BC_SIZE }),
       bcText('NOT TRANSFERABLE', { bold: true }),
+      new TextRun({ text: '\t', font: BC_FONT, size: BC_SIZE }),
+      bcText(`REF: ${ref}`, { bold: true }),
     ],
     tabStops: [{ type: 'right' as any, position: 9600 }],
   }))
@@ -302,23 +302,33 @@ function buildBbcWrcPage(
   children.push(bcSpacer(240))
 
   // 6. Owner block
-  // 6. Owner label — NOT bold
-  children.push(bcParagraph(
-    'NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:',
-    { bold: false, spacingAfter: 80 }
-  ))
-  // 7. Owner name in bold + caps, address in normal
+  // 6+7. Owner block in a bordered box
+  const ownerParas: Paragraph[] = []
+  ownerParas.push(new Paragraph({
+    spacing: { after: 80 },
+    children: [bcText('NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:')]
+  }))
   if (data.ownerName) {
-    children.push(bcParagraph(data.ownerName.toUpperCase(), { bold: true, spacingAfter: 40 }))
+    ownerParas.push(new Paragraph({ spacing: { after: 20 }, children: [bcText(data.ownerName.toUpperCase(), { bold: true })] }))
   }
   if (data.ownerAddress) {
-    children.push(...bcAddressBlock(
-      data.ownerAddress.split('\n').map(l => l.toUpperCase()),
-      240
-    ))
-  } else {
-    children.push(bcSpacer(240))
+    for (const line of data.ownerAddress.split('\n')) {
+      if (line.trim()) ownerParas.push(new Paragraph({ spacing: { after: 0 }, children: [bcText(line.trim().toUpperCase(), { bold: true })] }))
+    }
   }
+  const bcThinBorder = { style: BorderStyle.SINGLE, size: 1, color: '000000' }
+  children.push(new Table({
+    width: { size: 10000, type: WidthType.DXA },
+    rows: [new TableRow({
+      children: [new TableCell({
+        width: { size: 10000, type: WidthType.DXA },
+        borders: { top: bcThinBorder, bottom: bcThinBorder, left: bcThinBorder, right: bcThinBorder },
+        margins: { top: 80, bottom: 80, left: 120, right: 120 },
+        children: ownerParas
+      })]
+    })]
+  }) as unknown as Paragraph)
+  children.push(bcSpacer(200))
 
   // 7. Certification paragraph — justified (from settings)
   children.push(
@@ -332,32 +342,23 @@ function buildBbcWrcPage(
   // 8. Period of Insurance
   children.push(bcParagraph('Period of Insurance:', { bold: true, spacingAfter: 80 }))
 
-  // Period table: 3 columns — From/To (small) | date (bold) | time + timezone merged (bold)
-  const inceptionTimeTz = [data.inceptionTime, data.timezone].filter(Boolean).join(' ')
-  const expiryTimeTz = [data.expiryTime, data.timezone].filter(Boolean).join(' ')
-  const pLabelW = 600
-  const pDateW = 3400
-  const pTimeTzW = 6000
+  // Period table: 4 columns — From/To | Date | Time | Timezone
+  const pLabelW = 800
+  const pDateW = 3200
+  const pTimeW = 1200
+  const pTzW = 4800
 
-  const periodFromRow = new TableRow({
-    children: [
-      new TableCell({ width: { size: pLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText('From', { bold: true })] })] }),
-      new TableCell({ width: { size: pDateW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(inceptionFmt, { bold: true })] })] }),
-      new TableCell({ width: { size: pTimeTzW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(inceptionTimeTz, { bold: true })] })] }),
-    ],
-  })
-
-  const periodToRow = new TableRow({
-    children: [
-      new TableCell({ width: { size: pLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText('To', { bold: true })] })] }),
-      new TableCell({ width: { size: pDateW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(expiryFmt, { bold: true })] })] }),
-      new TableCell({ width: { size: pTimeTzW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(expiryTimeTz, { bold: true })] })] }),
-    ],
+  const bcPeriodCell = (text: string, w: number) => new TableCell({
+    width: { size: w, type: WidthType.DXA }, borders: bcNoBorders(),
+    children: [new Paragraph({ spacing: { before: 20, after: 20 }, children: [bcText(text, { bold: true })] })]
   })
 
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
-    rows: [periodFromRow, periodToRow],
+    rows: [
+      new TableRow({ children: [bcPeriodCell('From', pLabelW), bcPeriodCell(inceptionFmt, pDateW), bcPeriodCell(data.inceptionTime || '', pTimeW), bcPeriodCell(data.timezone || '', pTzW)] }),
+      new TableRow({ children: [bcPeriodCell('To', pLabelW), bcPeriodCell(expiryFmt, pDateW), bcPeriodCell(data.expiryTime || '', pTimeW), bcPeriodCell(data.timezone || '', pTzW)] })
+    ],
   }) as unknown as Paragraph)
 
   children.push(bcSpacer(200))
@@ -620,15 +621,7 @@ export async function exportBlueCardDocx(
       headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hSpacing, spacingAfter: 0 }))
     }
   } catch { /* no header */ }
-  // Add policy number + vessel name line
-  headerParas.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 40, after: 0 },
-    children: [
-      new TextRun({ text: data.policyNumber, size: BC_SIZE, font: BC_FONT, bold: true }),
-      new TextRun({ text: data.vesselName ? ` \u2014 ${data.vesselName}` : '', size: BC_SIZE, font: BC_FONT, bold: true }),
-    ],
-  }))
+  // No policy/vessel line in header — shown in body REF line instead
 
   // Footer text from settings (no page number for blue cards)
   const footerParas: Paragraph[] = []
