@@ -429,36 +429,19 @@ function buildMlcPage(
     spacingAfter: 300,
   }))
 
-  // 3. Vessel details table — 3 columns (label | : | value bold)
-  const mlcLabelW = 4000
-  const mlcColonW = 400
-  const mlcValueW = 5600
-  const mlcDetailRow = (label: string, value: string) => new TableRow({
-    children: [
-      new TableCell({ width: { size: mlcLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(label, { caps: true })] })] }),
-      new TableCell({ width: { size: mlcColonW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(':')] })] }),
-      new TableCell({ width: { size: mlcValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(value, { bold: true })] })] }),
-    ],
-  })
-
+  // 3. Vessel details table — same design as BBC/WRC (reuse bcDetailRow)
   const vesselRows = [
-    mlcDetailRow('NAME OF SHIP', data.vesselName),
-    mlcDetailRow('IMO NUMBER', data.imoNumber),
-    mlcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
-    mlcDetailRow('PORT OF REGISTRY', portOfRegistry),
+    bcDetailRow('NAME OF SHIP', data.vesselName),
+    bcDetailRow('IMO NUMBER', data.imoNumber),
+    bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
+    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
+    bcDetailRow('PERIOD OF INSURANCE', `FROM ${inceptionFmt.toUpperCase()} TO ${expiryFmt.toUpperCase()}`),
   ]
-
-  // 3b. Period row inside the vessel table
-  vesselRows.push(new TableRow({
-    children: [
-      new TableCell({ width: { size: mlcLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText('PERIOD OF INSURANCE')] })] }),
-      new TableCell({ width: { size: mlcColonW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(':')] })] }),
-      new TableCell({ width: { size: mlcValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 60, after: 60 }, children: [bcText(`FROM ${inceptionFmt.toUpperCase()} TO ${expiryFmt.toUpperCase()}`, { bold: true })] })] }),
-    ],
-  }))
 
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
     rows: vesselRows,
   }) as unknown as Paragraph)
 
@@ -483,43 +466,42 @@ function buildMlcPage(
     'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY',
     { bold: false, spacingAfter: 80 }
   ))
-  children.push(...bcAddressBlock([
-    data.companyName,
-    ...(mlcCompanyAddress || '').split('\n'),
-    mlcWebsite,
-  ].filter(Boolean), 240))
+  const providerLines = [data.companyName, ...(mlcCompanyAddress || '').split('\n'), mlcWebsite].filter(Boolean)
+  for (let i = 0; i < providerLines.length; i++) {
+    children.push(new Paragraph({
+      spacing: { after: i === providerLines.length - 1 ? 240 : 0 },
+      children: [bcText(providerLines[i].toUpperCase(), { bold: true })]
+    }))
+  }
 
   // 7. Contact details — label NOT bold, values bold
   children.push(bcParagraph(
     'CONTACT DETAILS OF THE PERSONS OR ENTITY RESPONSIBLE FOR HANDLING SEAFARERS\u2019 REQUEST FOR RELIEF:',
     { bold: false, spacingAfter: 80 }
   ))
-  if (mlcEmail) {
-    children.push(
-      new Paragraph({
-        spacing: { after: 40 },
-        children: [
-          bcText('Email    '),
-          bcText(mlcEmail, { bold: true }),
-        ],
-      })
-    )
-  }
+  const contactRows: TableRow[] = []
+  const cLabelW = 800
+  const cValueW = 9200
+  const cRow = (label: string, value: string) => new TableRow({
+    children: [
+      new TableCell({ width: { size: cLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 20, after: 20 }, children: [bcText(label)] })] }),
+      new TableCell({ width: { size: cValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 20, after: 20 }, children: [bcText(value, { bold: true })] })] })
+    ]
+  })
+  if (mlcEmail) contactRows.push(cRow('Email', mlcEmail))
   if (mlcPhone) {
     const phoneLines = mlcPhone.split('\n').filter(Boolean)
-    phoneLines.forEach((line, i) => {
-      children.push(
-        new Paragraph({
-          spacing: { after: i === phoneLines.length - 1 ? 200 : 40 },
-          children: [
-            bcText(i === 0 ? 'Tel      ' : '         '),
-            bcText(line.trim(), { bold: true }),
-          ],
-        })
-      )
-    })
+    phoneLines.forEach((line, i) => contactRows.push(cRow(i === 0 ? 'Tel' : '', line.trim())))
   }
-  if (!mlcEmail && !mlcPhone) {
+  if (contactRows.length > 0) {
+    children.push(new Table({
+      width: { size: 10000, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [cLabelW, cValueW],
+      rows: contactRows,
+    }) as unknown as Paragraph)
+    children.push(bcSpacer(200))
+  } else {
     children.push(bcSpacer(100))
   }
 
