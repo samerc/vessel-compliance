@@ -3126,18 +3126,19 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   }
   ppcpContent.push(polEmptyP())
 
-  // Instalment table — 2 columns: "Xth Instalment due {date} (non-refundable)" | amount
+  // Instalment table — 2 columns: "Xth Instalment due {date}" | "USD X (non-refundable)"
   if (data.instalments.length > 0) {
     const isFirstInstNr = data.quotation.nonRefundableType === 'first_instalment'
-    const instDescW = Math.round(POL_BODY_W * 0.65)
+    const instDescW = Math.round(POL_BODY_W * 0.55)
     const instAmtW = POL_BODY_W - instDescW
     const instRows = data.instalments.map(inst => {
-      let label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
-      if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) label += ' (non-refundable)'
+      const label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
+      const isNR = inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)
+      const amtText = polFormatCurrency((inst as any).premiumAmount || (inst as any).amount || 0, currency) + (isNR ? ' (non-refundable)' : '')
       return new TableRow({
         children: [
           new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, alignment: AlignmentType.RIGHT, children: [new TextRun({ text: polFormatCurrency((inst as any).premiumAmount || (inst as any).amount || 0, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
+          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
         ]
       })
     })
