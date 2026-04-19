@@ -10535,9 +10535,9 @@ export class MySQLAdapter {
             const policyNumber = typeCode ? `POL-DRAFT-${typeCode}-${String(polDraftSeq).padStart(4, '0')}` : `POL-DRAFT-${String(polDraftSeq).padStart(4, '0')}`
             const policyId = uuidv4()
 
-            // Get payable premium: sum of instalments (most accurate) or vessel premium or quotation premium
+            // Get payable premium: explicit amount → instalment sum → vessel premium → quotation premium
             const instalmentSum = options.instalments.reduce((sum, inst) => sum + (inst.premiumAmount || 0), 0)
-            const premiumAmount = instalmentSum > 0 ? instalmentSum : (vessel?.premiumAmount || quotation.premiumAmount || 0)
+            const premiumAmount = (options as any).premiumAmount || (instalmentSum > 0 ? instalmentSum : (vessel?.premiumAmount || quotation.premiumAmount || 0))
 
             await this.pool.execute(`
                 INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,

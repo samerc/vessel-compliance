@@ -833,6 +833,7 @@ export interface Api {
     exchangeRate?: number
     selectedLolOptionId?: string | null
     selectedAgreedValueOptionId?: string | null
+    premiumAmount?: number | null
   }) => Promise<any[]>
   policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => Promise<string | null>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>

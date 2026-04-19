@@ -437,7 +437,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         selectedAlternativeId: data.selectedAltId || null,
         exchangeRate: data.exchangeRate || 1,
         selectedLolOptionId: data.selectedLolOptionId || null,
-        selectedAgreedValueOptionId: data.selectedAgreedValueOptionId || null
+        selectedAgreedValueOptionId: data.selectedAgreedValueOptionId || null,
+        premiumAmount: data.totalPremium || null
       })
       if ((result as any)?.error) {
         showError((result as any).message || 'Conversion failed')
