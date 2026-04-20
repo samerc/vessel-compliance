@@ -712,7 +712,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
                 {/* Right: Slide-in panel */}
                 {selectedAssuredId && selectedEntity && selectedVA && (
-                    <div style={{ width: '380px', flexShrink: 0, background: isLight ? '#f4f6fb' : '#14172a', border: '1px solid var(--glass-border)', borderLeft: 'none', borderRadius: '0 12px 12px 0', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+                    <div style={{ width: '440px', flexShrink: 0, background: isLight ? '#f4f6fb' : '#14172a', border: '1px solid var(--glass-border)', borderLeft: 'none', borderRadius: '0 12px 12px 0', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
                         {/* Panel header */}
                         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(0,170,200,0.15), rgba(0,170,200,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
