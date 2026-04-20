@@ -3290,7 +3290,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
         })
       })
       detailsContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
-      detailsContent.push(new Paragraph({ spacing: { before: 120, after: 0, line: 240, lineRule: 'auto' as any }, children: [] }))
+      detailsContent.push(new Paragraph({ spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: ' ', size: POL_FONT_SIZE, font: 'Arial' })] }))
     }
   }
   rows.push(makeRow('Details', detailsContent))
