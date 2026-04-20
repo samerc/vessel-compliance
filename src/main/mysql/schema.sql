@@ -144,9 +144,7 @@ CREATE TABLE IF NOT EXISTS entity_documents (
   expiry_date DATE,
   received_date DATE,
   uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_entity_doc (entity_id, document_type_id),
-  FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
-  FOREIGN KEY (document_type_id) REFERENCES entity_document_types(id) ON DELETE CASCADE
+  UNIQUE KEY uq_entity_doc (entity_id, document_type_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS app_settings (
