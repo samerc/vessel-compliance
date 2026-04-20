@@ -99,6 +99,7 @@ interface QuotationData {
   hullAdditionalConditions: QuotationHullAdditionalCondition[]
   allHullAdditionalConditions: HullAdditionalCondition[]
   hullAlternatives: QuotationHullAlternative[]
+  hullCustomConditions: { id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   // Survey warranties
   surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   // War-specific data
@@ -136,7 +137,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     excludedCountries, subjectivities, instalments, information, notes,
     sectionTexts, sanctionsVersions, clauseOverridesArr, logoPath,
     hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
-    hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw,
+    hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw, hullCustomConditionsRaw,
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
     flagStatesRaw, surveyWarrantiesRaw, fleetsRaw, assuredGroupsRaw
   ] = await Promise.all([
@@ -174,6 +175,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     window.api.hullGetQuotationHullAdditionalConditions(quotation.id),
     window.api.hullGetAdditionalConditions(),
     window.api.hullGetQuotationAlternatives(quotation.id),
+    window.api.hullGetQuotationCustomConditions(quotation.id),
     // War-specific data
     window.api.warGetQuotationWarConditions(quotation.id),
     window.api.warGetConditions(),
@@ -348,6 +350,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
     allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
+    hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
     surveyWarranties: Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) : [],
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: resolvedAllWarConditions,
@@ -1379,6 +1382,14 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           hcText += '\n'
         }
         if (blk.addl) hcText += blk.addl + '\n'
+      }
+      // Append custom additional conditions
+      if (data.hullCustomConditions.length > 0) {
+        hcText += '\n'
+        for (const cc of data.hullCustomConditions) {
+          if (cc.title) hcText += `${cc.title}\n`
+          hcText += `${cc.text}\n\n`
+        }
       }
       // Store blocks for PDF sub-table rendering
       ;(data as any)._hullCondBlocks = hcBlocks
@@ -3287,6 +3298,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             const isNewHullAddlInline = origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
             hcContent.push(dAddlBullet(condText + scope, isNewHullAddlInline ? RED : undefined))
           }
+        }
+      }
+      // Append custom hull additional conditions
+      if (data.hullCustomConditions.length > 0) {
+        hcContent.push(emptyP())
+        for (const cc of data.hullCustomConditions) {
+          if (cc.title) hcContent.push(bup(cc.title))
+          hcContent.push(np(cc.text))
         }
       }
       rowMap.set('hullConditions', makeRow('Conditions', hcContent))

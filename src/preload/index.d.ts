@@ -319,6 +319,13 @@ export interface Api {
   hullGetQuotationHullAdditionalConditions: (qId: string) => Promise<QuotationHullAdditionalCondition[]>
   hullSetQuotationHullAdditionalConditions: (qId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null; amount?: number | null }[]) => Promise<void>
 
+  // Custom hull additional conditions (per quotation)
+  hullGetQuotationCustomConditions: (qId: string) => Promise<{ id: string; quotationId: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]>
+  hullAddQuotationCustomCondition: (data: { quotationId: string; text: string; title?: string; vesselScope?: string[] | null; alternativeId?: string | null }) => Promise<any>
+  hullUpdateQuotationCustomCondition: (id: string, updates: { text?: string; title?: string; vesselScope?: string[] | null; alternativeId?: string | null }) => Promise<void>
+  hullDeleteQuotationCustomCondition: (id: string) => Promise<void>
+  hullReorderQuotationCustomConditions: (qId: string, ids: string[]) => Promise<void>
+
   warGetConditions: () => Promise<WarCondition[]>
   warAddCondition: (text: string, defaultSelected: boolean) => Promise<WarCondition>
   warUpdateCondition: (id: string, updates: Partial<WarCondition>) => Promise<void>

@@ -2073,6 +2073,13 @@ app.whenReady().then(() => {
   safeHandle('hull:getQuotationHullAdditionalConditions', (event, qId) => { requireSession(event); return db.getQuotationHullAdditionalConditions(qId) })
   safeHandle('hull:setQuotationHullAdditionalConditions', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationHullAdditionalConditions(qId, items) })
 
+  // Custom Hull Additional Conditions (per quotation)
+  safeHandle('hull:getQuotationCustomConditions', (event, qId) => { requireSession(event); return db.getQuotationHullCustomConditions(qId) })
+  safeHandle('hull:addQuotationCustomCondition', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationHullCustomCondition(data) })
+  safeHandle('hull:updateQuotationCustomCondition', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationHullCustomCondition(id, updates) })
+  safeHandle('hull:deleteQuotationCustomCondition', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationHullCustomCondition(id) })
+  safeHandle('hull:reorderQuotationCustomConditions', async (event, qId, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationHullCustomConditions(qId, ids) })
+
   // War Risk Conditions
   safeHandle('war:getConditions', (event) => { requireSession(event); return db.getWarConditions() })
   safeHandle('war:addCondition', async (event, text, defaultSelected) => { await requirePermission(event, 'quotations:settings'); return db.addWarCondition(text, defaultSelected) })

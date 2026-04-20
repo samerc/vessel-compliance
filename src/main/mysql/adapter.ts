@@ -3041,6 +3041,19 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: custom hull additional conditions per quotation
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_hull_custom_conditions (
+                    id VARCHAR(36) PRIMARY KEY,
+                    quotation_id VARCHAR(36) NOT NULL,
+                    text TEXT NOT NULL,
+                    title VARCHAR(255) DEFAULT NULL,
+                    order_index INT DEFAULT 0,
+                    vessel_scope TEXT DEFAULT NULL,
+                    alternative_id VARCHAR(36) DEFAULT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
             // Migration: our_share on policy_documents for war declarations
             try {
                 const [osCols] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'our_share'") as any[]
@@ -8097,6 +8110,7 @@ export class MySQLAdapter {
         const altScopeTables = [
             { table: 'quotation_hull_conditions', cols: 'quotation_id, hull_condition_id, text_override, condition_section, amount, vessel_amounts, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_hull_additional_conditions', cols: 'quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_hull_custom_conditions', cols: 'quotation_id, text, title, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_clauses', cols: 'quotation_id, pi_clause_id, description_override, vessel_scope, alternative_id' },
             { table: 'quotation_additional_clauses', cols: 'quotation_id, pi_additional_clause_id, custom_text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_warranties', cols: 'quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id' },
@@ -11551,6 +11565,52 @@ export class MySQLAdapter {
             }
         } finally {
             await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
+    }
+
+    // -- Custom Hull Additional Conditions (per quotation) --
+
+    async getQuotationHullCustomConditions(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, quotation_id as quotationId, text, title, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_custom_conditions WHERE quotation_id = ? ORDER BY order_index ASC',
+            [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+    }
+
+    async addQuotationHullCustomCondition(data: { quotationId: string; text: string; title?: string; vesselScope?: string[] | null; alternativeId?: string | null }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [countRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotation_hull_custom_conditions WHERE quotation_id = ?', [data.quotationId])
+        const order = (countRows as any[])[0]?.cnt || 0
+        await this.pool.execute(
+            'INSERT INTO quotation_hull_custom_conditions (id, quotation_id, text, title, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.text, data.title || null, order, data.vesselScope ? JSON.stringify(data.vesselScope) : null, data.alternativeId || null])
+        return { id, ...data, order }
+    }
+
+    async updateQuotationHullCustomCondition(id: string, updates: { text?: string; title?: string; vesselScope?: string[] | null; alternativeId?: string | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
+        if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
+        if (updates.alternativeId !== undefined) { fields.push('alternative_id = ?'); values.push(updates.alternativeId || null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_hull_custom_conditions SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationHullCustomCondition(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_hull_custom_conditions WHERE id = ?', [id])
+    }
+
+    async reorderQuotationHullCustomConditions(quotationId: string, ids: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE quotation_hull_custom_conditions SET order_index = ? WHERE id = ? AND quotation_id = ?', [i, ids[i], quotationId])
         }
     }
 

@@ -335,6 +335,8 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     const [selectedIvClauseId, setSelectedIvClauseId] = useState<string>('')
     const [qConditions, setQConditions] = useState<QuotationHullCondition[]>([])
     const [qAdditional, setQAdditional] = useState<QuotationHullAdditionalCondition[]>([])
+    const [customConditions, setCustomConditions] = useState<{ id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]>([])
+    const [newCustomText, setNewCustomText] = useState('')
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [selectedVesselScope, setSelectedVesselScope] = useState<string | null>(null) // null = "All Vessels"
     const [addOverrideOpen, setAddOverrideOpen] = useState(false)
@@ -355,15 +357,17 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     }, [addOverrideOpen])
 
     const loadData = async () => {
-        const [clauses, conditions, additional, existCond, existAdd, qv, alts] = await Promise.all([
+        const [clauses, conditions, additional, existCond, existAdd, qv, alts, customConds] = await Promise.all([
             window.api.hullGetClauses(),
             window.api.hullGetClauseConditions(),
             window.api.hullGetAdditionalConditions(),
             window.api.hullGetQuotationHullConditions(quotation.id),
             window.api.hullGetQuotationHullAdditionalConditions(quotation.id),
             window.api.getQuotationVessels(quotation.id),
-            window.api.hullGetQuotationAlternatives(quotation.id)
+            window.api.hullGetQuotationAlternatives(quotation.id),
+            window.api.hullGetQuotationCustomConditions(quotation.id)
         ])
+        setCustomConditions(Array.isArray(customConds) ? customConds : [])
         const safeClauses = Array.isArray(clauses) ? clauses : []
         const safeConds = Array.isArray(conditions) ? conditions : []
         const safeAdd = Array.isArray(additional) ? additional : []
@@ -1433,6 +1437,67 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                         </div>
                     )
                 })()}
+            </div>
+        )}
+        {/* Custom Additional Conditions */}
+        {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
+            <div className="glass-card" style={{ padding: '24px', marginTop: '16px' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
+                    Custom Additional Conditions
+                </h4>
+
+                {/* Add new custom condition */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <textarea
+                        value={newCustomText}
+                        onChange={e => setNewCustomText(e.target.value)}
+                        placeholder="Enter custom condition text..."
+                        rows={2}
+                        style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }}
+                    />
+                    <button
+                        className="btn-primary"
+                        disabled={!newCustomText.trim()}
+                        onClick={async () => {
+                            if (!newCustomText.trim()) return
+                            try {
+                                await window.api.hullAddQuotationCustomCondition({ quotationId: quotation.id, text: newCustomText.trim() })
+                                setNewCustomText('')
+                                const fresh = await window.api.hullGetQuotationCustomConditions(quotation.id)
+                                setCustomConditions(Array.isArray(fresh) ? fresh : [])
+                            } catch {}
+                        }}
+                        style={{ padding: '8px 14px', fontSize: '0.82rem', alignSelf: 'flex-start' }}
+                    >Add</button>
+                </div>
+
+                {/* List of custom conditions */}
+                {customConditions.map((cc, idx) => (
+                    <div key={cc.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '6px', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, minWidth: '18px', paddingTop: '2px' }}>{idx + 1}.</span>
+                        <textarea
+                            defaultValue={cc.text}
+                            onBlur={e => {
+                                if (e.target.value !== cc.text) {
+                                    window.api.hullUpdateQuotationCustomCondition(cc.id, { text: e.target.value })
+                                    setCustomConditions(prev => prev.map(c => c.id === cc.id ? { ...c, text: e.target.value } : c))
+                                }
+                            }}
+                            rows={2}
+                            style={{ flex: 1, padding: '4px 8px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }}
+                        />
+                        <button
+                            onClick={async () => {
+                                await window.api.hullDeleteQuotationCustomCondition(cc.id)
+                                setCustomConditions(prev => prev.filter(c => c.id !== cc.id))
+                            }}
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
+                        ><Trash2 size={14} /></button>
+                    </div>
+                ))}
+                {customConditions.length === 0 && (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '8px 0' }}>No custom conditions added.</div>
+                )}
             </div>
         )}
         </>

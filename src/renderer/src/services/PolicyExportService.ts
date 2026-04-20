@@ -782,6 +782,7 @@ interface PolicyExportData {
   hullAdditionalConditions: QuotationHullAdditionalCondition[]
   allHullAdditionalConditions: HullAdditionalCondition[]
   hullAlternatives: QuotationHullAlternative[]
+  hullCustomConditions: { id: string; text: string; title?: string; order: number }[]
   warConditions: QuotationWarCondition[]
   allWarConditions: WarCondition[]
   warSettings: WarSettings | null
@@ -840,7 +841,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     excludedCountries, subjectivities,
     sectionTexts, sanctionsVersions, clauseOverridesArr,
     hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
-    hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw,
+    hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw, hullCustomConditionsRaw,
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
     flagStatesRaw, surveyWarrantiesRaw, banks,
     assuredGroupsRaw, customSectionsRaw, agreedValueOptionsRaw, fleetsRaw
@@ -876,6 +877,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     window.api.hullGetQuotationHullAdditionalConditions(policy.quotationId),
     window.api.hullGetAdditionalConditions(),
     window.api.hullGetQuotationAlternatives(policy.quotationId),
+    window.api.hullGetQuotationCustomConditions(policy.quotationId),
     window.api.warGetQuotationWarConditions(policy.quotationId),
     window.api.warGetConditions(),
     window.api.warGetSettings(),
@@ -1017,6 +1019,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
     allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw) ? allHullAdditionalConditionsRaw : [],
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
+    hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
     warSettings: (warSettingsRaw && !(warSettingsRaw as any).error) ? warSettingsRaw : null,
@@ -1761,6 +1764,14 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
       // Issue 3: resolve generic {currency} and {amount} placeholders
       condText = condText.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
       content.push(polBulletP(decodeHtmlEntities(condText)))
+    }
+  }
+  // Custom hull additional conditions
+  if (data.hullCustomConditions.length > 0) {
+    content.push(polEmptyP())
+    for (const cc of data.hullCustomConditions) {
+      if (cc.title) content.push(polBp(cc.title))
+      content.push(polBulletP(decodeHtmlEntities(cc.text)))
     }
   }
 }

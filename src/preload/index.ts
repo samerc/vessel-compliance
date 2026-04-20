@@ -316,6 +316,13 @@ const api = {
   hullGetQuotationHullAdditionalConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationHullAdditionalConditions', qId),
   hullSetQuotationHullAdditionalConditions: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationHullAdditionalConditions', qId, items),
 
+  // Custom hull additional conditions (per quotation)
+  hullGetQuotationCustomConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationCustomConditions', qId),
+  hullAddQuotationCustomCondition: (data: any) => ipcRenderer.invoke('hull:addQuotationCustomCondition', data),
+  hullUpdateQuotationCustomCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateQuotationCustomCondition', id, updates),
+  hullDeleteQuotationCustomCondition: (id: string) => ipcRenderer.invoke('hull:deleteQuotationCustomCondition', id),
+  hullReorderQuotationCustomConditions: (qId: string, ids: string[]) => ipcRenderer.invoke('hull:reorderQuotationCustomConditions', qId, ids),
+
   warGetConditions: () => ipcRenderer.invoke('war:getConditions'),
   warAddCondition: (text: string, defaultSelected: boolean) => ipcRenderer.invoke('war:addCondition', text, defaultSelected),
   warUpdateCondition: (id: string, updates: any) => ipcRenderer.invoke('war:updateCondition', id, updates),
