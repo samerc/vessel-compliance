@@ -1047,3 +1047,67 @@ Draft quotation references include the policy type code:
 - `trading_custom_texts` - Custom trading warranty replacement texts
 - `email_templates` - Legacy email templates (migrated to document_templates)
 - `analytics_presets` - Fleet analytics saved filter presets
+- `policy_type_commissions` - Default commission % per policy type
+- `entity_commission_overrides` - Per-customer per-type commission overrides
+- `quotation_hull_custom_conditions` - Per-quotation custom hull additional conditions (free text)
+
+### Commission Defaults
+
+3-tier commission hierarchy for policies:
+- **Policy type default**: `policy_type_commissions` table, managed in Policy Settings → Commissions tab
+- **Customer override**: `entity_commission_overrides` table, per entity + policy type. Managed in Policy Settings + Entity Directory slide-in panel
+- **Per-policy**: `commissionPercent` on `policy_documents`, editable in wizard and PolicyDetail
+- **Resolution**: `commissionResolve(entityId, policyTypeId)` — customer override → type default → null
+- **Wizard auto-fill**: PolicySetupWizard resolves commission on load using `quotationTypeId || policyTypeId`
+
+### War Declaration Export
+
+Reinsurance declaration document for War policies:
+- **Export button**: "Export Declaration" in PolicyDetail actions menu (War policies only)
+- **Editable modal**: All fields pre-filled from policy/quotation, fully editable before export
+- **Fields**: Year of Account, UMR, Reinsured, Assured, Vessel (with IV split), Period, Wording (from war conditions), Warranties, Annual Rate, Our Share, Trading, Risk Code, Amlin Ref
+- **Settings**: Policy Settings → Declaration tab with per-year UMR, Amlin Ref, Risk Code stored in `declaration_settings` app_settings key
+- **Schema**: `our_share DECIMAL(5,2)` on `policy_documents`
+- **No headers/footers**, filename: `{policyNumber} - {vesselName} (Declaration).docx`
+
+### Custom Hull Additional Conditions
+
+Per-quotation free-text hull conditions (not from master settings list):
+- **Table**: `quotation_hull_custom_conditions` (id, quotation_id, text, title, order_index, vessel_scope, alternative_id)
+- **UI**: "Custom Additional Conditions" collapsible section in HullConditionsTab
+- **Export**: Appended after master additional conditions in both quotation and policy exports
+- **Cloned**: On quotation duplicate/renewal via `cloneQuotationJunctions`
+
+### Quotation Editing Lock
+
+Prevents concurrent editing of the same quotation:
+- **Schema**: `locked_by VARCHAR(36)`, `locked_at DATETIME` on `quotations`
+- **Auto-lock**: QuotationEditor locks on mount, unlocks on unmount
+- **Read-only mode**: Other users see yellow "Locked by {username}" banner, editing disabled
+- **30-min expiry**: Safety net for crashes
+- **Admin force-unlock**: `quotationForceUnlock` IPC
+- **List indicator**: Lock icon next to reference number in QuotationList
+- **No updated_at change**: Lock/unlock uses `updated_at = updated_at` to prevent list reordering
+
+### Policy Export Improvements
+
+- **Single instalment**: "Premium of {currency} {amount} shall be payable on {date}..." (configurable in Settings)
+- **Debit/Credit Advice**: Compact header (company only), title size 10 bold underline, 2-column instalment table, premium on one line with words + "Only", period as 3-column table, bank details without title
+- **Blue Cards (BBC/WRC)**: NOT TRANSFERABLE left / REF right, 3-column vessel table (label|:|value bold) with FIXED layout, 3-column period table, owner section without border, port includes country
+- **MLC Blue Cards**: Same vessel table design, provider address bold uppercase zero spacing, contact details in 2-column table
+- **Footer**: Strips HTML tags, splits by `<br>`, Arial 9pt left-aligned not italic
+- **Header spacing**: `spacingAfter: 0` on all document headers (policy, DA, CA, blue cards)
+- **QR Code**: Actual QR image via `qrcode` package, URL uses IMO number not policy number
+- **Draft policy numbers**: `POL-DRAFT-{code}-XXXX` format (includes type code)
+
+### HullConditionsTab Compact Redesign
+
+- **Single card**: Merged 3 separate glass-cards into one with 16px padding
+- **Compact HullConditionPicker**: Single-line rows with accordion expand (one at a time) for override/amount/scope
+- **Collapsible sections**: Conditions (expanded), Additional Conditions (collapsed), Custom Conditions (collapsed) — each with chevron + count badge
+- **Section dividers**: Thin 1px borders between sections
+
+### SumInsuredTab MoneyInput
+
+- **MoneyInput component**: Shows thousand separators when not focused, raw number while editing
+- **Applied to**: Sum insured amount, per-vessel amounts, Section 2 amount, premium
