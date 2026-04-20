@@ -8,6 +8,33 @@ import { formatDate } from '../utils/dateUtils'
 // Guard against IPC error objects (safeHandle returns { error:true } on failure)
 const safeArray = (v: unknown): any[] => Array.isArray(v) ? v : []
 
+// Dynamic entity document helpers
+async function loadEntityDocData() {
+  const [edTypes, edDocs] = await Promise.all([
+    window.api.getEntityDocumentTypes(),
+    window.api.getEntityDocuments()
+  ])
+  return {
+    edTypes: safeArray(edTypes).filter((t: any) => t.isActive && t.isRequired),
+    edDocs: safeArray(edDocs)
+  }
+}
+
+function getEntityDocList(entity: any, edTypes: any[]): { name: string; hasFile: boolean }[] {
+  return edTypes
+    .filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
+    .map((t: any) => ({ name: t.name, typeId: t.id })) as any[]
+}
+
+function entityDocStatus(entity: any, edTypes: any[], edDocs: any[]): { name: string; onFile: boolean }[] {
+  return edTypes
+    .filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
+    .map((t: any) => ({
+      name: t.name,
+      onFile: edDocs.some((d: any) => d.entityId === entity.id && d.documentTypeId === t.id && d.filePath)
+    }))
+}
+
 const isExpired = (expiryDate: string | null | undefined): boolean => {
   if (!expiryDate) return false
   const expiry = new Date(expiryDate)
@@ -113,6 +140,7 @@ export const ReportService = {
     const assuredRoles = safeArray(await window.api.getAssuredRoles())
     const roleOrderMap = new Map(assuredRoles.map((r, i) => [r.name, i]))
     vesselAssureds.sort((a, b) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999))
+    const { edTypes, edDocs } = await loadEntityDocData()
 
     const entityDocsData: any[] = []
     if (vesselAssureds.length > 0) {
@@ -126,50 +154,13 @@ export const ReportService = {
 
         entityDocsData.push({ 'Document Name': `Assured ${index + 1}: ${entity.name}`, 'Description': `Role: ${va.role}`, 'Status': entity.type.toUpperCase(), 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
 
-        // Company documents
-        if (entity.type === 'company') {
+        for (const ds of entityDocStatus(entity, edTypes, edDocs)) {
           requiredCount++
-          if (entity.certificateOfIncorporationPath) compliantCount++
+          if (ds.onFile) compliantCount++
           entityDocsData.push({
-            'Document Name': '  - Certificate of Incorporation',
+            'Document Name': `  - ${ds.name}`,
             'Description': '',
-            'Status': entity.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING',
-            'Date of Receipt': '',
-            'Expiry Date': '',
-            'Uploaded Date': ''
-          })
-
-          requiredCount++
-          if (entity.articlesOfAssociationPath) compliantCount++
-          entityDocsData.push({
-            'Document Name': '  - Articles of Association',
-            'Description': '',
-            'Status': entity.articlesOfAssociationPath ? 'ON FILE' : 'MISSING',
-            'Date of Receipt': '',
-            'Expiry Date': '',
-            'Uploaded Date': ''
-          })
-
-          requiredCount++
-          if (entity.kycFilePath) compliantCount++
-          entityDocsData.push({
-            'Document Name': '  - KYC',
-            'Description': '',
-            'Status': entity.kycFilePath ? 'ON FILE' : 'MISSING',
-            'Date of Receipt': '',
-            'Expiry Date': '',
-            'Uploaded Date': ''
-          })
-        }
-
-        // Person passport
-        if (entity.type === 'person') {
-          requiredCount++
-          if (entity.passportFilePath) compliantCount++
-          entityDocsData.push({
-            'Document Name': '  - ID/Passport',
-            'Description': '',
-            'Status': entity.passportFilePath ? 'ON FILE' : 'MISSING',
+            'Status': ds.onFile ? 'ON FILE' : 'MISSING',
             'Date of Receipt': '',
             'Expiry Date': '',
             'Uploaded Date': ''
@@ -189,48 +180,13 @@ export const ReportService = {
             entityDocsData.push({ 'Document Name': `    ${uboIndex + 1}. ${ubo.name}`, 'Description': ubo.identifier || '', 'Status': ubo.type.toUpperCase(), 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
 
 
-            if (ubo.type === 'company') {
+            for (const ds of entityDocStatus(ubo, edTypes, edDocs)) {
               requiredCount++
-              if (ubo.certificateOfIncorporationPath) compliantCount++
+              if (ds.onFile) compliantCount++
               entityDocsData.push({
-                'Document Name': '       - Certificate of Incorporation',
+                'Document Name': `       - ${ds.name}`,
                 'Description': '',
-                'Status': ubo.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING',
-                'Date of Receipt': '',
-                'Expiry Date': '',
-                'Uploaded Date': ''
-              })
-
-              requiredCount++
-              if (ubo.articlesOfAssociationPath) compliantCount++
-              entityDocsData.push({
-                'Document Name': '       - Articles of Association',
-                'Description': '',
-                'Status': ubo.articlesOfAssociationPath ? 'ON FILE' : 'MISSING',
-                'Date of Receipt': '',
-                'Expiry Date': '',
-                'Uploaded Date': ''
-              })
-
-              requiredCount++
-              if (ubo.kycFilePath) compliantCount++
-              entityDocsData.push({
-                'Document Name': '       - KYC',
-                'Description': '',
-                'Status': ubo.kycFilePath ? 'ON FILE' : 'MISSING',
-                'Date of Receipt': '',
-                'Expiry Date': '',
-                'Uploaded Date': ''
-              })
-            }
-
-            if (ubo.type === 'person') {
-              requiredCount++
-              if (ubo.passportFilePath) compliantCount++
-              entityDocsData.push({
-                'Document Name': '       - ID/Passport',
-                'Description': '',
-                'Status': ubo.passportFilePath ? 'ON FILE' : 'MISSING',
+                'Status': ds.onFile ? 'ON FILE' : 'MISSING',
                 'Date of Receipt': '',
                 'Expiry Date': '',
                 'Uploaded Date': ''
@@ -316,6 +272,7 @@ export const ReportService = {
     const pdfAssuredRoles = safeArray(await window.api.getAssuredRoles())
     const pdfRoleOrderMap = new Map(pdfAssuredRoles.map((r, i) => [r.name, i]))
     vesselAssureds.sort((a, b) => (pdfRoleOrderMap.get(a.role) ?? 999) - (pdfRoleOrderMap.get(b.role) ?? 999))
+    const { edTypes, edDocs } = await loadEntityDocData()
 
     // Count entity documents
     if (vesselAssureds.length > 0) {
@@ -323,16 +280,9 @@ export const ReportService = {
         const entity = allEntities.find(e => e.id === va.entityId)
         if (!entity) return
 
-        if (entity.type === 'company') {
-          requiredCount += 3 // COI, AOA, KYC
-          if (entity.certificateOfIncorporationPath) compliantCount++
-          if (entity.articlesOfAssociationPath) compliantCount++
-          if (entity.kycFilePath) compliantCount++
-        }
-
-        if (entity.type === 'person') {
-          requiredCount += 1 // Passport only
-          if (entity.passportFilePath) compliantCount++
+        for (const ds of entityDocStatus(entity, edTypes, edDocs)) {
+          requiredCount++
+          if (ds.onFile) compliantCount++
         }
 
         // Count UBO documents
@@ -343,15 +293,9 @@ export const ReportService = {
 
         ubos.forEach((ubo) => {
           if (!ubo) return
-          if (ubo.type === 'company') {
-            requiredCount += 3 // COI, AOA, KYC
-            if (ubo.certificateOfIncorporationPath) compliantCount++
-            if (ubo.articlesOfAssociationPath) compliantCount++
-            if (ubo.kycFilePath) compliantCount++
-          }
-          if (ubo.type === 'person') {
-            requiredCount += 1 // Passport only
-            if (ubo.passportFilePath) compliantCount++
+          for (const ds of entityDocStatus(ubo, edTypes, edDocs)) {
+            requiredCount++
+            if (ds.onFile) compliantCount++
           }
         })
       })
@@ -478,30 +422,12 @@ export const ReportService = {
         // Entity documents
         doc.setFontSize(9)
         doc.setTextColor(0, 0, 0)
-        if (entity.type === 'company') {
-          doc.text('• Certificate of Incorporation:', 20, finalY)
-          doc.setTextColor(entity.certificateOfIncorporationPath ? 0 : 255, entity.certificateOfIncorporationPath ? 150 : 0, 0)
-          doc.text(entity.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING', 85, finalY)
+        for (const ds of entityDocStatus(entity, edTypes, edDocs)) {
+          doc.text(`\u2022 ${ds.name}:`, 20, finalY)
+          doc.setTextColor(ds.onFile ? 0 : 255, ds.onFile ? 150 : 0, 0)
+          doc.text(ds.onFile ? 'ON FILE' : 'MISSING', 85, finalY)
           finalY += 5
-
           doc.setTextColor(0, 0, 0)
-          doc.text('• Articles of Association:', 20, finalY)
-          doc.setTextColor(entity.articlesOfAssociationPath ? 0 : 255, entity.articlesOfAssociationPath ? 150 : 0, 0)
-          doc.text(entity.articlesOfAssociationPath ? 'ON FILE' : 'MISSING', 85, finalY)
-          finalY += 5
-
-          doc.setTextColor(0, 0, 0)
-          doc.text('• KYC:', 20, finalY)
-          doc.setTextColor(entity.kycFilePath ? 0 : 255, entity.kycFilePath ? 150 : 0, 0)
-          doc.text(entity.kycFilePath ? 'ON FILE' : 'MISSING', 85, finalY)
-          finalY += 5
-        }
-
-        if (entity.type === 'person') {
-          doc.text('• ID/Passport:', 20, finalY)
-          doc.setTextColor(entity.passportFilePath ? 0 : 255, entity.passportFilePath ? 150 : 0, 0)
-          doc.text(entity.passportFilePath ? 'ON FILE' : 'MISSING', 85, finalY)
-          finalY += 5
         }
 
         // UBOs
@@ -535,31 +461,11 @@ export const ReportService = {
             doc.text(`(${ubo.type.toUpperCase()})`, 90, finalY)
             finalY += 5
 
-            if (ubo.type === 'company') {
+            for (const ds of entityDocStatus(ubo, edTypes, edDocs)) {
               doc.setTextColor(0, 0, 0)
-              doc.text('      - Certificate of Incorporation:', 30, finalY)
-              doc.setTextColor(ubo.certificateOfIncorporationPath ? 0 : 255, ubo.certificateOfIncorporationPath ? 150 : 0, 0)
-              doc.text(ubo.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING', 105, finalY)
-              finalY += 4
-
-              doc.setTextColor(0, 0, 0)
-              doc.text('      - Articles of Association:', 30, finalY)
-              doc.setTextColor(ubo.articlesOfAssociationPath ? 0 : 255, ubo.articlesOfAssociationPath ? 150 : 0, 0)
-              doc.text(ubo.articlesOfAssociationPath ? 'ON FILE' : 'MISSING', 105, finalY)
-              finalY += 4
-
-              doc.setTextColor(0, 0, 0)
-              doc.text('      - KYC:', 30, finalY)
-              doc.setTextColor(ubo.kycFilePath ? 0 : 255, ubo.kycFilePath ? 150 : 0, 0)
-              doc.text(ubo.kycFilePath ? 'ON FILE' : 'MISSING', 105, finalY)
-              finalY += 4
-            }
-
-            if (ubo.type === 'person') {
-              doc.setTextColor(0, 0, 0)
-              doc.text('      - ID/Passport:', 30, finalY)
-              doc.setTextColor(ubo.passportFilePath ? 0 : 255, ubo.passportFilePath ? 150 : 0, 0)
-              doc.text(ubo.passportFilePath ? 'ON FILE' : 'MISSING', 105, finalY)
+              doc.text(`      - ${ds.name}:`, 30, finalY)
+              doc.setTextColor(ds.onFile ? 0 : 255, ds.onFile ? 150 : 0, 0)
+              doc.text(ds.onFile ? 'ON FILE' : 'MISSING', 105, finalY)
               finalY += 4
             }
           })
@@ -628,6 +534,7 @@ export const ReportService = {
     const allEntityUBOs = await window.api.getEntityUBOs()
     const excelAssuredRoles = safeArray(await window.api.getAssuredRoles())
     const excelRoleOrderMap = new Map(excelAssuredRoles.map((r, i) => [r.name, i]))
+    const { edTypes: excelEdTypes, edDocs: excelEdDocs } = await loadEntityDocData()
 
     // Collect all unique assureds across the fleet with their vessel associations
     const assuredMap = new Map<string, { entity: any; vessels: string[]; role: string }>()
@@ -671,55 +578,16 @@ export const ReportService = {
           'Expiry Date': ''
         })
 
-        // Company documents
-        if (entity.type === 'company') {
+        // Entity documents
+        for (const ds of entityDocStatus(entity, excelEdTypes, excelEdDocs)) {
           totalRequired++
-          if (entity.certificateOfIncorporationPath) totalCompliant++
+          if (ds.onFile) totalCompliant++
           assuredData.push({
             'Vessel': '',
             'IMO': '',
-            'Document Name': '  - Certificate of Incorporation',
+            'Document Name': `  - ${ds.name}`,
             'Description': '',
-            'Status': entity.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING',
-            'Date of Receipt': '',
-            'Expiry Date': ''
-          })
-
-          totalRequired++
-          if (entity.articlesOfAssociationPath) totalCompliant++
-          assuredData.push({
-            'Vessel': '',
-            'IMO': '',
-            'Document Name': '  - Articles of Association',
-            'Description': '',
-            'Status': entity.articlesOfAssociationPath ? 'ON FILE' : 'MISSING',
-            'Date of Receipt': '',
-            'Expiry Date': ''
-          })
-
-          totalRequired++
-          if (entity.kycFilePath) totalCompliant++
-          assuredData.push({
-            'Vessel': '',
-            'IMO': '',
-            'Document Name': '  - KYC',
-            'Description': '',
-            'Status': entity.kycFilePath ? 'ON FILE' : 'MISSING',
-            'Date of Receipt': '',
-            'Expiry Date': ''
-          })
-        }
-
-        // Person passport
-        if (entity.type === 'person') {
-          totalRequired++
-          if (entity.passportFilePath) totalCompliant++
-          assuredData.push({
-            'Vessel': '',
-            'IMO': '',
-            'Document Name': '  - ID/Passport',
-            'Description': '',
-            'Status': entity.passportFilePath ? 'ON FILE' : 'MISSING',
+            'Status': ds.onFile ? 'ON FILE' : 'MISSING',
             'Date of Receipt': '',
             'Expiry Date': ''
           })
@@ -746,53 +614,15 @@ export const ReportService = {
               'Expiry Date': ''
             })
 
-            if (ubo.type === 'company') {
+            for (const ds of entityDocStatus(ubo, excelEdTypes, excelEdDocs)) {
               totalRequired++
-              if (ubo.certificateOfIncorporationPath) totalCompliant++
+              if (ds.onFile) totalCompliant++
               assuredData.push({
                 'Vessel': '',
                 'IMO': '',
-                'Document Name': '       - Certificate of Incorporation',
+                'Document Name': `       - ${ds.name}`,
                 'Description': '',
-                'Status': ubo.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING',
-                'Date of Receipt': '',
-                'Expiry Date': ''
-              })
-
-              totalRequired++
-              if (ubo.articlesOfAssociationPath) totalCompliant++
-              assuredData.push({
-                'Vessel': '',
-                'IMO': '',
-                'Document Name': '       - Articles of Association',
-                'Description': '',
-                'Status': ubo.articlesOfAssociationPath ? 'ON FILE' : 'MISSING',
-                'Date of Receipt': '',
-                'Expiry Date': ''
-              })
-
-              totalRequired++
-              if (ubo.kycFilePath) totalCompliant++
-              assuredData.push({
-                'Vessel': '',
-                'IMO': '',
-                'Document Name': '       - KYC',
-                'Description': '',
-                'Status': ubo.kycFilePath ? 'ON FILE' : 'MISSING',
-                'Date of Receipt': '',
-                'Expiry Date': ''
-              })
-            }
-
-            if (ubo.type === 'person') {
-              totalRequired++
-              if (ubo.passportFilePath) totalCompliant++
-              assuredData.push({
-                'Vessel': '',
-                'IMO': '',
-                'Document Name': '       - ID/Passport',
-                'Description': '',
-                'Status': ubo.passportFilePath ? 'ON FILE' : 'MISSING',
+                'Status': ds.onFile ? 'ON FILE' : 'MISSING',
                 'Date of Receipt': '',
                 'Expiry Date': ''
               })
@@ -872,6 +702,7 @@ export const ReportService = {
     const allEntityUBOs = await window.api.getEntityUBOs()
     const fleetAssuredRoles = safeArray(await window.api.getAssuredRoles())
     const fleetRoleOrderMap = new Map(fleetAssuredRoles.map((r, i) => [r.name, i]))
+    const { edTypes: fleetEdTypes, edDocs: fleetEdDocs } = await loadEntityDocData()
 
     // Collect all unique assureds across the fleet with their vessel associations
     const assuredMap = new Map<string, { entity: any; vessels: string[]; roles: string[] }>()
@@ -901,15 +732,9 @@ export const ReportService = {
 
     // Count entity documents for compliance rate
     for (const [, { entity }] of sortedAssureds) {
-      if (entity.type === 'company') {
-        totalRequired += 3
-        if (entity.certificateOfIncorporationPath) totalCompliant++
-        if (entity.articlesOfAssociationPath) totalCompliant++
-        if (entity.kycFilePath) totalCompliant++
-      }
-      if (entity.type === 'person') {
-        totalRequired += 1
-        if (entity.passportFilePath) totalCompliant++
+      for (const ds of entityDocStatus(entity, fleetEdTypes, fleetEdDocs)) {
+        totalRequired++
+        if (ds.onFile) totalCompliant++
       }
 
       const ubos = allEntityUBOs
@@ -919,15 +744,9 @@ export const ReportService = {
 
       ubos.forEach((ubo) => {
         if (!ubo) return
-        if (ubo.type === 'company') {
-          totalRequired += 3
-          if (ubo.certificateOfIncorporationPath) totalCompliant++
-          if (ubo.articlesOfAssociationPath) totalCompliant++
-          if (ubo.kycFilePath) totalCompliant++
-        }
-        if (ubo.type === 'person') {
-          totalRequired += 1
-          if (ubo.passportFilePath) totalCompliant++
+        for (const ds of entityDocStatus(ubo, fleetEdTypes, fleetEdDocs)) {
+          totalRequired++
+          if (ds.onFile) totalCompliant++
         }
       })
     }
@@ -1055,30 +874,12 @@ export const ReportService = {
         // Entity documents
         doc.setFontSize(9)
         doc.setTextColor(0, 0, 0)
-        if (entity.type === 'company') {
-          doc.text('\u2022 Certificate of Incorporation:', 20, finalY)
-          doc.setTextColor(entity.certificateOfIncorporationPath ? 0 : 255, entity.certificateOfIncorporationPath ? 150 : 0, 0)
-          doc.text(entity.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING', 85, finalY)
+        for (const ds of entityDocStatus(entity, fleetEdTypes, fleetEdDocs)) {
+          doc.text(`\u2022 ${ds.name}:`, 20, finalY)
+          doc.setTextColor(ds.onFile ? 0 : 255, ds.onFile ? 150 : 0, 0)
+          doc.text(ds.onFile ? 'ON FILE' : 'MISSING', 85, finalY)
           finalY += 5
-
           doc.setTextColor(0, 0, 0)
-          doc.text('\u2022 Articles of Association:', 20, finalY)
-          doc.setTextColor(entity.articlesOfAssociationPath ? 0 : 255, entity.articlesOfAssociationPath ? 150 : 0, 0)
-          doc.text(entity.articlesOfAssociationPath ? 'ON FILE' : 'MISSING', 85, finalY)
-          finalY += 5
-
-          doc.setTextColor(0, 0, 0)
-          doc.text('\u2022 KYC:', 20, finalY)
-          doc.setTextColor(entity.kycFilePath ? 0 : 255, entity.kycFilePath ? 150 : 0, 0)
-          doc.text(entity.kycFilePath ? 'ON FILE' : 'MISSING', 85, finalY)
-          finalY += 5
-        }
-
-        if (entity.type === 'person') {
-          doc.text('\u2022 ID/Passport:', 20, finalY)
-          doc.setTextColor(entity.passportFilePath ? 0 : 255, entity.passportFilePath ? 150 : 0, 0)
-          doc.text(entity.passportFilePath ? 'ON FILE' : 'MISSING', 85, finalY)
-          finalY += 5
         }
 
         // UBOs for this entity
@@ -1112,31 +913,11 @@ export const ReportService = {
             doc.text(`(${ubo.type.toUpperCase()})`, 90, finalY)
             finalY += 5
 
-            if (ubo.type === 'company') {
+            for (const ds of entityDocStatus(ubo, fleetEdTypes, fleetEdDocs)) {
               doc.setTextColor(0, 0, 0)
-              doc.text('      - Certificate of Incorporation:', 30, finalY)
-              doc.setTextColor(ubo.certificateOfIncorporationPath ? 0 : 255, ubo.certificateOfIncorporationPath ? 150 : 0, 0)
-              doc.text(ubo.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING', 105, finalY)
-              finalY += 4
-
-              doc.setTextColor(0, 0, 0)
-              doc.text('      - Articles of Association:', 30, finalY)
-              doc.setTextColor(ubo.articlesOfAssociationPath ? 0 : 255, ubo.articlesOfAssociationPath ? 150 : 0, 0)
-              doc.text(ubo.articlesOfAssociationPath ? 'ON FILE' : 'MISSING', 105, finalY)
-              finalY += 4
-
-              doc.setTextColor(0, 0, 0)
-              doc.text('      - KYC:', 30, finalY)
-              doc.setTextColor(ubo.kycFilePath ? 0 : 255, ubo.kycFilePath ? 150 : 0, 0)
-              doc.text(ubo.kycFilePath ? 'ON FILE' : 'MISSING', 105, finalY)
-              finalY += 4
-            }
-
-            if (ubo.type === 'person') {
-              doc.setTextColor(0, 0, 0)
-              doc.text('      - ID/Passport:', 30, finalY)
-              doc.setTextColor(ubo.passportFilePath ? 0 : 255, ubo.passportFilePath ? 150 : 0, 0)
-              doc.text(ubo.passportFilePath ? 'ON FILE' : 'MISSING', 105, finalY)
+              doc.text(`      - ${ds.name}:`, 30, finalY)
+              doc.setTextColor(ds.onFile ? 0 : 255, ds.onFile ? 150 : 0, 0)
+              doc.text(ds.onFile ? 'ON FILE' : 'MISSING', 105, finalY)
               finalY += 4
             }
           })
