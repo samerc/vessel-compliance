@@ -387,6 +387,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                 policyTypeId: row.policyTypeId,
                 isRenewal: true,
                 periodText,
+                quotationDate: new Date().toISOString().split('T')[0],
                 createdBy: user?.username
             } as any)
             if (!q || (q as any).error) throw new Error('Failed to create quotation')

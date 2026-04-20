@@ -7872,7 +7872,7 @@ export class MySQLAdapter {
             INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         `, [
-            id, referenceNumber, q.quotationTypeId || null, q.quotationDate || null, q.policyTypeId || null, q.vesselId || null,
+            id, referenceNumber, q.quotationTypeId || null, q.quotationDate || new Date().toISOString().split('T')[0], q.policyTypeId || null, q.vesselId || null,
             q.isRenewal || false, q.status || 'draft', q.periodText || null, q.validityDays || 14,
             q.sanctionsClauseVersion || null, q.vdrDeductibleEnabled !== false, q.createdBy || null, id
         ])
