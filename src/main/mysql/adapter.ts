@@ -3092,18 +3092,18 @@ export class MySQLAdapter {
                 return { success: false, lockedBy: row.locked_by, lockedByName: row.lockedByName || 'Unknown' }
             }
         }
-        await this.pool.execute('UPDATE quotations SET locked_by = ?, locked_at = NOW() WHERE id = ?', [userId, quotationId])
+        await this.pool.execute('UPDATE quotations SET locked_by = ?, locked_at = NOW(), updated_at = updated_at WHERE id = ?', [userId, quotationId])
         return { success: true }
     }
 
     async unlockQuotation(quotationId: string, userId: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE quotations SET locked_by = NULL, locked_at = NULL WHERE id = ? AND locked_by = ?', [quotationId, userId])
+        await this.pool.execute('UPDATE quotations SET locked_by = NULL, locked_at = NULL, updated_at = updated_at WHERE id = ? AND locked_by = ?', [quotationId, userId])
     }
 
     async forceUnlockQuotation(quotationId: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE quotations SET locked_by = NULL, locked_at = NULL WHERE id = ?', [quotationId])
+        await this.pool.execute('UPDATE quotations SET locked_by = NULL, locked_at = NULL, updated_at = updated_at WHERE id = ?', [quotationId])
     }
 
     async getQuotationLock(quotationId: string): Promise<{ lockedBy: string | null; lockedByName: string | null; lockedAt: string | null }> {
