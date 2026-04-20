@@ -661,7 +661,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                             <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
                                 <th style={{ padding: '14px 16px' }}>Assured Name</th>
                                 <th style={{ padding: '14px 16px' }}>Role</th>
-                                <th style={{ padding: '14px 16px' }}>Docs</th>
+                                <th style={{ padding: '14px 16px', minWidth: '100px' }}>Documents</th>
                                 <th style={{ padding: '14px 16px' }}>UBOs</th>
                                 <th style={{ padding: '14px 16px', textAlign: 'right' }}>Actions</th>
                             </tr>
