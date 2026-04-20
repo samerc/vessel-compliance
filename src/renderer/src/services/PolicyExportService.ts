@@ -3238,9 +3238,9 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
 
   const rows: TableRow[] = []
 
-  // INSURED — exclude broker entity (already shown at top of CA)
+  // INSURED — exclude broker entity and c/o line (broker already shown at top of CA)
   const caFilteredData = brokerEntityId
-    ? { ...data, addresses: data.addresses.filter(a => a.entityId !== brokerEntityId), assureds: data.assureds.filter(a => (a as any).entityId !== brokerEntityId) }
+    ? { ...data, quotation: { ...data.quotation, coName: '' }, addresses: data.addresses.filter(a => a.entityId !== brokerEntityId), assureds: data.assureds.filter(a => (a as any).entityId !== brokerEntityId) }
     : data
   const insuredContent = polBuildInsuredSection(caFilteredData)
   if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
