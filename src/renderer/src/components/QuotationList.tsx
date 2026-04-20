@@ -95,10 +95,11 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  // Month navigation
+  // Month navigation — always reset to current month on mount
   const [navYear, setNavYear] = useState(() => new Date().getFullYear())
   const [navMonth, setNavMonth] = useState(() => new Date().getMonth())
   const [isSearchActive, setIsSearchActive] = useState(false)
+  useEffect(() => { setNavYear(new Date().getFullYear()); setNavMonth(new Date().getMonth()) }, [])
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [page, setPage] = useState(0)
