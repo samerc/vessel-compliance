@@ -580,6 +580,10 @@ export interface Api {
 
   vesselGetQuotations: (vesselId: string) => Promise<any[]>
   getQuotation: (id: string) => Promise<Quotation | null>
+  quotationLock: (id: string) => Promise<{ success: boolean; lockedBy?: string; lockedByName?: string }>
+  quotationUnlock: (id: string) => Promise<void>
+  quotationForceUnlock: (id: string) => Promise<void>
+  quotationGetLock: (id: string) => Promise<{ lockedBy: string | null; lockedByName: string | null; lockedAt: string | null }>
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>
   deleteQuotation: (id: string) => Promise<void>

@@ -561,6 +561,10 @@ const api = {
 
   vesselGetQuotations: (vesselId: string) => ipcRenderer.invoke('vessel:getQuotations', vesselId),
   getQuotation: (id: string) => ipcRenderer.invoke('db:getQuotation', id),
+  quotationLock: (id: string) => ipcRenderer.invoke('quotation:lock', id),
+  quotationUnlock: (id: string) => ipcRenderer.invoke('quotation:unlock', id),
+  quotationForceUnlock: (id: string) => ipcRenderer.invoke('quotation:forceUnlock', id),
+  quotationGetLock: (id: string) => ipcRenderer.invoke('quotation:getLock', id),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
   updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),
   deleteQuotation: (id: string) => ipcRenderer.invoke('db:deleteQuotation', id),

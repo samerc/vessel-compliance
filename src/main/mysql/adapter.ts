@@ -3062,10 +3062,60 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: quotation locking
+            try {
+                const [lkCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'locked_by'") as any[]
+                if ((lkCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN locked_by VARCHAR(36) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN locked_at DATETIME DEFAULT NULL")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
         }
+    }
+
+    // --- Quotation Locking ---
+
+    async lockQuotation(quotationId: string, userId: string): Promise<{ success: boolean; lockedBy?: string; lockedByName?: string }> {
+        if (!this.pool) return { success: false }
+        // Check if already locked by someone else (and not expired — 30 min)
+        const [rows] = await this.pool.query(
+            'SELECT q.locked_by, q.locked_at, u.username as lockedByName FROM quotations q LEFT JOIN users u ON q.locked_by = u.id WHERE q.id = ?', [quotationId])
+        const row = (rows as any[])[0]
+        if (row?.locked_by && row.locked_by !== userId) {
+            const lockedAt = new Date(row.locked_at)
+            const elapsed = Date.now() - lockedAt.getTime()
+            if (elapsed < 30 * 60 * 1000) {
+                return { success: false, lockedBy: row.locked_by, lockedByName: row.lockedByName || 'Unknown' }
+            }
+        }
+        await this.pool.execute('UPDATE quotations SET locked_by = ?, locked_at = NOW() WHERE id = ?', [userId, quotationId])
+        return { success: true }
+    }
+
+    async unlockQuotation(quotationId: string, userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE quotations SET locked_by = NULL, locked_at = NULL WHERE id = ? AND locked_by = ?', [quotationId, userId])
+    }
+
+    async forceUnlockQuotation(quotationId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE quotations SET locked_by = NULL, locked_at = NULL WHERE id = ?', [quotationId])
+    }
+
+    async getQuotationLock(quotationId: string): Promise<{ lockedBy: string | null; lockedByName: string | null; lockedAt: string | null }> {
+        if (!this.pool) return { lockedBy: null, lockedByName: null, lockedAt: null }
+        const [rows] = await this.pool.query(
+            'SELECT q.locked_by as lockedBy, q.locked_at as lockedAt, u.username as lockedByName FROM quotations q LEFT JOIN users u ON q.locked_by = u.id WHERE q.id = ?', [quotationId])
+        const r = (rows as any[])[0]
+        if (!r?.lockedBy) return { lockedBy: null, lockedByName: null, lockedAt: null }
+        // Check expiry
+        const elapsed = Date.now() - new Date(r.lockedAt).getTime()
+        if (elapsed >= 30 * 60 * 1000) return { lockedBy: null, lockedByName: null, lockedAt: null }
+        return { lockedBy: r.lockedBy, lockedByName: r.lockedByName || null, lockedAt: r.lockedAt }
     }
 
     // --- T&C Templates ---
@@ -7332,6 +7382,7 @@ export class MySQLAdapter {
                 LEFT JOIN vessels v2 ON qv2.vessel_id = v2.id
                 GROUP BY qv2.quotation_id
             ) qv_agg ON qv_agg.quotation_id = q.id
+            LEFT JOIN users lu ON q.locked_by = lu.id
             WHERE q.id IN (${latestIdList}) ${whereClause}
         `
 
@@ -7371,7 +7422,8 @@ export class MySQLAdapter {
                 q.revision_number as revisionNumber, q.revision_group_id as revisionGroupId, q.is_locked as isLocked,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy,
                 q.workflow_step_id as workflowStepId, qws.name as workflowStepName, qws.color as workflowStepColor,
-                qv_agg.vessel_name as vesselName, qv_agg.vessel_count as vesselCount
+                qv_agg.vessel_name as vesselName, qv_agg.vessel_count as vesselCount,
+                q.locked_by as lockedBy, lu.username as lockedByName
             ${baseQuery}
             ORDER BY ${orderCol} ${sortDir}
             LIMIT ? OFFSET ?

@@ -122,12 +122,34 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         revisionCount: number
         deleteMode: 'single' | 'all'
     } | null>(null)
+    const [isLockedByOther, setIsLockedByOther] = useState(false)
+    const [lockedByName, setLockedByName] = useState<string | null>(null)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
     const isLight = theme === 'light'
-    const canEdit = hasPermission('quotations:edit')
     const canExport = hasPermission('quotations:export')
+
+    // Lock quotation on mount, unlock on unmount
+    useEffect(() => {
+        let mounted = true
+        ;(async () => {
+            try {
+                const result = await window.api.quotationLock(quotation.id)
+                if (!mounted) return
+                if (!result.success) {
+                    setIsLockedByOther(true)
+                    setLockedByName(result.lockedByName || 'another user')
+                }
+            } catch {}
+        })()
+        return () => {
+            mounted = false
+            window.api.quotationUnlock(quotation.id).catch(() => {})
+        }
+    }, [quotation.id])
+
+    const canEdit = hasPermission('quotations:edit') && !isLockedByOther
 
     useEffect(() => {
         loadMasterData()
@@ -573,7 +595,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             )}
 
             {/* Locked banner */}
-            {isLocked && (
+            {isLockedByOther && (
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', marginBottom: '12px',
                     borderRadius: '10px', background: 'rgba(255, 176, 32, 0.12)', border: '1px solid rgba(255, 176, 32, 0.3)',
@@ -604,6 +626,21 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                             View Policy <ExternalLink size={12} />
                         </button>
                     )}
+                </div>
+            )}
+
+            {/* Locked banner */}
+            {isLockedByOther && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 16px', marginBottom: '12px', borderRadius: '8px',
+                    background: isLight ? 'rgba(255,176,32,0.1)' : 'rgba(255,176,32,0.15)',
+                    border: '1px solid rgba(255,176,32,0.3)',
+                    color: isLight ? '#92400e' : '#fbbf24',
+                    fontSize: '0.85rem', fontWeight: 600
+                }}>
+                    <Lock size={16} />
+                    This quotation is being edited by {lockedByName}. You are viewing in read-only mode.
                 </div>
             )}
 
