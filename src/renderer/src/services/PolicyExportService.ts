@@ -3150,9 +3150,21 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   }
   const adviceFooter = await polBuildAdviceFooter(sigBuf)
 
+  // Load credit advice commission wording from settings
+  let caCommissionMultiText = 'Commission payable in {instalments} instalments:'
+  let caCommissionSingleText = 'Commission payable on {date}.'
+  try {
+    const caSettingsRaw = await window.api.getSetting('policyExportSettings')
+    if (caSettingsRaw) {
+      const caParsed = JSON.parse(caSettingsRaw)
+      if (caParsed.creditAdviceCommissionText) caCommissionMultiText = caParsed.creditAdviceCommissionText
+      if (caParsed.creditAdviceCommissionSingleText) caCommissionSingleText = caParsed.creditAdviceCommissionSingleText
+    }
+  } catch { /* use defaults */ }
+
   const children: (Paragraph | Table)[] = []
 
-  // Broker block — left-aligned, before title, NOT in the two-column table
+  // Broker block — left-aligned, before title
   const broker = data.assureds.find(a => a.role?.toLowerCase().includes('broker'))
   if (broker) {
     children.push(polBp(broker.name))
@@ -3163,11 +3175,8 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
         if (line.trim()) children.push(polNp(line.trim()))
       }
     }
-    const brokerEntity = data.assureds.find(a => a.role?.toLowerCase().includes('broker'))
-    if (brokerEntity) {
-      if ((brokerEntity as any).phone) children.push(polNp(`Phone: ${(brokerEntity as any).phone}`))
-      if ((brokerEntity as any).email) children.push(polNp(`${(brokerEntity as any).email}`))
-    }
+    if ((broker as any).phone) children.push(polNp(`Phone: ${(broker as any).phone}`))
+    if ((broker as any).email) children.push(polNp(`${(broker as any).email}`))
     children.push(polEmptyP())
   }
 
@@ -3206,7 +3215,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          margins: { top: 60, bottom: 200, left: 80, right: 80 },
+          margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: content.length > 0 ? content : [polEmptyP()]
         })
       ]
@@ -3215,8 +3224,9 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
 
   const rows: TableRow[] = []
 
-  // INSURED
-  const insuredContent = polBuildInsuredSection(data)
+  // INSURED — exclude broker (already shown at top of CA)
+  const caFilteredData = { ...data, addresses: data.addresses.filter(a => !a.role?.toLowerCase().includes('broker')), assureds: data.assureds.filter(a => !a.role?.toLowerCase().includes('broker')) }
+  const insuredContent = polBuildInsuredSection(caFilteredData)
   if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
 
   // CREDIT AMOUNT — amount + words on same line
@@ -3236,18 +3246,21 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
 
   // DETAILS
   const detailsContent: (Paragraph | Table)[] = []
-  detailsContent.push(polNp(`Being ${polFmtPct(commissionPercent)}% Commission on Premium ${polFormatCurrency(totalPremium, currency)}`))
-  detailsContent.push(polEmptyP())
+  detailsContent.push(new Paragraph({
+    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `Being ${polFmtPct(commissionPercent)}% Commission on Premium ${polFormatCurrency(totalPremium, currency)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  }))
 
   if (data.instalments.length > 0) {
     const numInst = data.instalments.length
     if (numInst === 1) {
-      detailsContent.push(polNp(`Commission payable on ${polFormatDateUS(data.instalments[0].dueDate)}.`))
+      const singleText = caCommissionSingleText.replace('{date}', polFormatDateUS(data.instalments[0].dueDate)).replace('{instalments}', '1')
+      detailsContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: singleText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
     } else {
-      detailsContent.push(polNp(`Commission payable in ${numInst} instalments:`))
+      const multiText = caCommissionMultiText.replace('{instalments}', String(numInst))
+      detailsContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: multiText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
     }
     if (numInst > 1) {
-      detailsContent.push(polEmptyP())
       const caInstDescW = Math.round(POL_BODY_W * 0.55)
       const caInstAmtW = POL_BODY_W - caInstDescW
       const caInstRows = data.instalments.map(inst => {

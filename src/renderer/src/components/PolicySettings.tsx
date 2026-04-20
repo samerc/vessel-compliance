@@ -777,6 +777,8 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
   const [premiumIntroSingleText, setPremiumIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
   const [daIntroText, setDaIntroText] = useState('Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:')
   const [daIntroSingleText, setDaIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
+  const [caCommText, setCaCommText] = useState('Commission payable in {instalments} instalments:')
+  const [caCommSingleText, setCaCommSingleText] = useState('Commission payable on {date}.')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -789,6 +791,8 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
           if (parsed.premiumIntroSingleText) setPremiumIntroSingleText(parsed.premiumIntroSingleText)
           if (parsed.debitAdviceIntroText) setDaIntroText(parsed.debitAdviceIntroText)
           if (parsed.debitAdviceIntroSingleText) setDaIntroSingleText(parsed.debitAdviceIntroSingleText)
+          if (parsed.creditAdviceCommissionText) setCaCommText(parsed.creditAdviceCommissionText)
+          if (parsed.creditAdviceCommissionSingleText) setCaCommSingleText(parsed.creditAdviceCommissionSingleText)
         }
       } catch { /* default */ }
       finally { setLoading(false) }
@@ -799,10 +803,10 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText }))
       showSuccess('Premium intro text saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText }))
       showSuccess('Premium intro text saved')
     }
   }
@@ -842,6 +846,17 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Single Instalment — Placeholders: {'{currency}'}, {'{amount}'}, {'{date}'}, {'{time}'}, {'{timezone}'}</label>
         <textarea value={daIntroSingleText} onChange={e => setDaIntroSingleText(e.target.value)} rows={3} style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }} />
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--table-border)', marginTop: '24px', paddingTop: '20px' }}>
+        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Credit Advice</h4>
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>Commission wording for the Credit Advice document.</p>
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Multiple Instalments — Placeholder: {'{instalments}'}</label>
+        <textarea value={caCommText} onChange={e => setCaCommText(e.target.value)} rows={2} style={{ width: '100%', marginBottom: '14px', resize: 'vertical' }} />
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Single Instalment — Placeholder: {'{date}'}</label>
+        <textarea value={caCommSingleText} onChange={e => setCaCommSingleText(e.target.value)} rows={2} style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }} />
       </div>
 
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
