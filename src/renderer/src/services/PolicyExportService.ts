@@ -3164,20 +3164,33 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
 
   const children: (Paragraph | Table)[] = []
 
-  // Broker block — left-aligned, before title
-  const broker = data.assureds.find(a => a.role?.toLowerCase().includes('broker'))
-  if (broker) {
-    children.push(polBp(broker.name))
-    const brokerAddr = data.addresses.find(a => a.entityName === broker.name || a.role?.toLowerCase().includes('broker'))
-    const addrText = brokerAddr?.addressText || brokerAddr?.address || ''
-    if (addrText) {
-      for (const line of addrText.split('\n')) {
-        if (line.trim()) children.push(polNp(line.trim()))
+  // Broker block — load from quotation customer (broker), show at top left
+  const brokerEntityId = data.quotation.customerEntityId
+  const isBroker = data.quotation.customerType === 'broker'
+  if (brokerEntityId && isBroker) {
+    try {
+      const allEntities = await window.api.getEntities()
+      const brokerEntity = (Array.isArray(allEntities) ? allEntities : []).find((e: any) => e.id === brokerEntityId)
+      if (brokerEntity) {
+        children.push(polBp(brokerEntity.name))
+        const brokerAddrs = await window.api.getEntityAddresses(brokerEntityId)
+        if (Array.isArray(brokerAddrs) && brokerAddrs.length > 0) {
+          const addrText = brokerAddrs[0].addressLine1 || ''
+          if (addrText) {
+            for (const line of addrText.split('\n')) {
+              if (line.trim()) children.push(polNp(line.trim()))
+            }
+          }
+          if (brokerAddrs[0].city || brokerAddrs[0].country) {
+            const cityCountry = [brokerAddrs[0].city, brokerAddrs[0].country].filter(Boolean).join(', ')
+            children.push(polNp(cityCountry))
+          }
+        }
+        if (brokerEntity.phone) children.push(polNp(`Phone: ${brokerEntity.phone}`))
+        if (brokerEntity.email) children.push(polNp(brokerEntity.email))
+        children.push(polEmptyP())
       }
-    }
-    if ((broker as any).phone) children.push(polNp(`Phone: ${(broker as any).phone}`))
-    if ((broker as any).email) children.push(polNp(`${(broker as any).email}`))
-    children.push(polEmptyP())
+    } catch { /* ignore broker load errors */ }
   }
 
   // Title block — centered, compact spacing
