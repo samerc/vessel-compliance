@@ -1207,17 +1207,18 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     const entities = await window.api.getEntities()
                                                     const safeAssureds = Array.isArray(assureds) ? assureds : []
                                                     const safeEntities = Array.isArray(entities) ? entities : []
+                                                    const edTypesRaw = await window.api.getEntityDocumentTypes()
+                                                    const edDocsRaw = await window.api.getEntityDocuments()
+                                                    const activeEdTypes = (Array.isArray(edTypesRaw) ? edTypesRaw : []).filter((t: any) => t.isActive && t.isRequired)
+                                                    const allEdDocs = Array.isArray(edDocsRaw) ? edDocsRaw : []
                                                     for (const va of safeAssureds) {
                                                         const entity = safeEntities.find((e: any) => e.id === va.entityId)
                                                         if (!entity) continue
                                                         const missing: string[] = []
-                                                        const isCompany = entity.type === 'company'
-                                                        if (isCompany) {
-                                                            if (!entity.certificateOfIncorporationPath) missing.push('Certificate of Incorporation')
-                                                            if (!entity.articlesOfAssociationPath) missing.push('Articles of Association')
-                                                            if (!entity.kycFilePath) missing.push('KYC')
-                                                        } else {
-                                                            if (!entity.passportFilePath) missing.push('ID / Passport')
+                                                        for (const edt of activeEdTypes.filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)) {
+                                                            if (!allEdDocs.some((d: any) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath)) {
+                                                                missing.push(edt.name)
+                                                            }
                                                         }
                                                         if (missing.length > 0) {
                                                             lines.push(`${entity.name}${va.role ? ` (${va.role})` : ''}:`)

@@ -6,7 +6,7 @@ import {
   Settings, BarChart3, GitBranch, Zap, Layers,
   ChevronUp, ChevronDown, RotateCcw, History
 } from 'lucide-react'
-import { Vessel, VesselDocument, DocumentType, Entity, SurveyWarranty, WorkflowStep } from '../../../shared/types'
+import { Vessel, VesselDocument, DocumentType, Entity, SurveyWarranty, WorkflowStep, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -171,6 +171,8 @@ export default function Dashboard({
   const [docs, setDocs] = useState<VesselDocument[]>([])
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
+  const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
+  const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
   const [openDefects, setOpenDefects] = useState<any[]>([])
   const [pendingSanctions, setPendingSanctions] = useState<any[]>([])
   const [activeWarranties, setActiveWarranties] = useState<SurveyWarranty[]>([])
@@ -218,16 +220,20 @@ export default function Dashboard({
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [vData, dData, tData, eData] = await Promise.all([
+      const [vData, dData, tData, eData, edtData, edData] = await Promise.all([
         window.api.getVessels(),
         window.api.getVesselDocuments(),
         window.api.getDocumentTypes(),
-        window.api.getEntities()
+        window.api.getEntities(),
+        window.api.getEntityDocumentTypes(),
+        window.api.getEntityDocuments()
       ])
       setVessels(Array.isArray(vData) ? vData : [])
       setDocs(Array.isArray(dData) ? dData : [])
       setDocTypes(Array.isArray(tData) ? tData : [])
       setEntities(Array.isArray(eData) ? eData : [])
+      setEntityDocTypes(Array.isArray(edtData) ? (edtData as EntityDocumentType[]).filter(t => t.isActive && t.isRequired) : [])
+      setEntityDocs(Array.isArray(edData) ? edData : [])
     } catch {
       showError('Failed to load core dashboard data')
     }
@@ -380,16 +386,14 @@ export default function Dashboard({
   const entityDocMissingCount = useMemo(() => {
     let count = 0
     for (const e of entities) {
-      if (e.type === 'company') {
-        if (!e.certificateOfIncorporationPath) count++
-        if (!e.articlesOfAssociationPath) count++
-        if (!e.kycFilePath) count++
-      } else {
-        if (!e.passportFilePath) count++
+      const applicable = entityDocTypes.filter(t => t.entityScope === 'both' || t.entityScope === e.type)
+      const docsForEntity = entityDocs.filter(d => d.entityId === e.id)
+      for (const t of applicable) {
+        if (!docsForEntity.some(d => d.documentTypeId === t.id && d.filePath)) count++
       }
     }
     return count
-  }, [entities])
+  }, [entities, entityDocTypes, entityDocs])
 
   const widgetData: WidgetData = useMemo(() => ({
     vessels, docs, docTypes, entities, openDefects, pendingSanctions, activeWarranties, endorsementsDue,

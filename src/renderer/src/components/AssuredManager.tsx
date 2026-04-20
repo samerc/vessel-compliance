@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Upload, FolderOpen, Plus } from 'lucide-react'
-import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress } from '../../../shared/types'
+import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -18,6 +18,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [vesselAssureds, setVesselAssureds] = useState<VesselAssured[]>([])
     const [entityUBOs, setEntityUBOs] = useState<EntityUBO[]>([])
+    const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
+    const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
     const isLight = theme === 'light'
@@ -87,18 +89,22 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const loadData = async () => {
         try {
-            const [e, r, va, eu, addrs] = await Promise.all([
+            const [e, r, va, eu, addrs, edTypes, allDocs] = await Promise.all([
                 window.api.getEntities(),
                 window.api.getAssuredRoles(),
                 window.api.getVesselAssureds(vessel.id),
                 window.api.getEntityUBOs(),
-                window.api.getAllEntityAddresses()
+                window.api.getAllEntityAddresses(),
+                window.api.getEntityDocumentTypes(),
+                window.api.getEntityDocuments()
             ])
             setEntities(Array.isArray(e) ? e : [])
             setRoles(Array.isArray(r) ? r : [])
             setVesselAssureds(Array.isArray(va) ? va : [])
             setEntityUBOs(Array.isArray(eu) ? eu : [])
             setAllAddresses(Array.isArray(addrs) ? addrs : [])
+            setEntityDocTypes(Array.isArray(edTypes) ? (edTypes as EntityDocumentType[]).filter(t => t.isActive) : [])
+            setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
         } catch (error) {
             console.error('Failed to load assured data:', error)
         }
@@ -338,120 +344,28 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         setDeleteConfirmation(prev => ({ ...prev, show: false }))
     }
 
-    const handleUploadPassport = async (e: React.DragEvent, entityId: string) => {
+    const handleDropEntityDoc = async (e: React.DragEvent, entityId: string, documentTypeId: string) => {
         e.preventDefault()
         e.stopPropagation()
-
         const files = e.dataTransfer.files
         if (files.length === 0) return
         const file = files[0]
-
         const filePath = window.api.getFilePath(file)
-        if (!filePath) {
-            showError('Could not retrieve file path')
-            return
-        }
-
-        // Security: Validate file type
+        if (!filePath) { showError('Could not retrieve file path'); return }
         const validation = await window.api.fileTypesValidateFile(filePath)
-        if (!validation.valid) {
-            showError(`File rejected: ${validation.reason}`)
-            return
-        }
-
-        await window.api.updateEntity(entityId, { passportFilePath: filePath })
-        showSuccess('ID/Passport uploaded successfully')
+        if (!validation.valid) { showError(`File rejected: ${validation.reason}`); return }
+        await window.api.upsertEntityDocument({ entityId, documentTypeId, filePath })
+        showSuccess('Document uploaded successfully')
         loadData()
     }
 
-    const handleUploadCertificateOfIncorporation = async (e: React.DragEvent, entityId: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-
-        const files = e.dataTransfer.files
-        if (files.length === 0) return
-        const file = files[0]
-
-        const filePath = window.api.getFilePath(file)
-        if (!filePath) {
-            showError('Could not retrieve file path')
-            return
-        }
-
-        // Security: Validate file type
-        const validation = await window.api.fileTypesValidateFile(filePath)
-        if (!validation.valid) {
-            showError(`File rejected: ${validation.reason}`)
-            return
-        }
-
-        await window.api.updateEntity(entityId, { certificateOfIncorporationPath: filePath })
-        showSuccess('Certificate of Incorporation uploaded successfully')
-        loadData()
-    }
-
-    const handleUploadArticlesOfAssociation = async (e: React.DragEvent, entityId: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-
-        const files = e.dataTransfer.files
-        if (files.length === 0) return
-        const file = files[0]
-
-        const filePath = window.api.getFilePath(file)
-        if (!filePath) {
-            showError('Could not retrieve file path')
-            return
-        }
-
-        // Security: Validate file type
-        const validation = await window.api.fileTypesValidateFile(filePath)
-        if (!validation.valid) {
-            showError(`File rejected: ${validation.reason}`)
-            return
-        }
-
-        await window.api.updateEntity(entityId, { articlesOfAssociationPath: filePath })
-        showSuccess('Articles of Association uploaded successfully')
-        loadData()
-    }
-
-    const handleUploadKYC = async (e: React.DragEvent, entityId: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-
-        const files = e.dataTransfer.files
-        if (files.length === 0) return
-        const file = files[0]
-
-        const filePath = window.api.getFilePath(file)
-        if (!filePath) {
-            showError('Could not retrieve file path')
-            return
-        }
-
-        // Security: Validate file type
-        const validation = await window.api.fileTypesValidateFile(filePath)
-        if (!validation.valid) {
-            showError(`File rejected: ${validation.reason}`)
-            return
-        }
-
-        await window.api.updateEntity(entityId, { kycFilePath: filePath })
-        showSuccess('KYC uploaded successfully')
-        loadData()
-    }
-
-    const handleClickUploadDoc = async (entityId: string, field: string, label: string) => {
+    const handleClickUploadDoc = async (entityId: string, documentTypeId: string, label: string) => {
         try {
             const filePath = await window.api.dialogOpenFileAny()
             if (!filePath) return
             const validation = await window.api.fileTypesValidateFile(filePath)
-            if (!validation.valid) {
-                showError(`File rejected: ${validation.reason}`)
-                return
-            }
-            await window.api.updateEntity(entityId, { [field]: filePath })
+            if (!validation.valid) { showError(`File rejected: ${validation.reason}`); return }
+            await window.api.upsertEntityDocument({ entityId, documentTypeId, filePath })
             showSuccess(`${label} uploaded successfully`)
             loadData()
         } catch (error: any) {
@@ -459,9 +373,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         }
     }
 
-    const handleDeleteDoc = async (entityId: string, field: string) => {
+    const handleDeleteDoc = async (entityId: string, documentTypeId: string) => {
         try {
-            await window.api.updateEntity(entityId, { [field]: null })
+            await window.api.deleteEntityDocument(entityId, documentTypeId)
             showSuccess('Document removed')
             loadData()
         } catch (error: any) {
@@ -1020,130 +934,45 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                             )}
                                                         </div>
                                                     )}
-                                                    {entity?.type === 'company' && (
-                                                        <div style={{ marginBottom: '20px', padding: '12px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                                                            <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Company Documents</h4>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                                                <div
-                                                                    onDragOver={(e) => e.preventDefault()}
-                                                                    onDrop={(e) => handleUploadCertificateOfIncorporation(e, entity.id)}
-                                                                    style={{
-                                                                        padding: '10px',
-                                                                        borderRadius: '6px',
-                                                                        background: entity.certificateOfIncorporationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                        border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                        fontSize: '0.8rem',
-                                                                        textAlign: 'center'
-                                                                    }}
-                                                                >
-                                                                    {entity.certificateOfIncorporationPath ? (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
-                                                                            <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.certificateOfIncorporationPath!)}>📄 Cert. of Incorporation</span>
-                                                                            <div style={{ display: 'flex', gap: '4px' }}>
-                                                                                <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.certificateOfIncorporationPath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
-                                                                                <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'certificateOfIncorporationPath', 'COI') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
+                                                    {(() => {
+                                                        const applicableDocTypes = entityDocTypes.filter(t => t.entityScope === 'both' || t.entityScope === entity?.type)
+                                                        if (applicableDocTypes.length === 0) return null
+                                                        const docsForEntity = entityDocs.filter(d => d.entityId === entity?.id)
+                                                        return (
+                                                            <div style={{ marginBottom: '20px', padding: '12px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                                                                <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Documents</h4>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: applicableDocTypes.length >= 3 ? '1fr 1fr 1fr' : '1fr '.repeat(applicableDocTypes.length).trim(), gap: '10px' }}>
+                                                                    {applicableDocTypes.map(dt => {
+                                                                        const doc = docsForEntity.find(d => d.documentTypeId === dt.id)
+                                                                        const hasFile = !!doc?.filePath
+                                                                        return (
+                                                                            <div key={dt.id}
+                                                                                onDragOver={(ev) => ev.preventDefault()}
+                                                                                onDrop={(ev) => handleDropEntityDoc(ev, entity!.id, dt.id)}
+                                                                                style={{ padding: '10px', borderRadius: '6px', background: hasFile ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'), border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)', fontSize: '0.8rem', textAlign: 'center' }}
+                                                                            >
+                                                                                {hasFile ? (
+                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                                                                                        <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(doc!.filePath!)}>📄 {dt.name}</span>
+                                                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                                                            <button onClick={(ev) => { ev.stopPropagation(); window.api.shellShowItemInFolder(doc!.filePath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
+                                                                                            <button onClick={(ev) => { ev.stopPropagation(); handleClickUploadDoc(entity!.id, dt.id, dt.name) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
+                                                                                            {canUploadDocs && <button onClick={(ev) => { ev.stopPropagation(); handleDeleteDoc(entity!.id, dt.id) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                                                        <span>📎 Drop {dt.name} here</span>
+                                                                                        <button onClick={() => handleClickUploadDoc(entity!.id, dt.id, dt.name)} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                                            <span>📎 Drop COI here</span>
-                                                                            <button onClick={() => handleClickUploadDoc(entity.id, 'certificateOfIncorporationPath', 'COI')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div
-                                                                    onDragOver={(e) => e.preventDefault()}
-                                                                    onDrop={(e) => handleUploadArticlesOfAssociation(e, entity.id)}
-                                                                    style={{
-                                                                        padding: '10px',
-                                                                        borderRadius: '6px',
-                                                                        background: entity.articlesOfAssociationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                        border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                        fontSize: '0.8rem',
-                                                                        textAlign: 'center'
-                                                                    }}
-                                                                >
-                                                                    {entity.articlesOfAssociationPath ? (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
-                                                                            <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.articlesOfAssociationPath!)}>📄 Articles of Assoc.</span>
-                                                                            <div style={{ display: 'flex', gap: '4px' }}>
-                                                                                <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.articlesOfAssociationPath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
-                                                                                <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'articlesOfAssociationPath', 'AOA') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
-                                                                            </div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                                            <span>📎 Drop AOA here</span>
-                                                                            <button onClick={() => handleClickUploadDoc(entity.id, 'articlesOfAssociationPath', 'AOA')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div
-                                                                    onDragOver={(e) => e.preventDefault()}
-                                                                    onDrop={(e) => handleUploadKYC(e, entity.id)}
-                                                                    style={{
-                                                                        padding: '10px',
-                                                                        borderRadius: '6px',
-                                                                        background: entity.kycFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                        border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                        fontSize: '0.8rem',
-                                                                        textAlign: 'center'
-                                                                    }}
-                                                                >
-                                                                    {entity.kycFilePath ? (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
-                                                                            <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.kycFilePath!)}>📄 KYC</span>
-                                                                            <div style={{ display: 'flex', gap: '4px' }}>
-                                                                                <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.kycFilePath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
-                                                                                <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'kycFilePath', 'KYC') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                                {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
-                                                                            </div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                                            <span>📎 Drop KYC here</span>
-                                                                            <button onClick={() => handleClickUploadDoc(entity.id, 'kycFilePath', 'KYC')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
-                                                                        </div>
-                                                                    )}
+                                                                        )
+                                                                    })}
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                    {entity?.type === 'person' && (
-                                                        <div style={{ marginBottom: '20px', padding: '12px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                                                            <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Identity Documents</h4>
-                                                            <div
-                                                                onDragOver={(e) => e.preventDefault()}
-                                                                onDrop={(e) => handleUploadPassport(e, entity.id)}
-                                                                style={{
-                                                                    padding: '10px',
-                                                                    borderRadius: '6px',
-                                                                    background: entity.passportFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)',
-                                                                    fontSize: '0.8rem',
-                                                                    textAlign: 'center'
-                                                                }}
-                                                            >
-                                                                {entity.passportFilePath ? (
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
-                                                                        <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(entity.passportFilePath!)}>📄 ID/Passport (Click to view)</span>
-                                                                        <div style={{ display: 'flex', gap: '4px' }}>
-                                                                            <button onClick={(e) => { e.stopPropagation(); window.api.shellShowItemInFolder(entity.passportFilePath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(entity.id, 'passportFilePath', 'ID/Passport') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                            {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(entity.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                                        <span>📎 Drop ID/Passport here</span>
-                                                                        <button onClick={() => handleClickUploadDoc(entity.id, 'passportFilePath', 'ID/Passport')} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                        )
+                                                    })()}
                                                     <h4 style={{ fontSize: '0.9rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         <UserCheck size={16} /> Ultimate Beneficial Owners (UBOs)
                                                     </h4>
@@ -1298,109 +1127,30 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                                                         </div>
                                                                     )}
                                                                     {ubo!.identifier && <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>{ubo!.identifier}</span>}
-                                                                    {ubo!.type === 'person' && (
-                                                                        <div
-                                                                            onDragOver={(e) => e.preventDefault()}
-                                                                            onDrop={(e) => handleUploadPassport(e, ubo!.id)}
-                                                                            style={{
-                                                                                fontSize: '0.7rem',
-                                                                                marginTop: '4px',
-                                                                                padding: '4px 6px',
-                                                                                borderRadius: '4px',
-                                                                                background: ubo!.passportFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
-                                                                            }}
-                                                                        >
-                                                                            {ubo!.passportFilePath ? (
-                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.passportFilePath!)}>📄 ID/Passport</span>
-                                                                                    <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'passportFilePath', 'ID/Passport') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                    {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'passportFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                    <span style={{ flex: 1 }}>📎 Drop ID/Passport</span>
-                                                                                    <button onClick={() => handleClickUploadDoc(ubo!.id, 'passportFilePath', 'ID/Passport')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                    {ubo!.type === 'company' && (
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                                                                            <div
-                                                                                onDragOver={(e) => e.preventDefault()}
-                                                                                onDrop={(e) => handleUploadCertificateOfIncorporation(e, ubo!.id)}
-                                                                                style={{
-                                                                                    fontSize: '0.7rem',
-                                                                                    padding: '4px 6px',
-                                                                                    borderRadius: '4px',
-                                                                                    background: ubo!.certificateOfIncorporationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
-                                                                                }}
+                                                                    {entityDocTypes.filter(dt => dt.entityScope === 'both' || dt.entityScope === ubo!.type).map(dt => {
+                                                                        const uboDoc = entityDocs.find(d => d.entityId === ubo!.id && d.documentTypeId === dt.id)
+                                                                        const hasUboFile = !!uboDoc?.filePath
+                                                                        return (
+                                                                            <div key={dt.id}
+                                                                                onDragOver={(ev) => ev.preventDefault()}
+                                                                                onDrop={(ev) => handleDropEntityDoc(ev, ubo!.id, dt.id)}
+                                                                                style={{ fontSize: '0.7rem', marginTop: '4px', padding: '4px 6px', borderRadius: '4px', background: hasUboFile ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'), border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)' }}
                                                                             >
-                                                                                {ubo!.certificateOfIncorporationPath ? (
+                                                                                {hasUboFile ? (
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.certificateOfIncorporationPath!)}>📄 COI</span>
-                                                                                        <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'certificateOfIncorporationPath', 'COI') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'certificateOfIncorporationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
+                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(uboDoc!.filePath!)}>📄 {dt.name}</span>
+                                                                                        <button onClick={(ev) => { ev.stopPropagation(); handleClickUploadDoc(ubo!.id, dt.id, dt.name) }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
+                                                                                        {canUploadDocs && <button onClick={(ev) => { ev.stopPropagation(); handleDeleteDoc(ubo!.id, dt.id) }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ flex: 1 }}>📎 Drop COI</span>
-                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, 'certificateOfIncorporationPath', 'COI')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
+                                                                                        <span style={{ flex: 1 }}>📎 Drop {dt.name}</span>
+                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, dt.id, dt.name)} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
                                                                                     </div>
                                                                                 )}
                                                                             </div>
-                                                                            <div
-                                                                                onDragOver={(e) => e.preventDefault()}
-                                                                                onDrop={(e) => handleUploadArticlesOfAssociation(e, ubo!.id)}
-                                                                                style={{
-                                                                                    fontSize: '0.7rem',
-                                                                                    padding: '4px 6px',
-                                                                                    borderRadius: '4px',
-                                                                                    background: ubo!.articlesOfAssociationPath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
-                                                                                }}
-                                                                            >
-                                                                                {ubo!.articlesOfAssociationPath ? (
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.articlesOfAssociationPath!)}>📄 AOA</span>
-                                                                                        <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'articlesOfAssociationPath', 'AOA') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'articlesOfAssociationPath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ flex: 1 }}>📎 Drop AOA</span>
-                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, 'articlesOfAssociationPath', 'AOA')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                            <div
-                                                                                onDragOver={(e) => e.preventDefault()}
-                                                                                onDrop={(e) => handleUploadKYC(e, ubo!.id)}
-                                                                                style={{
-                                                                                    fontSize: '0.7rem',
-                                                                                    padding: '4px 6px',
-                                                                                    borderRadius: '4px',
-                                                                                    background: ubo!.kycFilePath ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                                                                                    border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)'
-                                                                                }}
-                                                                            >
-                                                                                {ubo!.kycFilePath ? (
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(ubo!.kycFilePath!)}>📄 KYC</span>
-                                                                                        <button onClick={(e) => { e.stopPropagation(); handleClickUploadDoc(ubo!.id, 'kycFilePath', 'KYC') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                        {canUploadDocs && <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(ubo!.id, 'kycFilePath') }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ flex: 1 }}>📎 Drop KYC</span>
-                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, 'kycFilePath', 'KYC')} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
+                                                                        )
+                                                                    })}
                                                                 </div>
                                                                 {canManageAssureds && (
                                                                     <button onClick={() => handleDeleteUBO(va.entityId, ubo!.id)} style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px' }} className="hover-danger" aria-label="Remove UBO">

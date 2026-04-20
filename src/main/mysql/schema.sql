@@ -126,6 +126,29 @@ CREATE TABLE IF NOT EXISTS entity_addresses (
   FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS entity_document_types (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  entity_scope VARCHAR(20) DEFAULT 'both',
+  is_required BOOLEAN DEFAULT TRUE,
+  order_index INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS entity_documents (
+  id VARCHAR(36) PRIMARY KEY,
+  entity_id VARCHAR(36) NOT NULL,
+  document_type_id VARCHAR(36) NOT NULL,
+  file_path TEXT,
+  expiry_date DATE,
+  received_date DATE,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_entity_doc (entity_id, document_type_id),
+  FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+  FOREIGN KEY (document_type_id) REFERENCES entity_document_types(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS app_settings (
   setting_key VARCHAR(100) PRIMARY KEY,
   setting_value TEXT NOT NULL,

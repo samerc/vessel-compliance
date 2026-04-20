@@ -6,7 +6,7 @@ import {
   ScanSearch, MapPin, CheckSquare, Square, Download, FolderOpen
 } from 'lucide-react'
 import RemapFilePathsModal from './RemapFilePathsModal'
-import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress } from '../../../shared/types'
+import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { CaseToggleBtn } from './CaseToggle'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -85,6 +85,9 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
   const isLight = theme === 'light'
+
+  const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
+  const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
 
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(25)
@@ -352,24 +355,22 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     }
   }
 
-  const handleUploadEntityDoc = async (entityId: string, field: string) => {
+  const handleUploadEntityDoc = async (entityId: string, documentTypeId: string) => {
     try {
       const filePath = await window.api.dialogOpenFileAny()
       if (!filePath) return
-      await window.api.updateEntity(entityId, { [field]: filePath })
+      await window.api.upsertEntityDocument({ entityId, documentTypeId, filePath })
       showSuccess('Document uploaded')
-      setSelectedEntity(prev => prev?.id === entityId ? { ...prev, [field]: filePath } : prev)
       loadData()
     } catch (error: any) {
       showError(error.message || 'Failed to upload document')
     }
   }
 
-  const handleDeleteEntityDoc = async (entityId: string, field: string) => {
+  const handleDeleteEntityDoc = async (entityId: string, documentTypeId: string) => {
     try {
-      await window.api.updateEntity(entityId, { [field]: null })
+      await window.api.deleteEntityDocument(entityId, documentTypeId)
       showSuccess('Document removed')
-      setSelectedEntity(prev => prev?.id === entityId ? { ...prev, [field]: undefined } : prev)
       loadData()
     } catch (error: any) {
       showError(error.message || 'Failed to remove document')
@@ -379,7 +380,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const loadData = async () => {
     setIsLoading(true)
     try {
-      const [result, v, va, eu, allEnts] = await Promise.all([
+      const [result, v, va, eu, allEnts, edTypes, allDocs] = await Promise.all([
         window.api.getEntitiesPaginated({
           page,
           limit,
@@ -391,7 +392,9 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
         window.api.getVessels(),
         window.api.getVesselAssureds(),
         window.api.getEntityUBOs(),
-        window.api.getEntities()
+        window.api.getEntities(),
+        window.api.getEntityDocumentTypes(),
+        window.api.getEntityDocuments()
       ])
       setEntities(Array.isArray(result?.data) ? result.data : [])
       setTotal(result?.total ?? 0)
@@ -400,6 +403,8 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       setVesselAssureds(Array.isArray(va) ? va : [])
       setEntityUBOs(Array.isArray(eu) ? eu : [])
       setAllEntities(Array.isArray(allEnts) ? allEnts : [])
+      setEntityDocTypes(Array.isArray(edTypes) ? edTypes.filter((t: EntityDocumentType) => t.isActive) : [])
+      setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
     } finally {
       setIsLoading(false)
     }
@@ -526,12 +531,12 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   }
 
   const getDocScore = (entity: Entity) => {
-    if (entity.type === 'person') {
-      return { have: entity.passportFilePath ? 1 : 0, total: 1 }
-    }
-    const have = [entity.certificateOfIncorporationPath, entity.articlesOfAssociationPath, entity.kycFilePath]
-      .filter(Boolean).length
-    return { have, total: 3 }
+    const applicableTypes = entityDocTypes.filter(t =>
+      t.isRequired && (t.entityScope === 'both' || t.entityScope === entity.type)
+    )
+    const docsForEntity = entityDocs.filter(d => d.entityId === entity.id)
+    const have = applicableTypes.filter(t => docsForEntity.some(d => d.documentTypeId === t.id && d.filePath)).length
+    return { have, total: applicableTypes.length }
   }
 
   // ── Stats ───────────────────────────────────────────────────────────────────
@@ -1218,35 +1223,20 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {selectedEntity.type === 'person' ? (
-                  <DocBadge label="ID / Passport" hasFile={!!selectedEntity.passportFilePath}
-                    onClick={selectedEntity.passportFilePath ? () => window.api.fsOpen(selectedEntity.passportFilePath!) : undefined}
-                    onUpload={!selectedEntity.passportFilePath ? () => handleUploadEntityDoc(selectedEntity.id, 'passportFilePath') : undefined}
-                    onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'passportFilePath')}
-                    onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'passportFilePath')}
-                  />
-                ) : (
-                  <>
-                    <DocBadge label="Certificate of Incorporation" hasFile={!!selectedEntity.certificateOfIncorporationPath}
-                      onClick={selectedEntity.certificateOfIncorporationPath ? () => window.api.fsOpen(selectedEntity.certificateOfIncorporationPath!) : undefined}
-                      onUpload={!selectedEntity.certificateOfIncorporationPath ? () => handleUploadEntityDoc(selectedEntity.id, 'certificateOfIncorporationPath') : undefined}
-                      onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'certificateOfIncorporationPath')}
-                      onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'certificateOfIncorporationPath')}
-                    />
-                    <DocBadge label="Articles of Association" hasFile={!!selectedEntity.articlesOfAssociationPath}
-                      onClick={selectedEntity.articlesOfAssociationPath ? () => window.api.fsOpen(selectedEntity.articlesOfAssociationPath!) : undefined}
-                      onUpload={!selectedEntity.articlesOfAssociationPath ? () => handleUploadEntityDoc(selectedEntity.id, 'articlesOfAssociationPath') : undefined}
-                      onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'articlesOfAssociationPath')}
-                      onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'articlesOfAssociationPath')}
-                    />
-                    <DocBadge label="KYC" hasFile={!!selectedEntity.kycFilePath}
-                      onClick={selectedEntity.kycFilePath ? () => window.api.fsOpen(selectedEntity.kycFilePath!) : undefined}
-                      onUpload={!selectedEntity.kycFilePath ? () => handleUploadEntityDoc(selectedEntity.id, 'kycFilePath') : undefined}
-                      onDelete={() => handleDeleteEntityDoc(selectedEntity.id, 'kycFilePath')}
-                      onReplace={() => handleUploadEntityDoc(selectedEntity.id, 'kycFilePath')}
-                    />
-                  </>
-                )}
+                {entityDocTypes
+                  .filter(t => t.entityScope === 'both' || t.entityScope === selectedEntity.type)
+                  .map(t => {
+                    const doc = entityDocs.find(d => d.entityId === selectedEntity.id && d.documentTypeId === t.id)
+                    const hasFile = !!doc?.filePath
+                    return (
+                      <DocBadge key={t.id} label={t.name} hasFile={hasFile}
+                        onClick={hasFile ? () => window.api.fsOpen(doc!.filePath!) : undefined}
+                        onUpload={!hasFile ? () => handleUploadEntityDoc(selectedEntity.id, t.id) : undefined}
+                        onDelete={() => handleDeleteEntityDoc(selectedEntity.id, t.id)}
+                        onReplace={() => handleUploadEntityDoc(selectedEntity.id, t.id)}
+                      />
+                    )
+                  })}
               </div>
             </div>
 

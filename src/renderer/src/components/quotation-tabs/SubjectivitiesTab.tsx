@@ -89,16 +89,18 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                 try {
                     const qAssureds = await window.api.getQuotationAssureds(quotation.id)
                     const allEntities = await window.api.getEntities()
+                    const edTypesRaw = await window.api.getEntityDocumentTypes()
+                    const edDocsRaw = await window.api.getEntityDocuments()
+                    const activeEdTypes = (Array.isArray(edTypesRaw) ? edTypesRaw : []).filter((t: any) => t.isActive && t.isRequired)
+                    const allEdDocs = Array.isArray(edDocsRaw) ? edDocsRaw : []
                     for (const qa of (Array.isArray(qAssureds) ? qAssureds : [])) {
                         if (!qa.entityId) continue
                         const entity = allEntities.find((e: any) => e.id === qa.entityId)
                         if (!entity) continue
-                        if (entity.type === 'company') {
-                            if (!entity.certificateOfIncorporationPath) missingDocTypeIds.add('entity:coi')
-                            if (!entity.articlesOfAssociationPath) missingDocTypeIds.add('entity:aoa')
-                            if (!entity.kycFilePath) missingDocTypeIds.add('entity:kyc')
-                        } else {
-                            if (!entity.passportFilePath) missingDocTypeIds.add('entity:passport')
+                        for (const edt of activeEdTypes.filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)) {
+                            if (!allEdDocs.some((d: any) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath)) {
+                                missingDocTypeIds.add(`entity:${edt.id}`)
+                            }
                         }
                     }
                 } catch { /* ignore entity doc check errors */ }
@@ -214,6 +216,15 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
             allEntities = Array.isArray(ents) ? ents : []
         } catch { /* ignore */ }
 
+        // Load entity document data
+        let scopeEdTypes: any[] = []
+        let scopeEdDocs: any[] = []
+        try {
+            const [edtRaw, eddRaw] = await Promise.all([window.api.getEntityDocumentTypes(), window.api.getEntityDocuments()])
+            scopeEdTypes = (Array.isArray(edtRaw) ? edtRaw : []).filter((t: any) => t.isActive && t.isRequired)
+            scopeEdDocs = Array.isArray(eddRaw) ? eddRaw : []
+        } catch { /* ignore */ }
+
         // Pre-fetch vessel docs and assureds per vessel
         const vesselDocsMap = new Map<string, any[]>()
         const vesselAssuredsMap = new Map<string, any[]>()
@@ -256,7 +267,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                     if (!hasDoc) { vesselHasAll = false; break }
                 }
 
-                // Check entity documents (CoI, AoA, KYC, Passport)
+                // Check entity documents dynamically
                 if (vesselHasAll && entityDocTypeIds.length > 0) {
                     const assureds = vesselAssuredsMap.get(qv.vesselId) || []
                     for (const assured of assureds) {
@@ -264,10 +275,15 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                         const entity = allEntities.find(e => e.id === assured.entityId)
                         if (!entity) continue
                         for (const eid of entityDocTypeIds) {
-                            if (eid === 'entity:coi' && !entity.certificateOfIncorporationPath && entity.type === 'company') { vesselHasAll = false; break }
-                            if (eid === 'entity:aoa' && !entity.articlesOfAssociationPath && entity.type === 'company') { vesselHasAll = false; break }
-                            if (eid === 'entity:kyc' && !entity.kycFilePath && entity.type === 'company') { vesselHasAll = false; break }
-                            if (eid === 'entity:passport' && !entity.passportFilePath && entity.type === 'person') { vesselHasAll = false; break }
+                            const edtId = eid.startsWith('entity:') ? eid.slice(7) : null
+                            if (edtId) {
+                                const edt = scopeEdTypes.find((t: any) => t.id === edtId)
+                                if (edt && (edt.entityScope === 'both' || edt.entityScope === entity.type)) {
+                                    if (!scopeEdDocs.some((d: any) => d.entityId === entity.id && d.documentTypeId === edtId && d.filePath)) {
+                                        vesselHasAll = false; break
+                                    }
+                                }
+                            }
                         }
                         if (!vesselHasAll) break
                     }

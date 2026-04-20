@@ -37,6 +37,18 @@ const api = {
   mergeEntities: (sourceId, targetId, keepName?) => ipcRenderer.invoke('db:mergeEntities', sourceId, targetId, keepName),
 
 
+  // Entity Document Types
+  getEntityDocumentTypes: () => ipcRenderer.invoke('entityDocTypes:getAll'),
+  addEntityDocumentType: (dt: any) => ipcRenderer.invoke('entityDocTypes:add', dt),
+  updateEntityDocumentType: (id: string, updates: any) => ipcRenderer.invoke('entityDocTypes:update', id, updates),
+  deleteEntityDocumentType: (id: string) => ipcRenderer.invoke('entityDocTypes:delete', id),
+
+  // Entity Documents
+  getEntityDocuments: (entityId?: string) => entityId ? ipcRenderer.invoke('entityDocs:getByEntity', entityId) : ipcRenderer.invoke('entityDocs:getAll'),
+  upsertEntityDocument: (doc: any) => ipcRenderer.invoke('entityDocs:upsert', doc),
+  updateEntityDocumentExpiry: (entityId: string, documentTypeId: string, expiryDate: string | null) => ipcRenderer.invoke('entityDocs:updateExpiry', entityId, documentTypeId, expiryDate),
+  deleteEntityDocument: (entityId: string, documentTypeId: string) => ipcRenderer.invoke('entityDocs:delete', entityId, documentTypeId),
+
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),
   addAssuredRole: (role) => ipcRenderer.invoke('db:addAssuredRole', role),
   updateAssuredRole: (id, updates) => ipcRenderer.invoke('db:updateAssuredRole', id, updates),

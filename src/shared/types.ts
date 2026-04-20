@@ -82,6 +82,26 @@ export interface Entity {
   ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
 }
 
+export interface EntityDocumentType {
+  id: string
+  name: string
+  description?: string
+  entityScope: 'company' | 'person' | 'both'
+  isRequired: boolean
+  orderIndex: number
+  isActive: boolean
+}
+
+export interface EntityDocument {
+  id: string
+  entityId: string
+  documentTypeId: string
+  filePath?: string
+  expiryDate?: string
+  receivedDate?: string
+  uploadedAt?: string
+}
+
 export interface AssuredRole {
   id: string
   name: string

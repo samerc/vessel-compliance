@@ -76,14 +76,10 @@ function getStatus(
 }
 
 // Returns [onFile, onFile, ...] booleans for each required document of an entity
-function entityDocPresence(entity: any): boolean[] {
-  if (entity.type === 'company') return [
-    !!entity.certificateOfIncorporationPath,
-    !!entity.articlesOfAssociationPath,
-    !!entity.kycFilePath,
-  ]
-  if (entity.type === 'person') return [!!entity.passportFilePath]
-  return []
+function entityDocPresence(entity: any, edTypes: any[], edDocs: any[]): boolean[] {
+  const applicable = edTypes.filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
+  const docsForEntity = edDocs.filter((d: any) => d.entityId === entity.id)
+  return applicable.map((t: any) => docsForEntity.some((d: any) => d.documentTypeId === t.id && d.filePath))
 }
 
 // ── Page chrome ───────────────────────────────────────────────────────────────
@@ -144,7 +140,7 @@ export const ReportServiceV2 = {
     const pageH = doc.internal.pageSize.getHeight()
 
     // ── Load data ──────────────────────────────────────────────────────────────
-    const [dynamicPolicies, vesselAssureds, allEntities, allEntityUBOs, assuredRoles, customDocTypes] =
+    const [dynamicPolicies, vesselAssureds, allEntities, allEntityUBOs, assuredRoles, customDocTypes, entityDocTypesRaw, entityDocsRaw] =
       await Promise.all([
         window.api.getVesselDynamicPolicies(vessel.id),
         window.api.getVesselAssureds(vessel.id),
@@ -152,7 +148,11 @@ export const ReportServiceV2 = {
         window.api.getEntityUBOs(),
         window.api.getAssuredRoles(),
         window.api.getVesselCustomDocTypes(vessel.id),
+        window.api.getEntityDocumentTypes(),
+        window.api.getEntityDocuments(),
       ])
+    const activeEdTypes = (Array.isArray(entityDocTypesRaw) ? entityDocTypesRaw : []).filter((t: any) => t.isActive && t.isRequired)
+    const allEntityDocs = Array.isArray(entityDocsRaw) ? entityDocsRaw : []
 
     const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
     const roleOrderMap = new Map((assuredRoles as any[]).map((r, i) => [r.name, i]))
@@ -212,7 +212,7 @@ export const ReportServiceV2 = {
     for (const va of vesselAssureds as any[]) {
       const entity = (allEntities as any[]).find(e => e.id === va.entityId)
       if (!entity) continue
-      for (const onFile of entityDocPresence(entity)) {
+      for (const onFile of entityDocPresence(entity, activeEdTypes, allEntityDocs)) {
         if (onFile) compliant++; else missing++
       }
       const ubos = (allEntityUBOs as any[])
@@ -220,7 +220,7 @@ export const ReportServiceV2 = {
         .map(u => (allEntities as any[]).find(e => e.id === u.uboEntityId))
         .filter(Boolean)
       for (const ubo of ubos) {
-        for (const onFile of entityDocPresence(ubo)) {
+        for (const onFile of entityDocPresence(ubo, activeEdTypes, allEntityDocs)) {
           if (onFile) compliant++; else missing++
         }
       }
@@ -386,16 +386,9 @@ export const ReportServiceV2 = {
         entityRows.push([entity.name, `${va.role}  ·  ${entity.type.toUpperCase()}`, ''])
         entityRowMeta.push('entityHeader')
 
-        if (entity.type === 'company') {
-          entityRows.push(['Certificate of Incorporation', '', entity.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING'])
-          entityRowMeta.push('doc')
-          entityRows.push(['Articles of Association', '', entity.articlesOfAssociationPath ? 'ON FILE' : 'MISSING'])
-          entityRowMeta.push('doc')
-          entityRows.push(['KYC', '', entity.kycFilePath ? 'ON FILE' : 'MISSING'])
-          entityRowMeta.push('doc')
-        }
-        if (entity.type === 'person') {
-          entityRows.push(['ID / Passport', '', entity.passportFilePath ? 'ON FILE' : 'MISSING'])
+        for (const edt of activeEdTypes.filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)) {
+          const hasDoc = allEntityDocs.some((d: any) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath)
+          entityRows.push([edt.name, '', hasDoc ? 'ON FILE' : 'MISSING'])
           entityRowMeta.push('doc')
         }
 
@@ -413,16 +406,9 @@ export const ReportServiceV2 = {
             entityRows.push([ubo.name, ubo.type.toUpperCase(), ''])
             entityRowMeta.push('uboEntityHeader')
 
-            if (ubo.type === 'company') {
-              entityRows.push(['Certificate of Incorporation', '', ubo.certificateOfIncorporationPath ? 'ON FILE' : 'MISSING'])
-              entityRowMeta.push('doc')
-              entityRows.push(['Articles of Association', '', ubo.articlesOfAssociationPath ? 'ON FILE' : 'MISSING'])
-              entityRowMeta.push('doc')
-              entityRows.push(['KYC', '', ubo.kycFilePath ? 'ON FILE' : 'MISSING'])
-              entityRowMeta.push('doc')
-            }
-            if (ubo.type === 'person') {
-              entityRows.push(['ID / Passport', '', ubo.passportFilePath ? 'ON FILE' : 'MISSING'])
+            for (const edt of activeEdTypes.filter((t: any) => t.entityScope === 'both' || t.entityScope === ubo.type)) {
+              const hasDoc = allEntityDocs.some((d: any) => d.entityId === ubo.id && d.documentTypeId === edt.id && d.filePath)
+              entityRows.push([edt.name, '', hasDoc ? 'ON FILE' : 'MISSING'])
               entityRowMeta.push('doc')
             }
           }

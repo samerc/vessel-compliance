@@ -604,6 +604,10 @@ export default function CustomerComplianceReport() {
       const safeEntities = Array.isArray(allEntities) ? allEntities : []
       const fleets = await window.api.getFleets()
       const safeFleets = Array.isArray(fleets) ? fleets : []
+      const edTypes = await window.api.getEntityDocumentTypes()
+      const safeEdTypes = (Array.isArray(edTypes) ? edTypes : []).filter((t: any) => t.isActive && t.isRequired)
+      const edDocs = await window.api.getEntityDocuments()
+      const safeEdDocs = Array.isArray(edDocs) ? edDocs : []
 
       // Get vessel IDs from current report groups
       const vesselIds = groups.flatMap(g => g.vessels.map(v => v.vesselId))
@@ -687,12 +691,10 @@ export default function CustomerComplianceReport() {
           const entity = safeEntities.find((e: any) => e.id === va.entityId)
           if (!entity) continue
           const missing: string[] = []
-          if (entity.type === 'company') {
-            if (!entity.certificateOfIncorporationPath) missing.push('Certificate of Incorporation')
-            if (!entity.articlesOfAssociationPath) missing.push('Articles of Association')
-            if (!entity.kycFilePath) missing.push('KYC')
-          } else {
-            if (!entity.passportFilePath) missing.push('ID / Passport')
+          const applicable = safeEdTypes.filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
+          const docsForEnt = safeEdDocs.filter((d: any) => d.entityId === entity.id)
+          for (const t of applicable) {
+            if (!docsForEnt.some((d: any) => d.documentTypeId === t.id && d.filePath)) missing.push(t.name)
           }
           if (missing.length > 0) {
             vLines.push(`  ${entity.name}${va.role ? ` (${va.role})` : ''}:`)

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES } from '../../../shared/types'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -10,6 +10,7 @@ import RichTextEditor from './RichTextEditor'
 // ── Section definitions ────────────────────────────────────────────────────────
 const GRANTABLE_SECTIONS = [
     { id: 'docTypes',      label: 'Document Types' },
+    { id: 'entityDocTypes',label: 'Entity Document Types' },
     { id: 'roles',         label: 'Assured Roles' },
     { id: 'surveyTypes',   label: 'Survey Types' },
     { id: 'vesselTypes',   label: 'Vessel Types' },
@@ -28,6 +29,20 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [annualRenewal, setAnnualRenewal] = useState(false)
     const [newDocPolicyTypeIds, setNewDocPolicyTypeIds] = useState<string[]>([])
     const [editDocPolicyTypeIds, setEditDocPolicyTypeIds] = useState<string[]>([])
+    // Entity Document Types state
+    const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
+    const [newEdtName, setNewEdtName] = useState('')
+    const [newEdtDescription, setNewEdtDescription] = useState('')
+    const [newEdtScope, setNewEdtScope] = useState<'company' | 'person' | 'both'>('both')
+    const [newEdtRequired, setNewEdtRequired] = useState(true)
+    const [editingEdtId, setEditingEdtId] = useState<string | null>(null)
+    const [editEdtName, setEditEdtName] = useState('')
+    const [editEdtDescription, setEditEdtDescription] = useState('')
+    const [editEdtScope, setEditEdtScope] = useState<'company' | 'person' | 'both'>('both')
+    const [editEdtRequired, setEditEdtRequired] = useState(true)
+    const dragEdtIndex = useRef<number | null>(null)
+    const [dragOverEdtIndex, setDragOverEdtIndex] = useState<number | null>(null)
+
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [newRole, setNewRole] = useState('')
     const [surveyTypes, setSurveyTypes] = useState<ConditionSurveyType[]>([])
@@ -679,6 +694,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     const loadData = async () => {
         await loadDocTypes()
+        await loadEntityDocTypes()
         await loadRoles()
         await loadSurveyTypes()
         await loadClassSocieties()
@@ -903,6 +919,58 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         }
 
         setDocTypes(sorted)
+    }
+
+    // --- Entity Document Types ---
+    const loadEntityDocTypes = async () => {
+        const data = await window.api.getEntityDocumentTypes()
+        setEntityDocTypes(Array.isArray(data) ? data : [])
+    }
+
+    const handleAddEntityDocType = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newEdtName.trim()) return
+        await window.api.addEntityDocumentType({ name: newEdtName, description: newEdtDescription, entityScope: newEdtScope, isRequired: newEdtRequired, orderIndex: entityDocTypes.length + 1, isActive: true })
+        setNewEdtName('')
+        setNewEdtDescription('')
+        setNewEdtScope('both')
+        setNewEdtRequired(true)
+        await loadEntityDocTypes()
+    }
+
+    const handleDeleteEntityDocType = async (id: string) => {
+        if (confirm('Delete this entity document type? All uploaded entity documents of this type will be removed.')) {
+            await window.api.deleteEntityDocumentType(id)
+            await loadEntityDocTypes()
+        }
+    }
+
+    const saveEdtEdit = async (id: string) => {
+        if (!editEdtName.trim()) return
+        await window.api.updateEntityDocumentType(id, { name: editEdtName, description: editEdtDescription, entityScope: editEdtScope, isRequired: editEdtRequired })
+        setEditingEdtId(null)
+        await loadEntityDocTypes()
+    }
+
+    const handleEdtToggleActive = async (id: string, isActive: boolean) => {
+        await window.api.updateEntityDocumentType(id, { isActive: !isActive })
+        await loadEntityDocTypes()
+    }
+
+    const handleEdtDragStart = (index: number) => { dragEdtIndex.current = index }
+    const handleEdtDragOver = (e: React.DragEvent, index: number) => { e.preventDefault(); setDragOverEdtIndex(index) }
+    const handleEdtDrop = async (e: React.DragEvent, dropIndex: number) => {
+        e.preventDefault()
+        setDragOverEdtIndex(null)
+        if (dragEdtIndex.current === null || dragEdtIndex.current === dropIndex) return
+        const reordered = [...entityDocTypes]
+        const [moved] = reordered.splice(dragEdtIndex.current, 1)
+        reordered.splice(dropIndex, 0, moved)
+        dragEdtIndex.current = null
+        for (let i = 0; i < reordered.length; i++) {
+            await window.api.updateEntityDocumentType(reordered[i].id, { orderIndex: i + 1 })
+        }
+        await loadEntityDocTypes()
     }
 
     const loadRoles = async () => {
@@ -1246,6 +1314,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const sidebarSections: { id: string; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
         ...(isAdmin ? [{ id: 'userAccess', label: 'User Access', icon: <UserCheck size={16} />, adminOnly: true }] : []),
         ...(isAdmin || userSectionAccess.includes('docTypes') ? [{ id: 'docTypes', label: 'Document Types', icon: <FileText size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('entityDocTypes') ? [{ id: 'entityDocTypes', label: 'Entity Document Types', icon: <FileText size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('roles') ? [{ id: 'roles', label: 'Assured Roles', icon: <UserCheck size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('surveyTypes') ? [{ id: 'surveyTypes', label: 'Survey Types', icon: <ClipboardCheck size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('vesselTypes') ? [{ id: 'vesselTypes', label: 'Vessel Types', icon: <Ship size={16} /> }] : []),
@@ -1606,6 +1675,118 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             </tbody>
                         </table>
                     </div>
+            </section>
+            )}
+
+            {/* Entity Document Types */}
+            {effectiveSection === 'entityDocTypes' && (
+            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={20} color="var(--accent-primary)" /> Entity Document Types
+                </h3>
+                <form onSubmit={handleAddEntityDocType} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                    <div style={{ flex: '1 1 300px' }}>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name</label>
+                        <input type="text" value={newEdtName} onChange={e => setNewEdtName(e.target.value)} style={{ width: '100%', marginBottom: '12px' }} placeholder="e.g. Power of Attorney" />
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Description (optional)</label>
+                        <textarea value={newEdtDescription} onChange={e => setNewEdtDescription(e.target.value)} style={{ width: '100%', minHeight: '50px', resize: 'vertical' }} placeholder="Brief description..." />
+                    </div>
+                    <div style={{ width: '1px' }}></div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Scope:</span>
+                            {(['company', 'person', 'both'] as const).map(s => (
+                                <button key={s} type="button" onClick={() => setNewEdtScope(s)} style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', border: newEdtScope === s ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newEdtScope === s ? 'rgba(0,170,200,0.08)' : 'transparent', color: newEdtScope === s ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: newEdtScope === s ? 600 : 400, textTransform: 'capitalize' }}>
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                            <input type="checkbox" checked={newEdtRequired} onChange={e => setNewEdtRequired(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }} />
+                            Required
+                        </label>
+                        <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                            <Plus size={18} /> Add Type
+                        </button>
+                    </div>
+                </form>
+
+                <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <caption className="sr-only">Entity document types configuration</caption>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                <th scope="col" style={{ padding: '16px', width: '60px' }}>#</th>
+                                <th scope="col" style={{ padding: '16px' }}>Document Type</th>
+                                <th scope="col" style={{ padding: '16px' }}>Scope</th>
+                                <th scope="col" style={{ padding: '16px' }}>Status</th>
+                                <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {entityDocTypes.map((edt, index) => (
+                                <tr key={edt.id} draggable onDragStart={() => handleEdtDragStart(index)} onDragOver={(e) => handleEdtDragOver(e, index)} onDrop={(e) => handleEdtDrop(e, index)} onDragEnd={() => { dragEdtIndex.current = null; setDragOverEdtIndex(null) }} style={{ borderBottom: '1px solid var(--table-border)', opacity: dragEdtIndex.current === index ? 0.5 : 1, background: dragOverEdtIndex === index ? 'rgba(0, 210, 255, 0.1)' : 'transparent', cursor: 'grab' }}>
+                                    <td style={{ padding: '20px 16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <GripVertical size={16} color="var(--text-secondary)" style={{ opacity: 0.5 }} />
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '20px', textAlign: 'center' }}>{index + 1}</span>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '20px 16px' }}>
+                                        {editingEdtId === edt.id ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                <input type="text" value={editEdtName} onChange={e => setEditEdtName(e.target.value)} autoFocus style={{ width: '100%' }} />
+                                                <textarea value={editEdtDescription} onChange={e => setEditEdtDescription(e.target.value)} placeholder="Description..." style={{ width: '100%', minHeight: '50px', borderRadius: '8px' }} />
+                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Scope:</span>
+                                                    {(['company', 'person', 'both'] as const).map(s => (
+                                                        <button key={s} type="button" onClick={() => setEditEdtScope(s)} style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', cursor: 'pointer', border: editEdtScope === s ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editEdtScope === s ? 'rgba(0,170,200,0.08)' : 'transparent', color: editEdtScope === s ? 'var(--accent-primary)' : 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                                                            {s}
+                                                        </button>
+                                                    ))}
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
+                                                        <input type="checkbox" checked={editEdtRequired} onChange={e => setEditEdtRequired(e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
+                                                        Required
+                                                    </label>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button onClick={() => saveEdtEdit(edt.id)} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Save</button>
+                                                    <button onClick={() => setEditingEdtId(null)} style={{ padding: '4px 12px', fontSize: '0.8rem', background: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div style={{ fontWeight: 600 }}>{edt.name}</div>
+                                                {edt.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{edt.description}</div>}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '20px 16px' }}>
+                                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, background: edt.entityScope === 'company' ? 'rgba(100,100,255,0.1)' : edt.entityScope === 'person' ? 'rgba(255,100,200,0.1)' : 'rgba(0,170,200,0.1)', color: edt.entityScope === 'company' ? '#6464ff' : edt.entityScope === 'person' ? '#ff64c8' : 'var(--accent-primary)', textTransform: 'capitalize' }}>
+                                            {edt.entityScope}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '20px 16px' }}>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, background: edt.isRequired ? 'rgba(0,170,200,0.1)' : 'rgba(100,100,100,0.1)', color: edt.isRequired ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                                {edt.isRequired ? 'REQUIRED' : 'OPTIONAL'}
+                                            </span>
+                                            <button onClick={() => handleEdtToggleActive(edt.id, edt.isActive)} style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', border: 'none', background: edt.isActive ? 'rgba(0,200,100,0.1)' : 'rgba(255,77,77,0.1)', color: edt.isActive ? '#00c864' : 'var(--danger)' }}>
+                                                {edt.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '20px 16px', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                            <button onClick={() => { setEditingEdtId(edt.id); setEditEdtName(edt.name); setEditEdtDescription(edt.description || ''); setEditEdtScope(edt.entityScope); setEditEdtRequired(edt.isRequired) }} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }}><Edit3 size={18} /></button>
+                                            <button onClick={() => handleDeleteEntityDocType(edt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </section>
             )}
 

@@ -1178,6 +1178,19 @@ app.whenReady().then(() => {
   safeHandle('db:mergeEntities', async (event, sourceId, targetId, keepName) => { await requirePermission(event, 'entities:edit'); return db.mergeEntities(sourceId, targetId, keepName) })
   safeHandle('maintenance:syncSettings', async (event) => { await requirePermission(event, 'admin:settings'); return db.syncAssuredRoles() })
 
+  // Entity Document Types
+  safeHandle('entityDocTypes:getAll', (event) => { requireSession(event); return db.getEntityDocumentTypes() })
+  safeHandle('entityDocTypes:add', async (event, dt) => { await requirePermission(event, 'admin:settings'); return db.addEntityDocumentType(dt) })
+  safeHandle('entityDocTypes:update', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updateEntityDocumentType(id, updates) })
+  safeHandle('entityDocTypes:delete', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteEntityDocumentType(id) })
+
+  // Entity Documents
+  safeHandle('entityDocs:getByEntity', (event, entityId) => { requireSession(event); return db.getEntityDocuments(entityId) })
+  safeHandle('entityDocs:getAll', (event) => { requireSession(event); return db.getEntityDocuments() })
+  safeHandle('entityDocs:upsert', async (event, doc) => { await requirePermission(event, 'entities:edit'); return db.upsertEntityDocument(doc) })
+  safeHandle('entityDocs:updateExpiry', async (event, entityId, documentTypeId, expiryDate) => { await requirePermission(event, 'entities:edit'); return db.updateEntityDocumentExpiry(entityId, documentTypeId, expiryDate) })
+  safeHandle('entityDocs:delete', async (event, entityId, documentTypeId) => { await requirePermission(event, 'entities:edit'); return db.deleteEntityDocument(entityId, documentTypeId) })
+
   safeHandle('db:getAssuredRoles', (event) => { requireSession(event); return db.getAssuredRoles() })
   safeHandle('db:addAssuredRole', async (event, role) => { await requirePermission(event, 'admin:settings'); return db.addAssuredRole(role) })
   safeHandle('db:updateAssuredRole', async (event, id, updates) => { await requirePermission(event, 'admin:settings'); return db.updateAssuredRole(id, updates) })

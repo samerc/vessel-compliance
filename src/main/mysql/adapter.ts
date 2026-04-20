@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText, SavedReport, ReportConfig } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText, SavedReport, ReportConfig, EntityDocumentType, EntityDocument } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -3071,6 +3071,51 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: seed entity_document_types + migrate legacy entity file paths
+            try {
+                const [edtRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM entity_document_types') as any[]
+                if ((edtRows as any[])[0].cnt === 0) {
+                    const seedTypes = [
+                        { id: uuidv4(), name: 'Certificate of Incorporation', scope: 'company', order: 1 },
+                        { id: uuidv4(), name: 'Articles of Association', scope: 'company', order: 2 },
+                        { id: uuidv4(), name: 'KYC', scope: 'company', order: 3 },
+                        { id: uuidv4(), name: 'ID / Passport', scope: 'person', order: 4 },
+                    ]
+                    for (const st of seedTypes) {
+                        await this.pool.execute(
+                            'INSERT INTO entity_document_types (id, name, entity_scope, is_required, order_index, is_active) VALUES (?, ?, ?, TRUE, ?, TRUE)',
+                            [st.id, st.name, st.scope, st.order]
+                        )
+                    }
+
+                    // Migrate existing entity file paths to entity_documents
+                    const [entities] = await this.pool.query(
+                        'SELECT id, passport_file_path, certificate_of_incorporation_path, articles_of_association_path, kyc_file_path FROM entities'
+                    ) as any[]
+                    const coiType = seedTypes.find(t => t.name === 'Certificate of Incorporation')!
+                    const aoaType = seedTypes.find(t => t.name === 'Articles of Association')!
+                    const kycType = seedTypes.find(t => t.name === 'KYC')!
+                    const passType = seedTypes.find(t => t.name === 'ID / Passport')!
+
+                    for (const ent of entities as any[]) {
+                        const mappings = [
+                            { path: ent.certificate_of_incorporation_path, typeId: coiType.id },
+                            { path: ent.articles_of_association_path, typeId: aoaType.id },
+                            { path: ent.kyc_file_path, typeId: kycType.id },
+                            { path: ent.passport_file_path, typeId: passType.id },
+                        ]
+                        for (const m of mappings) {
+                            if (m.path) {
+                                await this.pool.execute(
+                                    'INSERT IGNORE INTO entity_documents (id, entity_id, document_type_id, file_path) VALUES (?, ?, ?, ?)',
+                                    [uuidv4(), ent.id, m.typeId, m.path]
+                                )
+                            }
+                        }
+                    }
+                }
+            } catch (e) { console.error('Migration warning (entity_document_types seed):', e) }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -4019,6 +4064,20 @@ export class MySQLAdapter {
                 [targetId, sourceId]
             )
 
+            // 4b. Merge entity_documents: copy source docs to target where target doesn't have them
+            try {
+                const [srcDocs] = await conn.query('SELECT document_type_id, file_path, expiry_date, received_date FROM entity_documents WHERE entity_id = ?', [sourceId])
+                for (const sd of srcDocs as any[]) {
+                    const [existing] = await conn.query('SELECT id FROM entity_documents WHERE entity_id = ? AND document_type_id = ?', [targetId, sd.document_type_id])
+                    if ((existing as any[]).length === 0 && sd.file_path) {
+                        await conn.execute(
+                            'INSERT INTO entity_documents (id, entity_id, document_type_id, file_path, expiry_date, received_date) VALUES (?, ?, ?, ?, ?, ?)',
+                            [uuidv4(), targetId, sd.document_type_id, sd.file_path, sd.expiry_date, sd.received_date]
+                        )
+                    }
+                }
+            } catch {}
+
             // 5. Delete the source entity
             await conn.execute('DELETE FROM entities WHERE id = ?', [sourceId])
 
@@ -4030,6 +4089,84 @@ export class MySQLAdapter {
         } finally {
             conn.release()
         }
+    }
+
+    // --- Entity Document Types ---
+    async getEntityDocumentTypes(): Promise<EntityDocumentType[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, name, description, entity_scope as entityScope, is_required as isRequired, order_index as orderIndex, is_active as isActive FROM entity_document_types ORDER BY order_index'
+        )
+        return (rows as any[]).map(r => ({ ...r, isRequired: Boolean(r.isRequired), isActive: Boolean(r.isActive) }))
+    }
+
+    async addEntityDocumentType(dt: Omit<EntityDocumentType, 'id'>): Promise<EntityDocumentType> {
+        if (!this.pool) throw new Error('DB Not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO entity_document_types (id, name, description, entity_scope, is_required, order_index, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, dt.name, dt.description || null, dt.entityScope || 'both', dt.isRequired ? 1 : 0, dt.orderIndex || 0, dt.isActive !== false ? 1 : 0]
+        )
+        return { ...dt, id }
+    }
+
+    async updateEntityDocumentType(id: string, updates: Partial<EntityDocumentType>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description || null) }
+        if (updates.entityScope !== undefined) { fields.push('entity_scope = ?'); values.push(updates.entityScope) }
+        if (updates.isRequired !== undefined) { fields.push('is_required = ?'); values.push(updates.isRequired ? 1 : 0) }
+        if (updates.orderIndex !== undefined) { fields.push('order_index = ?'); values.push(updates.orderIndex) }
+        if (updates.isActive !== undefined) { fields.push('is_active = ?'); values.push(updates.isActive ? 1 : 0) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE entity_document_types SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteEntityDocumentType(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM entity_document_types WHERE id = ?', [id])
+    }
+
+    // --- Entity Documents ---
+    async getEntityDocuments(entityId?: string): Promise<EntityDocument[]> {
+        if (!this.pool) return []
+        let q = 'SELECT id, entity_id as entityId, document_type_id as documentTypeId, file_path as filePath, expiry_date as expiryDate, received_date as receivedDate, uploaded_at as uploadedAt FROM entity_documents'
+        const params: any[] = []
+        if (entityId) { q += ' WHERE entity_id = ?'; params.push(entityId) }
+        const [rows] = await this.pool.query(q, params)
+        return rows as EntityDocument[]
+    }
+
+    async upsertEntityDocument(doc: { entityId: string; documentTypeId: string; filePath: string; expiryDate?: string; receivedDate?: string }): Promise<EntityDocument> {
+        if (!this.pool) throw new Error('DB Not connected')
+        if (doc.filePath) {
+            const validation = await this.validateFileExtension(doc.filePath)
+            if (!validation.valid) throw new Error(`File validation failed: ${validation.reason}`)
+        }
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO entity_documents (id, entity_id, document_type_id, file_path, expiry_date, received_date)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE file_path = VALUES(file_path), expiry_date = VALUES(expiry_date), received_date = VALUES(received_date), uploaded_at = CURRENT_TIMESTAMP`,
+            [id, doc.entityId, doc.documentTypeId, doc.filePath || null, doc.expiryDate || null, doc.receivedDate || null]
+        )
+        return { id, entityId: doc.entityId, documentTypeId: doc.documentTypeId, filePath: doc.filePath }
+    }
+
+    async updateEntityDocumentExpiry(entityId: string, documentTypeId: string, expiryDate: string | null): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE entity_documents SET expiry_date = ? WHERE entity_id = ? AND document_type_id = ?',
+            [expiryDate, entityId, documentTypeId]
+        )
+    }
+
+    async deleteEntityDocument(entityId: string, documentTypeId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM entity_documents WHERE entity_id = ? AND document_type_id = ?', [entityId, documentTypeId])
     }
 
     // --- Roles ---
@@ -11057,31 +11194,23 @@ export class MySQLAdapter {
 
     async getEntityFilePaths(entityId: string): Promise<any[]> {
         if (!this.pool) return []
-        const [rows] = await this.pool.query('SELECT id, name, type, certificate_of_incorporation_path, articles_of_association_path, kyc_file_path, passport_file_path FROM entities WHERE id = ?', [entityId])
-        const entity = (rows as any[])[0]
-        if (!entity) return []
-        const entries: any[] = []
-        const fields = [
-            { key: 'certificate_of_incorporation_path', label: 'Certificate of Incorporation' },
-            { key: 'articles_of_association_path', label: 'Articles of Association' },
-            { key: 'kyc_file_path', label: 'KYC' },
-            { key: 'passport_file_path', label: 'ID / Passport' },
-        ]
-        for (const f of fields) {
-            if (entity[f.key]) {
-                entries.push({ id: entityId, source: f.key, filePath: entity[f.key], label: f.label })
-            }
-        }
-        return entries
+        const [rows] = await this.pool.query(
+            `SELECT ed.entity_id as id, ed.document_type_id as source, ed.file_path as filePath, edt.name as label
+             FROM entity_documents ed
+             JOIN entity_document_types edt ON edt.id = ed.document_type_id
+             WHERE ed.entity_id = ? AND ed.file_path IS NOT NULL`,
+            [entityId]
+        )
+        return rows as any[]
     }
 
     async remapEntityFilePaths(remaps: { source: string; id: string; newPath: string }[]): Promise<void> {
         if (!this.pool || remaps.length === 0) return
         for (const remap of remaps) {
-            const allowedCols = ['certificate_of_incorporation_path', 'articles_of_association_path', 'kyc_file_path', 'passport_file_path']
-            if (allowedCols.includes(remap.source)) {
-                await this.pool.execute(`UPDATE entities SET ${remap.source} = ? WHERE id = ?`, [remap.newPath, remap.id])
-            }
+            await this.pool.execute(
+                'UPDATE entity_documents SET file_path = ? WHERE entity_id = ? AND document_type_id = ?',
+                [remap.newPath, remap.id, remap.source]
+            )
         }
     }
 

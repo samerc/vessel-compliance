@@ -20,12 +20,6 @@ async function loadEntityDocData() {
   }
 }
 
-function getEntityDocList(entity: any, edTypes: any[]): { name: string; hasFile: boolean }[] {
-  return edTypes
-    .filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
-    .map((t: any) => ({ name: t.name, typeId: t.id })) as any[]
-}
-
 function entityDocStatus(entity: any, edTypes: any[], edDocs: any[]): { name: string; onFile: boolean }[] {
   return edTypes
     .filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
