@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Plus, Trash2, ChevronDown, X, RefreshCw, Users, Ship, GitBranch } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, X, RefreshCw, Users, Ship, GitBranch } from 'lucide-react'
 import { Quotation, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationVessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
@@ -125,6 +125,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
     onVesselAmountBlur?: () => void
 }) {
     const [dropdownOpen, setDropdownOpen] = useState(false)
+    const [expandedId, setExpandedId] = useState<string | null>(null)
     const { theme } = useTheme()
     const isLight = theme === 'light'
     const bg = isLight ? '#ffffff' : '#1a1d28'
@@ -132,100 +133,56 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
     const selectedCount = selectedItems.length
 
     return (
-        <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
-                {label}
-            </label>
+        <div>
+            {label && <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '6px', color: 'var(--text-secondary)' }}>{label}</label>}
 
             {items.length === 0 ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
+                <div style={{ padding: '10px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.78rem', border: '1px dashed var(--table-border)', borderRadius: '6px' }}>
                     {emptyText}
                 </div>
             ) : (
                 <>
                     {/* Dropdown selector */}
-                    <div style={{ position: 'relative', marginBottom: selectedCount > 0 ? '12px' : 0 }}>
+                    <div style={{ position: 'relative', marginBottom: selectedCount > 0 ? '6px' : 0 }}>
                         <button
                             type="button"
                             onClick={() => setDropdownOpen(!dropdownOpen)}
                             style={{
-                                width: '100%',
-                                padding: '9px 14px',
-                                borderRadius: '8px',
-                                border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
-                                background: bg,
-                                color: isLight ? '#1c1e21' : '#e8e8e8',
-                                cursor: 'pointer',
-                                fontSize: '0.84rem',
-                                textAlign: 'left',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
+                                width: '100%', padding: '6px 10px', borderRadius: '6px',
+                                border: `1px solid ${isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)'}`,
+                                background: bg, color: isLight ? '#1c1e21' : '#e8e8e8',
+                                cursor: 'pointer', fontSize: '0.8rem', textAlign: 'left',
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                             }}
                         >
                             <span>{selectedCount} of {items.length} selected</span>
-                            <ChevronDown size={16} style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
+                            <ChevronDown size={14} style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
                         </button>
                         {dropdownOpen && (
                             <>
                                 <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setDropdownOpen(false)} />
                                 <div style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    left: 0,
-                                    right: 0,
-                                    marginTop: '4px',
-                                    maxHeight: '320px',
-                                    overflowY: 'auto',
-                                    borderRadius: '8px',
+                                    position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px',
+                                    maxHeight: '280px', overflowY: 'auto', borderRadius: '6px',
                                     border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
-                                    background: bg,
-                                    zIndex: 999,
-                                    boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
+                                    background: bg, zIndex: 999,
+                                    boxShadow: isLight ? '0 6px 20px rgba(0,0,0,0.1)' : '0 6px 20px rgba(0,0,0,0.4)'
                                 }}>
-                                    {/* Select all / deselect all */}
-                                    <div style={{
-                                        padding: '8px 12px',
-                                        borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
-                                        display: 'flex',
-                                        gap: '8px',
-                                        position: 'sticky',
-                                        top: 0,
-                                        background: bg,
-                                        zIndex: 1
-                                    }}>
+                                    <div style={{ padding: '6px 10px', borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`, display: 'flex', gap: '6px', position: 'sticky', top: 0, background: bg, zIndex: 1 }}>
                                         <button type="button" onClick={() => { items.forEach(i => { if (!selectedIds.has(i.id)) onToggle(i.id) }) }}
-                                            style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--accent-primary)', background: 'rgba(0,170,200,0.08)', color: 'var(--accent-primary)', cursor: 'pointer' }}
-                                        >Select All</button>
+                                            style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid var(--accent-primary)', background: 'rgba(0,170,200,0.08)', color: 'var(--accent-primary)', cursor: 'pointer' }}>Select All</button>
                                         <button type="button" onClick={() => { items.forEach(i => { if (selectedIds.has(i.id)) onToggle(i.id) }) }}
-                                            style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--table-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
-                                        >Deselect All</button>
+                                            style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid var(--table-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Deselect All</button>
                                     </div>
                                     {items.map(item => {
                                         const checked = selectedIds.has(item.id)
                                         return (
-                                            <div
-                                                key={item.id}
-                                                onClick={() => onToggle(item.id)}
-                                                style={{
-                                                    padding: '8px 12px',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    gap: '10px',
-                                                    alignItems: 'flex-start',
-                                                    borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                                    background: checked ? 'rgba(0, 170, 200, 0.06)' : 'transparent'
-                                                }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    readOnly
-                                                    style={{ marginTop: '2px', width: '15px', height: '15px', accentColor: 'var(--accent-primary)', pointerEvents: 'none' }}
-                                                />
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    {item.label && <span style={{ fontWeight: 600, fontSize: '0.82rem', marginRight: '6px' }}>{item.label}</span>}
-                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.text.length > 120 ? item.text.slice(0, 120) + '...' : item.text}</span>
+                                            <div key={item.id} onClick={() => onToggle(item.id)}
+                                                style={{ padding: '5px 10px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.03)', background: checked ? 'rgba(0,170,200,0.05)' : 'transparent' }}>
+                                                <input type="checkbox" checked={checked} readOnly style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)', pointerEvents: 'none' }} />
+                                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem' }}>
+                                                    {item.label && <span style={{ fontWeight: 600, marginRight: '4px' }}>{item.label}</span>}
+                                                    <span style={{ color: 'var(--text-secondary)' }}>{item.text.length > 100 ? item.text.slice(0, 100) + '...' : item.text}</span>
                                                 </div>
                                             </div>
                                         )
@@ -235,84 +192,64 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                         )}
                     </div>
 
-                    {/* Selected items with overrides */}
-                    {selectedItems.map(item => (
-                        <div key={item.id} style={{
-                            marginBottom: '6px',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(0, 170, 200, 0.25)',
-                            background: 'rgba(0, 170, 200, 0.04)'
-                        }}>
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                <button type="button" onClick={() => onToggle(item.id)} title="Remove"
-                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', marginTop: '1px' }}
-                                ><X size={14} /></button>
-                                <div style={{ flex: 1 }}>
-                                    {item.label && <span style={{ fontWeight: 600, fontSize: '0.85rem', marginRight: '8px' }}>{item.label}</span>}
-                                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{item.text}</span>
-                                    <div style={{ marginTop: '8px' }}>
-                                        <textarea
-                                            value={overrides[item.id] || ''}
-                                            onChange={e => onOverrideChange(item.id, e.target.value)}
-                                            onBlur={onOverrideBlur}
-                                            placeholder="Override text (optional)..."
-                                            rows={2}
-                                            style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem', resize: 'vertical', fontFamily: 'inherit' }}
-                                        />
-                                        {item.hasAmount && amounts && onAmountChange && onAmountBlur && (
-                                            vessels.length >= 2 && vesselAmountsMap && onVesselAmountChange && onVesselAmountBlur && !scopes[item.id] ? (
-                                                <div style={{ marginTop: '6px' }}>
-                                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{item.amountPlaceholder || 'Amount'} (per vessel):</span>
-                                                    {vessels.map(v => {
-                                                        const va = vesselAmountsMap[item.id]
-                                                        const perVesselVal = va ? va[v.id] : undefined
-                                                        const displayVal = perVesselVal ?? amounts[item.id] ?? ''
-                                                        return (
-                                                            <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={(v.name || v.vesselLabel).toUpperCase()}>
-                                                                    {(v.name || v.vesselLabel).toUpperCase()}
-                                                                </span>
-                                                                <input
-                                                                    type="number"
-                                                                    value={displayVal}
-                                                                    onChange={e => onVesselAmountChange(item.id, v.id, e.target.value ? Number(e.target.value) : undefined)}
-                                                                    onBlur={onVesselAmountBlur}
-                                                                    placeholder="0.00"
-                                                                    style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem' }}
-                                                                />
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            ) : (
-                                                <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{item.amountPlaceholder || 'Amount'}:</span>
-                                                    <input
-                                                        type="number"
-                                                        value={amounts[item.id] ?? ''}
-                                                        onChange={e => onAmountChange(item.id, e.target.value ? Number(e.target.value) : undefined)}
-                                                        onBlur={onAmountBlur}
-                                                        placeholder="0.00"
-                                                        style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem' }}
-                                                    />
-                                                </div>
-                                            )
-                                        )}
-                                        {vessels.length > 1 && (
-                                            <div style={{ marginTop: '4px' }}>
-                                                <VesselScopeChips
-                                                    vessels={vessels}
-                                                    vesselScope={scopes[item.id]}
-                                                    onChange={scope => onScopeChange(item.id, scope)}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                    {/* Selected items — compact rows with accordion expand */}
+                    {selectedItems.map(item => {
+                        const isExpanded = expandedId === item.id
+                        return (
+                        <div key={item.id} style={{ marginBottom: '2px', borderRadius: '4px', border: '1px solid rgba(0,170,200,0.15)', background: 'rgba(0,170,200,0.03)' }}>
+                            {/* Compact row */}
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 8px', cursor: 'pointer' }} onClick={() => setExpandedId(isExpanded ? null : item.id)}>
+                                <button type="button" onClick={e => { e.stopPropagation(); onToggle(item.id) }} title="Remove"
+                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', flexShrink: 0 }}><X size={12} /></button>
+                                {item.label && <span style={{ fontWeight: 600, fontSize: '0.78rem', flexShrink: 0 }}>{item.label}</span>}
+                                <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{overrides[item.id] || item.text}</span>
+                                {item.hasAmount && amounts && amounts[item.id] != null && (
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', flexShrink: 0 }}>{Number(amounts[item.id]).toLocaleString()}</span>
+                                )}
+                                <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--text-secondary)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                             </div>
+                            {/* Expanded detail */}
+                            {isExpanded && (
+                                <div style={{ padding: '6px 8px 8px 28px', borderTop: '1px solid rgba(0,170,200,0.1)' }}>
+                                    <textarea
+                                        value={overrides[item.id] || ''}
+                                        onChange={e => onOverrideChange(item.id, e.target.value)}
+                                        onBlur={onOverrideBlur}
+                                        placeholder={item.text}
+                                        rows={2}
+                                        style={{ width: '100%', padding: '4px 8px', borderRadius: '4px', fontSize: '0.78rem', resize: 'vertical', fontFamily: 'inherit', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
+                                    />
+                                    {item.hasAmount && amounts && onAmountChange && onAmountBlur && (
+                                        vessels.length >= 2 && vesselAmountsMap && onVesselAmountChange && onVesselAmountBlur && !scopes[item.id] ? (
+                                            <div style={{ marginTop: '4px' }}>
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>{item.amountPlaceholder || 'Amount'} (per vessel):</span>
+                                                {vessels.map(v => {
+                                                    const va = vesselAmountsMap[item.id]
+                                                    const perVesselVal = va ? va[v.id] : undefined
+                                                    return (
+                                                        <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', width: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                                                            <input type="number" value={perVesselVal ?? amounts[item.id] ?? ''} onChange={e => onVesselAmountChange(item.id, v.id, e.target.value ? Number(e.target.value) : undefined)} onBlur={onVesselAmountBlur} placeholder="0" style={{ width: '120px', padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{item.amountPlaceholder || 'Amount'}:</span>
+                                                <input type="number" value={amounts[item.id] ?? ''} onChange={e => onAmountChange(item.id, e.target.value ? Number(e.target.value) : undefined)} onBlur={onAmountBlur} placeholder="0" style={{ width: '120px', padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                                            </div>
+                                        )
+                                    )}
+                                    {vessels.length > 1 && (
+                                        <div style={{ marginTop: '4px' }}>
+                                            <VesselScopeChips vessels={vessels} vesselScope={scopes[item.id]} onChange={scope => onScopeChange(item.id, scope)} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    ))}
+                    )})}
                 </>
             )}
         </div>
@@ -337,6 +274,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     const [qAdditional, setQAdditional] = useState<QuotationHullAdditionalCondition[]>([])
     const [customConditions, setCustomConditions] = useState<{ id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]>([])
     const [newCustomText, setNewCustomText] = useState('')
+    const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({ conditions: true, additional: false, custom: false })
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [selectedVesselScope, setSelectedVesselScope] = useState<string | null>(null) // null = "All Vessels"
     const [addOverrideOpen, setAddOverrideOpen] = useState(false)
@@ -970,7 +908,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
 
     return (
         <>
-        <div className="glass-card" style={{ padding: '24px', minHeight: '300px', position: 'relative', zIndex: 2 }}>
+        <div className="glass-card" style={{ padding: '16px', position: 'relative', zIndex: 2 }}>
             {qVessels.length >= 2 && (
                 <div style={{
                     display: 'flex',
@@ -1374,14 +1312,18 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     </div>
                 </>
             )}
-        </div>
-
-        {/* Additional Conditions — separate card */}
+        {/* Additional Conditions — collapsible section */}
         {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
-            <div className="glass-card" style={{ padding: '24px', marginTop: '16px' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
-                    Additional Conditions
-                </h4>
+            <div style={{ borderTop: '1px solid var(--table-border)', marginTop: '12px', paddingTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: sectionExpanded.additional ? '8px' : 0 }}
+                    onClick={() => setSectionExpanded(prev => ({ ...prev, additional: !prev.additional }))}>
+                    <ChevronRight size={14} style={{ transform: sectionExpanded.additional ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Additional Conditions</span>
+                    <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600, background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>
+                        {filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length}/{filteredAdditional.length}
+                    </span>
+                </div>
+                {sectionExpanded.additional && (<>
                 <HullConditionPicker
                     label=""
                     items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
@@ -1437,15 +1379,20 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                         </div>
                     )
                 })()}
+                </>)}
             </div>
         )}
-        {/* Custom Additional Conditions */}
-        {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
-            <div className="glass-card" style={{ padding: '24px', marginTop: '16px' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
-                    Custom Additional Conditions
-                </h4>
 
+        {/* Custom Additional Conditions — collapsible section */}
+        {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
+            <div style={{ borderTop: '1px solid var(--table-border)', marginTop: '12px', paddingTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: sectionExpanded.custom ? '8px' : 0 }}
+                    onClick={() => setSectionExpanded(prev => ({ ...prev, custom: !prev.custom }))}>
+                    <ChevronRight size={14} style={{ transform: sectionExpanded.custom ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Custom Conditions</span>
+                    {customConditions.length > 0 && <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600, background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>{customConditions.length}</span>}
+                </div>
+                {sectionExpanded.custom && (<>
                 {/* Add new custom condition */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <textarea
@@ -1496,10 +1443,12 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     </div>
                 ))}
                 {customConditions.length === 0 && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '8px 0' }}>No custom conditions added.</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '4px 0' }}>No custom conditions added.</div>
                 )}
+                </>)}
             </div>
         )}
+        </div>
         </>
     )
 }
