@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, ChevronDown, ChevronUp, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Upload, FolderOpen, Plus } from 'lucide-react'
+import { Trash2, Users, UserPlus, UserCheck, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Upload, FolderOpen, Plus, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
@@ -24,7 +24,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const { theme } = useTheme()
     const isLight = theme === 'light'
     const { hasPermission } = useAuth()
-    const canEditEntities = hasPermission('entities:edit')
     const canManageAssureds = hasPermission('assureds:manage')
     const canUploadDocs = hasPermission('documents:upload')
 
@@ -33,7 +32,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [newType, setNewType] = useState<'company' | 'person'>('company')
     const [newRole, setNewRole] = useState('')
     const [newIdentifier, setNewIdentifier] = useState('')
-    const [expandedAssuredId, setExpandedAssuredId] = useState<string | null>(null)
+    const [selectedAssuredId, setSelectedAssuredId] = useState<string | null>(null)
     const [newUBOName, setNewUBOName] = useState('')
     const [newUBOType, setNewUBOType] = useState<'company' | 'person'>('person')
     const [newUBOIdentifier, setNewUBOIdentifier] = useState('')
@@ -55,10 +54,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [editRoleValue, setEditRoleValue] = useState('')
     const [isUpdatingRole, setIsUpdatingRole] = useState(false)
 
-    // Editing state for entity/UBO names
-    const [editingEntityId, setEditingEntityId] = useState<string | null>(null)
-    const [editEntityName, setEditEntityName] = useState('')
-    const [isSavingName, setIsSavingName] = useState(false)
 
     // Loading states
     const [isAddingAssured, setIsAddingAssured] = useState(false)
@@ -249,21 +244,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             showError(error.message || 'Failed to update role.')
         } finally {
             setIsUpdatingRole(false)
-        }
-    }
-
-    const handleRenameEntity = async (entityId: string) => {
-        if (!editEntityName.trim()) return
-        setIsSavingName(true)
-        try {
-            await window.api.updateEntity(entityId, { name: editEntityName.trim() })
-            showSuccess('Name updated successfully')
-            setEditingEntityId(null)
-            loadData()
-        } catch (error: any) {
-            showError(error.message || 'Failed to rename entity.')
-        } finally {
-            setIsSavingName(false)
         }
     }
 
@@ -563,6 +543,58 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         )
     }
 
+    const sortedAssureds = [...vesselAssureds].sort((a, b) => {
+        const aOrder = roles.findIndex(r => r.name === a.role)
+        const bOrder = roles.findIndex(r => r.name === b.role)
+        return (aOrder === -1 ? 999 : aOrder) - (bOrder === -1 ? 999 : bOrder)
+    })
+
+    const selectedVA = sortedAssureds.find(va => va.id === selectedAssuredId)
+    const selectedEntity = selectedVA ? entities.find(e => e.id === selectedVA.entityId) : null
+    const selectedUbos = selectedVA ? entityUBOs.filter(u => u.assuredEntityId === selectedVA.entityId).map(u => entities.find(e => e.id === u.uboEntityId)).filter(Boolean) : []
+
+    const getDocScore = (entityId: string, entityType: string) => {
+        const applicable = entityDocTypes.filter(t => t.isRequired && (t.entityScope === 'both' || t.entityScope === entityType))
+        const docs = entityDocs.filter(d => d.entityId === entityId)
+        const have = applicable.filter(t => docs.some(d => d.documentTypeId === t.id && d.filePath)).length
+        return { have, total: applicable.length }
+    }
+
+    const DocRow = ({ ent }: { ent: Entity }) => {
+        const applicable = entityDocTypes.filter(t => t.entityScope === 'both' || t.entityScope === ent.type)
+        const docsForEnt = entityDocs.filter(d => d.entityId === ent.id)
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {applicable.map(dt => {
+                    const doc = docsForEnt.find(d => d.documentTypeId === dt.id)
+                    const hasFile = !!doc?.filePath
+                    return (
+                        <div key={dt.id}
+                            onDragOver={ev => ev.preventDefault()}
+                            onDrop={ev => handleDropEntityDoc(ev, ent.id, dt.id)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', background: hasFile ? (isLight ? 'rgba(0,140,70,0.06)' : 'rgba(0,255,136,0.04)') : (isLight ? 'rgba(200,0,0,0.04)' : 'rgba(255,77,77,0.04)'), border: hasFile ? (isLight ? '1px solid rgba(0,140,70,0.15)' : '1px solid rgba(0,255,136,0.12)') : (isLight ? '1px solid rgba(200,0,0,0.12)' : '1px solid rgba(255,77,77,0.1)'), display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            {hasFile
+                                ? <CheckCircle2 size={14} color={isLight ? '#008c46' : '#00ff88'} />
+                                : <AlertTriangle size={14} color={isLight ? '#c00000' : '#ff4d4d'} />
+                            }
+                            <span style={{ flex: 1, fontSize: '0.82rem', color: hasFile ? (isLight ? '#008c46' : 'rgba(0,255,136,0.85)') : (isLight ? '#c00000' : 'rgba(255,77,77,0.85)'), cursor: hasFile ? 'pointer' : 'default' }} onClick={hasFile ? () => window.api.fsOpen(doc!.filePath!) : undefined}>{dt.name}</span>
+                            {hasFile ? (
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button onClick={e => { e.stopPropagation(); window.api.shellShowItemInFolder(doc!.filePath!) }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.68rem' }} title="Open location"><FolderOpen size={10} /></button>
+                                    <button onClick={e => { e.stopPropagation(); handleClickUploadDoc(ent.id, dt.id, dt.name) }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
+                                    {canUploadDocs && <button onClick={e => { e.stopPropagation(); handleDeleteDoc(ent.id, dt.id) }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
+                                </div>
+                            ) : (
+                                <button onClick={() => handleClickUploadDoc(ent.id, dt.id, dt.name)} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Upload</button>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
+        )
+    }
+
     return (
         <section className="fade-in" style={{ marginTop: '32px' }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -586,590 +618,238 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                             <div style={{ position: 'relative' }}>
                                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Entity Name</label>
-                                <input
-                                    type="text"
-                                    value={newName}
-                                    onChange={e => { setNewName(e.target.value); setSelectedEntityId(null); }}
-                                    style={{ width: '100%' }}
-                                    placeholder="Type name to find or create..."
-                                    required
-                                    aria-label="Entity name"
-                                />
-
+                                <input type="text" value={newName} onChange={e => { setNewName(e.target.value); setSelectedEntityId(null); }} style={{ width: '100%' }} placeholder="Type name to find or create..." required aria-label="Entity name" />
                                 {newName && !selectedEntityId && matchingEntities.length > 0 && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: 0,
-                                        right: 0,
-                                        zIndex: 100,
-                                        marginTop: '4px',
-                                        padding: '8px',
-                                        maxHeight: '200px',
-                                        overflowY: 'auto',
-                                        background: isLight ? '#ffffff' : '#1e222a',
-                                        border: '1px solid var(--accent-primary)',
-                                        borderRadius: '8px',
-                                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                                        backdropFilter: 'none'
-                                    }}>
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '8px', padding: '4px' }}>Existing matches (Click to select):</div>
+                                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: '4px', padding: '8px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1e222a', border: '1px solid var(--accent-primary)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', backdropFilter: 'none' }}>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '8px', padding: '4px' }}>Existing matches:</div>
                                         {matchingEntities.map(ent => (
-                                            <div
-                                                key={ent.id}
-                                                onClick={() => { setSelectedEntityId(ent.id); setNewName(ent.name); }}
-                                                style={{ padding: '8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                                                className="hover-effect"
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    {ent.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
-                                                    <span>{ent.name}</span>
-                                                </div>
+                                            <div key={ent.id} onClick={() => { setSelectedEntityId(ent.id); setNewName(ent.name); }} style={{ padding: '8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="hover-effect">
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{ent.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}<span>{ent.name}</span></div>
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>{ent.identifier ? `[${ent.identifier}]` : '(ID: ' + ent.id.slice(0, 4) + ')'}</span>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-                                {selectedEntityId && (
-                                    <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Check size={14} /> Linked to existing entity
-                                    </div>
-                                )}
+                                {selectedEntityId && <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px' }}><Check size={14} /> Linked to existing entity</div>}
                             </div>
-
                             {!selectedEntityId && (
                                 <>
                                     <div style={{ display: 'flex', gap: '20px' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Distinguishing Identifier (Optional)</label>
-                                            <input
-                                                type="text"
-                                                value={newIdentifier}
-                                                onChange={e => setNewIdentifier(e.target.value)}
-                                                style={{ width: '100%' }}
-                                                placeholder="e.g. Greek Branch, ID Number..."
-                                                aria-label="Distinguishing identifier"
-                                            />
-                                        </div>
-                                        <div style={{ width: '140px' }}>
-                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Entity Type</label>
-                                            <select
-                                                value={newType}
-                                                onChange={e => setNewType(e.target.value as any)}
-                                                style={{ width: '100%', color: 'var(--text-primary)' }}
-                                                aria-label="Entity type"
-                                            >
-                                                <option value="company">Company</option>
-                                                <option value="person">Person</option>
-                                            </select>
-                                        </div>
+                                        <div style={{ flex: 1 }}><label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Identifier (Optional)</label><input type="text" value={newIdentifier} onChange={e => setNewIdentifier(e.target.value)} style={{ width: '100%' }} placeholder="e.g. Greek Branch..." /></div>
+                                        <div style={{ width: '140px' }}><label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Type</label><select value={newType} onChange={e => setNewType(e.target.value as any)} style={{ width: '100%', color: 'var(--text-primary)' }}><option value="company">Company</option><option value="person">Person</option></select></div>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
-                                        <div>
-                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</label>
-                                            <input
-                                                type="email"
-                                                value={newEmail}
-                                                onChange={e => setNewEmail(e.target.value)}
-                                                style={{ width: '100%' }}
-                                                placeholder="contact@entity.com"
-                                                aria-label="Entity email"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone</label>
-                                            <input
-                                                type="text"
-                                                value={newPhone}
-                                                onChange={e => setNewPhone(e.target.value)}
-                                                style={{ width: '100%' }}
-                                                placeholder="+123..."
-                                                aria-label="Entity phone"
-                                            />
-                                        </div>
+                                        <div><label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</label><input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ width: '100%' }} placeholder="contact@entity.com" /></div>
+                                        <div><label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone</label><input type="text" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ width: '100%' }} placeholder="+123..." /></div>
                                     </div>
                                 </>
                             )}
                         </div>
-
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'flex-end' }}>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Role on Vessel</label>
-                                <input
-                                    list="role-suggestions"
-                                    type="text"
-                                    value={newRole}
-                                    onChange={e => setNewRole(e.target.value)}
-                                    style={{ width: '100%' }}
-                                    placeholder="Select or type role..."
-                                    required
-                                    aria-label="Role on vessel"
-                                />
-                                <datalist id="role-suggestions">
-                                    {roles.map(r => <option key={r.id} value={r.name} />)}
-                                </datalist>
-                            </div>
-                            <button type="submit" className="btn-primary" disabled={isAddingAssured} style={{ padding: '10px 32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {isAddingAssured && <Loader2 size={16} className="spinner" />}
-                                {isAddingAssured ? 'Adding...' : selectedEntityId ? 'Link Existing Assured' : 'Register & Add New Assured'}
-                            </button>
+                            <div><label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Role on Vessel</label><input list="role-suggestions" type="text" value={newRole} onChange={e => setNewRole(e.target.value)} style={{ width: '100%' }} placeholder="Select or type role..." required /><datalist id="role-suggestions">{roles.map(r => <option key={r.id} value={r.name} />)}</datalist></div>
+                            <button type="submit" className="btn-primary" disabled={isAddingAssured} style={{ padding: '10px 32px', display: 'flex', alignItems: 'center', gap: '8px' }}>{isAddingAssured && <Loader2 size={16} className="spinner" />}{isAddingAssured ? 'Adding...' : selectedEntityId ? 'Link Existing' : 'Register & Add'}</button>
                         </div>
                     </form>
                 </div>
             )}
 
-            <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                            <th style={{ padding: '16px' }}>Assured Name</th>
-                            <th style={{ padding: '16px' }}>Role</th>
-                            <th style={{ padding: '16px' }}>Address</th>
-                            <th style={{ padding: '16px' }}>UBOs</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {[...vesselAssureds].sort((a, b) => {
-                            const aOrder = roles.findIndex(r => r.name === a.role)
-                            const bOrder = roles.findIndex(r => r.name === b.role)
-                            return (aOrder === -1 ? 999 : aOrder) - (bOrder === -1 ? 999 : bOrder)
-                        }).map(va => {
-                            const entity = entities.find(e => e.id === va.entityId)
-                            const ubos = entityUBOs
-                                .filter(u => u.assuredEntityId === va.entityId)
-                                .map(u => entities.find(e => e.id === u.uboEntityId))
-                                .filter(Boolean)
+            <div style={{ display: 'flex', gap: '0' }}>
+                {/* Left: Assured table */}
+                <div className="glass-card" style={{ flex: 1, padding: '0', overflow: 'hidden', borderRadius: selectedAssuredId ? '12px 0 0 12px' : '12px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                <th style={{ padding: '14px 16px' }}>Assured Name</th>
+                                <th style={{ padding: '14px 16px' }}>Role</th>
+                                <th style={{ padding: '14px 16px' }}>Docs</th>
+                                <th style={{ padding: '14px 16px' }}>UBOs</th>
+                                <th style={{ padding: '14px 16px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sortedAssureds.map(va => {
+                                const entity = entities.find(e => e.id === va.entityId)
+                                const ubos = entityUBOs.filter(u => u.assuredEntityId === va.entityId)
+                                const isSelected = selectedAssuredId === va.id
+                                const score = entity ? getDocScore(entity.id, entity.type) : { have: 0, total: 0 }
+                                const docColor = score.total === 0 ? 'var(--text-secondary)' : score.have === score.total ? (isLight ? '#008c46' : '#00c264') : score.have === 0 ? (isLight ? '#c00000' : '#ff4d4d') : (isLight ? '#b45309' : '#f59e0b')
 
-                            const isExpanded = expandedAssuredId === va.id
-
-                            return (
-                                <React.Fragment key={va.id}>
-                                    <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)' }}>
-                                        <td style={{ padding: '16px' }}>
+                                return (
+                                    <tr key={va.id} onClick={() => setSelectedAssuredId(isSelected ? null : va.id)} style={{ borderBottom: '1px solid var(--table-border)', cursor: 'pointer', background: isSelected ? 'rgba(0,210,255,0.06)' : 'transparent', transition: 'background 0.15s' }} className="hover-effect">
+                                        <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {entity?.type === 'company' ? <Building2 size={16} opacity={0.5} /> : <User size={16} opacity={0.5} />}
-                                                <div style={{ flex: 1 }}>
-                                                    {editingEntityId === entity?.id ? (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            <input
-                                                                type="text"
-                                                                value={editEntityName}
-                                                                onChange={e => setEditEntityName(e.target.value)}
-                                                                onKeyDown={e => {
-                                                                    if (e.key === 'Enter') handleRenameEntity(entity!.id)
-                                                                    if (e.key === 'Escape') setEditingEntityId(null)
-                                                                }}
-                                                                style={{ padding: '4px 8px', fontSize: '0.85rem', width: '200px' }}
-                                                                autoFocus
-                                                            />
-                                                            <button onClick={() => handleRenameEntity(entity!.id)} style={{ background: 'transparent', color: 'var(--success)', padding: '2px' }} title="Save" disabled={isSavingName}>
-                                                                {isSavingName ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}
-                                                            </button>
-                                                            <button onClick={() => setEditingEntityId(null)} style={{ background: 'transparent', color: 'var(--danger)', padding: '2px' }} title="Cancel">
-                                                                <X size={14} />
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            {entity?.name}
-                                                            {entity && <OfacBadge entity={entity} />}
-                                                            {entity && canEditEntities && (
-                                                                <button
-                                                                    onClick={() => { setEditingEntityId(entity.id); setEditEntityName(entity.name) }}
-                                                                    style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px', opacity: 0.5 }}
-                                                                    title="Rename"
-                                                                >
-                                                                    <Pencil size={12} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {entity?.identifier && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entity.identifier}</div>}
+                                                {entity?.type === 'company' ? <Building2 size={15} opacity={0.5} /> : <User size={15} opacity={0.5} />}
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{entity?.name}</div>
+                                                    {entity?.identifier && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{entity.identifier}</div>}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '16px' }}>
-                                            {editingVesselAssuredId === va.id ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <input
-                                                        list="role-suggestions-edit"
-                                                        type="text"
-                                                        value={editRoleValue}
-                                                        onChange={e => setEditRoleValue(e.target.value)}
-                                                        style={{ padding: '4px 8px', fontSize: '0.8rem', width: '150px' }}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleUpdateRole(va.id)
-                                                            if (e.key === 'Escape') setEditingVesselAssuredId(null)
-                                                        }}
-                                                        autoFocus
-                                                    />
-                                                    <datalist id="role-suggestions-edit">
-                                                        {roles.map(r => <option key={r.id} value={r.name} />)}
-                                                    </datalist>
-                                                </div>
-                                            ) : (
-                                                <span style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>{va.role}</span>
-                                            )}
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <span style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.78rem' }}>{va.role}</span>
                                         </td>
-                                        <td style={{ padding: '16px' }}>
-                                            {(() => {
-                                                const entityAddrs = allAddresses.filter(a => a.entityId === va.entityId)
-                                                const currentAddr = entityAddrs.find(a => a.id === va.addressId)
-                                                return (
-                                                    <div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            <select
-                                                                value={va.addressId || ''}
-                                                                onChange={e => handleChangeAddress(va.id, e.target.value || null)}
-                                                                style={{ padding: '4px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', maxWidth: '180px' }}
-                                                            >
-                                                                <option value="">— No address —</option>
-                                                                {entityAddrs.map(a => (
-                                                                    <option key={a.id} value={a.id}>{a.label}</option>
-                                                                ))}
-                                                            </select>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setShowAddAddressFor(showAddAddressFor === va.id ? null : va.id)
-                                                                    setAddrForm({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
-                                                                }}
-                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }}
-                                                                title="Add new address"
-                                                            >
-                                                                <Plus size={14} />
-                                                            </button>
-                                                        </div>
-                                                        {currentAddr && (
-                                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.3, whiteSpace: 'pre-line' }}>
-                                                                {currentAddr.addressLine1}
-                                                            </div>
-                                                        )}
-                                                        {showAddAddressFor === va.id && (
-                                                            <div style={{ marginTop: '8px', background: isLight ? '#f0f4f8' : 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '10px', border: '1px solid var(--table-border)' }}>
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                                                    <input placeholder="Label (e.g. Registered Office) *" value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
-                                                                    <textarea placeholder="Paste or type full address *" value={addrForm.addressLine1} onChange={e => setAddrForm(p => ({ ...p, addressLine1: e.target.value }))} rows={3} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem', resize: 'vertical', fontFamily: 'inherit' }} />
-                                                                    <div style={{ display: 'flex', gap: '5px', marginTop: '3px' }}>
-                                                                        <button onClick={() => handleAddNewAddress(va.id, va.entityId)} disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>Save & Assign</button>
-                                                                        <button onClick={() => setShowAddAddressFor(null)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>Cancel</button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )
-                                            })()}
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: docColor }}>{score.have}/{score.total}</span>
                                         </td>
-                                        <td style={{ padding: '16px' }}>
-                                            <button
-                                                onClick={() => setExpandedAssuredId(isExpanded ? null : va.id)}
-                                                style={{ background: 'transparent', color: 'var(--accent-primary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                aria-expanded={isExpanded}
-                                                aria-label="Toggle UBO details"
-                                            >
-                                                {ubos.length} UBO(s) {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                            </button>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{ubos.length}</span>
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                                {editingVesselAssuredId === va.id ? (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleUpdateRole(va.id)}
-                                                            className="btn-secondary"
-                                                            style={{ padding: '4px', color: 'var(--success)' }}
-                                                            title="Save Role"
-                                                            disabled={isUpdatingRole}
-                                                        >
-                                                            {isUpdatingRole ? <Loader2 size={18} className="spinner" /> : <Save size={18} />}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setEditingVesselAssuredId(null)}
-                                                            className="btn-secondary"
-                                                            style={{ padding: '4px', color: 'var(--danger)' }}
-                                                            title="Cancel"
-                                                        >
-                                                            <X size={18} />
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        {canManageAssureds && (
-                                                            <button
-                                                                onClick={() => { setEditingVesselAssuredId(va.id); setEditRoleValue(va.role); }}
-                                                                style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '4px' }}
-                                                                title="Edit Role"
-                                                            >
-                                                                <Pencil size={18} />
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
-                                                {canManageAssureds && (
-                                                    <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)', padding: '4px' }} title="Remove Assured" aria-label="Remove assured">
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                )}
+                                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }} onClick={e => e.stopPropagation()}>
+                                                {canManageAssureds && <button onClick={() => { setEditingVesselAssuredId(va.id); setEditRoleValue(va.role) }} style={{ background: 'transparent', color: 'var(--accent-primary)', padding: '3px' }} title="Edit Role"><Pencil size={15} /></button>}
+                                                {canManageAssureds && <button onClick={() => handleDeleteAssured(va.id)} style={{ background: 'transparent', color: 'var(--danger)', padding: '3px' }} title="Remove"><Trash2 size={15} /></button>}
                                             </div>
                                         </td>
                                     </tr>
-                                    {isExpanded && (
-                                        <tr style={{ background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)', borderBottom: '1px solid var(--table-border)' }}>
-                                            <td colSpan={5} style={{ padding: '16px 32px' }}>
-                                                <div style={{ padding: '16px', borderLeft: '2px solid var(--accent-primary)', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
-                                                    {entity && (entity.email || entity.phone) && (
-                                                        <div style={{ marginBottom: '16px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                                                            {entity.email && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
-                                                                    <span style={{ color: 'var(--text-secondary)' }}>Email:</span>
-                                                                    <span style={{ color: 'var(--accent-primary)' }}>{entity.email}</span>
-                                                                </div>
-                                                            )}
-                                                            {entity.phone && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
-                                                                    <span style={{ color: 'var(--text-secondary)' }}>Phone:</span>
-                                                                    <span>{entity.phone}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {(() => {
-                                                        const applicableDocTypes = entityDocTypes.filter(t => t.entityScope === 'both' || t.entityScope === entity?.type)
-                                                        if (applicableDocTypes.length === 0) return null
-                                                        const docsForEntity = entityDocs.filter(d => d.entityId === entity?.id)
-                                                        return (
-                                                            <div style={{ marginBottom: '20px', padding: '12px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                                                                <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)' }}>Documents</h4>
-                                                                <div style={{ display: 'grid', gridTemplateColumns: applicableDocTypes.length >= 3 ? '1fr 1fr 1fr' : '1fr '.repeat(applicableDocTypes.length).trim(), gap: '10px' }}>
-                                                                    {applicableDocTypes.map(dt => {
-                                                                        const doc = docsForEntity.find(d => d.documentTypeId === dt.id)
-                                                                        const hasFile = !!doc?.filePath
-                                                                        return (
-                                                                            <div key={dt.id}
-                                                                                onDragOver={(ev) => ev.preventDefault()}
-                                                                                onDrop={(ev) => handleDropEntityDoc(ev, entity!.id, dt.id)}
-                                                                                style={{ padding: '10px', borderRadius: '6px', background: hasFile ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'), border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)', fontSize: '0.8rem', textAlign: 'center' }}
-                                                                            >
-                                                                                {hasFile ? (
-                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
-                                                                                        <span style={{ cursor: 'pointer' }} onClick={() => window.api.fsOpen(doc!.filePath!)}>📄 {dt.name}</span>
-                                                                                        <div style={{ display: 'flex', gap: '4px' }}>
-                                                                                            <button onClick={(ev) => { ev.stopPropagation(); window.api.shellShowItemInFolder(doc!.filePath!) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Open file location"><FolderOpen size={10} /></button>
-                                                                                            <button onClick={(ev) => { ev.stopPropagation(); handleClickUploadDoc(entity!.id, dt.id, dt.name) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                                                                            {canUploadDocs && <button onClick={(ev) => { ev.stopPropagation(); handleDeleteDoc(entity!.id, dt.id) }} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                                                        <span>📎 Drop {dt.name} here</span>
-                                                                                        <button onClick={() => handleClickUploadDoc(entity!.id, dt.id, dt.name)} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Browse</button>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        )
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })()}
-                                                    <h4 style={{ fontSize: '0.9rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <UserCheck size={16} /> Ultimate Beneficial Owners (UBOs)
-                                                    </h4>
+                                )
+                            })}
+                            {vesselAssureds.length === 0 && (
+                                <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No assureds assigned to this vessel.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px auto', gap: '12px', marginBottom: '12px' }}>
-                                                        <div style={{ position: 'relative' }}>
-                                                            <input
-                                                                type="text"
-                                                                value={newUBOName}
-                                                                onChange={e => { setNewUBOName(e.target.value); setSelectedUBOId(null); }}
-                                                                placeholder="UBO Name..."
-                                                                style={{ width: '100%' }}
-                                                                aria-label="UBO name"
-                                                            />
-                                                            {newUBOName && !selectedUBOId && matchingUBOs.length > 0 && (
-                                                                <div style={{
-                                                                    position: 'absolute',
-                                                                    top: '100%',
-                                                                    left: 0,
-                                                                    right: 0,
-                                                                    zIndex: 100,
-                                                                    marginTop: '4px',
-                                                                    padding: '8px',
-                                                                    maxHeight: '150px',
-                                                                    overflowY: 'auto',
-                                                                    background: isLight ? '#ffffff' : '#1e222a',
-                                                                    border: '1px solid var(--accent-primary)',
-                                                                    borderRadius: '8px',
-                                                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                                                                    backdropFilter: 'none'
-                                                                }}>
-                                                                    {matchingUBOs.map(ent => (
-                                                                        <div
-                                                                            key={ent.id}
-                                                                            onClick={() => handleLinkExistingUBO(va.entityId, ent.id)}
-                                                                            style={{ padding: '6px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                                                                            className="hover-effect"
-                                                                        >
-                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                {ent.type === 'company' ? <Building2 size={12} opacity={0.5} /> : <User size={12} opacity={0.5} />}
-                                                                                <span>{ent.name}</span>
-                                                                            </div>
-                                                                            <span style={{ color: 'var(--accent-primary)' }}>{ent.identifier || ent.id.slice(0, 4)}</span>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div>
-                                                            {!selectedUBOId && (
-                                                                <input
-                                                                    type="text"
-                                                                    value={newUBOIdentifier}
-                                                                    onChange={e => setNewUBOIdentifier(e.target.value)}
-                                                                    placeholder="UBO Identifier..."
-                                                                    style={{ width: '100%' }}
-                                                                    aria-label="UBO identifier"
-                                                                />
-                                                            )}
-                                                            {selectedUBOId && <div style={{ padding: '8px', fontSize: '0.8rem', color: 'var(--success)' }}><Check size={14} /> Linked</div>}
-                                                        </div>
-                                                        {!selectedUBOId ? (
-                                                            <select
-                                                                value={newUBOType}
-                                                                onChange={e => setNewUBOType(e.target.value as any)}
-                                                                style={{ width: '100%', color: 'var(--text-primary)' }}
-                                                                aria-label="UBO type"
-                                                            >
-                                                                <option value="company">Company</option>
-                                                                <option value="person">Person</option>
-                                                            </select>
-                                                        ) : <div />}
-                                                        {canManageAssureds && (
-                                                            <button onClick={() => handleAddUBO(va.entityId)} className="btn-secondary" disabled={isAddingUBO || !!selectedUBOId} style={{ padding: '0 20px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                {isAddingUBO && <Loader2 size={14} className="spinner" />}
-                                                                {isAddingUBO ? 'Adding...' : 'Add New'}
-                                                            </button>
-                                                        )}
-                                                    </div>
+                {/* Right: Slide-in panel */}
+                {selectedAssuredId && selectedEntity && selectedVA && (
+                    <div style={{ width: '380px', flexShrink: 0, background: isLight ? '#f4f6fb' : '#14172a', border: '1px solid var(--glass-border)', borderLeft: 'none', borderRadius: '0 12px 12px 0', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+                        {/* Panel header */}
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(0,170,200,0.15), rgba(0,170,200,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {selectedEntity.type === 'company' ? <Building2 size={20} color="var(--accent-primary)" /> : <User size={20} color="var(--accent-primary)" />}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{selectedEntity.name}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {selectedVA.role} <span style={{ opacity: 0.4 }}>|</span> {selectedEntity.type}
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedAssuredId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><X size={18} /></button>
+                        </div>
 
-                                                    {!selectedUBOId && (
-                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                                                            <input
-                                                                type="email"
-                                                                value={newUBOEmail}
-                                                                onChange={e => setNewUBOEmail(e.target.value)}
-                                                                placeholder="UBO Email..."
-                                                                style={{ width: '100%' }}
-                                                                aria-label="UBO email"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={newUBOPhone}
-                                                                onChange={e => setNewUBOPhone(e.target.value)}
-                                                                placeholder="UBO Phone..."
-                                                                style={{ width: '100%' }}
-                                                                aria-label="UBO phone"
-                                                            />
-                                                        </div>
-                                                    )}
+                        {/* Sanctions */}
+                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
+                            <OfacBadge entity={selectedEntity} />
+                        </div>
 
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                                        {ubos.map(ubo => (
-                                                            <div
-                                                                key={ubo!.id}
-                                                                style={{
-                                                                    background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)',
-                                                                    border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
-                                                                    borderRadius: '12px',
-                                                                    padding: '8px 12px',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '8px',
-                                                                    minWidth: '200px'
-                                                                }}
-                                                            >
-                                                                {ubo!.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
-                                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                                    {editingEntityId === ubo!.id ? (
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                            <input
-                                                                                type="text"
-                                                                                value={editEntityName}
-                                                                                onChange={e => setEditEntityName(e.target.value)}
-                                                                                onKeyDown={e => {
-                                                                                    if (e.key === 'Enter') handleRenameEntity(ubo!.id)
-                                                                                    if (e.key === 'Escape') setEditingEntityId(null)
-                                                                                }}
-                                                                                style={{ padding: '2px 6px', fontSize: '0.8rem', width: '140px' }}
-                                                                                autoFocus
-                                                                            />
-                                                                            <button onClick={() => handleRenameEntity(ubo!.id)} style={{ background: 'transparent', color: 'var(--success)', padding: '1px' }} title="Save" disabled={isSavingName}>
-                                                                                {isSavingName ? <Loader2 size={12} className="spinner" /> : <Save size={12} />}
-                                                                            </button>
-                                                                            <button onClick={() => setEditingEntityId(null)} style={{ background: 'transparent', color: 'var(--danger)', padding: '1px' }} title="Cancel">
-                                                                                <X size={12} />
-                                                                            </button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                            <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{ubo!.name}</span>
-                                                                            <OfacBadge entity={ubo!} />
-                                                                            {canEditEntities && (
-                                                                                <button
-                                                                                    onClick={() => { setEditingEntityId(ubo!.id); setEditEntityName(ubo!.name) }}
-                                                                                    style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '1px', opacity: 0.5 }}
-                                                                                    title="Rename"
-                                                                                >
-                                                                                    <Pencil size={10} />
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                    {ubo!.identifier && <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>{ubo!.identifier}</span>}
-                                                                    {entityDocTypes.filter(dt => dt.entityScope === 'both' || dt.entityScope === ubo!.type).map(dt => {
-                                                                        const uboDoc = entityDocs.find(d => d.entityId === ubo!.id && d.documentTypeId === dt.id)
-                                                                        const hasUboFile = !!uboDoc?.filePath
-                                                                        return (
-                                                                            <div key={dt.id}
-                                                                                onDragOver={(ev) => ev.preventDefault()}
-                                                                                onDrop={(ev) => handleDropEntityDoc(ev, ubo!.id, dt.id)}
-                                                                                style={{ fontSize: '0.7rem', marginTop: '4px', padding: '4px 6px', borderRadius: '4px', background: hasUboFile ? (isLight ? 'rgba(0, 180, 80, 0.1)' : 'rgba(0, 255, 136, 0.1)') : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'), border: isLight ? '1px dashed rgba(0,0,0,0.2)' : '1px dashed rgba(255,255,255,0.2)' }}
-                                                                            >
-                                                                                {hasUboFile ? (
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => window.api.fsOpen(uboDoc!.filePath!)}>📄 {dt.name}</span>
-                                                                                        <button onClick={(ev) => { ev.stopPropagation(); handleClickUploadDoc(ubo!.id, dt.id, dt.name) }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Replace"><Upload size={9} /></button>
-                                                                                        {canUploadDocs && <button onClick={(ev) => { ev.stopPropagation(); handleDeleteDoc(ubo!.id, dt.id) }} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={9} /></button>}
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                        <span style={{ flex: 1 }}>📎 Drop {dt.name}</span>
-                                                                                        <button onClick={() => handleClickUploadDoc(ubo!.id, dt.id, dt.name)} className="btn-secondary" style={{ padding: '1px 4px', fontSize: '0.6rem' }} title="Browse"><Upload size={9} /></button>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        )
-                                                                    })}
-                                                                </div>
-                                                                {canManageAssureds && (
-                                                                    <button onClick={() => handleDeleteUBO(va.entityId, ubo!.id)} style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px' }} className="hover-danger" aria-label="Remove UBO">
-                                                                        <Trash2 size={12} />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                        {ubos.length === 0 && <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No UBOs listed.</div>}
-                                                    </div>
+                        {/* Contact info */}
+                        {(selectedEntity.email || selectedEntity.phone) && (
+                            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)', fontSize: '0.82rem' }}>
+                                {selectedEntity.email && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><span style={{ color: 'var(--text-secondary)', minWidth: '50px' }}>Email</span><span style={{ color: 'var(--accent-primary)' }}>{selectedEntity.email}</span></div>}
+                                {selectedEntity.phone && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: 'var(--text-secondary)', minWidth: '50px' }}>Phone</span><span>{selectedEntity.phone}</span></div>}
+                            </div>
+                        )}
+
+                        {/* Role editing */}
+                        {editingVesselAssuredId === selectedVA.id && (
+                            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
+                                <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '6px' }}>Edit Role</div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input list="role-suggestions-edit" type="text" value={editRoleValue} onChange={e => setEditRoleValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleUpdateRole(selectedVA.id); if (e.key === 'Escape') setEditingVesselAssuredId(null) }} style={{ flex: 1, padding: '6px 10px', fontSize: '0.82rem' }} autoFocus />
+                                    <datalist id="role-suggestions-edit">{roles.map(r => <option key={r.id} value={r.name} />)}</datalist>
+                                    <button onClick={() => handleUpdateRole(selectedVA.id)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.78rem' }} disabled={isUpdatingRole}>{isUpdatingRole ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}</button>
+                                    <button onClick={() => setEditingVesselAssuredId(null)} className="btn-secondary" style={{ padding: '6px 8px' }}><X size={14} /></button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Address */}
+                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
+                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '6px' }}>Address</div>
+                            {(() => {
+                                const entityAddrs = allAddresses.filter(a => a.entityId === selectedVA.entityId)
+                                return (
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <select value={selectedVA.addressId || ''} onChange={e => handleChangeAddress(selectedVA.id, e.target.value || null)} style={{ flex: 1, padding: '5px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+                                                <option value="">— No address —</option>
+                                                {entityAddrs.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+                                            </select>
+                                            <button onClick={() => { setShowAddAddressFor(showAddAddressFor === selectedVA.id ? null : selectedVA.id); setAddrForm({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }} title="Add new address"><Plus size={14} /></button>
+                                        </div>
+                                        {showAddAddressFor === selectedVA.id && (
+                                            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                <input placeholder="Label *" value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem' }} />
+                                                <textarea placeholder="Full address *" value={addrForm.addressLine1} onChange={e => setAddrForm(p => ({ ...p, addressLine1: e.target.value }))} rows={2} style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.78rem', resize: 'vertical', fontFamily: 'inherit' }} />
+                                                <div style={{ display: 'flex', gap: '5px' }}>
+                                                    <button onClick={() => handleAddNewAddress(selectedVA.id, selectedVA.entityId)} disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>Save & Assign</button>
+                                                    <button onClick={() => setShowAddAddressFor(null)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>Cancel</button>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })()}
+                        </div>
+
+                        {/* Documents */}
+                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
+                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>Documents</div>
+                            <DocRow ent={selectedEntity} />
+                        </div>
+
+                        {/* UBOs */}
+                        <div style={{ padding: '12px 20px' }}>
+                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <UserCheck size={12} /> Ultimate Beneficial Owners ({selectedUbos.length})
+                            </div>
+
+                            {selectedUbos.map(ubo => {
+                                const uboScore = getDocScore(ubo!.id, ubo!.type)
+                                return (
+                                    <div key={ubo!.id} style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                            {ubo!.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
+                                            <span style={{ fontWeight: 600, fontSize: '0.85rem', flex: 1 }}>{ubo!.name}</span>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: uboScore.have === uboScore.total ? (isLight ? '#008c46' : '#00c264') : (isLight ? '#c00000' : '#ff4d4d') }}>{uboScore.have}/{uboScore.total}</span>
+                                            {canManageAssureds && <button onClick={() => handleDeleteUBO(selectedVA.entityId, ubo!.id)} style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px' }} className="hover-danger" title="Remove UBO"><Trash2 size={12} /></button>}
+                                        </div>
+                                        <OfacBadge entity={ubo!} />
+                                        <div style={{ marginTop: '8px' }}><DocRow ent={ubo!} /></div>
+                                    </div>
+                                )
+                            })}
+
+                            {selectedUbos.length === 0 && <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontStyle: 'italic', marginBottom: '12px' }}>No UBOs listed.</div>}
+
+                            {/* Add UBO form */}
+                            {canManageAssureds && (
+                                <div style={{ marginTop: '8px', padding: '10px', borderRadius: '8px', border: '1px dashed var(--table-border)' }}>
+                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                                        <div style={{ flex: 1, position: 'relative' }}>
+                                            <input type="text" value={newUBOName} onChange={e => { setNewUBOName(e.target.value); setSelectedUBOId(null) }} placeholder="UBO Name..." style={{ width: '100%', padding: '6px 10px', fontSize: '0.8rem' }} />
+                                            {newUBOName && !selectedUBOId && matchingUBOs.length > 0 && (
+                                                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: '4px', padding: '6px', maxHeight: '150px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1e222a', border: '1px solid var(--accent-primary)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                                                    {matchingUBOs.map(ent => (
+                                                        <div key={ent.id} onClick={() => handleLinkExistingUBO(selectedVA.entityId, ent.id)} style={{ padding: '5px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }} className="hover-effect">
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>{ent.type === 'company' ? <Building2 size={11} opacity={0.5} /> : <User size={11} opacity={0.5} />}<span>{ent.name}</span></div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {!selectedUBOId && <select value={newUBOType} onChange={e => setNewUBOType(e.target.value as any)} style={{ width: '90px', padding: '6px', fontSize: '0.78rem', color: 'var(--text-primary)' }}><option value="person">Person</option><option value="company">Company</option></select>}
+                                    </div>
+                                    {!selectedUBOId && (
+                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                                            <input type="text" value={newUBOIdentifier} onChange={e => setNewUBOIdentifier(e.target.value)} placeholder="Identifier..." style={{ flex: 1, padding: '6px 10px', fontSize: '0.78rem' }} />
+                                        </div>
                                     )}
-                                </React.Fragment>
-                            )
-                        })}
-                    </tbody>
-                </table>
+                                    {!selectedUBOId && (
+                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                                            <input type="email" value={newUBOEmail} onChange={e => setNewUBOEmail(e.target.value)} placeholder="Email..." style={{ flex: 1, padding: '6px 10px', fontSize: '0.78rem' }} />
+                                            <input type="text" value={newUBOPhone} onChange={e => setNewUBOPhone(e.target.value)} placeholder="Phone..." style={{ flex: 1, padding: '6px 10px', fontSize: '0.78rem' }} />
+                                        </div>
+                                    )}
+                                    <button onClick={() => handleAddUBO(selectedVA.entityId)} className="btn-primary" disabled={isAddingUBO || !newUBOName.trim()} style={{ width: '100%', padding: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                        {isAddingUBO ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />}
+                                        {isAddingUBO ? 'Adding...' : selectedUBOId ? 'Link UBO' : 'Add UBO'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {sanctionsModal.show && (
