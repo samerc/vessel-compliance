@@ -3164,30 +3164,31 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
 
   const children: (Paragraph | Table)[] = []
 
-  // Broker block — load from quotation customer (broker), show at top left
+  // Broker block — load from quotation customer (broker), show at top left with 0 spacing
   const brokerEntityId = data.quotation.customerEntityId
   const isBroker = data.quotation.customerType === 'broker'
+  const caZeroP = (text: string) => new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })
   if (brokerEntityId && isBroker) {
     try {
       const allEntities = await window.api.getEntities()
       const brokerEntity = (Array.isArray(allEntities) ? allEntities : []).find((e: any) => e.id === brokerEntityId)
       if (brokerEntity) {
-        children.push(polBp(brokerEntity.name))
+        children.push(caZeroP(brokerEntity.name))
         const brokerAddrs = await window.api.getEntityAddresses(brokerEntityId)
         if (Array.isArray(brokerAddrs) && brokerAddrs.length > 0) {
           const addrText = brokerAddrs[0].addressLine1 || ''
           if (addrText) {
             for (const line of addrText.split('\n')) {
-              if (line.trim()) children.push(polNp(line.trim()))
+              if (line.trim()) children.push(caZeroP(line.trim()))
             }
           }
           if (brokerAddrs[0].city || brokerAddrs[0].country) {
             const cityCountry = [brokerAddrs[0].city, brokerAddrs[0].country].filter(Boolean).join(', ')
-            children.push(polNp(cityCountry))
+            children.push(caZeroP(cityCountry))
           }
         }
-        if (brokerEntity.phone) children.push(polNp(`Phone: ${brokerEntity.phone}`))
-        if (brokerEntity.email) children.push(polNp(brokerEntity.email))
+        if (brokerEntity.phone) children.push(caZeroP(`Phone: ${brokerEntity.phone}`))
+        if (brokerEntity.email) children.push(caZeroP(brokerEntity.email))
         children.push(polEmptyP())
       }
     } catch { /* ignore broker load errors */ }
@@ -3237,8 +3238,10 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
 
   const rows: TableRow[] = []
 
-  // INSURED — exclude broker (already shown at top of CA)
-  const caFilteredData = { ...data, addresses: data.addresses.filter(a => !a.role?.toLowerCase().includes('broker')), assureds: data.assureds.filter(a => !a.role?.toLowerCase().includes('broker')) }
+  // INSURED — exclude broker entity (already shown at top of CA)
+  const caFilteredData = brokerEntityId
+    ? { ...data, addresses: data.addresses.filter(a => a.entityId !== brokerEntityId), assureds: data.assureds.filter(a => (a as any).entityId !== brokerEntityId) }
+    : data
   const insuredContent = polBuildInsuredSection(caFilteredData)
   if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
 
@@ -3248,7 +3251,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const commissionAmount = totalPremium * commissionPercent / 100
   const creditContent: (Paragraph | Table)[] = [
     new Paragraph({
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 120, line: 240, lineRule: 'auto' as any },
       children: [
         new TextRun({ text: polFormatCurrency(Math.round(commissionAmount * 100) / 100, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
         new TextRun({ text: ` (${numberToWords(Math.round(commissionAmount * 100) / 100, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
@@ -3274,6 +3277,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
       detailsContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: multiText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
     }
     if (numInst > 1) {
+      detailsContent.push(polEmptyP())
       const caInstDescW = Math.round(POL_BODY_W * 0.55)
       const caInstAmtW = POL_BODY_W - caInstDescW
       const caInstRows = data.instalments.map(inst => {
@@ -3286,6 +3290,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
         })
       })
       detailsContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
+      detailsContent.push(polEmptyP())
     }
   }
   rows.push(makeRow('Details', detailsContent))
