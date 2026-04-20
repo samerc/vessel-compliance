@@ -1527,8 +1527,8 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeW],
     rows: [
-      new TableRow({ children: [pCell('From', labelW), pCell(polFormatDateUS(inceptionDate), dateW), pCell(`${polFormatTime(inceptionTime)}  ${timezone || ''}`, timeW)] }),
-      new TableRow({ children: [pCell('To', labelW), pCell(polFormatDateUS(expiryDate), dateW), pCell(`${polFormatTime(expiryTime)}  ${timezone || ''}`, timeW)] })
+      new TableRow({ children: [pCell('From', labelW), pCell(polFormatDateUS(inceptionDate), dateW), pCell(`${polFormatTime(inceptionTime)} ${timezone || ''}`.trim(), timeW)] }),
+      new TableRow({ children: [pCell('To', labelW), pCell(polFormatDateUS(expiryDate), dateW), pCell(`${polFormatTime(expiryTime)} ${timezone || ''}`.trim(), timeW)] })
     ]
   })]
 }
