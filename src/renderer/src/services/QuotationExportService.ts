@@ -707,12 +707,14 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   {
     let insuredText = ''
     if (data.assuredGroups.length > 0) {
-      // Render by group
+      // Render by group — resolve group name to vessel name if possible
       for (const group of data.assuredGroups) {
         const groupAssureds = data.assureds.filter(a => a.groupId === group.id)
         if (groupAssureds.length === 0) continue
         if (insuredText.length > 0) insuredText += '\n'
-        insuredText += `${group.name.toUpperCase()}\n`
+        const matchedVessel = data.quotationVessels.find(qv => qv.vesselLabel === group.name)
+        const groupHeader = matchedVessel ? (matchedVessel.name || group.name).toUpperCase() : group.name.toUpperCase()
+        insuredText += `${groupHeader}\n`
         for (const a of groupAssureds) {
           insuredText += `${a.name}\n`
           if (a.role) insuredText += `"as ${a.role}"\n`
@@ -2309,11 +2311,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const insuredContent: (Paragraph | Table)[] = []
     if (data.assureds.length > 0) {
       if (data.assuredGroups.length > 0) {
-        // Render by group
+        // Render by group — resolve group name to vessel name if possible
         const groupRows: TableRow[] = []
         for (const group of data.assuredGroups) {
           const groupAssureds = data.assureds.filter(a => a.groupId === group.id)
           if (groupAssureds.length === 0) continue
+          const matchedVessel = data.quotationVessels.find(qv => qv.vesselLabel === group.name)
+          const groupHeader = matchedVessel ? (matchedVessel.name || group.name).toUpperCase() : group.name.toUpperCase()
           // Group header row (spans 2 columns)
           groupRows.push(new TableRow({
             children: [new TableCell({
@@ -2321,7 +2325,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               columnSpan: 2,
               children: [new Paragraph({
                 spacing: { before: groupRows.length > 0 ? 120 : 0, after: 0 },
-                children: [new TextRun({ text: group.name.toUpperCase(), bold: true, size: 22, font: 'Arial', color: '000000' })]
+                children: [new TextRun({ text: groupHeader, bold: true, size: 22, font: 'Arial', color: '000000' })]
               })]
             })]
           }))
