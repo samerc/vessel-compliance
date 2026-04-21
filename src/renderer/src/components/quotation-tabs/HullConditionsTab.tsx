@@ -1362,9 +1362,13 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                         e.preventDefault()
                                         const fromIdx = parseInt(e.dataTransfer.getData('addl-idx'))
                                         if (isNaN(fromIdx) || fromIdx === idx) return
-                                        const reordered = [...qAdditional]
-                                        const [moved] = reordered.splice(fromIdx, 1)
-                                        reordered.splice(idx, 0, moved)
+                                        // Reorder within the filtered subset
+                                        const reorderedFiltered = [...selectedItems]
+                                        const [moved] = reorderedFiltered.splice(fromIdx, 1)
+                                        reorderedFiltered.splice(idx, 0, moved)
+                                        // Rebuild full array: keep non-filtered items in place, replace filtered items in new order
+                                        const nonFiltered = qAdditional.filter(qa => !filteredAddIds.has(qa.hullAdditionalConditionId))
+                                        const reordered = [...reorderedFiltered.map(r => qAdditional.find(qa => qa.hullAdditionalConditionId === r.hullAdditionalConditionId)!), ...nonFiltered]
                                         setQAdditional(reordered)
                                         await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, reordered.map(mapAddForSave))
                                     }}
