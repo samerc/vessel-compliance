@@ -220,15 +220,21 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
     }
 
     // Filter warranties by quotation type scope
-    const typeCode = quotation.quotationTypeCode?.toLowerCase() === 'h' ? 'hull' : quotation.quotationTypeCode?.toLowerCase() === 'w' ? 'war' : 'pi'
-    const visibleWarranties = allWarranties.filter(w => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(typeCode))
+    const qTypeCode = quotation.quotationTypeCode?.toLowerCase() || 'p'
+    const typeCode = qTypeCode === 'h' ? 'hull' : qTypeCode === 'w' ? 'war' : qTypeCode === 'c' ? 'cargo' : 'pi'
+    const isCargo = qTypeCode === 'c'
+    const visibleWarranties = allWarranties.filter(w => {
+        // Exclude cargo-related warranties from non-cargo quotations
+        if (!isCargo && w.isCargoRelated) return false
+        return !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(typeCode)
+    })
 
     const getTabWarranties = () => {
         if (activeTab === 'all') return visibleWarranties
-        if (activeTab === 'untagged') return visibleWarranties.filter(w => !(w.tagIds || []).length && !w.isCargoRelated)
+        if (activeTab === 'untagged') return visibleWarranties.filter(w => !(w.tagIds || []).length && !(isCargo && w.isCargoRelated))
         const tag = tags.find(t => t.id === activeTab)
         const isCargoTag = tag && tag.name.toLowerCase() === 'cargo'
-        return visibleWarranties.filter(w => (w.tagIds || []).includes(activeTab) || (isCargoTag && w.isCargoRelated))
+        return visibleWarranties.filter(w => (w.tagIds || []).includes(activeTab) || (isCargo && isCargoTag && w.isCargoRelated))
     }
 
     const tabWarranties = getTabWarranties()

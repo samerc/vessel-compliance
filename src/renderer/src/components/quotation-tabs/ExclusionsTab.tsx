@@ -89,12 +89,13 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         }
     }
 
-    // Check if any cargo clause is selected
-    const hasCargoClause = allClauses.some(c => c.isCargoRelated && selectedClauseIds.has(c.id))
+    // Check if any cargo clause is selected (only relevant for cargo quotations)
+    const isCargo = quotation.quotationTypeCode?.toLowerCase() === 'c'
+    const hasCargoClause = isCargo || allClauses.some(c => c.isCargoRelated && selectedClauseIds.has(c.id))
 
-    // Filter: hide cargo-related exclusions when no cargo clauses selected
+    // Filter: hide cargo-related exclusions from non-cargo quotations
     const visibleExclusions = allExclusions.filter(e => {
-        if (e.isCargoRelated && !hasCargoClause) return false
+        if (e.isCargoRelated && !isCargo && !hasCargoClause) return false
         return true
     })
 
