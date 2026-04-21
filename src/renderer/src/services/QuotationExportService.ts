@@ -1760,8 +1760,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     // War P&I Excess: per-vessel Section 1 + Section 2 premiums
     const warExcessPrem = q.quotationTypeCode === 'W' && q.warExcessEnabled
     if (warExcessPrem) {
-      const s1Rate = q.premiumRate || 0
-      const s2Rate = q.warExcessRate || 0
+      const s1Rate = q.premiumRate ?? data.warSettings?.defaultRate ?? 0
+      const s2Rate = q.warExcessRate ?? data.warSettings?.defaultExcessRate ?? 0
       const wCur = q.premiumCurrency || q.agreedValueCurrency || 'USD'
       for (const v of data.quotationVessels) {
         const vi = getVesselInfo(v, data.allVessels, data.flagStates)
@@ -3940,8 +3940,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       // War P&I Excess: per-vessel Section 1 + Section 2 premiums
       const dWarExcessPrem = wq.quotationTypeCode === 'W' && wq.warExcessEnabled
       if (dWarExcessPrem) {
-        const dS1Rate = wq.premiumRate || 0
-        const dS2Rate = wq.warExcessRate || 0
+        const dS1Rate = wq.premiumRate ?? data.warSettings?.defaultRate ?? 0
+        const dS2Rate = wq.warExcessRate ?? data.warSettings?.defaultExcessRate ?? 0
         for (const v of data.quotationVessels) {
           const vi = getVesselInfo(v, data.allVessels, data.flagStates)
           const s1Amt = v.agreedValue ?? wq.agreedValue ?? 0
