@@ -1841,9 +1841,10 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         } else {
           if (pdfPremLines.length > 1) premText += 'Technical Premium\n'
           for (const l of pdfPremLines) {
-            premText += `${l.label || 'Technical Premium'}  ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
+            premText += `${l.label || 'Technical Premium'}  ${fc(l.tech)}${pa}${prevSuffix(l) || prevQSuffix}\n`
           }
-          if (pdfPremLines.length > 1) premText += '\nPayable Premium\n'
+          premText += '\n'
+          if (pdfPremLines.length > 1) premText += 'Payable Premium\n'
           for (const l of pdfPremLines) {
             premText += `${l.label || 'Payable Premium'}  ${fc(computePayable(l.tech))}${pa}\n`
           }
@@ -1861,7 +1862,6 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           }
         }
       }
-      premText += '\n'
     } else if (pdfPremLines.length === 1) {
       premText += `${formatCurrency(pdfPremLines[0].tech, q.premiumCurrency)} per annum${prevSuffix(pdfPremLines[0]) || prevQSuffix}\n\n`
     }
@@ -4001,9 +4001,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const rows: TableRow[] = []
           rows.push(premRow(lines.length > 1 ? 'Technical Premium' : '', ''))
           for (const l of lines) {
-            rows.push(premRow(l.label || 'Technical Premium', formatCurrency(l.tech, wq.premiumCurrency)))
+            const prevText = wq.previousPremiumAmount != null && wq.previousPremiumAmount !== l.tech && lines.length === 1 ? ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})` : ''
+            rows.push(premRow(l.label || 'Technical Premium', `${formatCurrency(l.tech, wq.premiumCurrency)}${prevText}`))
           }
-          rows.push(premRow('', ''))
           rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', ''))
           for (const l of lines) {
             rows.push(premRow(l.label || 'Payable Premium', formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)))
