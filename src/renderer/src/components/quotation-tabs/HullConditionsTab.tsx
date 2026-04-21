@@ -1341,11 +1341,15 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     onAmountBlur={saveAdditionalOverrides}
                 />
                 {/* Reorder selected additional conditions */}
-                {qAdditional.length >= 2 && (() => {
-                    const selectedItems = qAdditional.map(qa => {
-                        const def = allAdditional.find(a => a.id === qa.hullAdditionalConditionId)
-                        return { ...qa, title: def?.title || '', text: def?.text || '' }
-                    })
+                {(() => {
+                    const filteredAddIds = new Set(filteredAdditional.map(a => a.id))
+                    const selectedItems = qAdditional
+                        .filter(qa => filteredAddIds.has(qa.hullAdditionalConditionId))
+                        .map(qa => {
+                            const def = allAdditional.find(a => a.id === qa.hullAdditionalConditionId)
+                            return { ...qa, title: def?.title || '', text: def?.text || '' }
+                        })
+                    if (selectedItems.length < 2) return null
                     return (
                         <div style={{ marginTop: '16px', borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`, paddingTop: '12px' }}>
                             <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Export Order (drag to reorder)</label>
