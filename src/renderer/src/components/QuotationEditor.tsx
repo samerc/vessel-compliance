@@ -321,8 +321,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         const warnings: string[] = []
         const typeCode = quotation.quotationTypeCode
 
-        // Premium — required for all types except cargo rate mode
-        if (typeCode !== 'C' || quotation.premiumType !== 'rate') {
+        // Premium — required for all types except cargo rate mode and war excess (auto-calculated from rates)
+        if ((typeCode !== 'C' || quotation.premiumType !== 'rate') && !(typeCode === 'W' && quotation.warExcessEnabled)) {
             // Check if premium is set on quotation level OR on alternatives/vessels/value options
             let hasPremium = quotation.premiumAmount != null && quotation.premiumAmount !== 0
             if (!hasPremium && typeCode === 'P') {
