@@ -10817,8 +10817,8 @@ export class MySQLAdapter {
                     // Look up address from entity_addresses if available
                     let addrText = ''
                     if (a.entityId) {
-                        const [addrRows] = await this.pool.query('SELECT address_text FROM entity_addresses WHERE entity_id = ? LIMIT 1', [a.entityId])
-                        if ((addrRows as any[]).length > 0) addrText = (addrRows as any[])[0].address_text || ''
+                        const [addrRows] = await this.pool.query('SELECT address_line1 FROM entity_addresses WHERE entity_id = ? LIMIT 1', [a.entityId])
+                        if ((addrRows as any[]).length > 0) addrText = (addrRows as any[])[0].address_line1 || ''
                     }
                     await this.pool.execute(`
                         INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text, \`order\`)
