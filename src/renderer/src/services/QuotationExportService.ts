@@ -1398,7 +1398,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   }
 
   // Sum Insured / Limits (War)
-  if (data.quotation.quotationTypeCode === 'W' && data.quotation.agreedValue != null) {
+  if (data.quotation.quotationTypeCode === 'W' && (data.quotation.agreedValue != null || data.quotation.warExcessEnabled)) {
     const wCur = data.quotation.agreedValueCurrency || 'USD'
     if (data.quotation.warExcessEnabled) {
       // Interest section
@@ -3313,7 +3313,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   }
 
   // ---- Sum Insured / Interest (War) ----
-  if (data.quotation.quotationTypeCode === 'W' && data.quotation.agreedValue != null) {
+  if (data.quotation.quotationTypeCode === 'W' && (data.quotation.agreedValue != null || data.quotation.warExcessEnabled)) {
     const dWCur = data.quotation.agreedValueCurrency || 'USD'
     if (data.quotation.warExcessEnabled) {
       // Interest section
