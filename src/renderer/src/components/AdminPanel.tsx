@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
@@ -1332,6 +1332,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             { id: 'fileTypes', label: 'File Upload Security', icon: <Shield size={16} />, adminOnly: true },
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
             { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
+            { id: 'filePaths', label: 'File Paths', icon: <FolderOpen size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
         ] : []),
     ]
@@ -2674,6 +2675,9 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             </section>
             )}
 
+            {/* File Path Settings */}
+            {effectiveSection === 'filePaths' && <FilePathSettingsSection showSuccess={showSuccess} showError={showError} />}
+
             {/* 6. Database Configuration */}
             {effectiveSection === 'dbConfig' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
@@ -3898,3 +3902,79 @@ function PolicyExportSettings() {
     )
 }
 
+function FilePathSettingsSection({ showSuccess, showError }: { showSuccess: (m: string) => void; showError: (m: string) => void }) {
+    const [localPath, setLocalPath] = useState('')
+    const [networkPath, setNetworkPath] = useState('')
+    const [isRemote, setIsRemote] = useState(false)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        ;(async () => {
+            try {
+                const s = await window.api.filePathGetSettings()
+                setLocalPath(s.localPath || '')
+                setNetworkPath(s.networkPath || '')
+                setIsRemote(s.isRemoteUser)
+            } catch {}
+            finally { setLoading(false) }
+        })()
+    }, [])
+
+    const handleSave = async () => {
+        try {
+            await window.api.filePathSetSettings({ localPath: localPath.trim(), networkPath: networkPath.trim() })
+            showSuccess('File path settings saved')
+        } catch (e: any) { showError(e.message || 'Failed to save') }
+    }
+
+    if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+    return (
+        <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+            <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FolderOpen size={20} color="var(--accent-primary)" /> File Path Settings
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Configure file paths for remote access. When a user connects to the database remotely (not localhost), the app
+                automatically replaces the local path with the network path when opening files, and reverses it when saving.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '600px' }}>
+                <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        Local Path (server)
+                    </label>
+                    <input
+                        type="text"
+                        value={localPath}
+                        onChange={e => setLocalPath(e.target.value)}
+                        placeholder="e.g. C:\folder1"
+                        style={{ width: '100%' }}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>The path as seen on the server where the database runs.</span>
+                </div>
+                <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        Network Path (UNC share)
+                    </label>
+                    <input
+                        type="text"
+                        value={networkPath}
+                        onChange={e => setNetworkPath(e.target.value)}
+                        placeholder="e.g. \\192.168.10.1\folder1"
+                        style={{ width: '100%' }}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>The UNC path used by remote/VPN users to access the same folder.</span>
+                </div>
+                <div style={{ padding: '10px 14px', borderRadius: '8px', background: isRemote ? 'rgba(255,193,7,0.08)' : 'rgba(0,200,100,0.08)', border: isRemote ? '1px solid rgba(255,193,7,0.2)' : '1px solid rgba(0,200,100,0.2)', fontSize: '0.78rem' }}>
+                    {isRemote
+                        ? <span style={{ color: '#b89500' }}>This machine is connecting remotely — files will be accessed via the network path.</span>
+                        : <span style={{ color: '#00a050' }}>This machine is the server (localhost) — files will be accessed via the local path.</span>
+                    }
+                </div>
+                <button className="btn-primary" onClick={handleSave} style={{ padding: '8px 24px', display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start' }}>
+                    <Save size={14} /> Save
+                </button>
+            </div>
+        </section>
+    )
+}

@@ -11,6 +11,8 @@ export class MySQLAdapter {
     pool: Pool | null = null
     private configPath: string = ''
 
+    getConfigPath(): string { return this.configPath }
+
     setConfigPath(path: string) {
         this.configPath = path
     }

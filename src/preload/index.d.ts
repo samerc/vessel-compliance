@@ -71,6 +71,12 @@ export interface Api {
   updateEntityDocumentExpiry: (entityId: string, documentTypeId: string, expiryDate: string | null) => Promise<void>
   deleteEntityDocument: (entityId: string, documentTypeId: string) => Promise<void>
 
+  // File Path Resolution
+  filePathCanonicalize: (filePath: string) => Promise<string>
+  filePathResolve: (filePath: string) => Promise<string>
+  filePathGetSettings: () => Promise<{ localPath: string; networkPath: string; isRemoteUser: boolean }>
+  filePathSetSettings: (settings: { localPath: string; networkPath: string }) => Promise<{ success: boolean }>
+
   getAssuredRoles: () => Promise<AssuredRole[]>
   addAssuredRole: (role: Omit<AssuredRole, 'id'>) => Promise<AssuredRole>
   updateAssuredRole: (id: string, updates: Partial<AssuredRole>) => Promise<void>
@@ -115,6 +121,7 @@ export interface Api {
   fsExists: (filePath: string) => Promise<boolean>
   fsOpen: (filePath: string) => Promise<void>
   getFilePath: (file: File) => string
+  getFilePathCanonicalized: (file: File) => Promise<string>
 
   dialogOpenFile: () => Promise<string | null>
   dialogOpenImageFile: () => Promise<{ filePath: string; fileName: string } | null>

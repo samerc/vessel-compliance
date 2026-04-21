@@ -49,6 +49,12 @@ const api = {
   updateEntityDocumentExpiry: (entityId: string, documentTypeId: string, expiryDate: string | null) => ipcRenderer.invoke('entityDocs:updateExpiry', entityId, documentTypeId, expiryDate),
   deleteEntityDocument: (entityId: string, documentTypeId: string) => ipcRenderer.invoke('entityDocs:delete', entityId, documentTypeId),
 
+  // File Path Resolution
+  filePathCanonicalize: (filePath: string) => ipcRenderer.invoke('filePath:canonicalize', filePath),
+  filePathResolve: (filePath: string) => ipcRenderer.invoke('filePath:resolve', filePath),
+  filePathGetSettings: () => ipcRenderer.invoke('filePath:getSettings'),
+  filePathSetSettings: (settings: { localPath: string; networkPath: string }) => ipcRenderer.invoke('filePath:setSettings', settings),
+
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),
   addAssuredRole: (role) => ipcRenderer.invoke('db:addAssuredRole', role),
   updateAssuredRole: (id, updates) => ipcRenderer.invoke('db:updateAssuredRole', id, updates),
@@ -93,6 +99,13 @@ const api = {
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   fsOpen: (filePath) => ipcRenderer.invoke('fs:open', filePath),
   getFilePath: (file: File) => webUtils.getPathForFile(file),
+  getFilePathCanonicalized: async (file: File) => {
+    const raw = webUtils.getPathForFile(file)
+    try {
+      const canonical = await ipcRenderer.invoke('filePath:canonicalize', raw)
+      return canonical || raw
+    } catch { return raw }
+  },
 
   dialogOpenFile: () => ipcRenderer.invoke('dialog:openFile'),
   dialogOpenImageFile: () => ipcRenderer.invoke('dialog:openImageFile'),

@@ -15,6 +15,68 @@ import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
 
+// ── File Path Resolution (local ↔ network) ────────────────────────────────────
+let filePathLocal = '' // e.g. C:\folder1
+let filePathNetwork = '' // e.g. \\192.168.10.1\folder1
+let isRemoteUser = false // true when db host is not localhost
+
+function initFilePathSettings(): void {
+  // Determine if this is a remote user from the db config
+  try {
+    const cfgPath = db.getConfigPath?.() || ''
+    if (cfgPath && existsSync(cfgPath)) {
+      const cfg = JSON.parse(readFileSync(cfgPath, 'utf-8'))
+      const host = (cfg.host || '').toLowerCase()
+      isRemoteUser = host !== 'localhost' && host !== '127.0.0.1' && host !== '::1'
+    }
+  } catch { /* default to local */ }
+}
+
+async function loadFilePathSettings(): Promise<void> {
+  try {
+    const raw = await db.getSetting('filePathSettings')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      filePathLocal = (parsed.localPath || '').replace(/[\\/]+$/, '')
+      filePathNetwork = (parsed.networkPath || '').replace(/[\\/]+$/, '')
+    }
+  } catch { /* ignore */ }
+}
+
+/** Resolve a DB path for the current user (local→network for remote users) */
+function resolveFilePath(dbPath: string): string {
+  if (!dbPath || !filePathLocal || !filePathNetwork || !isRemoteUser) return dbPath
+  const normalLocal = normalize(filePathLocal).toLowerCase()
+  const normalDbPath = normalize(dbPath).toLowerCase()
+  if (normalDbPath.startsWith(normalLocal)) {
+    return filePathNetwork + dbPath.substring(filePathLocal.length)
+  }
+  return dbPath
+}
+
+/** Canonicalize a user-selected path to the DB form (network→local for remote users) */
+function canonicalizeFilePath(userPath: string): string {
+  if (!userPath || !filePathLocal || !filePathNetwork) return userPath
+  const normalNetwork = normalize(filePathNetwork).toLowerCase()
+  const normalUserPath = normalize(userPath).toLowerCase()
+  if (normalUserPath.startsWith(normalNetwork)) {
+    return filePathLocal + userPath.substring(filePathNetwork.length)
+  }
+  // If already canonical (local path), keep as-is
+  const normalLocal = normalize(filePathLocal).toLowerCase()
+  if (normalUserPath.startsWith(normalLocal)) return userPath
+  return userPath
+}
+
+/** Check if a file path is on the shared folder (local or network) */
+function isSharedPath(userPath: string): boolean {
+  if (!filePathLocal && !filePathNetwork) return true // no settings = allow all
+  const normalPath = normalize(userPath).toLowerCase()
+  if (filePathLocal && normalPath.startsWith(normalize(filePathLocal).toLowerCase())) return true
+  if (filePathNetwork && normalPath.startsWith(normalize(filePathNetwork).toLowerCase())) return true
+  return false
+}
+
 // Force hardware acceleration even over Remote Desktop (RDP)
 // RDP disables GPU by default, causing fuzzy SVG/text rendering
 app.commandLine.appendSwitch('enable-gpu-rasterization')
@@ -261,6 +323,10 @@ function createWindow(): void {
         } catch (schemaError) {
           console.error('Schema init error (non-fatal):', schemaError)
         }
+        // Load file path resolution settings
+        initFilePathSettings()
+        await loadFilePathSettings()
+
         // Cleanup old activity log entries based on retention setting
         try {
           const retentionDays = await db.getActivityLogRetention()
@@ -572,7 +638,14 @@ app.whenReady().then(() => {
 
   safeHandle('fileTypes:validateFile', async (event, filePath: string) => {
     requireSession(event)
-    return await db.validateFileExtension(filePath)
+    // Block remote users from uploading files outside the shared folder
+    if (isRemoteUser && filePathLocal && filePathNetwork && !isSharedPath(filePath)) {
+      return { valid: false, reason: `Files must be located in the shared folder (${filePathNetwork})` }
+    }
+    const result = await db.validateFileExtension(filePath)
+    // Return canonical path alongside validation so drag-drop uploads use DB-canonical paths
+    if (result.valid) (result as any).canonicalPath = canonicalizeFilePath(filePath)
+    return result
   })
 
   ipcMain.handle('setup:selectDirectory', async (event) => {
@@ -654,6 +727,8 @@ app.whenReady().then(() => {
       if (connected) {
         await db.initSchema()
         await auth.createInitialAdmin()
+        initFilePathSettings()
+        await loadFilePathSettings()
         return { success: true }
       } else {
         // Rollback: delete created file and state
@@ -1559,10 +1634,39 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePaths[0]
   })
 
+  // File path resolution IPC
+  safeHandle('filePath:canonicalize', (event, filePath: string) => {
+    requireSession(event)
+    if (!filePath) return filePath
+    if (isRemoteUser && filePathLocal && filePathNetwork && !isSharedPath(filePath)) {
+      throw new Error(`Files must be located in the shared folder (${filePathNetwork})`)
+    }
+    return canonicalizeFilePath(filePath)
+  })
+
+  safeHandle('filePath:resolve', (event, filePath: string) => {
+    requireSession(event)
+    return resolveFilePath(filePath)
+  })
+
+  safeHandle('filePath:getSettings', (event) => {
+    requireSession(event)
+    return { localPath: filePathLocal, networkPath: filePathNetwork, isRemoteUser }
+  })
+
+  safeHandle('filePath:setSettings', async (event, settings: { localPath: string; networkPath: string }) => {
+    await requirePermission(event, 'admin:settings')
+    filePathLocal = (settings.localPath || '').replace(/[\\/]+$/, '')
+    filePathNetwork = (settings.networkPath || '').replace(/[\\/]+$/, '')
+    await db.setSetting('filePathSettings', JSON.stringify({ localPath: filePathLocal, networkPath: filePathNetwork }))
+    initFilePathSettings()
+    return { success: true }
+  })
+
   safeHandle('shell:showItemInFolder', (event, filePath: string) => {
     requireSession(event)
     if (typeof filePath !== 'string' || !filePath) return
-    shell.showItemInFolder(normalize(filePath))
+    shell.showItemInFolder(normalize(resolveFilePath(filePath)))
   })
 
   // War Breach Records
@@ -1613,7 +1717,11 @@ app.whenReady().then(() => {
     if (typeof filePath !== 'string' || !filePath) {
       throw new Error('Invalid file path')
     }
-    const normalized = normalize(filePath)
+    const resolved = resolveFilePath(filePath)
+    const normalized = normalize(resolved)
+    if (!existsSync(normalized)) {
+      throw new Error('File not accessible. Check your network connection.')
+    }
     const validation = await db.validateFileExtension(normalized)
     if (!validation.valid) {
       throw new Error(validation.reason || 'File type not allowed')
@@ -1647,7 +1755,12 @@ app.whenReady().then(() => {
         { name: 'All Files', extensions: ['*'] }
       ]
     })
-    return result.canceled ? null : result.filePaths[0]
+    if (result.canceled) return null
+    const filePath = result.filePaths[0]
+    if (isRemoteUser && filePathLocal && filePathNetwork && !isSharedPath(filePath)) {
+      throw new Error(`Files must be located in the shared folder (${filePathNetwork})`)
+    }
+    return canonicalizeFilePath(filePath)
   })
 
   // Excel Import Handlers (session required)
