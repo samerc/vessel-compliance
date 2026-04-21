@@ -613,16 +613,18 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 )
             })}
 
-            <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--input-border)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
-                    <input type="checkbox" checked={quotation.anyOtherVessel || false}
-                        onChange={e => {
-                            window.api.updateQuotation(quotation.id, { anyOtherVessel: e.target.checked } as any)
-                            setQ?.(p => ({ ...p, anyOtherVessel: e.target.checked }))
-                        }} />
-                    Any other vessel(s) to be agreed by Insurers in advance
-                </label>
-            </div>
+            {quotation.quotationTypeCode === 'C' && (
+                <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--input-border)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={quotation.anyOtherVessel || false}
+                            onChange={e => {
+                                window.api.updateQuotation(quotation.id, { anyOtherVessel: e.target.checked } as any)
+                                setQ?.(p => ({ ...p, anyOtherVessel: e.target.checked }))
+                            }} style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }} />
+                        Any other vessel(s) to be agreed by Insurers in advance
+                    </label>
+                </div>
+            )}
         </div>
     )
 }
