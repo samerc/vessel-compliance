@@ -124,6 +124,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     } | null>(null)
     const [isLockedByOther, setIsLockedByOther] = useState(false)
     const [lockedByName, setLockedByName] = useState<string | null>(null)
+    const hasEdited = useRef(false)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
@@ -499,6 +500,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         try {
             await window.api.updateQuotation(q.id, { [field]: value } as any)
             setQ(prev => ({ ...prev, [field]: value }))
+            hasEdited.current = true
         } catch (err: any) {
             showError(err.message || 'Failed to update')
         }
@@ -564,14 +566,22 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     // statusColors used for future status display
     void statusColors
 
+    const handleBack = async () => {
+        // If draft quotation with no edits, delete it (abandoned renewal/creation)
+        if (isDraft && !hasEdited.current) {
+            try { await window.api.deleteQuotation(q.id) } catch { /* ignore */ }
+        }
+        onBack()
+    }
+
     return (
         <div className="fade-in">
             {policyContext ? (
-                <button onClick={() => onReturnToPolicy ? onReturnToPolicy(policyContext.policyId) : onBack()} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <button onClick={() => onReturnToPolicy ? onReturnToPolicy(policyContext.policyId) : handleBack()} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                     <ArrowLeft size={18} /> Return to Policy
                 </button>
             ) : (
-                <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <button onClick={handleBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                     <ArrowLeft size={18} /> Back to Quotations
                 </button>
             )}
