@@ -342,10 +342,10 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 } catch {}
             }
             if (!hasPremium) {
-                // Check per-vessel premiums
+                // Check per-vessel premiums (including war excess section premiums)
                 try {
                     const qv = await window.api.getQuotationVessels(quotation.id)
-                    if (Array.isArray(qv) && qv.some((v: any) => v.premiumAmount)) hasPremium = true
+                    if (Array.isArray(qv) && qv.some((v: any) => v.premiumAmount || v.warSection1Premium || v.warSection2Premium)) hasPremium = true
                 } catch {}
             }
             if (!hasPremium && typeCode === 'P') {
@@ -391,8 +391,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             } catch { /* ignore — hull alternatives check is best-effort */ }
         }
 
-        // War: Sum Insured
-        if (typeCode === 'W' && (quotation.agreedValue == null || quotation.agreedValue === 0)) {
+        // War: Sum Insured (skip if war excess — per-vessel values used instead)
+        if (typeCode === 'W' && !quotation.warExcessEnabled && (quotation.agreedValue == null || quotation.agreedValue === 0)) {
             warnings.push('Sum Insured is not set')
         }
 
