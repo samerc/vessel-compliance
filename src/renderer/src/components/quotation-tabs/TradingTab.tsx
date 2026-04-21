@@ -198,8 +198,8 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
                 )}
             </div>
 
-            {/* Section E: Custom Exclusion Text */}
-            <div style={sectionStyle}>
+            {/* Section E: Custom Exclusion Text (not for P&I) */}
+            {quotation.quotationTypeCode !== 'P' && <div style={sectionStyle}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Custom Trading Section (optional)</label>
                 {templates.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
@@ -228,7 +228,7 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
                     minHeight={60}
                     showFontSize showAlignment showLineSpacing
                 />
-            </div>
+            </div>}
 
             {/* Country Management */}
             <h4 style={{ fontSize: '0.95rem', marginTop: '20px', marginBottom: '10px' }}>Country Lists</h4>
