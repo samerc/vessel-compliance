@@ -397,7 +397,8 @@ function fmtPct(val: number | string): string {
 function formatCurrency(amount: number | undefined, currency: string | undefined): string {
   if (amount == null) return '-'
   const c = currency || 'USD'
-  return `${c} ${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  const isWhole = Number.isInteger(amount)
+  return `${c} ${amount.toLocaleString('en-US', { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`
 }
 
 function formatAmountOnly(amount: number | undefined): string {
