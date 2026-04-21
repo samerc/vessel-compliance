@@ -4,7 +4,7 @@ import { Quotation, Vessel, QuotationVessel } from '../../../../shared/types'
 
 const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
 
-export default function VesselTab({ quotation, vessels, showSuccess, showError, isLight, onVesselsChanged }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean; onVesselsChanged?: () => void }) {
+export default function VesselTab({ quotation, vessels, showSuccess, showError, isLight, onVesselsChanged, setQ }: { quotation: Quotation; vessels: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; isLight?: boolean; onVesselsChanged?: () => void; setQ?: (fn: (p: Quotation) => Quotation) => void }) {
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [showAddForm, setShowAddForm] = useState(false)
     const [addMode, setAddMode] = useState<'existing' | 'new' | 'fleet'>('existing')
@@ -613,17 +613,16 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                 )
             })}
 
-            {quotation.quotationTypeCode === 'C' && (
-                <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--input-border)' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
-                        <input type="checkbox" checked={quotation.anyOtherVessel || false}
-                            onChange={e => {
-                                window.api.updateQuotation(quotation.id, { anyOtherVessel: e.target.checked } as any)
-                            }} />
-                        Any other vessel(s) to be agreed by Insurers in advance
-                    </label>
-                </div>
-            )}
+            <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--input-border)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={quotation.anyOtherVessel || false}
+                        onChange={e => {
+                            window.api.updateQuotation(quotation.id, { anyOtherVessel: e.target.checked } as any)
+                            setQ?.(p => ({ ...p, anyOtherVessel: e.target.checked }))
+                        }} />
+                    Any other vessel(s) to be agreed by Insurers in advance
+                </label>
+            </div>
         </div>
     )
 }

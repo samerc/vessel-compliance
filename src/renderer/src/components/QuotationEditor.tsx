@@ -1152,7 +1152,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     </div>
                 )}
                 {activeTab === 'insured' && <InsuredTab key={vesselVersion} quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
-                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} isLight={isLight} onVesselsChanged={() => setVesselVersion(v => v + 1)} />}
+                {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} isLight={isLight} onVesselsChanged={() => setVesselVersion(v => v + 1)} setQ={setQ} />}
                 {activeTab === 'agreedValue' && <AgreedValueTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
                 {activeTab === 'liability' && <LiabilityTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'sumInsured' && <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />}

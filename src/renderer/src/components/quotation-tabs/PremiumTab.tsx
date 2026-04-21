@@ -293,6 +293,33 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 )
                             })}
                         </div>
+                    ) : quotation.quotationTypeCode === 'C' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '80px' }}>Rate (%)</label>
+                                <input type="number" step="0.0001" value={quotation.premiumRate ?? ''} onChange={e => {
+                                    const rate = parseFloat(e.target.value) || undefined
+                                    const insVal = quotation.insuredValueAmount || 0
+                                    const calcPrem = rate && insVal ? Math.round(insVal * rate / 100 * 100) / 100 : undefined
+                                    setQ(p => ({ ...p, premiumRate: rate, premiumAmount: calcPrem }))
+                                }} onBlur={e => {
+                                    const rate = parseFloat(e.target.value) || null
+                                    updateField('premiumRate', rate)
+                                    const insVal = quotation.insuredValueAmount || 0
+                                    const calcPrem = rate && insVal ? Math.round(insVal * rate / 100 * 100) / 100 : null
+                                    updateField('premiumAmount', calcPrem)
+                                }} placeholder="e.g. 0.15" style={{ flex: 1, maxWidth: '140px' }} />
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', opacity: 0.6 }}>%</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '80px' }}>Premium</label>
+                                <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} placeholder="Calculated from rate" style={{ flex: 1, maxWidth: '200px' }} />
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency}</span>
+                                {quotation.insuredValueAmount && quotation.premiumRate ? (
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.7 }}>({quotation.premiumRate}% of {currency} {quotation.insuredValueAmount.toLocaleString()})</span>
+                                ) : null}
+                            </div>
+                        </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
