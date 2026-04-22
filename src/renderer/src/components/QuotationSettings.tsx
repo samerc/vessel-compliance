@@ -261,11 +261,28 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
     const [editId, setEditId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
     const [editCode, setEditCode] = useState('')
+    const [startSeq, setStartSeq] = useState('')
+    const [currentSeq, setCurrentSeq] = useState('')
 
-    useEffect(() => { load() }, [])
+    useEffect(() => { load(); loadSeq() }, [])
     const load = async () => {
         const res = await window.api.getQuotationTypes()
         setTypes(Array.isArray(res) ? res : [])
+    }
+    const loadSeq = async () => {
+        try {
+            const cur = await window.api.getSetting('real_quotation_seq')
+            const start = await window.api.getSetting('quotation_start_seq')
+            setCurrentSeq(cur || '0')
+            setStartSeq(start || '')
+        } catch {}
+    }
+    const saveStartSeq = async () => {
+        try {
+            await window.api.setSetting('quotation_start_seq', startSeq.trim() || '0')
+            showSuccess('Starting serial number saved')
+            loadSeq()
+        } catch (e: any) { showError(e.message || 'Failed') }
     }
 
     const handleAdd = async () => {
@@ -310,7 +327,7 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
                 <Tag size={18} /> Quotation Types
             </h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                Manage the types of quotations available. Each type has a short code used in auto-generated reference numbers (e.g. Q/P/1).
+                Manage the types of quotations available. Each type has a short code used in auto-generated reference numbers (e.g. Q/P/26/1).
             </p>
 
             {/* Add form */}
@@ -391,6 +408,19 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
                     ))}
                 </tbody>
             </table>
+
+            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--table-border)' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Reference Number Sequence</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+                    Reference format: Q/{'{code}'}/{'{year}'}/{'{serial}'}. Set the starting serial number for new quotations. Current last assigned: <strong>{currentSeq || '0'}</strong>
+                </p>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Start from:</label>
+                    <input type="number" value={startSeq} onChange={e => setStartSeq(e.target.value)} placeholder="e.g. 100" style={{ width: '120px', padding: '6px 10px' }} />
+                    <button className="btn-primary" onClick={saveStartSeq} style={{ padding: '6px 16px', fontSize: '0.8rem' }}>Save</button>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Next quotation will get serial {Math.max(parseInt(currentSeq || '0') || 0, parseInt(startSeq || '0') || 0) + 1}</span>
+                </div>
+            </div>
         </div>
     )
 }

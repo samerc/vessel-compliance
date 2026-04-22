@@ -8148,10 +8148,14 @@ export class MySQLAdapter {
 
         // Get next real sequential number from app_settings
         const curSeq = await this.getSetting('real_quotation_seq')
-        const nextSeq = (parseInt(curSeq || '0', 10) || 0) + 1
+        const startSeq = await this.getSetting('quotation_start_seq')
+        const currentNum = parseInt(curSeq || '0', 10) || 0
+        const startNum = parseInt(startSeq || '0', 10) || 0
+        const nextSeq = Math.max(currentNum, startNum) + 1
         await this.setSetting('real_quotation_seq', String(nextSeq))
 
-        const referenceNumber = `Q/${typeCode}/${nextSeq}`
+        const year = String(new Date().getFullYear()).slice(-2)
+        const referenceNumber = `Q/${typeCode}/${year}/${nextSeq}`
         await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [referenceNumber, quotationId])
         return referenceNumber
     }
