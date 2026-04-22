@@ -414,6 +414,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
     const [classDropdownOpen, setClassDropdownOpen] = useState(false)
     const [classSearch, setClassSearch] = useState('')
+    const [classConfirm, setClassConfirm] = useState<{ show: boolean; newId: string; newName: string } | null>(null)
     const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
     const [flagSearch, setFlagSearch] = useState('')
     const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
@@ -849,11 +850,16 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                                     key={cs.id}
                                                                     onMouseDown={e => {
                                                                         e.preventDefault()
-                                                                        setVesselClassificationIds(prev => {
-                                                                            const next = new Set(prev)
-                                                                            if (checked) next.delete(cs.id); else next.add(cs.id)
-                                                                            return next
-                                                                        })
+                                                                        if (checked) {
+                                                                            // Unchecking — always allow
+                                                                            setVesselClassificationIds(prev => { const next = new Set(prev); next.delete(cs.id); return next })
+                                                                        } else if (vesselClassificationIds.size > 0) {
+                                                                            // Adding when one exists — ask replace or add
+                                                                            setClassConfirm({ show: true, newId: cs.id, newName: cs.abbreviation || cs.name })
+                                                                        } else {
+                                                                            // Adding first class — just add
+                                                                            setVesselClassificationIds(prev => new Set(prev).add(cs.id))
+                                                                        }
                                                                     }}
                                                                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
                                                                 >
@@ -2221,6 +2227,31 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     showError={showError}
                 />
             )}
+
+            {/* Classification replace/add modal */}
+            {classConfirm?.show && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => setClassConfirm(null)}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+                        onClick={e => e.stopPropagation()}>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Change Classification</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                            This vessel already has a classification assigned. Do you want to replace it with <strong>{classConfirm.newName}</strong> or add it alongside?
+                        </p>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button className="btn-secondary" onClick={() => setClassConfirm(null)} style={{ padding: '8px 16px' }}>Cancel</button>
+                            <button className="btn-secondary" onClick={() => {
+                                setVesselClassificationIds(prev => new Set(prev).add(classConfirm.newId))
+                                setClassConfirm(null)
+                            }} style={{ padding: '8px 16px' }}>Add Alongside</button>
+                            <button className="btn-primary" onClick={() => {
+                                setVesselClassificationIds(new Set([classConfirm.newId]))
+                                setClassConfirm(null)
+                            }} style={{ padding: '8px 16px' }}>Replace</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -2823,6 +2854,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                     onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
                 />
             )}
+
         </div>
     )
 }
