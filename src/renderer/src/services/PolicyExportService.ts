@@ -1023,7 +1023,13 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
     warSettings: (warSettingsRaw && !(warSettingsRaw as any).error) ? warSettingsRaw : null,
-    surveyWarranties: Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) : [],
+    surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => ({
+      ...sw,
+      text: (sw.text || '')
+        .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
+        .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
+        .replace(/\{event\}/g, sw.eventValue || '{event}')
+    })),
     companyName: reportSettings.companyName || 'Insurance Company',
     assuredGroups: Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : [],
     customSections: Array.isArray(customSectionsRaw) ? customSectionsRaw : [],
