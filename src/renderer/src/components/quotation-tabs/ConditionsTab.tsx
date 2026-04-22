@@ -5,6 +5,7 @@ import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
 
 export default function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
+    const [subTab, setSubTab] = useState<'clauses' | 'additional'>('clauses')
     const [allClauses, setAllClauses] = useState<PIClause[]>([])
     const [clauseSets, setClauseSets] = useState<PIClauseSet[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -273,104 +274,114 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
 
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>P&I Conditions (Clauses)</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
-                Select the P&I conditions and clauses. Use clause set presets for quick selection. Override descriptions as needed.
-            </p>
-            {clauseSets.length > 0 && (
-                <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Presets:</span>
-                    {clauseSets.map(cs => (
-                        <button key={cs.id} onClick={() => applySet(cs.id)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }}>{cs.name}</button>
-                    ))}
-                </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
-                {allClauses.map(c => {
-                    const checked = isClauseCheckedForAlt(c.id)
-                    return (
-                    <div key={c.id} style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)', background: checked ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                            <input type="checkbox" checked={checked} onChange={() => toggleClause(c.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
-                            <span style={{ fontWeight: 600, fontSize: '0.85rem', minWidth: '60px' }}>Cl. {c.clauseNumber}</span>
-                            <span style={{ fontSize: '0.85rem' }}>{c.name}</span>
-                            {c.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
-                            {getOverride(c.id) && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)' }}>(edited)</span>}
-                        </label>
-                        {checked && (c.description || getOverride(c.id)) && (
-                            <div style={{ marginTop: '6px', marginLeft: '32px' }}>
-                                <input
-                                    type="text"
-                                    value={getOverride(c.id) ?? c.description ?? ''}
-                                    onChange={e => setDescOverrides(prev => ({ ...prev, [overrideKey(c.id)]: e.target.value }))}
-                                    onBlur={e => updateDescOverride(c.id, e.target.value)}
-                                    placeholder="Clause description..."
-                                    style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
-                                />
-                            </div>
-                        )}
-                        {checked && !selectedPIAltId && (
-                            <div style={{ paddingLeft: '30px' }}>
-                                <VesselScopeChips vessels={qVessels} vesselScope={clauseVesselScopes[c.id]} onChange={scope => updateClauseScope(c.id, scope)} />
-                                <AlternativeScopeChips alternatives={piAlternatives} currentAltId={clauseAltIds[c.id] || null} onChangeAltId={altId => updateClauseAltId(c.id, altId)} />
-                            </div>
-                        )}
-                    </div>
-                )})}
+            {/* Sub-tab bar */}
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '2px solid var(--table-border)', paddingBottom: '0' }}>
+                <button onClick={() => setSubTab('clauses')} style={{ padding: '8px 18px', fontSize: '0.88rem', fontWeight: 600, border: 'none', borderBottom: subTab === 'clauses' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: subTab === 'clauses' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px', transition: 'color 0.15s' }}>
+                    Clauses <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '6px' }}>{selectedIds.size}</span>
+                </button>
+                <button onClick={() => setSubTab('additional')} style={{ padding: '8px 18px', fontSize: '0.88rem', fontWeight: 600, border: 'none', borderBottom: subTab === 'additional' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: subTab === 'additional' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px', transition: 'color 0.15s' }}>
+                    Additional Clauses <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '6px' }}>{additionalClauses.length}</span>
+                </button>
             </div>
 
-            <h4 style={{ fontSize: '0.9rem', marginBottom: '10px' }}>Additional Clauses</h4>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                {additionalClauseSets.length > 0 && (
-                    <>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Presets:</span>
-                        {additionalClauseSets.map(s => (
-                            <button key={s.id} onClick={() => applyAdditionalSet(s.id)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }}>{s.name}</button>
-                        ))}
-                        <span style={{ color: 'var(--table-border)', fontSize: '0.7rem' }}>|</span>
-                    </>
-                )}
-                {allAdditional.length > 0 && (() => {
-                    const alreadyIds = new Set(additionalClauses.map((ac: any) => ac.piAdditionalClauseId))
-                    return (
-                    <select
-                        onChange={e => { if (e.target.value) { addAdditionalClause(e.target.value); e.target.value = '' } }}
-                        style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)', fontSize: '0.83rem' }}
-                        value=""
-                    >
-                        <option value="">Add individual clause…</option>
-                        {allAdditional.map(ac => {
-                            const added = alreadyIds.has(ac.id)
+            {/* Clauses sub-tab */}
+            {subTab === 'clauses' && (
+                <div>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                        Select the P&I conditions and clauses. Use clause set presets for quick selection. Override descriptions as needed.
+                    </p>
+                    {clauseSets.length > 0 && (
+                        <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Presets:</span>
+                            {clauseSets.map(cs => (
+                                <button key={cs.id} onClick={() => applySet(cs.id)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }}>{cs.name}</button>
+                            ))}
+                        </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {allClauses.map(c => {
+                            const checked = isClauseCheckedForAlt(c.id)
                             return (
-                            <option key={ac.id} value={ac.id} disabled={added} style={added ? { color: 'var(--text-secondary)' } : undefined}>
-                                {added ? '\u2713 ' : ''}{ac.title ? `${ac.title} — ` : ''}{ac.code ? `[${ac.code}] ` : ''}{ac.text.substring(0, 70)}{ac.text.length > 70 ? '…' : ''}
-                            </option>
+                            <div key={c.id} style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)', background: checked ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={checked} onChange={() => toggleClause(c.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+                                    <span style={{ fontWeight: 600, fontSize: '0.85rem', minWidth: '60px' }}>Cl. {c.clauseNumber}</span>
+                                    <span style={{ fontSize: '0.85rem' }}>{c.name}</span>
+                                    {c.isCargoRelated && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 180, 0, 0.15)', color: '#ffb400' }}>Cargo</span>}
+                                    {getOverride(c.id) && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)' }}>(edited)</span>}
+                                </label>
+                                {checked && (c.description || getOverride(c.id)) && (
+                                    <div style={{ marginTop: '6px', marginLeft: '32px' }}>
+                                        <input type="text" value={getOverride(c.id) ?? c.description ?? ''} onChange={e => setDescOverrides(prev => ({ ...prev, [overrideKey(c.id)]: e.target.value }))} onBlur={e => updateDescOverride(c.id, e.target.value)} placeholder="Clause description..." style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                                    </div>
+                                )}
+                                {checked && !selectedPIAltId && (
+                                    <div style={{ paddingLeft: '30px' }}>
+                                        <VesselScopeChips vessels={qVessels} vesselScope={clauseVesselScopes[c.id]} onChange={scope => updateClauseScope(c.id, scope)} />
+                                        <AlternativeScopeChips alternatives={piAlternatives} currentAltId={clauseAltIds[c.id] || null} onChangeAltId={altId => updateClauseAltId(c.id, altId)} />
+                                    </div>
+                                )}
+                            </div>
                         )})}
-                    </select>
-                )})()}
-            </div>
-            {additionalClauses.map((ac: any) => {
-                const def = allAdditional.find(a => a.id === ac.piAdditionalClauseId)
-                const code = def?.code || ''
-                const text = ac.customText || def?.text || ''
-                return (
-                    <div key={ac.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                            <span style={{ color: 'var(--accent-primary)', fontFamily: 'monospace', fontSize: '0.9rem', flexShrink: 0, marginTop: '1px' }}>-</span>
-                            <span style={{ flex: 1, fontSize: '0.83rem', whiteSpace: 'pre-wrap' }}>
-                                {def?.title && <span style={{ fontWeight: 600, marginRight: '8px', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{def.title}</span>}
-                                {code && <span style={{ fontWeight: 700, marginRight: '6px', color: 'var(--text-primary)' }}>{code}</span>}
-                                {text}
-                            </span>
-                            <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
-                        </div>
-                        <div style={{ paddingLeft: '30px' }}>
-                            <VesselScopeChips vessels={qVessels} vesselScope={ac.vesselScope} onChange={scope => updateAdditionalClauseScope(ac.id, scope)} />
-                        </div>
                     </div>
-                )
-            })}
-            {additionalClauses.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No additional clauses added yet.</p>}
+                </div>
+            )}
+
+            {/* Additional Clauses sub-tab */}
+            {subTab === 'additional' && (
+                <div>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                        Additional clauses appended after the main conditions in exports. Use presets or add individually.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {additionalClauseSets.length > 0 && (
+                            <>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Presets:</span>
+                                {additionalClauseSets.map(s => (
+                                    <button key={s.id} onClick={() => applyAdditionalSet(s.id)} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }}>{s.name}</button>
+                                ))}
+                                <span style={{ color: 'var(--table-border)', fontSize: '0.7rem' }}>|</span>
+                            </>
+                        )}
+                        {allAdditional.length > 0 && (() => {
+                            const alreadyIds = new Set(additionalClauses.map((ac: any) => ac.piAdditionalClauseId))
+                            return (
+                            <select onChange={e => { if (e.target.value) { addAdditionalClause(e.target.value); e.target.value = '' } }} style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)', fontSize: '0.83rem' }} value="">
+                                <option value="">Add individual clause…</option>
+                                {allAdditional.map(ac => {
+                                    const added = alreadyIds.has(ac.id)
+                                    return (
+                                    <option key={ac.id} value={ac.id} disabled={added} style={added ? { color: 'var(--text-secondary)' } : undefined}>
+                                        {added ? '\u2713 ' : ''}{ac.title ? `${ac.title} — ` : ''}{ac.code ? `[${ac.code}] ` : ''}{ac.text.substring(0, 70)}{ac.text.length > 70 ? '…' : ''}
+                                    </option>
+                                )})}
+                            </select>
+                        )})()}
+                    </div>
+                    {additionalClauses.map((ac: any) => {
+                        const def = allAdditional.find(a => a.id === ac.piAdditionalClauseId)
+                        const code = def?.code || ''
+                        const text = ac.customText || def?.text || ''
+                        return (
+                            <div key={ac.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                    <span style={{ color: 'var(--accent-primary)', fontFamily: 'monospace', fontSize: '0.9rem', flexShrink: 0, marginTop: '1px' }}>-</span>
+                                    <span style={{ flex: 1, fontSize: '0.83rem', whiteSpace: 'pre-wrap' }}>
+                                        {def?.title && <span style={{ fontWeight: 600, marginRight: '8px', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{def.title}</span>}
+                                        {code && <span style={{ fontWeight: 700, marginRight: '6px', color: 'var(--text-primary)' }}>{code}</span>}
+                                        {text}
+                                    </span>
+                                    <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
+                                </div>
+                                <div style={{ paddingLeft: '30px' }}>
+                                    <VesselScopeChips vessels={qVessels} vesselScope={ac.vesselScope} onChange={scope => updateAdditionalClauseScope(ac.id, scope)} />
+                                </div>
+                            </div>
+                        )
+                    })}
+                    {additionalClauses.length === 0 && <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No additional clauses added yet. Default clauses are auto-selected on first load.</p>}
+                </div>
+            )}
         </div>
     )
 }
