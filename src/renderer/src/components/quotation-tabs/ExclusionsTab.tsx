@@ -227,6 +227,25 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Exclusions</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Select exclusions for this quotation. If an exclusion applies to multiple alternatives, select it separately for each alternative.</p>
 
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <button className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }} onClick={async () => {
+                    const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+                    for (const e of visibleExclusions) {
+                        if (!selectedIds.has(e.id)) await window.api.addQuotationExclusion(quotation.id, e.id, altId)
+                    }
+                    const qe = await window.api.getQuotationExclusions(quotation.id)
+                    setSelectedRows(Array.isArray(qe) ? qe : [])
+                }}>Select All</button>
+                <button className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }} onClick={async () => {
+                    const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+                    const toRemove = altId ? selectedRows.filter((r: any) => r.alternativeId === altId) : selectedRows
+                    for (const r of toRemove) await window.api.deleteQuotationExclusion(r.id)
+                    const qe = await window.api.getQuotationExclusions(quotation.id)
+                    setSelectedRows(Array.isArray(qe) ? qe : [])
+                }}>Deselect All</button>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center' }}>{selectedIds.size} of {visibleExclusions.length} selected</span>
+            </div>
+
             {hiddenCargoCount > 0 && (
                 <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(255, 180, 0, 0.08)', border: '1px solid rgba(255, 180, 0, 0.3)', marginBottom: '12px', fontSize: '0.82rem', color: '#ffb400', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <AlertTriangle size={14} />

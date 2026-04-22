@@ -184,7 +184,8 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
             {/* Deductibles list */}
             {deductibles.map((d, i) => (
                 <div key={d.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', ...altStyle(d.alternativeId) }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                    {/* Row 1: reorder + title + amounts + actions */}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
                         <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
                             <button onClick={() => moveDeductible(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={12} /></button>
                             <button onClick={() => moveDeductible(i, 'down')} disabled={i === deductibles.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === deductibles.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={12} /></button>
@@ -194,24 +195,29 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         {!(qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts)) && (
                             <input type="number" defaultValue={d.amount} onBlur={e => handleUpdate(d.id, { amount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Prev:</span>
-                            <input type="number" defaultValue={d.previousAmount ?? ''} onBlur={e => handleUpdate(d.id, { previousAmount: parseFloat(e.target.value) || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
-                        </div>
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
                                 <input type="number" defaultValue={d.secondaryAmount || 0} onBlur={e => handleUpdate(d.id, { secondaryAmount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Prev:</span>
-                                    <input type="number" defaultValue={d.previousSecondaryAmount ?? ''} onBlur={e => handleUpdate(d.id, { previousSecondaryAmount: parseFloat(e.target.value) || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
-                                </div>
                             </>
                         )}
                         {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>custom</span>}
                         <div style={{ flex: 1 }} />
                         <button onClick={() => { setEditingDescId(editingDescId === d.id ? null : d.id); setEditDescText(d.description) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
                         <button onClick={async () => { await window.api.deleteQuotationDeductible(d.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
+                    </div>
+                    {/* Row 2: previous amounts (compact, secondary) */}
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingLeft: '24px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous:</span>
+                            <input type="number" defaultValue={d.previousAmount ?? ''} onBlur={e => handleUpdate(d.id, { previousAmount: parseFloat(e.target.value) || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
+                        </div>
+                        {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous 2nd:</span>
+                                <input type="number" defaultValue={d.previousSecondaryAmount ?? ''} onBlur={e => handleUpdate(d.id, { previousSecondaryAmount: parseFloat(e.target.value) || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
+                            </div>
+                        )}
                     </div>
                     {/* Per-vessel amount inputs */}
                     {qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts) && (
