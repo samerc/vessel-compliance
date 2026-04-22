@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, X, RefreshCw, Users, Ship, GitBranch } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, X, RefreshCw, Users, Ship, GitBranch } from 'lucide-react'
 import { Quotation, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationVessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
@@ -274,7 +274,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     const [qAdditional, setQAdditional] = useState<QuotationHullAdditionalCondition[]>([])
     const [customConditions, setCustomConditions] = useState<{ id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]>([])
     const [newCustomText, setNewCustomText] = useState('')
-    const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({ conditions: true, additional: false, custom: false })
+    const [hullSubTab, setHullSubTab] = useState<'conditions' | 'additional' | 'custom'>('conditions')
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [selectedVesselScope, setSelectedVesselScope] = useState<string | null>(null) // null = "All Vessels"
     const [addOverrideOpen, setAddOverrideOpen] = useState(false)
@@ -927,6 +927,20 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     ))}
                 </div>
             )}
+            {/* Sub-tab bar */}
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', borderBottom: '2px solid var(--table-border)', paddingBottom: '0' }}>
+                <button onClick={() => setHullSubTab('conditions')} style={{ padding: '8px 16px', fontSize: '0.86rem', fontWeight: 600, border: 'none', borderBottom: hullSubTab === 'conditions' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: hullSubTab === 'conditions' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px' }}>
+                    Conditions
+                </button>
+                <button onClick={() => setHullSubTab('additional')} style={{ padding: '8px 16px', fontSize: '0.86rem', fontWeight: 600, border: 'none', borderBottom: hullSubTab === 'additional' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: hullSubTab === 'additional' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px' }}>
+                    Additional Conditions <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '4px' }}>{filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length}</span>
+                </button>
+                <button onClick={() => setHullSubTab('custom')} style={{ padding: '8px 16px', fontSize: '0.86rem', fontWeight: 600, border: 'none', borderBottom: hullSubTab === 'custom' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: hullSubTab === 'custom' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px' }}>
+                    Custom <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '4px' }}>{customConditions.length}</span>
+                </button>
+            </div>
+
+            <div style={{ display: hullSubTab !== 'conditions' ? 'none' : undefined }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Hull Conditions</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1312,18 +1326,10 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     </div>
                 </>
             )}
-        {/* Additional Conditions — collapsible section */}
-        {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
-            <div style={{ borderTop: '1px solid var(--table-border)', marginTop: '12px', paddingTop: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: sectionExpanded.additional ? '8px' : 0 }}
-                    onClick={() => setSectionExpanded(prev => ({ ...prev, additional: !prev.additional }))}>
-                    <ChevronRight size={14} style={{ transform: sectionExpanded.additional ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Additional Conditions</span>
-                    <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600, background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>
-                        {filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length}/{filteredAdditional.length}
-                    </span>
-                </div>
-                {sectionExpanded.additional && (<>
+            </div>
+        {/* Additional Conditions — sub-tab */}
+        {hullSubTab === 'additional' && (
+            <div>
                 <HullConditionPicker
                     label=""
                     items={filteredAdditional.map(ac => ({ id: ac.id, label: ac.title || '', text: ac.text, hasAmount: ac.hasAmount, amountPlaceholder: ac.amountPlaceholder }))}
@@ -1387,20 +1393,13 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                         </div>
                     )
                 })()}
-                </>)}
+
             </div>
         )}
 
-        {/* Custom Additional Conditions — collapsible section */}
-        {!isVesselEmptyState && !isSharedEmptyState && selectedVesselScope === null && (
-            <div style={{ borderTop: '1px solid var(--table-border)', marginTop: '12px', paddingTop: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: sectionExpanded.custom ? '8px' : 0 }}
-                    onClick={() => setSectionExpanded(prev => ({ ...prev, custom: !prev.custom }))}>
-                    <ChevronRight size={14} style={{ transform: sectionExpanded.custom ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-secondary)' }} />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Custom Conditions</span>
-                    {customConditions.length > 0 && <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600, background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>{customConditions.length}</span>}
-                </div>
-                {sectionExpanded.custom && (<>
+        {/* Custom Additional Conditions — sub-tab */}
+        {hullSubTab === 'custom' && (
+            <div>
                 {/* Add new custom condition */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <textarea
@@ -1453,7 +1452,6 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 {customConditions.length === 0 && (
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '4px 0' }}>No custom conditions added.</div>
                 )}
-                </>)}
             </div>
         )}
         </div>
