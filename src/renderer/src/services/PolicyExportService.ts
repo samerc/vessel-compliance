@@ -2139,6 +2139,20 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
     }
   }
 
+  // 2b. Outstanding premium notice
+  if (wq.outstandingPremiumEnabled && wq.outstandingPremiumText) {
+    content.push(new Paragraph({
+      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({
+        text: wq.outstandingPremiumText,
+        size: POL_FONT_SIZE, font: 'Arial', color: '000000',
+        bold: wq.outstandingPremiumBold !== false,
+        underline: wq.outstandingPremiumUnderline !== false ? {} : undefined
+      })]
+    }))
+    content.push(polEmptyP())
+  }
+
   // 3. Additional premium text
   if (wq.premiumAdditionalText) { content.push(...polMp(wq.premiumAdditionalText)); content.push(polEmptyP()) }
 

@@ -779,6 +779,7 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
   const [daIntroSingleText, setDaIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
   const [caCommText, setCaCommText] = useState('Commission payable in {instalments} instalments:')
   const [caCommSingleText, setCaCommSingleText] = useState('Commission payable on {date}.')
+  const [outstandingText, setOutstandingText] = useState('All outstanding premium to be settled prior inception')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -793,6 +794,7 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
           if (parsed.debitAdviceIntroSingleText) setDaIntroSingleText(parsed.debitAdviceIntroSingleText)
           if (parsed.creditAdviceCommissionText) setCaCommText(parsed.creditAdviceCommissionText)
           if (parsed.creditAdviceCommissionSingleText) setCaCommSingleText(parsed.creditAdviceCommissionSingleText)
+          if (parsed.outstandingPremiumDefaultText) setOutstandingText(parsed.outstandingPremiumDefaultText)
         }
       } catch { /* default */ }
       finally { setLoading(false) }
@@ -803,10 +805,10 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText }))
       showSuccess('Premium intro text saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText }))
       showSuccess('Premium intro text saved')
     }
   }
@@ -857,6 +859,12 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Single Instalment — Placeholder: {'{date}'}</label>
         <textarea value={caCommSingleText} onChange={e => setCaCommSingleText(e.target.value)} rows={2} style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }} />
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--table-border)', marginTop: '24px', paddingTop: '20px' }}>
+        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Outstanding Premium Notice</h4>
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>Default text when the outstanding premium notice is enabled on a quotation.</p>
+        <textarea value={outstandingText} onChange={e => setOutstandingText(e.target.value)} rows={2} style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }} />
       </div>
 
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>

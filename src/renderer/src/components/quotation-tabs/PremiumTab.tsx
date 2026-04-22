@@ -738,6 +738,44 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 )}
             </div>
 
+            {/* Outstanding premium notice */}
+            <div style={{ marginBottom: '20px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', marginBottom: quotation.outstandingPremiumEnabled ? '10px' : '0' }}>
+                    <input type="checkbox" checked={quotation.outstandingPremiumEnabled || false}
+                        onChange={async e => {
+                            const enabled = e.target.checked
+                            setQ(p => ({ ...p, outstandingPremiumEnabled: enabled }))
+                            updateField('outstandingPremiumEnabled', enabled)
+                            if (enabled && !quotation.outstandingPremiumText) {
+                                try {
+                                    const raw = await window.api.getSetting('policyExportSettings')
+                                    const defaultText = raw ? JSON.parse(raw).outstandingPremiumDefaultText : null
+                                    const text = defaultText || 'All outstanding premium to be settled prior inception'
+                                    setQ(p => ({ ...p, outstandingPremiumText: text }))
+                                    updateField('outstandingPremiumText', text)
+                                } catch {}
+                            }
+                        }}
+                        style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }} />
+                    Outstanding premium notice
+                </label>
+                {quotation.outstandingPremiumEnabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <input type="text" value={quotation.outstandingPremiumText || ''} onChange={e => setQ(p => ({ ...p, outstandingPremiumText: e.target.value }))} onBlur={e => updateField('outstandingPremiumText', e.target.value)} placeholder="All outstanding premium to be settled prior inception" style={{ width: '100%', maxWidth: '600px' }} />
+                        <div style={{ display: 'flex', gap: '16px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" checked={quotation.outstandingPremiumBold !== false} onChange={e => { setQ(p => ({ ...p, outstandingPremiumBold: e.target.checked })); updateField('outstandingPremiumBold', e.target.checked) }} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+                                Bold
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" checked={quotation.outstandingPremiumUnderline !== false} onChange={e => { setQ(p => ({ ...p, outstandingPremiumUnderline: e.target.checked })); updateField('outstandingPremiumUnderline', e.target.checked) }} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+                                Underline
+                            </label>
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* Additional premium instructions */}
             <div style={{ marginBottom: '20px' }}>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Additional premium instructions</label>

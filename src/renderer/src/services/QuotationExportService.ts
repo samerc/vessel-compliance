@@ -1901,6 +1901,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
       if (data.instalments.length > 0) premText += '\n'
     }
+    if (q.outstandingPremiumEnabled && q.outstandingPremiumText) premText += q.outstandingPremiumText + '\n\n'
     if (q.premiumAdditionalText) premText += stripHtml(q.premiumAdditionalText) + '\n\n'
     if (st(data, 'premiumCondition')) premText += stripHtml(st(data, 'premiumCondition')) + '\n\n'
     if (st(data, 'premiumEarned')) premText += stripHtml(st(data, 'premiumEarned')) + '\n\n'
@@ -4074,6 +4075,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
         premContent.push(emptyP())
       }
+    }
+    if (wq.outstandingPremiumEnabled && wq.outstandingPremiumText) {
+      premContent.push(new Paragraph({
+        spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+        children: [new TextRun({
+          text: wq.outstandingPremiumText,
+          size: 22, font: 'Arial', color: '000000',
+          bold: wq.outstandingPremiumBold !== false,
+          underline: wq.outstandingPremiumUnderline !== false ? {} : undefined
+        })]
+      }))
+      premContent.push(emptyP())
     }
     if (wq.premiumAdditionalText) { premContent.push(...mp(wq.premiumAdditionalText)); premContent.push(emptyP()) }
     if (st(data, 'premiumCondition')) { premContent.push(...mp(st(data, 'premiumCondition'))); premContent.push(emptyP()) }
