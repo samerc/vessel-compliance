@@ -1137,6 +1137,9 @@ export interface Quotation {
   voyageText?: string
   cargoClauseId?: string
   previousPremiumAmount?: number | null
+  isProRata?: boolean
+  annualPremiumAmount?: number | null
+  proRataMonths?: number | null
   outstandingPremiumEnabled?: boolean
   outstandingPremiumText?: string | null
   outstandingPremiumBold?: boolean

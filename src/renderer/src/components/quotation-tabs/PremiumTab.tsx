@@ -1,8 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Quotation, QuotationInstalment, QuotationPIAlternative, QuotationHullAlternative, QuotationVessel, PISectionTexts, InstalmentDefaults, PremiumTextTemplate, HullClause, QuotationAgreedValueOption, WarSettings } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './shared'
+
+/** Parse periodText to extract number of months. Returns null if unparseable. */
+function parsePeriodMonths(text: string | undefined): number | null {
+    if (!text) return null
+    const t = text.toLowerCase().trim()
+    // "12 months", "6 months from...", "3 months"
+    const monthsMatch = t.match(/(\d+)\s*months?/)
+    if (monthsMatch) return parseInt(monthsMatch[1])
+    // "1 year", "2 years", "1 year 3 months"
+    const yearMonthMatch = t.match(/(\d+)\s*years?\s*(?:(?:and\s*)?(\d+)\s*months?)?/)
+    if (yearMonthMatch) {
+        const years = parseInt(yearMonthMatch[1])
+        const months = yearMonthMatch[2] ? parseInt(yearMonthMatch[2]) : 0
+        return years * 12 + months
+    }
+    return null
+}
 
 export default function PremiumTab({ quotation, updateField, setQ, getEffectiveText }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [instalments, setInstalments] = useState<QuotationInstalment[]>([])
@@ -117,6 +134,26 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
             updateField('nonRefundablePercent', 25)
         }
     }
+
+    // Pro-rata: auto-detect from periodText
+    const isCargo = quotation.quotationTypeCode === 'C'
+    const proRataDetectRan = useRef(false)
+    useEffect(() => {
+        if (isCargo || proRataDetectRan.current) return
+        proRataDetectRan.current = true
+        const months = parsePeriodMonths(quotation.periodText)
+        if (months !== null && months < 12 && !quotation.isProRata) {
+            setQ(p => ({ ...p, isProRata: true, proRataMonths: months }))
+            updateField('isProRata', true)
+            updateField('proRataMonths', months)
+        } else if (months !== null && months >= 12 && quotation.isProRata && !quotation.annualPremiumAmount) {
+            setQ(p => ({ ...p, isProRata: false }))
+            updateField('isProRata', false)
+        }
+    }, [quotation.periodText])
+
+    const proRataMonths = quotation.proRataMonths || parsePeriodMonths(quotation.periodText) || 0
+    const computeProRata = (annual: number) => proRataMonths > 0 ? Math.round(annual / 12 * proRataMonths * 100) / 100 : 0
 
     const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled
     const ncbType = quotation.ncbDiscountType || 'percentage'
@@ -322,23 +359,71 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>
-                                    {quotation.quotationTypeCode === 'H' && quotation.ivEnabled ? 'Section A (H&M)' : quotation.quotationTypeCode === 'H' ? 'H&M' : premiumLabel}
-                                </label>
-                                <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
-                                  <label style={{ fontSize: '0.72rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous:</label>
-                                  <input type="number" value={quotation.previousPremiumAmount ?? ''} onChange={e => setQ(p => ({ ...p, previousPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('previousPremiumAmount', parseFloat(e.target.value) || null)} placeholder="—" style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }} />
-                                </div>
-                            </div>
-                            {quotation.quotationTypeCode === 'H' && quotation.ivEnabled && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Section B (IV)</label>
-                                    <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
-                                </div>
+                            {quotation.isProRata ? (
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Annual Premium</label>
+                                        <input type="number" value={quotation.annualPremiumAmount ?? ''} onChange={e => {
+                                            const annual = parseFloat(e.target.value) || undefined
+                                            const proRata = annual ? computeProRata(annual) : undefined
+                                            setQ(p => ({ ...p, annualPremiumAmount: annual, premiumAmount: proRata }))
+                                        }} onBlur={e => {
+                                            const annual = parseFloat(e.target.value) || null
+                                            updateField('annualPremiumAmount', annual)
+                                            const proRata = annual ? computeProRata(annual) : null
+                                            updateField('premiumAmount', proRata)
+                                        }} placeholder="Full year amount" style={{ flex: 1, maxWidth: '200px' }} />
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+                                            <label style={{ fontSize: '0.72rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous:</label>
+                                            <input type="number" value={quotation.previousPremiumAmount ?? ''} onChange={e => setQ(p => ({ ...p, previousPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('previousPremiumAmount', parseFloat(e.target.value) || null)} placeholder="—" style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }} />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', background: 'rgba(0,170,200,0.04)' }}>
+                                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Pro-Rata Premium</label>
+                                        <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} placeholder="Calculated" style={{ flex: 1, maxWidth: '200px' }} />
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency}</span>
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.7 }}>({proRataMonths} months)</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Period (months):</label>
+                                        <input type="number" step="0.5" value={quotation.proRataMonths ?? ''} onChange={e => {
+                                            const m = parseFloat(e.target.value) || undefined
+                                            setQ(p => ({ ...p, proRataMonths: m }))
+                                        }} onBlur={e => {
+                                            const m = parseFloat(e.target.value) || null
+                                            updateField('proRataMonths', m)
+                                            if (m && quotation.annualPremiumAmount) {
+                                                const proRata = Math.round(quotation.annualPremiumAmount / 12 * m * 100) / 100
+                                                setQ(p => ({ ...p, premiumAmount: proRata }))
+                                                updateField('premiumAmount', proRata)
+                                            }
+                                        }} style={{ width: '70px', padding: '4px 8px', fontSize: '0.82rem' }} />
+                                        <button onClick={() => { setQ(p => ({ ...p, isProRata: false })); updateField('isProRata', false) }} style={{ fontSize: '0.72rem', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Disable pro-rata</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>
+                                            {quotation.quotationTypeCode === 'H' && quotation.ivEnabled ? 'Section A (H&M)' : quotation.quotationTypeCode === 'H' ? 'H&M' : premiumLabel}
+                                        </label>
+                                        <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+                                            <label style={{ fontSize: '0.72rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous:</label>
+                                            <input type="number" value={quotation.previousPremiumAmount ?? ''} onChange={e => setQ(p => ({ ...p, previousPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('previousPremiumAmount', parseFloat(e.target.value) || null)} placeholder="—" style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }} />
+                                        </div>
+                                    </div>
+                                    {quotation.quotationTypeCode === 'H' && quotation.ivEnabled && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                                            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Section B (IV)</label>
+                                            <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
+                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                        </div>
+                                    )}
+                                    <button onClick={() => { setQ(p => ({ ...p, isProRata: true, proRataMonths: parsePeriodMonths(quotation.periodText) || undefined })); updateField('isProRata', true); updateField('proRataMonths', parsePeriodMonths(quotation.periodText) || null) }} style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline', alignSelf: 'flex-start' }}>Enable pro-rata premium</button>
+                                </>
                             )}
                         </div>
                     )}

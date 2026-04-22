@@ -1864,7 +1864,12 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         }
       }
     } else if (pdfPremLines.length === 1) {
-      premText += `${formatCurrency(pdfPremLines[0].tech, q.premiumCurrency)} per annum${prevSuffix(pdfPremLines[0]) || prevQSuffix}\n\n`
+      if (q.isProRata && q.annualPremiumAmount) {
+        premText += `${formatCurrency(q.annualPremiumAmount, q.premiumCurrency)} per annum${prevQSuffix}\n`
+        premText += `Pro-rata premium: ${formatCurrency(pdfPremLines[0].tech, q.premiumCurrency)}\n\n`
+      } else {
+        premText += `${formatCurrency(pdfPremLines[0].tech, q.premiumCurrency)} per annum${prevSuffix(pdfPremLines[0]) || prevQSuffix}\n\n`
+      }
     }
     const numInst = q.numInstalments || 1
     const firstInstDays = data.instalments.length > 0 ? data.instalments[0].daysFromInception : 0
@@ -4023,13 +4028,23 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         premContent.push(emptyP())
       } else if (!dWarExcessPrem) {
         // Single premium, no discount — plain bold text (skip if war excess already rendered)
-        const premChanged = origData && origData.quotation.premiumAmount !== wq.premiumAmount
-        const singlePremRuns: TextRun[] = [new TextRun({ text: `${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: premChanged ? RED : '000000' })]
-        if (wq.previousPremiumAmount != null && wq.previousPremiumAmount !== (wq.premiumAmount || 0)) {
-          singlePremRuns.push(new TextRun({ text: ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+        if (wq.isProRata && wq.annualPremiumAmount) {
+          const annualRuns: TextRun[] = [new TextRun({ text: `${formatCurrency(wq.annualPremiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: '000000' })]
+          if (wq.previousPremiumAmount != null && wq.previousPremiumAmount !== wq.annualPremiumAmount) {
+            annualRuns.push(new TextRun({ text: ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+          }
+          premContent.push(new Paragraph({ children: annualRuns }))
+          premContent.push(new Paragraph({ children: [new TextRun({ text: `Pro-rata premium: ${formatCurrency(wq.premiumAmount, wq.premiumCurrency)}`, size: 22, font: 'Arial', bold: true, color: '000000' })] }))
+          premContent.push(emptyP())
+        } else {
+          const premChanged = origData && origData.quotation.premiumAmount !== wq.premiumAmount
+          const singlePremRuns: TextRun[] = [new TextRun({ text: `${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: premChanged ? RED : '000000' })]
+          if (wq.previousPremiumAmount != null && wq.previousPremiumAmount !== (wq.premiumAmount || 0)) {
+            singlePremRuns.push(new TextRun({ text: ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+          }
+          premContent.push(new Paragraph({ children: singlePremRuns }))
+          premContent.push(emptyP())
         }
-        premContent.push(new Paragraph({ children: singlePremRuns }))
-        premContent.push(emptyP())
       }
     }
     const wNumInst = wq.numInstalments || 1

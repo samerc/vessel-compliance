@@ -3073,7 +3073,7 @@ export class MySQLAdapter {
                 }
             } catch {}
 
-            // Migration: outstanding premium fields on quotations
+            // Migration: outstanding premium + pro-rata fields on quotations
             try {
                 const [opCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'outstanding_premium_enabled'") as any[]
                 if ((opCol as any[]).length === 0) {
@@ -3081,6 +3081,14 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN outstanding_premium_text TEXT NULL")
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN outstanding_premium_bold BOOLEAN DEFAULT TRUE")
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN outstanding_premium_underline BOOLEAN DEFAULT TRUE")
+                }
+            } catch {}
+            try {
+                const [prCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'is_pro_rata'") as any[]
+                if ((prCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN is_pro_rata BOOLEAN DEFAULT FALSE")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN annual_premium_amount DECIMAL(15,2) NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN pro_rata_months DECIMAL(5,1) NULL")
                 }
             } catch {}
 
@@ -7782,6 +7790,9 @@ export class MySQLAdapter {
                 q.voyage_text,
                 q.cargo_clause_id as cargoClauseId,
                 q.previous_premium_amount as previousPremiumAmount,
+                q.is_pro_rata as isProRata,
+                q.annual_premium_amount as annualPremiumAmount,
+                q.pro_rata_months as proRataMonths,
                 q.outstanding_premium_enabled as outstandingPremiumEnabled,
                 q.outstanding_premium_text as outstandingPremiumText,
                 q.outstanding_premium_bold as outstandingPremiumBold,
@@ -7851,6 +7862,9 @@ export class MySQLAdapter {
             warCombinedLimitText: r.war_combined_limit_text || null,
             voyageText: r.voyage_text || null,
             cargoClauseId: r.cargoClauseId || null,
+            isProRata: Boolean(r.isProRata),
+            annualPremiumAmount: r.annualPremiumAmount != null ? Number(r.annualPremiumAmount) : null,
+            proRataMonths: r.proRataMonths != null ? Number(r.proRataMonths) : null,
             outstandingPremiumEnabled: Boolean(r.outstandingPremiumEnabled),
             outstandingPremiumText: r.outstandingPremiumText || null,
             outstandingPremiumBold: r.outstandingPremiumBold != null ? Boolean(r.outstandingPremiumBold) : true,
@@ -7941,6 +7955,9 @@ export class MySQLAdapter {
             voyageText: 'voyage_text',
             cargoClauseId: 'cargo_clause_id',
             previousPremiumAmount: 'previous_premium_amount',
+            isProRata: 'is_pro_rata',
+            annualPremiumAmount: 'annual_premium_amount',
+            proRataMonths: 'pro_rata_months',
             outstandingPremiumEnabled: 'outstanding_premium_enabled',
             outstandingPremiumText: 'outstanding_premium_text',
             outstandingPremiumBold: 'outstanding_premium_bold',
@@ -8638,7 +8655,8 @@ export class MySQLAdapter {
                     port_of_loading, port_of_destination, estimated_departure,
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
                     cargo_clause_id, previous_premium_amount,
-                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline
+                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
+                    is_pro_rata, annual_premium_amount, pro_rata_months
                 )
                 SELECT
                     ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
@@ -8660,7 +8678,8 @@ export class MySQLAdapter {
                     port_of_loading, port_of_destination, estimated_departure,
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
                     cargo_clause_id, premium_amount,
-                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline
+                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
+                    is_pro_rata, annual_premium_amount, pro_rata_months
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newPeriodText, newId, createdBy, policyId, policy.policyNumber || null, source.id])
 
