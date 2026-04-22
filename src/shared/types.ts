@@ -1144,6 +1144,8 @@ export interface Quotation {
   outstandingPremiumText?: string | null
   outstandingPremiumBold?: boolean
   outstandingPremiumUnderline?: boolean
+  fullPremiumLossEnabled?: boolean
+  fullPremiumLossText?: string | null
   createdAt?: string
   updatedAt?: string
   createdBy?: string

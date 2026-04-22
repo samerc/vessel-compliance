@@ -1906,6 +1906,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       if (data.instalments.length > 0) premText += '\n'
     }
     if (q.outstandingPremiumEnabled && q.outstandingPremiumText) premText += q.outstandingPremiumText + '\n\n'
+    if (q.fullPremiumLossEnabled && q.fullPremiumLossText) premText += q.fullPremiumLossText + '\n\n'
     if (q.premiumAdditionalText) premText += stripHtml(q.premiumAdditionalText) + '\n\n'
     if (st(data, 'premiumCondition')) premText += stripHtml(st(data, 'premiumCondition')) + '\n\n'
     if (st(data, 'premiumEarned')) premText += stripHtml(st(data, 'premiumEarned')) + '\n\n'
@@ -4098,6 +4099,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           underline: wq.outstandingPremiumUnderline !== false ? {} : undefined
         })]
       }))
+      premContent.push(emptyP())
+    }
+    if (wq.fullPremiumLossEnabled && wq.fullPremiumLossText) {
+      premContent.push(np(wq.fullPremiumLossText))
       premContent.push(emptyP())
     }
     if (wq.premiumAdditionalText) { premContent.push(...mp(wq.premiumAdditionalText)); premContent.push(emptyP()) }

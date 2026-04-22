@@ -2153,6 +2153,12 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
     content.push(polEmptyP())
   }
 
+  // 2c. Full premium in case of loss
+  if (wq.fullPremiumLossEnabled && wq.fullPremiumLossText) {
+    content.push(polNp(wq.fullPremiumLossText))
+    content.push(polEmptyP())
+  }
+
   // 3. Additional premium text
   if (wq.premiumAdditionalText) { content.push(...polMp(wq.premiumAdditionalText)); content.push(polEmptyP()) }
 

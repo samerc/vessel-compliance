@@ -780,6 +780,7 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
   const [caCommText, setCaCommText] = useState('Commission payable in {instalments} instalments:')
   const [caCommSingleText, setCaCommSingleText] = useState('Commission payable on {date}.')
   const [outstandingText, setOutstandingText] = useState('All outstanding premium to be settled prior inception')
+  const [fullPremiumLossText, setFullPremiumLossText] = useState('Full annual premium payable in case of loss.')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -795,6 +796,7 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
           if (parsed.creditAdviceCommissionText) setCaCommText(parsed.creditAdviceCommissionText)
           if (parsed.creditAdviceCommissionSingleText) setCaCommSingleText(parsed.creditAdviceCommissionSingleText)
           if (parsed.outstandingPremiumDefaultText) setOutstandingText(parsed.outstandingPremiumDefaultText)
+          if (parsed.fullPremiumLossDefaultText) setFullPremiumLossText(parsed.fullPremiumLossDefaultText)
         }
       } catch { /* default */ }
       finally { setLoading(false) }
@@ -805,10 +807,10 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText, fullPremiumLossDefaultText: fullPremiumLossText }))
       showSuccess('Premium intro text saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText }))
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText, fullPremiumLossDefaultText: fullPremiumLossText }))
       showSuccess('Premium intro text saved')
     }
   }
@@ -865,6 +867,10 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
         <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Outstanding Premium Notice</h4>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>Default text when the outstanding premium notice is enabled on a quotation.</p>
         <textarea value={outstandingText} onChange={e => setOutstandingText(e.target.value)} rows={2} style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }} />
+
+        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px', marginTop: '16px' }}>Full Premium in Case of Loss</h4>
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>Default text for the full premium loss notice on pro-rata quotations.</p>
+        <textarea value={fullPremiumLossText} onChange={e => setFullPremiumLossText(e.target.value)} rows={2} style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }} />
       </div>
 
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>

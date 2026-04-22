@@ -861,6 +861,34 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 )}
             </div>
 
+            {/* Full premium in case of loss */}
+            {!isCargo && (
+            <div style={{ marginBottom: '20px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', marginBottom: quotation.fullPremiumLossEnabled ? '10px' : '0' }}>
+                    <input type="checkbox" checked={quotation.fullPremiumLossEnabled || false}
+                        onChange={async e => {
+                            const enabled = e.target.checked
+                            setQ(p => ({ ...p, fullPremiumLossEnabled: enabled }))
+                            updateField('fullPremiumLossEnabled', enabled)
+                            if (enabled && !quotation.fullPremiumLossText) {
+                                try {
+                                    const raw = await window.api.getSetting('policyExportSettings')
+                                    const defaultText = raw ? JSON.parse(raw).fullPremiumLossDefaultText : null
+                                    const text = defaultText || 'Full annual premium payable in case of loss.'
+                                    setQ(p => ({ ...p, fullPremiumLossText: text }))
+                                    updateField('fullPremiumLossText', text)
+                                } catch {}
+                            }
+                        }}
+                        style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }} />
+                    Full premium in case of loss
+                </label>
+                {quotation.fullPremiumLossEnabled && (
+                    <input type="text" value={quotation.fullPremiumLossText || ''} onChange={e => setQ(p => ({ ...p, fullPremiumLossText: e.target.value }))} onBlur={e => updateField('fullPremiumLossText', e.target.value)} placeholder="Full annual premium payable in case of loss." style={{ width: '100%', maxWidth: '600px' }} />
+                )}
+            </div>
+            )}
+
             {/* Additional premium instructions */}
             <div style={{ marginBottom: '20px' }}>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Additional premium instructions</label>

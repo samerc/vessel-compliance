@@ -3091,6 +3091,13 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN pro_rata_months DECIMAL(5,1) NULL")
                 }
             } catch {}
+            try {
+                const [fpCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'full_premium_loss_enabled'") as any[]
+                if ((fpCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN full_premium_loss_enabled BOOLEAN DEFAULT FALSE")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN full_premium_loss_text TEXT NULL")
+                }
+            } catch {}
 
             // Migration: seed entity_document_types + migrate legacy entity file paths
             try {
@@ -7793,6 +7800,8 @@ export class MySQLAdapter {
                 q.is_pro_rata as isProRata,
                 q.annual_premium_amount as annualPremiumAmount,
                 q.pro_rata_months as proRataMonths,
+                q.full_premium_loss_enabled as fullPremiumLossEnabled,
+                q.full_premium_loss_text as fullPremiumLossText,
                 q.outstanding_premium_enabled as outstandingPremiumEnabled,
                 q.outstanding_premium_text as outstandingPremiumText,
                 q.outstanding_premium_bold as outstandingPremiumBold,
@@ -7865,6 +7874,8 @@ export class MySQLAdapter {
             isProRata: Boolean(r.isProRata),
             annualPremiumAmount: r.annualPremiumAmount != null ? Number(r.annualPremiumAmount) : null,
             proRataMonths: r.proRataMonths != null ? Number(r.proRataMonths) : null,
+            fullPremiumLossEnabled: Boolean(r.fullPremiumLossEnabled),
+            fullPremiumLossText: r.fullPremiumLossText || null,
             outstandingPremiumEnabled: Boolean(r.outstandingPremiumEnabled),
             outstandingPremiumText: r.outstandingPremiumText || null,
             outstandingPremiumBold: r.outstandingPremiumBold != null ? Boolean(r.outstandingPremiumBold) : true,
@@ -7962,6 +7973,8 @@ export class MySQLAdapter {
             outstandingPremiumText: 'outstanding_premium_text',
             outstandingPremiumBold: 'outstanding_premium_bold',
             outstandingPremiumUnderline: 'outstanding_premium_underline',
+            fullPremiumLossEnabled: 'full_premium_loss_enabled',
+            fullPremiumLossText: 'full_premium_loss_text',
         }
         const fields: string[] = []
         const values: any[] = []
@@ -8660,7 +8673,8 @@ export class MySQLAdapter {
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
                     cargo_clause_id, previous_premium_amount,
                     outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
-                    is_pro_rata, annual_premium_amount, pro_rata_months
+                    is_pro_rata, annual_premium_amount, pro_rata_months,
+                    full_premium_loss_enabled, full_premium_loss_text
                 )
                 SELECT
                     ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
@@ -8683,7 +8697,8 @@ export class MySQLAdapter {
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
                     cargo_clause_id, premium_amount,
                     outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
-                    is_pro_rata, annual_premium_amount, pro_rata_months
+                    is_pro_rata, annual_premium_amount, pro_rata_months,
+                    full_premium_loss_enabled, full_premium_loss_text
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newPeriodText, newId, createdBy, policyId, policy.policyNumber || null, source.id])
 
