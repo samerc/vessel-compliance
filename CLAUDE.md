@@ -183,11 +183,34 @@ Entity management page (`src/renderer/src/components/EntityDirectory.tsx`) — t
 - **Vessel Navigation**: Clicking vessel names navigates to VesselDetail
 - **Find Duplicates**: Button scans all entities for similar names using Jaro-Winkler similarity with an adjustable threshold slider. Pairs can be merged directly from the results via `mergeEntities` adapter method.
 
-### Entity Documents
-Required documents vary by entity type:
-- **Companies**: Certificate of Incorporation, Articles of Association, KYC
-- **Persons**: ID/Passport only (no KYC required)
-- **UBOs**: Same document requirements based on their type (company or person)
+### Entity Documents (Configurable)
+
+Entity document types are configurable via Admin Panel → Entity Document Types:
+
+- **Tables**: `entity_document_types` (admin-managed types with scope/required/order/active) + `entity_documents` (per-entity records with file_path, expiry, received date; UNIQUE entity_id + document_type_id)
+- **Scope**: Each type has `entity_scope` ('company', 'person', 'both') — only matching types shown for each entity
+- **Seed**: 4 default types on first run (CoI, AoA, KYC for companies; ID/Passport for persons) + migration copies legacy entity column paths
+- **Legacy columns**: `passport_file_path`, `certificate_of_incorporation_path`, `articles_of_association_path`, `kyc_file_path` kept on entities table but no longer used for reads
+- **IPC**: `entityDocTypes:*` for admin CRUD, `entityDocs:*` for per-entity document management
+- **UI**: EntityDirectory slide-in panel + AssuredManager slide-in panel show dynamic document list with upload/replace/delete
+- **Compliance**: Dashboard, Reports (v1+v2), CustomerComplianceReport, VesselDetail copy-missing, SubjectivitiesTab all use dynamic entity_document_types
+- **Remap**: `getEntityFilePaths` / `remapEntityFilePaths` read from entity_documents table
+- **Merge**: `mergeEntities` copies entity_documents from source to target (skip duplicates)
+
+### AssuredManager (Vessel Assureds Page)
+
+Redesigned to table + slide-in panel layout:
+
+- **Left**: Compact assured table with Name, Role, Documents score (e.g. "3/4"), UBO count, action buttons
+- **Right**: Slide-in panel (440px) when a row is clicked showing:
+  - Entity header (icon + name + role + type)
+  - Sanctions badge
+  - Contact info (email/phone)
+  - Role editing
+  - Address selector with add-new
+  - Dynamic document list with upload/replace/delete per doc type
+  - UBOs section — each UBO as a card with doc score, sanctions, documents, delete button
+  - Add UBO form at the bottom
 
 ### Annual Document Compliance Rule
 
@@ -1038,6 +1061,8 @@ Draft quotation references include the policy type code:
 - `user_signatures` - Digital signature images per user
 - `user_column_prefs` - Per-user table column visibility
 - `custom_validation_rules` - Admin-created data quality rules
+- `entity_document_types` - Configurable entity document type definitions (scope, required, order, active)
+- `entity_documents` - Per-entity document records (file_path, expiry, received; UNIQUE entity_id+document_type_id)
 - `entity_addresses` - Multiple addresses per entity
 - `flag_state_ports` - Ports of registry per flag state
 - `quotation_pi_alternatives` - P&I alternatives per quotation
@@ -1092,7 +1117,8 @@ Prevents concurrent editing of the same quotation:
 ### Policy Export Improvements
 
 - **Single instalment**: "Premium of {currency} {amount} shall be payable on {date}..." (configurable in Settings)
-- **Debit/Credit Advice**: Compact header (company only), title size 10 bold underline, 2-column instalment table, premium on one line with words + "Only", period as 3-column table, bank details without title
+- **Debit Advice**: Compact header (company only), title size 10 bold underline, 2-column instalment table, premium on one line with words + "Only", period as 3-column table, bank details without title
+- **Credit Advice**: Broker name+address at top (from quotation customerEntityId), broker excluded from Insured section (+ c/o line cleared), commission wording configurable in Settings (placeholders: `{instalments}`, `{date}`), reduced cell margins
 - **Blue Cards (BBC/WRC)**: NOT TRANSFERABLE left / REF right, 3-column vessel table (label|:|value bold) with FIXED layout, 3-column period table, owner section without border, port includes country
 - **MLC Blue Cards**: Same vessel table design, provider address bold uppercase zero spacing, contact details in 2-column table
 - **Footer**: Strips HTML tags, splits by `<br>`, Arial 9pt left-aligned not italic
@@ -1111,3 +1137,22 @@ Prevents concurrent editing of the same quotation:
 
 - **MoneyInput component**: Shows thousand separators when not focused, raw number while editing
 - **Applied to**: Sum insured amount, per-vessel amounts, Section 2 amount, premium
+
+### File Path Resolution (Remote/VPN Users)
+
+Configurable local↔network path mapping for users connecting via VPN:
+
+- **Admin Settings**: File Paths section with Local Path (server, e.g. `C:\folder1`) and Network Path (UNC, e.g. `\\192.168.10.1\folder1`)
+- **Auto-detection**: Reads `db-config.json` host — `localhost`/`127.0.0.1` = server user, other = remote user
+- **`resolveFilePath(dbPath)`**: Replaces local prefix with network prefix for remote users (used in `fs:open`, `shell:showItemInFolder`)
+- **`canonicalizeFilePath(userPath)`**: Replaces network prefix with local prefix before saving to DB (used in `dialog:openFileAny`)
+- **Upload blocking**: Remote users blocked from uploading files not on the shared folder (`isSharedPath` check)
+- **`fileTypesValidateFile`**: Returns `canonicalPath` alongside validation for drag-drop uploads
+- **Settings stored in**: `app_settings` key `filePathSettings` (JSON: `{ localPath, networkPath }`)
+- **IPC**: `filePath:getSettings`, `filePath:setSettings`, `filePath:canonicalize`, `filePath:resolve`
+
+### Abandoned Draft Quotation Cleanup
+
+- **QuotationEditor**: Tracks edits via `hasEdited` ref, set `true` on any `updateField` call
+- **Back navigation**: If draft (`referenceNumber.startsWith('DRAFT-')`) and no edits made, quotation is auto-deleted
+- **Applies to**: Renewal quotations from PolicyRenewals, new quotations — prevents orphaned empty drafts
