@@ -5,7 +5,7 @@ import { Quotation, Vessel, QuotationVessel, PISectionTexts, PISanctionsVersion,
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Plus, Trash2, ChevronDown, GitBranch, RefreshCw, Lock, MoreHorizontal, Copy, Search, X } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, GitBranch, RefreshCw, Lock, MoreHorizontal, Copy, Search, X, History } from 'lucide-react'
 import { exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
 import InsuredTab from './quotation-tabs/InsuredTab'
@@ -105,13 +105,15 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [revisions, setRevisions] = useState<Quotation[]>([])
     const [showRevisionHistory, setShowRevisionHistory] = useState(false)
     const [reachableSteps, setReachableSteps] = useState<import('../../../shared/types').WorkflowStep[]>([])
+    const [allWorkflowSteps, setAllWorkflowSteps] = useState<import('../../../shared/types').WorkflowStep[]>([])
     const [showStepMenu, setShowStepMenu] = useState(false)
     const [showActionsMenu, setShowActionsMenu] = useState(false)
     const actionsRef = useRef<HTMLDivElement>(null)
     const stepMenuRef = useRef<HTMLButtonElement>(null)
     const [stepComment, setStepComment] = useState('')
     const [showStepCommentModal, setShowStepCommentModal] = useState<string | null>(null)
-    const [_workflowLog, setWorkflowLog] = useState<import('../../../shared/types').QuotationWorkflowLog[]>([])
+    const [workflowLog, setWorkflowLog] = useState<import('../../../shared/types').QuotationWorkflowLog[]>([])
+    const [showWorkflowLog, setShowWorkflowLog] = useState(false)
     const [piAlternatives, setPiAlternatives] = useState<QuotationPIAlternative[]>([])
     const [selectedPIAltId, setSelectedPIAltId] = useState<string | null>(null)
     const [showDraftExportModal, setShowDraftExportModal] = useState<'pdf' | 'word' | null>(null)
@@ -129,7 +131,10 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
     const isLight = theme === 'light'
-    const canExport = hasPermission('quotations:export')
+    const currentStep = allWorkflowSteps.find(s => s.id === q.workflowStepId)
+    const stepCanEdit = currentStep ? currentStep.canEdit !== false : true
+    const stepCanExport = currentStep ? currentStep.canExport !== false : true
+    const canExport = hasPermission('quotations:export') && stepCanExport
 
     // Lock quotation on mount, unlock on unmount
     useEffect(() => {
@@ -150,7 +155,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         }
     }, [quotation.id])
 
-    const canEdit = hasPermission('quotations:edit') && !isLockedByOther
+    const canEdit = hasPermission('quotations:edit') && !isLockedByOther && stepCanEdit
 
     useEffect(() => {
         loadMasterData()
@@ -194,11 +199,15 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             const groupId = fullQ.revisionGroupId || fullQ.id
             const revs = await window.api.getQuotationRevisions(groupId)
             setRevisions(Array.isArray(revs) ? revs : [])
-            // Load reachable workflow steps
+            // Load workflow steps
             try {
-                const steps = await window.api.workflowGetReachableSteps(fullQ.id)
+                const [steps, allSteps] = await Promise.all([
+                    window.api.workflowGetReachableSteps(fullQ.id),
+                    window.api.workflowGetSteps()
+                ])
                 setReachableSteps(Array.isArray(steps) ? steps : [])
-            } catch { setReachableSteps([]) }
+                setAllWorkflowSteps(Array.isArray(allSteps) ? allSteps : [])
+            } catch { setReachableSteps([]); setAllWorkflowSteps([]) }
             // Load workflow log
             try {
                 const log = await window.api.workflowGetQuotationLog(fullQ.id)
@@ -654,6 +663,20 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 </div>
             )}
 
+            {!stepCanEdit && !isLockedByOther && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 16px', marginBottom: '12px', borderRadius: '8px',
+                    background: isLight ? 'rgba(100,100,255,0.08)' : 'rgba(100,100,255,0.12)',
+                    border: '1px solid rgba(100,100,255,0.3)',
+                    color: isLight ? '#4338ca' : '#818cf8',
+                    fontSize: '0.85rem', fontWeight: 600
+                }}>
+                    <Lock size={16} />
+                    Editing is disabled at the &quot;{currentStep?.name}&quot; workflow step.
+                </div>
+            )}
+
             {/* Type title */}
             {q.quotationTypeName && (
                 <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: isLight ? '#007a91' : '#00aac8', margin: '0 0 14px', letterSpacing: '0.02em' }}>
@@ -746,6 +769,25 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     </div>
                                 </>,
                                 document.body
+                            )}
+                        </div>
+                    )}
+                    {/* Workflow log toggle */}
+                    {workflowLog.length > 0 && (
+                        <div style={{ position: 'relative' }}>
+                            <button onClick={() => setShowWorkflowLog(!showWorkflowLog)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px' }} title="Workflow history">
+                                <History size={13} /> {workflowLog.length}
+                            </button>
+                            {showWorkflowLog && (
+                                <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, marginTop: '4px', padding: '10px', background: isLight ? '#ffffff' : '#1e222a', border: '1px solid var(--glass-border)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.4)', minWidth: '280px', maxHeight: '200px', overflowY: 'auto' }}>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Workflow History</div>
+                                    {workflowLog.map(entry => (
+                                        <div key={entry.id} style={{ fontSize: '0.75rem', padding: '4px 0', borderBottom: '1px solid var(--table-border)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <div><span style={{ fontWeight: 600 }}>{entry.fromStepName || '—'}</span> → <span style={{ fontWeight: 600 }}>{entry.toStepName}</span></div>
+                                            <div style={{ color: 'var(--text-secondary)' }}>{entry.username} · {new Date(entry.createdAt).toLocaleDateString()}{entry.comment ? ` · "${entry.comment}"` : ''}</div>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     )}

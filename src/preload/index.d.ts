@@ -807,7 +807,7 @@ export interface Api {
   workflowGetSteps: () => Promise<WorkflowStep[]>
   workflowAddStep: (step: { name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }) => Promise<WorkflowStep>
   workflowUpdateStep: (id: string, updates: Partial<{ name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }>) => Promise<void>
-  workflowDeleteStep: (id: string) => Promise<void>
+  workflowDeleteStep: (id: string) => Promise<{ success: boolean; message?: string }>
   workflowReorderSteps: (orderedIds: string[]) => Promise<void>
   workflowGetTransitions: () => Promise<WorkflowTransition[]>
   workflowAddTransition: (t: { fromStepId: string; toStepId: string; permissionKey: string | null; autoCreateRevision: boolean }) => Promise<WorkflowTransition>

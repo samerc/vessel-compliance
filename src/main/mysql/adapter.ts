@@ -7914,13 +7914,19 @@ export class MySQLAdapter {
             }
             referenceNumber = await this.nextDraftRef(typeCode)
         }
+        // Get initial workflow step
+        let initialStepId: string | null = null
+        try {
+            const [stepRows] = await this.pool.query("SELECT id FROM quotation_workflow_steps WHERE is_initial = TRUE ORDER BY order_index LIMIT 1")
+            initialStepId = (stepRows as any[])[0]?.id || null
+        } catch {}
         await this.pool.execute(`
-            INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number, workflow_step_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
         `, [
             id, referenceNumber, q.quotationTypeId || null, q.quotationDate || new Date().toISOString().split('T')[0], q.policyTypeId || null, q.vesselId || null,
             q.isRenewal || false, q.status || 'draft', q.periodText || null, q.validityDays || 14,
-            q.sanctionsClauseVersion || null, q.vdrDeductibleEnabled !== false, q.createdBy || null, id
+            q.sanctionsClauseVersion || null, q.vdrDeductibleEnabled !== false, q.createdBy || null, id, initialStepId
         ])
         return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || null, vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: referenceNumber || '' } as Quotation
     }
@@ -12316,14 +12322,25 @@ export class MySQLAdapter {
         if (updates.isLockPoint !== undefined) { sets.push('is_lock_point = ?'); params.push(updates.isLockPoint) }
         if (updates.isInitial !== undefined) { sets.push('is_initial = ?'); params.push(updates.isInitial) }
         if (sets.length === 0) return
+        // Enforce single initial step
+        if (updates.isInitial === true) {
+            await this.pool.execute('UPDATE quotation_workflow_steps SET is_initial = FALSE WHERE id != ?', [id])
+        }
         params.push(id)
         await this.pool.execute(`UPDATE quotation_workflow_steps SET ${sets.join(', ')} WHERE id = ?`, params)
     }
 
-    async deleteWorkflowStep(id: string): Promise<void> {
-        if (!this.pool) return
+    async deleteWorkflowStep(id: string): Promise<{ success: boolean; message?: string }> {
+        if (!this.pool) return { success: false, message: 'DB not connected' }
+        // Check if any quotations are on this step
+        const [countRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotations WHERE workflow_step_id = ?', [id])
+        const count = (countRows as any[])[0]?.cnt || 0
+        if (count > 0) {
+            return { success: false, message: `Cannot delete: ${count} quotation(s) are currently on this step. Move them to another step first.` }
+        }
         await this.pool.execute('DELETE FROM quotation_workflow_transitions WHERE from_step_id = ? OR to_step_id = ?', [id, id])
         await this.pool.execute('DELETE FROM quotation_workflow_steps WHERE id = ?', [id])
+        return { success: true }
     }
 
     async reorderWorkflowSteps(orderedIds: string[]): Promise<void> {
@@ -12377,20 +12394,32 @@ export class MySQLAdapter {
     // --- Quotation Workflow Actions ---
     async moveQuotationToStep(quotationId: string, toStepId: string, userId: string, username: string, comment?: string): Promise<void> {
         if (!this.pool) return
-        const [qRows] = await this.pool.query('SELECT workflow_step_id FROM quotations WHERE id = ?', [quotationId])
-        const fromStepId = (qRows as any[])[0]?.workflow_step_id || null
-        const [stepRows] = await this.pool.query('SELECT is_lock_point FROM quotation_workflow_steps WHERE id = ?', [toStepId])
+        // Validate target step exists
+        const [stepRows] = await this.pool.query('SELECT id, is_lock_point FROM quotation_workflow_steps WHERE id = ?', [toStepId])
+        if ((stepRows as any[]).length === 0) throw new Error('Target workflow step no longer exists')
         const isLockPoint = Boolean((stepRows as any[])[0]?.is_lock_point)
-        const updates: string[] = ['workflow_step_id = ?']
-        const params: any[] = [toStepId]
-        if (isLockPoint) { updates.push('is_locked = TRUE'); }
-        params.push(quotationId)
-        await this.pool.execute(`UPDATE quotations SET ${updates.join(', ')} WHERE id = ?`, params)
-        // Log workflow action
-        await this.pool.execute(
-            'INSERT INTO quotation_workflow_log (id, quotation_id, from_step_id, to_step_id, user_id, username, comment) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [uuidv4(), quotationId, fromStepId, toStepId, userId, username, comment || null]
-        )
+
+        const conn = await this.pool.getConnection()
+        try {
+            await conn.beginTransaction()
+            const [qRows] = await conn.query('SELECT workflow_step_id FROM quotations WHERE id = ?', [quotationId])
+            const fromStepId = (qRows as any[])[0]?.workflow_step_id || null
+            const updates: string[] = ['workflow_step_id = ?']
+            const params: any[] = [toStepId]
+            if (isLockPoint) { updates.push('is_locked = TRUE') }
+            params.push(quotationId)
+            await conn.execute(`UPDATE quotations SET ${updates.join(', ')} WHERE id = ?`, params)
+            await conn.execute(
+                'INSERT INTO quotation_workflow_log (id, quotation_id, from_step_id, to_step_id, user_id, username, comment) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [uuidv4(), quotationId, fromStepId, toStepId, userId, username, comment || null]
+            )
+            await conn.commit()
+        } catch (err) {
+            await conn.rollback()
+            throw err
+        } finally {
+            conn.release()
+        }
     }
 
     async getQuotationWorkflowLog(quotationId: string): Promise<import('../../shared/types').QuotationWorkflowLog[]> {

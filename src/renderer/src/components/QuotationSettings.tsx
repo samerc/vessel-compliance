@@ -4240,8 +4240,14 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
     }
 
     const handleDeleteStep = async (id: string) => {
+        const step = steps.find(s => s.id === id)
+        if (!confirm(`Delete step "${step?.name || 'this step'}"? This will also remove all transitions involving it.`)) return
         try {
-            await window.api.workflowDeleteStep(id)
+            const result = await window.api.workflowDeleteStep(id)
+            if (result && !(result as any).success) {
+                showError((result as any).message || 'Cannot delete step')
+                return
+            }
             showSuccess('Step deleted')
             loadAll()
         } catch (err: any) { showError(err.message || 'Failed to delete step') }
