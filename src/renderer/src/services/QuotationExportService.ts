@@ -665,9 +665,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   const selectedClauses = data.allClauses.filter(c => data.selectedClauseIds.includes(c.id))
   const ddqCountries = data.excludedCountries.filter(c => c.listType === 'ddq')
   const exclusionTexts = getExclusionTexts(data)
-  const dateStr = data.quotation.quotationDate
-    ? formatDateLong(data.quotation.quotationDate)
-    : ''
+  const dateStr = formatDateLong(new Date().toISOString().split('T')[0])
 
   let startY = 18
 
@@ -698,8 +696,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   doc.text(pdfTitleText, pageWidth / 2, startY, { align: 'center' })
   doc.setFontSize(11)
   doc.setFont('helvetica', 'normal')
+  const refWithRev = (data.quotation.referenceNumber || '-') + (data.quotation.revisionNumber ? `-R${data.quotation.revisionNumber}` : '')
   doc.text(dateStr, pageWidth - margin, startY + 10, { align: 'right' })
-  doc.text(`Ref: ${data.quotation.referenceNumber || '-'}`, margin, startY + 18)
+  doc.text(`Ref: ${refWithRev}`, margin, startY + 18)
 
   // Build two-column sections into a map keyed by section ID
   const sectionMap = new Map<string, [string, string]>()
@@ -2199,9 +2198,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   const sortedWordCustom = [...data.customWarranties].sort((a, b) => a.order - b.order)
   const ddqCountries = data.excludedCountries.filter(c => c.listType === 'ddq')
   const exclusionTexts = getExclusionTexts(data)
-  const dateStr = data.quotation.quotationDate
-    ? formatDateLong(data.quotation.quotationDate)
-    : ''
+  const dateStr = formatDateLong(new Date().toISOString().split('T')[0])
 
   // ---- Renewal change-highlighting: load original quotation data ----
   let origData: QuotationData | null = null
@@ -4345,7 +4342,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }),
     new Paragraph({
       spacing: { after: 200 },
-      children: [new TextRun({ text: `Ref: ${data.quotation.referenceNumber || '-'}`, size: 22, font: 'Arial', color: '000000' })]
+      children: [new TextRun({ text: `Ref: ${data.quotation.referenceNumber || '-'}${data.quotation.revisionNumber ? `-R${data.quotation.revisionNumber}` : ''}`, size: 22, font: 'Arial', color: '000000' })]
     }),
     mainTable,
     ...afterTable
