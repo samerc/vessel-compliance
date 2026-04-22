@@ -645,7 +645,11 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
           background: selectedIds.has(q.id) ? (isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,210,255,0.06)') : undefined
         }}
         className="hover-effect"
-        onClick={() => selectMode ? toggleSelectId(q.id) : onOpenQuotation(q)}
+        onClick={() => {
+          if (selectMode) { toggleSelectId(q.id); return }
+          if (q.lockedBy && q.lockedBy !== user?.id) { showError(`This quotation is locked by ${q.lockedByName || 'another user'}`); return }
+          onOpenQuotation(q)
+        }}
       >
         {selectMode && (
           <td style={{ padding: '12px 6px 12px 14px', width: '30px' }}>
