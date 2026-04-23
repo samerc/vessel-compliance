@@ -263,8 +263,9 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
     const [editCode, setEditCode] = useState('')
     const [startSeq, setStartSeq] = useState('')
     const [currentSeq, setCurrentSeq] = useState('')
+    const [registryPath, setRegistryPath] = useState('')
 
-    useEffect(() => { load(); loadSeq() }, [])
+    useEffect(() => { load(); loadSeq(); loadRegistry() }, [])
     const load = async () => {
         const res = await window.api.getQuotationTypes()
         setTypes(Array.isArray(res) ? res : [])
@@ -276,6 +277,22 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
             setCurrentSeq(cur || '0')
             setStartSeq(start || '')
         } catch {}
+    }
+    const loadRegistry = async () => {
+        try {
+            const path = await window.api.quotationRegistryGetPath()
+            setRegistryPath(path || '')
+        } catch {}
+    }
+    const saveRegistryPath = async () => {
+        try {
+            await window.api.quotationRegistrySetPath(registryPath.trim())
+            showSuccess('Registry path saved')
+        } catch (e: any) { showError(e.message || 'Failed') }
+    }
+    const browseRegistry = async () => {
+        const path = await window.api.quotationRegistryBrowse()
+        if (path) setRegistryPath(path)
     }
     const saveStartSeq = async () => {
         try {
@@ -420,6 +437,19 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
                     <button className="btn-primary" onClick={saveStartSeq} style={{ padding: '6px 16px', fontSize: '0.8rem' }}>Save</button>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Next quotation will get serial {Math.max(parseInt(currentSeq || '0') || 0, parseInt(startSeq || '0') || 0) + 1}</span>
                 </div>
+            </div>
+            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--table-border)' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Quotation Registry</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+                    Path to the Excel registry file. When configured, quotation numbers are assigned from the registry
+                    instead of the database counter. Leave empty to use the database counter.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input type="text" value={registryPath} onChange={e => setRegistryPath(e.target.value)} placeholder="e.g. C:\folder1\policies\Register of Quotations.xlsx" style={{ flex: 1, padding: '6px 10px' }} />
+                    <button className="btn-secondary" onClick={browseRegistry} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>Browse</button>
+                    <button className="btn-primary" onClick={saveRegistryPath} style={{ padding: '6px 16px', fontSize: '0.8rem' }}>Save</button>
+                </div>
+                {registryPath && <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>Format: Q/{'{R|N}'}/{'{branch}'}/{'{YY}'}/{'{serial}'} — serial read from last row in the current year sheet</span>}
             </div>
         </div>
     )

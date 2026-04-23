@@ -11,6 +11,7 @@ import { FileManagerService } from './services/FileManagerService'
 import { DailyAlertScheduler } from './services/DailyAlertScheduler'
 import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
+import { assignRegistryNumber } from './services/QuotationRegistryService'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
@@ -75,6 +76,67 @@ function isSharedPath(userPath: string): boolean {
   if (filePathLocal && normalPath.startsWith(normalize(filePathLocal).toLowerCase())) return true
   if (filePathNetwork && normalPath.startsWith(normalize(filePathNetwork).toLowerCase())) return true
   return false
+}
+
+/** Assign quotation number via registry Excel (if configured) or DB fallback */
+async function assignQuotationNumberViaRegistry(quotationId: string): Promise<string> {
+  const registryPath = await db.getSetting('quotationRegistryPath')
+  if (!registryPath) {
+    // No registry configured — use DB-based numbering
+    return db.assignQuotationNumber(quotationId)
+  }
+
+  const resolvedPath = resolveFilePath(registryPath)
+
+  // Load quotation data for registry entry
+  const q = await db.getQuotation(quotationId)
+  if (!q) throw new Error('Quotation not found')
+  if (q.referenceNumber && !q.referenceNumber.startsWith('DRAFT-')) return q.referenceNumber
+
+  // Get vessels, assureds, customer info
+  const vessels = await db.getQuotationVessels(quotationId)
+  const vesselNames = vessels.map((v: any) => v.name || v.vesselLabel).filter(Boolean)
+  const vesselIMOs = vessels.map((v: any) => v.imoNumber).filter(Boolean)
+  const vesselTypes = vessels.map((v: any) => v.vesselType).filter(Boolean)
+
+  // Get customer/broker name
+  let broker = ''
+  if (q.customerEntityId) {
+    try {
+      const entities = await db.getEntities()
+      const entity = entities.find((e: any) => e.id === q.customerEntityId)
+      broker = entity?.name || ''
+    } catch {}
+  }
+
+  // Get managers from assureds
+  let managers = ''
+  try {
+    const assureds = await db.getQuotationAssureds(quotationId)
+    const mgr = (Array.isArray(assureds) ? assureds : []).find((a: any) => a.role?.toLowerCase().includes('manager'))
+    managers = mgr?.name || (Array.isArray(assureds) && assureds.length > 0 ? assureds[0].name : '')
+  } catch {}
+
+  try {
+    const result = assignRegistryNumber(resolvedPath, {
+      isRenewal: q.isRenewal || false,
+      typeCode: q.quotationTypeCode || 'P',
+      managers,
+      vessel: vesselNames.join(' / '),
+      imo: vesselIMOs.join(' / '),
+      vesselType: vesselTypes[0] || '',
+      broker
+    })
+
+    // Update quotation with the assigned reference
+    await db.updateQuotation(quotationId, { referenceNumber: result.reference } as any)
+    // Also update the DB counter to stay in sync
+    await db.setSetting('real_quotation_seq', String(result.serial))
+
+    return result.reference
+  } catch (err: any) {
+    throw new Error(`Failed to write to quotation registry: ${err.message}. Check the file is not open in Excel.`)
+  }
 }
 
 // Force hardware acceleration even over Remote Desktop (RDP)
@@ -3596,8 +3658,11 @@ app.whenReady().then(() => {
     let assignedRef: string | undefined
     if (toStep && toStep.name.toLowerCase() === 'approved') {
       try {
-        assignedRef = await db.assignQuotationNumber(quotationId)
-      } catch (e) { console.error('Failed to assign quotation number:', e) }
+        assignedRef = await assignQuotationNumberViaRegistry(quotationId)
+      } catch (e: any) {
+        // If registry write fails, don't complete the move
+        return { success: false, message: e.message || 'Failed to assign quotation number' }
+      }
     }
 
     // Get the current step info to check if we're moving FROM "Approved"
@@ -3636,8 +3701,27 @@ app.whenReady().then(() => {
 
   safeHandle('workflow:assignQuotationNumber', async (event, quotationId: string) => {
     await requirePermission(event, 'quotations:approve')
-    const ref = await db.assignQuotationNumber(quotationId)
+    const ref = await assignQuotationNumberViaRegistry(quotationId)
     return { referenceNumber: ref }
+  })
+
+  safeHandle('quotationRegistry:getPath', async (event) => {
+    requireSession(event)
+    return db.getSetting('quotationRegistryPath') || ''
+  })
+  safeHandle('quotationRegistry:setPath', async (event, path: string) => {
+    await requirePermission(event, 'admin:settings')
+    await db.setSetting('quotationRegistryPath', path || '')
+    return { success: true }
+  })
+  safeHandle('quotationRegistry:browse', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+    })
+    return result.canceled ? null : result.filePaths[0]
   })
 
   safeHandle('workflow:getQuotationLog', async (event, quotationId: string) => {

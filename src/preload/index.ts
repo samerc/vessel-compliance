@@ -55,6 +55,11 @@ const api = {
   filePathGetSettings: () => ipcRenderer.invoke('filePath:getSettings'),
   filePathSetSettings: (settings: { localPath: string; networkPath: string }) => ipcRenderer.invoke('filePath:setSettings', settings),
 
+  // Quotation Registry
+  quotationRegistryGetPath: () => ipcRenderer.invoke('quotationRegistry:getPath'),
+  quotationRegistrySetPath: (path: string) => ipcRenderer.invoke('quotationRegistry:setPath', path),
+  quotationRegistryBrowse: () => ipcRenderer.invoke('quotationRegistry:browse'),
+
   getAssuredRoles: () => ipcRenderer.invoke('db:getAssuredRoles'),
   addAssuredRole: (role) => ipcRenderer.invoke('db:addAssuredRole', role),
   updateAssuredRole: (id, updates) => ipcRenderer.invoke('db:updateAssuredRole', id, updates),

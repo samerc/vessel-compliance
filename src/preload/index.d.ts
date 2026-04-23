@@ -77,6 +77,11 @@ export interface Api {
   filePathGetSettings: () => Promise<{ localPath: string; networkPath: string; isRemoteUser: boolean }>
   filePathSetSettings: (settings: { localPath: string; networkPath: string }) => Promise<{ success: boolean }>
 
+  // Quotation Registry
+  quotationRegistryGetPath: () => Promise<string>
+  quotationRegistrySetPath: (path: string) => Promise<{ success: boolean }>
+  quotationRegistryBrowse: () => Promise<string | null>
+
   getAssuredRoles: () => Promise<AssuredRole[]>
   addAssuredRole: (role: Omit<AssuredRole, 'id'>) => Promise<AssuredRole>
   updateAssuredRole: (id: string, updates: Partial<AssuredRole>) => Promise<void>
