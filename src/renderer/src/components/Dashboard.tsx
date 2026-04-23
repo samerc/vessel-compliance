@@ -445,7 +445,7 @@ export default function Dashboard({
   // ── Styles ──
   const cardStyle: React.CSSProperties = {
     background: isLight ? '#fff' : 'rgba(255,255,255,0.04)',
-    border: `1px solid ${isLight ? '#e4e7ef' : 'rgba(255,255,255,0.08)'}`,
+    border: `1px solid ${isLight ? '#d0d4de' : 'rgba(255,255,255,0.08)'}`,
     borderRadius: '14px',
     padding: '20px'
   }
@@ -1620,7 +1620,7 @@ function KPICard({
   valueColor?: string
 }) {
   return (
-    <div className="glass-card" style={{ padding: '18px 20px' }}>
+    <div className="glass-card" style={{ padding: '18px 20px', border: '1px solid var(--table-border)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div style={{ width: '38px', height: '38px', borderRadius: '9px', background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {icon}
