@@ -132,6 +132,7 @@ const api = {
   authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),
+  updateUser: (userId: string, updates: { username?: string; fullName?: string }) => ipcRenderer.invoke('db:updateUser', userId, updates),
   updateUserRole: (userId: string, role: 'admin' | 'user') => ipcRenderer.invoke('db:updateUserRole', userId, role),
 
   setupSelectDirectory: () => ipcRenderer.invoke('setup:selectDirectory'),

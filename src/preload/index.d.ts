@@ -16,6 +16,7 @@ export interface Api {
   authCreateUser: (userData: { username: string; password: string; role: 'admin' | 'user' }) => Promise<{ success: boolean; message?: string; userId?: string }>
   getUsers: () => Promise<User[]>
   deleteUser: (id: string) => Promise<void>
+  updateUser: (userId: string, updates: { username?: string; fullName?: string }) => Promise<{ success: boolean }>
   updateUserRole: (userId: string, role: 'admin' | 'user') => Promise<void>
   setupSelectDirectory: () => Promise<string | null>
   setupSelectConfigFile: () => Promise<string | null>

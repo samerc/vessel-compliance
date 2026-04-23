@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { User, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
-import { Trash2, Shield, KeyRound, ArrowLeftRight, Users, X, Plus, Search, ChevronDown, ChevronRight, Key, Monitor } from 'lucide-react'
+import { Trash2, Shield, KeyRound, ArrowLeftRight, Users, X, Plus, Search, ChevronDown, ChevronRight, Key, Monitor, Pencil, Save } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -16,6 +16,9 @@ export default function UserManager() {
     const isLight = theme === 'light'
     const [users, setUsers] = useState<User[]>([])
     const [resettingUser, setResettingUser] = useState<string | null>(null)
+    const [editingUserId, setEditingUserId] = useState<string | null>(null)
+    const [editUsername, setEditUsername] = useState('')
+    const [editFullName, setEditFullName] = useState('')
     const [tempPassword, setTempPassword] = useState<string | null>(null)
     const [showCreateForm, setShowCreateForm] = useState(false)
     const [userGroupMap, setUserGroupMap] = useState<Record<string, string[]>>({})
@@ -52,6 +55,16 @@ export default function UserManager() {
     const [overrideSearch, setOverrideSearch] = useState('')
     const [showOverrideDropdown, setShowOverrideDropdown] = useState(false)
     const [collapsedOverrideCats, setCollapsedOverrideCats] = useState<Set<string>>(new Set())
+
+    const handleSaveUser = async (userId: string) => {
+        if (!editUsername.trim()) { showError('Username is required'); return }
+        try {
+            await window.api.updateUser(userId, { username: editUsername.trim(), fullName: editFullName.trim() || undefined })
+            showSuccess('User updated')
+            setEditingUserId(null)
+            loadUsers()
+        } catch (e: any) { showError(e.message || 'Failed to update user') }
+    }
 
     const handleResetPassword = async (username: string) => {
         setConfirmation({
@@ -529,17 +542,34 @@ export default function UserManager() {
                                                 }}>
                                                     {user.username.charAt(0)}
                                                 </div>
-                                                <div>
-                                                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.username}</div>
-                                                    <span style={{
-                                                        display: 'inline-block', marginTop: '2px',
-                                                        padding: '1px 8px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '600',
-                                                        background: uIsAdmin ? adminBg : userBg,
-                                                        color: uIsAdmin ? adminColor : userColor,
-                                                        border: `1px solid ${uIsAdmin ? adminBorder : userBorder}`
-                                                    }}>
-                                                        {user.role.toUpperCase()}
-                                                    </span>
+                                                <div style={{ flex: 1 }}>
+                                                    {editingUserId === user.id ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                <input type="text" value={editUsername} onChange={e => setEditUsername(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveUser(user.id); if (e.key === 'Escape') setEditingUserId(null) }} autoFocus placeholder="Username" style={{ padding: '3px 8px', fontSize: '0.85rem', width: '140px' }} />
+                                                                <button onClick={() => handleSaveUser(user.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--success)', padding: '2px' }}><Save size={14} /></button>
+                                                                <button onClick={() => setEditingUserId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><X size={14} /></button>
+                                                            </div>
+                                                            <input type="text" value={editFullName} onChange={e => setEditFullName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveUser(user.id); if (e.key === 'Escape') setEditingUserId(null) }} placeholder="Full Name (optional)" style={{ padding: '3px 8px', fontSize: '0.78rem', width: '200px' }} />
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.username}</span>
+                                                                {canManageUsers && <button onClick={() => { setEditingUserId(user.id); setEditUsername(user.username); setEditFullName(user.fullName || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '1px', opacity: 0.5 }} title="Edit"><Pencil size={11} /></button>}
+                                                            </div>
+                                                            {user.fullName && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{user.fullName}</div>}
+                                                            <span style={{
+                                                                display: 'inline-block', marginTop: '2px',
+                                                                padding: '1px 8px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '600',
+                                                                background: uIsAdmin ? adminBg : userBg,
+                                                                color: uIsAdmin ? adminColor : userColor,
+                                                                border: `1px solid ${uIsAdmin ? adminBorder : userBorder}`
+                                                            }}>
+                                                                {user.role.toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>

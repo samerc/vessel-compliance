@@ -1950,6 +1950,12 @@ app.whenReady().then(() => {
     return result
   })
 
+  safeHandle('db:updateUser', async (event, userId: string, updates: { username?: string; fullName?: string }) => {
+    await requirePermission(event, 'admin:users')
+    await db.updateUser(userId, updates)
+    return { success: true }
+  })
+
   safeHandle('db:updateUserRole', async (event, userId: string, role: 'admin' | 'user') => {
     const user = await requirePermission(event, 'admin:users')
     const [roleRows] = await (db as any).pool.query('SELECT username, role FROM users WHERE id = ?', [userId])

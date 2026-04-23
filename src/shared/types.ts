@@ -176,6 +176,7 @@ export interface AppData {
 export interface User {
   id: string
   username: string
+  fullName?: string
   passwordHash: string
   role: 'admin' | 'user'
   themePreference?: 'light' | 'dark'

@@ -3091,6 +3091,14 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN pro_rata_months DECIMAL(5,1) NULL")
                 }
             } catch {}
+            // Migration: full_name on users
+            try {
+                const [fnCol] = await this.pool.query("SHOW COLUMNS FROM users LIKE 'full_name'") as any[]
+                if ((fnCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE users ADD COLUMN full_name VARCHAR(255) DEFAULT NULL AFTER username")
+                }
+            } catch {}
+
             try {
                 const [fpCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'full_premium_loss_enabled'") as any[]
                 if ((fpCol as any[]).length === 0) {
@@ -4607,7 +4615,7 @@ export class MySQLAdapter {
     async getUser(username: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
+            'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
             [username]
         )
         return rows.length > 0 ? (rows[0] as User) : null
@@ -4630,10 +4638,26 @@ export class MySQLAdapter {
     async getUsers(): Promise<User[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, username, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users ORDER BY username ASC'
+            'SELECT id, username, full_name as fullName, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users ORDER BY username ASC'
         )
         // Return without passwordHash
         return rows as User[]
+    }
+
+    async updateUser(userId: string, updates: { username?: string; fullName?: string }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.username !== undefined) {
+            // Check uniqueness
+            const [existing] = await this.pool.query('SELECT id FROM users WHERE username = ? AND id != ?', [updates.username, userId])
+            if ((existing as any[]).length > 0) throw new Error('Username already taken')
+            fields.push('username = ?'); values.push(updates.username)
+        }
+        if (updates.fullName !== undefined) { fields.push('full_name = ?'); values.push(updates.fullName || null) }
+        if (fields.length === 0) return
+        values.push(userId)
+        await this.pool.execute(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
     async updateUserLastLogin(userId: string): Promise<void> {
@@ -4697,7 +4721,7 @@ export class MySQLAdapter {
     async getUserById(userId: string): Promise<User | null> {
         if (!this.pool) return null
         const [rows]: any[] = await this.pool.query(
-            'SELECT id, username, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt FROM users WHERE id = ?',
+            'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt FROM users WHERE id = ?',
             [userId]
         )
         return rows.length > 0 ? (rows[0] as User) : null
