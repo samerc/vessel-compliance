@@ -1257,7 +1257,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             )}
 
             {/* Tab Content */}
-            {activeTab !== 'hullConditions' && <div className="glass-card" style={{ padding: '24px', minHeight: '300px' }}>
+            {activeTab !== 'hullConditions' && <div className="glass-card" style={{ padding: '24px', minHeight: '300px', position: 'relative' }}>
                 {qVessels.length >= 2 && (
                     <div style={{
                         display: 'flex',
@@ -1276,6 +1276,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         ))}
                     </div>
                 )}
+                {!canEdit && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'not-allowed' }} />}
                 {activeTab === 'insured' && <InsuredTab key={vesselVersion} quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} updateField={updateField} />}
                 {activeTab === 'vessel' && <VesselTab quotation={q} vessels={vessels} showSuccess={showSuccess} showError={showError} isLight={isLight} onVesselsChanged={() => setVesselVersion(v => v + 1)} setQ={setQ} />}
                 {activeTab === 'agreedValue' && <AgreedValueTab quotation={q} updateField={updateField} setQ={setQ} showSuccess={showSuccess} showError={showError} />}
@@ -1304,7 +1305,10 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 {activeTab === 'notes' && <NotesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} />}
             </div>}
 
-            {activeTab === 'hullConditions' && <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />}
+            {activeTab === 'hullConditions' && <div style={{ position: 'relative' }}>
+                {!canEdit && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'not-allowed' }} />}
+                <HullConditionsTab quotation={q} updateField={updateField} showSuccess={showSuccess} showError={showError} />
+            </div>}
 
             {showSectionOrder && (
                 <SectionOrderModal
