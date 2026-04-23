@@ -1237,5 +1237,98 @@ Configurable local↔network path mapping for users connecting via VPN:
 ### Abandoned Draft Quotation Cleanup
 
 - **QuotationEditor**: Tracks edits via `hasEdited` ref, set `true` on any `updateField` call
-- **Back navigation**: If draft (`referenceNumber.startsWith('DRAFT-')`) and no edits made, quotation is auto-deleted
+- **Back navigation**: If draft + no edits + created <60s ago + no vessels → auto-deleted
 - **Applies to**: Renewal quotations from PolicyRenewals, new quotations — prevents orphaned empty drafts
+
+### Quotation Registry (Excel-Based Numbering)
+
+Excel registry file for quotation numbering and logging:
+- **Path**: Configurable in Admin Panel → File Paths → Quotation Registry
+- **Format**: `Q/{R|N}/{branch}/{YY}/{serial}` — R=Renewal, N=New, branch=P/H/W/C/F
+- **Serial**: Read from last row column D of current year sheet, incremented
+- **Row data**: Date, Quotation Type, Branch, Serial, Reference, Managers, Vessel, IMO, Type, Broker, Remarks
+- **Cancelled**: Moving away from Approved marks row as CANCELLED in Remarks column (K)
+- **Year sheets**: Auto-created when year changes
+- **Fallback**: DB counter used if no registry path configured
+- **File locked**: Approval fails with error if Excel is open
+- **IPC**: `quotationRegistry:getPath`, `quotationRegistry:setPath`, `quotationRegistry:browse`
+- **Service**: `src/main/services/QuotationRegistryService.ts`
+
+### Quotation Workflow Enforcement
+
+- **Initial step**: New quotations auto-assigned the `isInitial` workflow step
+- **canEdit/canExport**: Step constraints enforced — `canEdit=false` disables editing with blue banner, `canExport=false` blocks Approve & Export (draft export always allowed)
+- **Step deletion**: Blocked when quotations exist on the step
+- **Single initial**: Setting a step as initial unsets all others
+- **Transaction**: Workflow move (update + log insert) wrapped in transaction
+- **Workflow log**: History button in editor shows transition log dropdown
+- **Approved = read-only**: Green banner + pointer-events overlay blocks all interaction. "Create a new revision from the Actions menu"
+- **Status flow**: `draft` → `approved` (on approval) → `exported` (on export) → `converted` (on policy conversion)
+- **Locked quotations**: Blocked from opening entirely (not read-only, error toast)
+
+### Quotation Lock Heartbeat
+
+- **Heartbeat**: Pings every 2 min to refresh `locked_at` while editor is open
+- **Inactivity**: After 10 min idle (no mouse/keyboard), heartbeat stops
+- **Lock expiry**: 5 min (reduced from 30 min)
+- **Re-lock**: When user returns from idle, attempts to re-acquire lock
+- **Admin force-unlock**: ✕ button next to lock icon in QuotationList (admin only)
+- **IPC**: `quotation:heartbeat`
+
+### Quotation Export Enhancements
+
+- **Date**: Always today's date (not quotation creation date)
+- **Revision**: Centered "Rev.N" below title, reference suffix `/RN`
+- **Filename**: `{subject} - {type} Quote {year} - {broker}` — 1 vessel=name, 2=Name1 & Name2, 2+ same fleet=fleet, 3+ same manager=manager, else first and others
+- **Draft export**: Users without `quotations:approve` get toast "Exporting as draft"; users with permission get Approve & Export modal
+- **TBA**: When no assureds defined, shows "TBA" as Registered Owners
+- **IACS first**: Dual-classed vessels show IACS classification first in all displays/exports
+- **Previous premium in red**: UPCC discount table shows "(previously USD X)" in red in DOCX
+
+### Pro-Rata Premium
+
+Sub-annual quotation premium with auto-detection:
+- **Detection**: Parses `periodText` for "X months" / "X year(s) Y months" patterns
+- **Fields**: `is_pro_rata`, `annual_premium_amount`, `pro_rata_months` on quotations
+- **UI**: Annual Premium input (p.a.) + Pro-Rata Premium (calculated) + editable months + enable/disable toggle
+- **Calculation**: `annualPremium / 12 × months`
+- **Export**: Annual amount "per annum" line + "Pro-rata premium: {currency} {amount}" line
+- **Not for cargo**: Cargo has its own rate-based premium
+
+### Outstanding Premium & Full Loss Notices
+
+Two checkbox-based notices in PremiumTab (non-cargo):
+- **Outstanding Premium**: Configurable text + bold/underline toggles. Default: "All outstanding premium to be settled prior inception"
+- **Full Premium Loss**: Configurable text (no formatting). Default: "Full annual premium payable in case of loss."
+- **Settings**: Defaults in Policy Settings → Premium Intro
+- **Export**: Rendered after instalments in quotation (PDF/DOCX) and policy exports
+
+### Survey Warranty Template Enhancements
+
+- **Title**: Optional title field for easy reference in template list and editor picker
+- **New placeholders**: `{surveyor}` (green) and `{dateofsurvey}` (amber)
+- **Schema**: `title` on `survey_warranty_templates`, `surveyor_value`/`date_of_survey_value` on `quotation_survey_warranties`
+- **UI sections**: Templates and selected warranties visually separated with headers
+
+### Cargo Quotation Specifics
+
+- **Premium**: Rate (%) input with auto-calculated premium from insuredValue × rate. No "p.a." suffix, no previous premium
+- **TBA vessel**: "Any other vessel(s) to be agreed" checkbox (cargo only, updates local state via `setQ`)
+- **Cargo warranties/exclusions**: Only visible when cargo quotation type OR cargo clause selected in P&I conditions
+
+### User Management Enhancements
+
+- **Username**: Editable inline in UserManager (uniqueness enforced)
+- **Full name**: Optional field on users table, shown below username
+- **Schema**: `full_name VARCHAR(255)` on users, included in login session queries
+
+### Deductible MoneyInput
+
+- **MoneyInput**: Shared component in `shared.tsx` — shows thousand separators when not focused, raw number while editing
+- **Applied to**: All deductible amount fields (primary, secondary, previous, per-vessel)
+- **Layout**: Previous amounts on dedicated second row below main amounts
+
+### Conditions Sub-Tabs
+
+- **P&I Conditions**: Split into "Clauses" and "Additional Clauses" sub-tabs with count badges
+- **Hull Conditions**: Split into "Conditions", "Additional Conditions", and "Custom" sub-tabs with count badges
