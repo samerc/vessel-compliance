@@ -3906,15 +3906,20 @@ function FilePathSettingsSection({ showSuccess, showError }: { showSuccess: (m: 
     const [localPath, setLocalPath] = useState('')
     const [networkPath, setNetworkPath] = useState('')
     const [isRemote, setIsRemote] = useState(false)
+    const [registryPath, setRegistryPath] = useState('')
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         ;(async () => {
             try {
-                const s = await window.api.filePathGetSettings()
+                const [s, regPath] = await Promise.all([
+                    window.api.filePathGetSettings(),
+                    window.api.quotationRegistryGetPath()
+                ])
                 setLocalPath(s.localPath || '')
                 setNetworkPath(s.networkPath || '')
                 setIsRemote(s.isRemoteUser)
+                setRegistryPath(regPath || '')
             } catch {}
             finally { setLoading(false) }
         })()
@@ -3974,6 +3979,25 @@ function FilePathSettingsSection({ showSuccess, showError }: { showSuccess: (m: 
                 <button className="btn-primary" onClick={handleSave} style={{ padding: '8px 24px', display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start' }}>
                     <Save size={14} /> Save
                 </button>
+            </div>
+
+            <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--table-border)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px' }}>Quotation Registry</h4>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    Path to the Excel registry file. When set, quotation numbers are assigned from the registry
+                    (reading the last serial from the current year sheet). Leave empty to use the database counter.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', maxWidth: '600px' }}>
+                    <input type="text" value={registryPath} onChange={e => setRegistryPath(e.target.value)} placeholder="e.g. C:\folder1\policies\Register of Quotations.xlsx" style={{ flex: 1 }} />
+                    <button className="btn-secondary" onClick={async () => { const p = await window.api.quotationRegistryBrowse(); if (p) setRegistryPath(p) }} style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>Browse</button>
+                    <button className="btn-primary" onClick={async () => {
+                        try {
+                            await window.api.quotationRegistrySetPath(registryPath.trim())
+                            showSuccess('Registry path saved')
+                        } catch (e: any) { showError(e.message || 'Failed') }
+                    }} style={{ padding: '6px 16px', fontSize: '0.8rem' }}>Save</button>
+                </div>
+                {registryPath && <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '6px', display: 'block' }}>Reference format: Q/{'{R|N}'}/{'{branch}'}/{'{YY}'}/{'{serial}'}</span>}
             </div>
         </section>
     )
