@@ -134,7 +134,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const currentStep = allWorkflowSteps.find(s => s.id === q.workflowStepId)
     const stepCanEdit = currentStep ? currentStep.canEdit !== false : true
     const stepCanExport = currentStep ? currentStep.canExport !== false : true
-    const canExport = hasPermission('quotations:export') && stepCanExport
+    const canExport = hasPermission('quotations:export')
 
     // Lock quotation on mount, unlock on unmount
     useEffect(() => {
@@ -434,8 +434,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
     const handleExportWithDraftCheck = async (format: 'pdf' | 'word') => {
         const canApprove = hasPermission('quotations:approve')
-        if (isDraft && canApprove) {
-            // User can approve — show choice: draft or approve & export
+        if (isDraft && canApprove && stepCanExport) {
+            // User can approve and step allows final export — show choice: draft or approve & export
             const ok = await runExportWithValidation(q, format, 'approve')
             if (ok) setShowDraftExportModal(format)
             return
