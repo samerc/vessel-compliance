@@ -514,9 +514,7 @@ function getFileName(data: QuotationData, ext: string): string {
   const vessels = data.quotationVessels
   if (vessels.length === 1) {
     subject = getVesselInfo(vessels[0], data.allVessels, data.flagStates).name
-  } else if (vessels.length === 2) {
-    subject = vessels.map(qv => getVesselInfo(qv, data.allVessels, data.flagStates).name).join(' & ')
-  } else if (vessels.length >= 3) {
+  } else if (vessels.length >= 2) {
     // Check if all vessels belong to the same fleet
     const fleetIds = vessels
       .map(qv => qv.vesselId ? data.allVessels.find(v => v.id === qv.vesselId)?.fleetId : undefined)
@@ -527,13 +525,17 @@ function getFileName(data: QuotationData, ext: string): string {
       if (fleet) subject = fleet.name
     }
     if (!subject) {
-      // Try common manager
-      const managers = data.assureds.filter(a => a.role?.toLowerCase().includes('manager'))
-      const uniqueManagers = [...new Set(managers.map(m => m.name))]
-      if (uniqueManagers.length === 1) {
-        subject = uniqueManagers[0]
+      if (vessels.length === 2) {
+        subject = vessels.map(qv => getVesselInfo(qv, data.allVessels, data.flagStates).name).join(' & ')
       } else {
-        subject = getVesselInfo(vessels[0], data.allVessels, data.flagStates).name + ' and others'
+        // 3+ vessels, no fleet — try common manager
+        const managers = data.assureds.filter(a => a.role?.toLowerCase().includes('manager'))
+        const uniqueManagers = [...new Set(managers.map(m => m.name))]
+        if (uniqueManagers.length === 1) {
+          subject = uniqueManagers[0]
+        } else {
+          subject = getVesselInfo(vessels[0], data.allVessels, data.flagStates).name + ' and others'
+        }
       }
     }
   }
