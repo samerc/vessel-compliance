@@ -3665,6 +3665,8 @@ app.whenReady().then(() => {
     if (toStep && toStep.name.toLowerCase() === 'approved') {
       try {
         assignedRef = await assignQuotationNumberViaRegistry(quotationId)
+        // Update quotation status to approved
+        await db.updateQuotation(quotationId, { status: 'approved' } as any)
       } catch (e: any) {
         // If registry write fails, don't complete the move
         return { success: false, message: e.message || 'Failed to assign quotation number' }
@@ -3674,9 +3676,10 @@ app.whenReady().then(() => {
     // Get the current step info to check if we're moving FROM "Approved"
     const fromStep = steps.find(s => s.id === currentStepId)
     if (fromStep && fromStep.name.toLowerCase() === 'approved' && toStep && toStep.name.toLowerCase() !== 'approved') {
-      // Moving away from Approved — release the number
+      // Moving away from Approved — release the number and revert status
       try {
         await db.releaseQuotationNumber(quotationId)
+        await db.updateQuotation(quotationId, { status: 'draft' } as any)
       } catch (e) { console.error('Failed to release quotation number:', e) }
     }
 
