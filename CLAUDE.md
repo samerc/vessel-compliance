@@ -442,7 +442,8 @@ Single `policy_types` table serves both vessel policies and quotations. The `cod
 - **Table**: `policy_types` (id, name, code, order_index) — seeded with P&I (P), Hull (H), War Risk (W), FDD (F), Loss of Hire (L), Cargo (C)
 - **Unified**: `quotation_types` table is legacy — all CRUD methods (`getQuotationTypes`, `addQuotationType`, etc.) now read/write `policy_types` WHERE code IS NOT NULL
 - **`quotation_type_id`** on `quotations` table — now references `policy_types` rows (migrated from old `quotation_types` IDs)
-- **Auto-reference**: `Q/{type_code}/{global_sequential}` generated on creation (e.g. `Q/P/1`, `Q/H/2`)
+- **Auto-reference**: `Q/{code}/{YY}/{serial}` for DB-based (e.g. `Q/P/26/1`); `Q/{R|N}/{branch}/{YY}/{serial}` for registry-based
+- **Starting serial**: Configurable per type in Quotation Settings → Quotation Types
 - **Admin Panel**: Policy Types section manages both policy and quotation types with name + code fields
 - **Renaming**: Renaming a type auto-reflects everywhere since all references are by UUID. The `code` field should NOT be renamed (drives application logic).
 - **IPC**: `db:getQuotationTypes`, `db:addQuotationType`, etc. delegate to `policy_types` table
@@ -884,10 +885,11 @@ Per-quotation P&I alternatives (similar to hull):
 
 ### Survey Warranty Templates for Quotations
 
-- **Templates** (`survey_warranty_templates`): Text with {deadline}, {days}, {event} placeholders
+- **Templates** (`survey_warranty_templates`): Text with {deadline}, {days}, {event}, {surveyor}, {dateofsurvey} placeholders. Title field for easy reference.
+- **Placeholders**: {deadline} (blue), {days} (purple), {event} (red), {surveyor} (green), {dateofsurvey} (amber)
 - **Sets** (`survey_warranty_template_sets`): Named groups for batch-apply
-- **Editor Tab**: "Survey Warranties" in all quotation types
-- **Placeholder Inputs**: Dropdown presets for deadline, number input for days, text for event
+- **Editor Tab**: "Survey Warranties" in all quotation types. Templates and selected items visually separated.
+- **Placeholder Inputs**: Dropdown presets for deadline, number input for days, text for event/surveyor/dateofsurvey
 
 ### Bulk Operations
 
@@ -1000,6 +1002,7 @@ Draft quotation references include the policy type code:
 
 - **Format**: `DRAFT-{code}-{sequential}` (e.g., `DRAFT-P-0001`, `DRAFT-H-0002`, `DRAFT-W-0003`)
 - **Applied to**: new quotations, duplicates, revisions, renewals
+- **Revision suffix**: `/RN` appended (e.g. `Q/N/P/26/1552/R1`)
 - **Backward compatible**: `startsWith('DRAFT-')` checks work for both old and new formats
 
 ### Number Input Behavior
@@ -1010,7 +1013,7 @@ Draft quotation references include the policy type code:
 
 ### Key Tables
 
-- `users` - User accounts with auth, theme, window preferences, sidebar state, sanctions threshold
+- `users` - User accounts with auth, theme, window preferences, sidebar state, sanctions threshold, full_name
 - `vessels`, `fleets` - Vessel registry and fleet grouping
 - `entities`, `vessel_assureds`, `entity_ubos` - Assured parties and beneficial owners
 - `document_types`, `vessel_documents` - Document requirements and uploads
@@ -1026,7 +1029,7 @@ Draft quotation references include the policy type code:
 - `vessel_name_history`, `vessel_audit_log` - Vessel change tracking
 - `war_breach_records` - Saved War Breach Calculator results
 - `quotation_types` - Quotation type definitions (P&I, H&M, War Risk, FDD, Loss of Hire) with code and order
-- `quotations` - Insurance quotation records (section_texts_override is MEDIUMTEXT, quotation_type_id FK)
+- `quotations` - Insurance quotation records (section_texts_override is MEDIUMTEXT, quotation_type_id FK, workflow_step_id, pro_rata_enabled, outstanding_premium_enabled, full_premium_loss_enabled)
 - `pi_warranties`, `pi_warranty_tags`, `pi_warranty_tag_map` - P&I warranty definitions with tag categorization
 - `pi_warranty_sets`, `pi_warranty_set_items` - Named warranty groups with default_selected flag
 - `quotation_warranties` - Per-quotation warranty selections with order_index
@@ -1066,8 +1069,10 @@ Draft quotation references include the policy type code:
 - `entity_addresses` - Multiple addresses per entity
 - `flag_state_ports` - Ports of registry per flag state
 - `quotation_pi_alternatives` - P&I alternatives per quotation
-- `survey_warranty_templates`, `survey_warranty_template_sets` - Survey warranty templates
-- `quotation_survey_warranties` - Per-quotation survey warranty selections
+- `survey_warranty_templates`, `survey_warranty_template_sets` - Survey warranty templates (title, {surveyor}/{dateofsurvey} placeholders)
+- `quotation_survey_warranties` - Per-quotation survey warranty selections (surveyor_value, date_of_survey_value columns)
+- `quotation_workflow_steps` - Workflow step definitions with can_edit/can_export/is_initial flags
+- `quotation_workflow_log` - Workflow transition history per quotation
 - `premium_text_templates` - NCB/UPCC text templates
 - `trading_custom_texts` - Custom trading warranty replacement texts
 - `email_templates` - Legacy email templates (migrated to document_templates)
@@ -1108,9 +1113,11 @@ Per-quotation free-text hull conditions (not from master settings list):
 Prevents concurrent editing of the same quotation:
 - **Schema**: `locked_by VARCHAR(36)`, `locked_at DATETIME` on `quotations`
 - **Auto-lock**: QuotationEditor locks on mount, unlocks on unmount
-- **Read-only mode**: Other users see yellow "Locked by {username}" banner, editing disabled
-- **30-min expiry**: Safety net for crashes
-- **Admin force-unlock**: `quotationForceUnlock` IPC
+- **Blocked opening**: Locked quotations cannot be opened by other users (not read-only — fully blocked)
+- **Heartbeat**: Every 2 min refreshes `locked_at` to keep lock alive
+- **Inactivity detection**: After 10 min idle (no mouse/keyboard), heartbeat stops
+- **5-min expiry**: Safety net for crashes (reduced from 30 min)
+- **Admin force-unlock**: `quotationForceUnlock` IPC; force-unlock button (X) in QuotationList
 - **List indicator**: Lock icon next to reference number in QuotationList
 - **No updated_at change**: Lock/unlock uses `updated_at = updated_at` to prevent list reordering
 
@@ -1118,7 +1125,7 @@ Prevents concurrent editing of the same quotation:
 
 - **Single instalment**: "Premium of {currency} {amount} shall be payable on {date}..." (configurable in Settings)
 - **Debit Advice**: Compact header (company only), title size 10 bold underline, 2-column instalment table, premium on one line with words + "Only", period as 3-column table, bank details without title
-- **Credit Advice**: Broker name+address at top (from quotation customerEntityId), broker excluded from Insured section (+ c/o line cleared), commission wording configurable in Settings (placeholders: `{instalments}`, `{date}`), reduced cell margins
+- **Credit Advice**: Broker from quotation customerEntityId at top, broker excluded from Insured + c/o line, commission wording configurable in Settings (placeholders: `{instalments}`, `{date}`), reduced cell margins
 - **Blue Cards (BBC/WRC)**: NOT TRANSFERABLE left / REF right, 3-column vessel table (label|:|value bold) with FIXED layout, 3-column period table, owner section without border, port includes country
 - **MLC Blue Cards**: Same vessel table design, provider address bold uppercase zero spacing, contact details in 2-column table
 - **Footer**: Strips HTML tags, splits by `<br>`, Arial 9pt left-aligned not italic
@@ -1136,7 +1143,83 @@ Prevents concurrent editing of the same quotation:
 ### SumInsuredTab MoneyInput
 
 - **MoneyInput component**: Shows thousand separators when not focused, raw number while editing
-- **Applied to**: Sum insured amount, per-vessel amounts, Section 2 amount, premium
+- **Applied to**: Sum insured amount, per-vessel amounts, Section 2 amount, premium, deductible amounts
+
+### Quotation Registry
+
+Excel-based quotation numbering system for formal reference tracking:
+
+- **Path**: Configurable in Admin Panel → File Paths section
+- **Reference format**: `Q/{R|N}/{branch}/{YY}/{serial}` (R=renewal, N=new)
+- **Serial**: Reads last serial from column D of current year sheet in the Excel workbook
+- **Row written**: Date, Type, Branch, Serial, Reference, Managers, Vessel, IMO, Type, Broker, Remarks
+- **Cancellation**: Cancelled numbers marked as CANCELLED in Remarks column (K)
+- **Year sheets**: Creates new year sheet if needed (copies header from existing sheet)
+- **Fallback**: DB counter used if no registry path configured
+- **IPC**: `quotationRegistry:getPath`, `quotationRegistry:setPath`, `quotationRegistry:browse`
+
+### Quotation Workflow
+
+Approval workflow with step-based constraints:
+
+- **Tables**: `quotation_workflow_steps` (name, order_index, can_edit, can_export, is_initial, color), `quotation_workflow_log` (quotation_id, from_step_id, to_step_id, user_id, note, created_at)
+- **Auto-assign**: New quotations auto-assigned to the initial workflow step
+- **Constraints**: `canEdit`/`canExport` per step enforced in editor (approved quotations are read-only with green banner and `pointer-events: none` overlay)
+- **Step deletion**: Blocked when quotations currently have that step assigned
+- **Single initial**: Only one step can be marked `is_initial`
+- **Transaction**: Workflow move wrapped in DB transaction (update step + insert log)
+- **History**: Workflow log displayed in editor via History button
+- **Status flow**: `draft` → `approved` (on approval step) → `exported` (on first export) → `converted`
+- **Status badges**: Colored badges in QuotationList (draft=gray, approved=green, exported=blue, converted=purple)
+- **Export gating**: Draft export for users without approve permission (toast notification); Approve & Export modal for users with permission
+- **IPC**: `quotationWorkflow:*` prefix
+
+### Quotation Export Enhancements
+
+- **Revision display**: Centered "Rev.N" below title (not in title text)
+- **Reference**: Includes `/RN` suffix for revisions
+- **Export date**: Always today (not quotation creation date)
+- **Filename**: `{subject} - {type} Quote {year} - {broker}`
+- **TBA owners**: "TBA" shown as Registered Owners when no assureds defined
+- **IACS classification**: Always listed first when vessel has dual classification
+
+### Pro-Rata Premium (Quotation)
+
+Automatic pro-rata calculation for short-period quotations:
+
+- **Auto-detect**: Period < 12 months detected from `periodText` field
+- **Calculation**: User enters annual premium; pro-rata auto-calculates based on months
+- **Toggle**: Manual enable/disable override
+- **Editable months**: Months field editable for fine-tuning
+- **Export**: Annual amount "per annum" + "Pro-rata premium: {amount}" line
+
+### Outstanding Premium Notice
+
+- **Toggle**: Checkbox + configurable text + bold/underline toggles per quotation
+- **Default text**: Configurable in Policy Settings → Premium Intro
+- **Export**: Rendered in both quotation and policy DOCX exports
+
+### Full Premium in Case of Loss
+
+- **Toggle**: Checkbox + configurable text (no bold/underline toggles)
+- **Default text**: Configurable in Policy Settings → Premium Intro
+- **Export**: Rendered in both quotation and policy DOCX exports
+
+### Entity Classification (IACS Priority)
+
+- **IACS first**: When a vessel has dual classification societies, IACS member is always displayed first
+- **Applied to**: VesselDetail display, quotation exports, policy exports
+
+### Cargo Quotation Specifics
+
+- **Rate-based premium**: Rate % input → calculated premium amount (no "p.a." suffix, no previous premium display)
+- **TBA vessel**: Checkbox (cargo-only) to mark vessel as TBA
+- **Cargo clause**: Cargo warranties and exclusions only visible when a cargo clause is selected
+
+### User Management Enhancements
+
+- **Editable username**: Username can be changed (uniqueness enforced server-side)
+- **Full name**: Optional `full_name` field on `users` table
 
 ### File Path Resolution (Remote/VPN Users)
 
