@@ -4227,9 +4227,9 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
     const [steps, setSteps] = useState<WorkflowStep[]>([])
     const [transitions, setTransitions] = useState<WorkflowTransition[]>([])
     const [editingStep, setEditingStep] = useState<string | null>(null)
-    const [editForm, setEditForm] = useState<{ name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }>({ name: '', color: '#6b7280', canEdit: true, canExport: false, isLockPoint: false, isInitial: false })
+    const [editForm, setEditForm] = useState<{ name: string; color: string; canEdit: boolean; isLockPoint: boolean; isInitial: boolean }>({ name: '', color: '#6b7280', canEdit: true, isLockPoint: false, isInitial: false })
     const [addingStep, setAddingStep] = useState(false)
-    const [newStep, setNewStep] = useState<{ name: string; color: string; canEdit: boolean; canExport: boolean; isLockPoint: boolean; isInitial: boolean }>({ name: '', color: '#6b7280', canEdit: true, canExport: false, isLockPoint: false, isInitial: false })
+    const [newStep, setNewStep] = useState<{ name: string; color: string; canEdit: boolean; isLockPoint: boolean; isInitial: boolean }>({ name: '', color: '#6b7280', canEdit: true, isLockPoint: false, isInitial: false })
     const [addingTransition, setAddingTransition] = useState(false)
     const [newTransition, setNewTransition] = useState<{ fromStepId: string; toStepId: string; permissionKey: string | null; autoCreateRevision: boolean }>({ fromStepId: '', toStepId: '', permissionKey: null, autoCreateRevision: false })
 
@@ -4251,10 +4251,10 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
     const handleAddStep = async () => {
         if (!newStep.name.trim()) return
         try {
-            await window.api.workflowAddStep(newStep)
+            await window.api.workflowAddStep({ ...newStep, canExport: true })
             showSuccess('Step added')
             setAddingStep(false)
-            setNewStep({ name: '', color: '#6b7280', canEdit: true, canExport: false, isLockPoint: false, isInitial: false })
+            setNewStep({ name: '', color: '#6b7280', canEdit: true, isLockPoint: false, isInitial: false })
             loadAll()
         } catch (err: any) { showError(err.message || 'Failed to add step') }
     }
@@ -4262,7 +4262,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
     const handleUpdateStep = async (id: string) => {
         if (!editForm.name.trim()) return
         try {
-            await window.api.workflowUpdateStep(id, editForm)
+            await window.api.workflowUpdateStep(id, { ...editForm, canExport: true })
             showSuccess('Step updated')
             setEditingStep(null)
             loadAll()
@@ -4321,7 +4321,6 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
             name: step.name,
             color: step.color,
             canEdit: step.canEdit,
-            canExport: step.canExport,
             isLockPoint: step.isLockPoint,
             isInitial: step.isInitial
         })
@@ -4366,7 +4365,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                     <GitBranch size={18} /> Workflow Steps
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                    Define the stages a quotation moves through. The initial step is automatically assigned to new quotations.
+                    Define the stages a quotation moves through. The initial step is automatically assigned to new quotations. Export and approval are controlled by user permissions.
                 </p>
 
                 {/* Visual flow */}
@@ -4412,7 +4411,6 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                             <th style={thStyle}>Step</th>
                             <th style={thStyle}>Color</th>
                             <th style={{ ...thStyle, textAlign: 'center' }}>Can Edit</th>
-                            <th style={{ ...thStyle, textAlign: 'center' }}>Can Export</th>
                             <th style={{ ...thStyle, textAlign: 'center' }}>Lock Point</th>
                             <th style={{ ...thStyle, textAlign: 'center' }}>Initial</th>
                             <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
@@ -4453,13 +4451,6 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                                         <input type="checkbox" checked={editForm.canEdit} onChange={e => setEditForm({ ...editForm, canEdit: e.target.checked })} />
                                     ) : (
                                         step.canEdit ? <Check size={16} style={{ color: '#22c55e' }} /> : <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
-                                    )}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                    {editingStep === step.id ? (
-                                        <input type="checkbox" checked={editForm.canExport} onChange={e => setEditForm({ ...editForm, canExport: e.target.checked })} />
-                                    ) : (
-                                        step.canExport ? <Check size={16} style={{ color: '#22c55e' }} /> : <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
                                     )}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: 'center' }}>
@@ -4532,7 +4523,6 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                             </div>
                             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                                 <ToggleCheckbox checked={newStep.canEdit} onChange={v => setNewStep({ ...newStep, canEdit: v })} label="Can Edit" />
-                                <ToggleCheckbox checked={newStep.canExport} onChange={v => setNewStep({ ...newStep, canExport: v })} label="Can Export" />
                                 <ToggleCheckbox checked={newStep.isLockPoint} onChange={v => setNewStep({ ...newStep, isLockPoint: v })} label="Lock Point" />
                                 <ToggleCheckbox checked={newStep.isInitial} onChange={v => setNewStep({ ...newStep, isInitial: v })} label="Initial Step" />
                             </div>
