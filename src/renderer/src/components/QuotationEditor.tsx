@@ -319,7 +319,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const handleMoveToStep = async (stepId: string, comment?: string) => {
         try {
             const result = await window.api.workflowMoveQuotation(q.id, stepId, comment)
-            if ((result as any)?.error) { showError((result as any).message || 'Failed to move'); return }
+            if ((result as any)?.error || (result as any)?.success === false) { showError((result as any).message || 'Failed to move'); return }
             showSuccess('Workflow step updated')
             setShowStepMenu(false)
             setShowStepCommentModal(null)

@@ -3722,6 +3722,7 @@ app.whenReady().then(() => {
   safeHandle('workflow:assignQuotationNumber', async (event, quotationId: string) => {
     await requirePermission(event, 'quotations:approve')
     const ref = await assignQuotationNumberViaRegistry(quotationId)
+    await db.updateQuotation(quotationId, { status: 'approved' } as any)
     return { referenceNumber: ref }
   })
 
