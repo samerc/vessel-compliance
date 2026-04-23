@@ -223,18 +223,37 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
     const qTypeCode = quotation.quotationTypeCode?.toLowerCase() || 'p'
     const typeCode = qTypeCode === 'h' ? 'hull' : qTypeCode === 'w' ? 'war' : qTypeCode === 'c' ? 'cargo' : 'pi'
     const isCargo = qTypeCode === 'c'
+    const [hasCargoClauseSelected, setHasCargoClauseSelected] = useState(false)
+    useEffect(() => {
+        if (isCargo) { setHasCargoClauseSelected(true); return }
+        // Check if any cargo-related clause is selected in Conditions tab
+        ;(async () => {
+            try {
+                const [clauses, selected] = await Promise.all([
+                    window.api.piGetClauses(),
+                    window.api.getQuotationClauses(quotation.id)
+                ])
+                const safeClauses = Array.isArray(clauses) ? clauses : []
+                const safeSelected = Array.isArray(selected) ? selected : []
+                const selectedClauseIds = new Set(safeSelected.map((r: any) => r.piClauseId))
+                setHasCargoClauseSelected(safeClauses.some(c => c.isCargoRelated && selectedClauseIds.has(c.id)))
+            } catch { setHasCargoClauseSelected(false) }
+        })()
+    }, [quotation.id, isCargo])
+
+    const showCargoWarranties = isCargo || hasCargoClauseSelected
     const visibleWarranties = allWarranties.filter(w => {
-        // Exclude cargo-related warranties from non-cargo quotations
-        if (!isCargo && w.isCargoRelated) return false
+        // Exclude cargo-related warranties unless cargo type or cargo clause selected
+        if (!showCargoWarranties && w.isCargoRelated) return false
         return !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(typeCode)
     })
 
     const getTabWarranties = () => {
         if (activeTab === 'all') return visibleWarranties
-        if (activeTab === 'untagged') return visibleWarranties.filter(w => !(w.tagIds || []).length && !(isCargo && w.isCargoRelated))
+        if (activeTab === 'untagged') return visibleWarranties.filter(w => !(w.tagIds || []).length && !(showCargoWarranties && w.isCargoRelated))
         const tag = tags.find(t => t.id === activeTab)
         const isCargoTag = tag && tag.name.toLowerCase() === 'cargo'
-        return visibleWarranties.filter(w => (w.tagIds || []).includes(activeTab) || (isCargo && isCargoTag && w.isCargoRelated))
+        return visibleWarranties.filter(w => (w.tagIds || []).includes(activeTab) || (showCargoWarranties && isCargoTag && w.isCargoRelated))
     }
 
     const tabWarranties = getTabWarranties()
@@ -394,6 +413,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                     const isCargoTag = tag.name.toLowerCase() === 'cargo'
                                     const matchesTag = (w: PIWarranty) => (w.tagIds || []).includes(tag.id) || (isCargoTag && w.isCargoRelated)
                                     const count = visibleWarranties.filter(matchesTag).length
+                                    if (count === 0) return null
                                     return (
                                         <button key={tag.id} onClick={() => setActiveTab(tag.id)} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', cursor: 'pointer', background: activeTab === tag.id ? 'rgba(0,210,255,0.12)' : 'transparent', border: `1px solid ${activeTab === tag.id ? 'var(--accent-primary)' : 'var(--table-border)'}`, color: activeTab === tag.id ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                             {tag.name} ({count})
