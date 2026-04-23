@@ -307,7 +307,9 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             const newRev = await window.api.createQuotationRevision(q.id)
             if ((newRev as any)?.error) { showError((newRev as any).message || 'Failed to create revision'); return }
             showSuccess(`Revision R${newRev.revisionNumber} created`)
-            if (onOpenQuotation) onOpenQuotation(newRev)
+            // Load full quotation data and switch to it
+            const fullRev = await window.api.getQuotation(newRev.id)
+            if (fullRev && onOpenQuotation) onOpenQuotation(fullRev)
         } catch (err: any) {
             showError(err.message || 'Failed to create revision')
         }
@@ -878,7 +880,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                         {revisions.map(rev => (
                                             <button
                                                 key={rev.id}
-                                                onClick={() => { setShowRevisionHistory(false); if (rev.id !== q.id && onOpenQuotation) onOpenQuotation(rev) }}
+                                                onClick={async () => {
+                                                    setShowRevisionHistory(false)
+                                                    if (rev.id !== q.id && onOpenQuotation) {
+                                                        const fullRev = await window.api.getQuotation(rev.id)
+                                                        if (fullRev) onOpenQuotation(fullRev)
+                                                    }
+                                                }}
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
                                                     padding: '10px 14px', border: 'none', borderRadius: '6px',
