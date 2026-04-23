@@ -5,6 +5,46 @@ import { useTheme } from '../../contexts/ThemeContext'
 
 export const ALT_COLORS = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
 
+/** Format a number with thousand separators */
+export function fmtMoney(val: number | undefined | null): string {
+    if (val == null || val === 0) return ''
+    return val.toLocaleString('en-US', { maximumFractionDigits: 2 })
+}
+
+/** Parse a formatted number string back to a number */
+export function parseMoney(str: string): number | undefined {
+    const cleaned = str.replace(/,/g, '')
+    if (!cleaned) return undefined
+    const n = parseFloat(cleaned)
+    return isNaN(n) ? undefined : n
+}
+
+/** Number input that shows commas when not focused, raw number while editing */
+export function MoneyInput({ value, placeholder, onChange, onBlur, style, className }: {
+    value: number | undefined | null
+    placeholder?: string
+    onChange: (val: number | undefined) => void
+    onBlur?: (val: number | undefined) => void
+    style?: React.CSSProperties
+    className?: string
+}) {
+    const [editing, setEditing] = useState(false)
+    const [raw, setRaw] = useState('')
+    const displayVal = editing ? raw : fmtMoney(value)
+    return (
+        <input
+            type="text"
+            className={className}
+            value={displayVal}
+            placeholder={placeholder}
+            onFocus={() => { setEditing(true); setRaw(value != null && value !== 0 ? String(value) : '') }}
+            onChange={e => { const v = e.target.value.replace(/[^0-9.,\-]/g, ''); setRaw(v); onChange(parseMoney(v)) }}
+            onBlur={() => { setEditing(false); const parsed = parseMoney(raw); onBlur?.(parsed) }}
+            style={style}
+        />
+    )
+}
+
 export function AlternativeScopeChips({ alternatives, currentAltId, onChangeAltId }: { alternatives: QuotationPIAlternative[]; currentAltId: string | null; onChangeAltId: (altId: string | null) => void }) {
     if (alternatives.length < 2) return null
     return (

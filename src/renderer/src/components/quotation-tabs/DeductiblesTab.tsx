@@ -3,7 +3,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save } from 'lucide-re
 import { Quotation, PIDeductible, PITextDeductible, QuotationDeductible, QuotationTextDeductible, QuotationPIAlternative, QuotationVessel, PISectionTexts } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
-import { AlternativeScopeChips, ALT_COLORS, PickerDropdown } from './shared'
+import { AlternativeScopeChips, ALT_COLORS, PickerDropdown, MoneyInput } from './shared'
 
 export default function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiveText, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError?: (m: string) => void; isLight?: boolean; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const altStyle = (altId: string | null | undefined): React.CSSProperties => {
@@ -193,12 +193,12 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         {d.title && <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{d.title}</span>}
                         <input type="text" defaultValue={d.currency} onBlur={e => handleUpdate(d.id, { currency: e.target.value })} style={{ width: '60px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         {!(qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts)) && (
-                            <input type="number" defaultValue={d.amount} onBlur={e => handleUpdate(d.id, { amount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                            <MoneyInput value={d.amount || undefined} onChange={() => {}} onBlur={val => handleUpdate(d.id, { amount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         )}
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
-                                <input type="number" defaultValue={d.secondaryAmount || 0} onBlur={e => handleUpdate(d.id, { secondaryAmount: parseFloat(e.target.value) || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                                <MoneyInput value={d.secondaryAmount || undefined} onChange={() => {}} onBlur={val => handleUpdate(d.id, { secondaryAmount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                             </>
                         )}
                         {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>custom</span>}
@@ -210,12 +210,12 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingLeft: '24px', marginBottom: '4px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous:</span>
-                            <input type="number" defaultValue={d.previousAmount ?? ''} onBlur={e => handleUpdate(d.id, { previousAmount: parseFloat(e.target.value) || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
+                            <MoneyInput value={d.previousAmount} onChange={() => {}} onBlur={val => handleUpdate(d.id, { previousAmount: val || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
                         </div>
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous 2nd:</span>
-                                <input type="number" defaultValue={d.previousSecondaryAmount ?? ''} onBlur={e => handleUpdate(d.id, { previousSecondaryAmount: parseFloat(e.target.value) || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
+                                <MoneyInput value={d.previousSecondaryAmount} onChange={() => {}} onBlur={val => handleUpdate(d.id, { previousSecondaryAmount: val || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
                             </div>
                         )}
                     </div>
@@ -232,10 +232,9 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={(v.name || v.vesselLabel).toUpperCase()}>
                                             {(v.name || v.vesselLabel).toUpperCase()}
                                         </span>
-                                        <input
-                                            type="number"
-                                            value={displayVal}
-                                            onChange={e => updateDeductibleVesselAmount(d.id, v.id, e.target.value ? Number(e.target.value) : undefined)}
+                                        <MoneyInput
+                                            value={typeof displayVal === 'number' ? displayVal : parseFloat(String(displayVal)) || undefined}
+                                            onChange={val => updateDeductibleVesselAmount(d.id, v.id, val)}
                                             onBlur={() => saveDeductibleVesselAmounts(d.id)}
                                             placeholder="0"
                                             style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
