@@ -136,7 +136,9 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const stepCanExport = currentStep ? currentStep.canExport !== false : true
     const canExport = hasPermission('quotations:export')
 
-    // Lock quotation on mount, unlock on unmount
+    // Lock quotation on mount, heartbeat while active, unlock on unmount
+    const lastActivity = useRef(Date.now())
+    const heartbeatActive = useRef(true)
     useEffect(() => {
         let mounted = true
         ;(async () => {
@@ -149,8 +151,47 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 }
             } catch {}
         })()
+
+        // Heartbeat: ping every 2 min while user is active
+        const HEARTBEAT_MS = 2 * 60 * 1000
+        const IDLE_TIMEOUT_MS = 10 * 60 * 1000
+        const heartbeatInterval = setInterval(() => {
+            const idle = Date.now() - lastActivity.current
+            if (idle > IDLE_TIMEOUT_MS) {
+                // User idle — stop heartbeating, let lock expire
+                heartbeatActive.current = false
+                return
+            }
+            heartbeatActive.current = true
+            window.api.quotationHeartbeat(quotation.id).catch(() => {})
+        }, HEARTBEAT_MS)
+
+        // Track user activity
+        const onActivity = () => {
+            lastActivity.current = Date.now()
+            // If was idle and came back, try to re-lock
+            if (!heartbeatActive.current) {
+                heartbeatActive.current = true
+                window.api.quotationLock(quotation.id).then(result => {
+                    if (!mounted) return
+                    if (!result.success) {
+                        setIsLockedByOther(true)
+                        setLockedByName(result.lockedByName || 'another user')
+                    } else {
+                        setIsLockedByOther(false)
+                        setLockedByName(null)
+                    }
+                }).catch(() => {})
+            }
+        }
+        window.addEventListener('mousemove', onActivity)
+        window.addEventListener('keydown', onActivity)
+
         return () => {
             mounted = false
+            clearInterval(heartbeatInterval)
+            window.removeEventListener('mousemove', onActivity)
+            window.removeEventListener('keydown', onActivity)
             window.api.quotationUnlock(quotation.id).catch(() => {})
         }
     }, [quotation.id])

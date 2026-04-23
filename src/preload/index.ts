@@ -594,6 +594,7 @@ const api = {
   getQuotation: (id: string) => ipcRenderer.invoke('db:getQuotation', id),
   quotationLock: (id: string) => ipcRenderer.invoke('quotation:lock', id),
   quotationUnlock: (id: string) => ipcRenderer.invoke('quotation:unlock', id),
+  quotationHeartbeat: (id: string) => ipcRenderer.invoke('quotation:heartbeat', id),
   quotationForceUnlock: (id: string) => ipcRenderer.invoke('quotation:forceUnlock', id),
   quotationGetLock: (id: string) => ipcRenderer.invoke('quotation:getLock', id),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),

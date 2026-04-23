@@ -3169,7 +3169,7 @@ export class MySQLAdapter {
         if (row?.locked_by && row.locked_by !== userId) {
             const lockedAt = new Date(row.locked_at)
             const elapsed = Date.now() - lockedAt.getTime()
-            if (elapsed < 30 * 60 * 1000) {
+            if (elapsed < 5 * 60 * 1000) {
                 return { success: false, lockedBy: row.locked_by, lockedByName: row.lockedByName || 'Unknown' }
             }
         }
@@ -3180,6 +3180,16 @@ export class MySQLAdapter {
     async unlockQuotation(quotationId: string, userId: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('UPDATE quotations SET locked_by = NULL, locked_at = NULL, updated_at = updated_at WHERE id = ? AND locked_by = ?', [quotationId, userId])
+    }
+
+    async quotationHeartbeat(quotationId: string, userId: string): Promise<{ success: boolean }> {
+        if (!this.pool) return { success: false }
+        // Only refresh if this user holds the lock
+        const [result] = await this.pool.execute(
+            'UPDATE quotations SET locked_at = NOW(), updated_at = updated_at WHERE id = ? AND locked_by = ?',
+            [quotationId, userId]
+        )
+        return { success: (result as any).affectedRows > 0 }
     }
 
     async forceUnlockQuotation(quotationId: string): Promise<void> {
@@ -3195,7 +3205,7 @@ export class MySQLAdapter {
         if (!r?.lockedBy) return { lockedBy: null, lockedByName: null, lockedAt: null }
         // Check expiry
         const elapsed = Date.now() - new Date(r.lockedAt).getTime()
-        if (elapsed >= 30 * 60 * 1000) return { lockedBy: null, lockedByName: null, lockedAt: null }
+        if (elapsed >= 5 * 60 * 1000) return { lockedBy: null, lockedByName: null, lockedAt: null }
         return { lockedBy: r.lockedBy, lockedByName: r.lockedByName || null, lockedAt: r.lockedAt }
     }
 

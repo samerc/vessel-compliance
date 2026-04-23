@@ -695,7 +695,10 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                   : '#00aac8'
             }}
           >
-            {q.lockedBy && <span title={`Locked by ${q.lockedByName || 'user'}`}><Lock size={12} style={{ marginRight: '4px', color: '#ffb020' }} /></span>}
+            {q.lockedBy && <>
+              <span title={`Locked by ${q.lockedByName || 'user'}`}><Lock size={12} style={{ marginRight: '4px', color: '#ffb020' }} /></span>
+              {hasPermission('admin:settings') && <button onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ffb020', padding: '0 2px', fontSize: '0.6rem', verticalAlign: 'middle' }} title="Force unlock">✕</button>}
+            </>}
             {q.referenceNumber || (
               <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>
             )}

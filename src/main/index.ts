@@ -3113,6 +3113,7 @@ app.whenReady().then(() => {
   safeHandle('db:getQuotation', (event, id) => { requireSession(event); return db.getQuotation(id) })
   safeHandle('quotation:lock', async (event, id) => { const user = requireSession(event); return db.lockQuotation(id, user.id) })
   safeHandle('quotation:unlock', async (event, id) => { const user = requireSession(event); return db.unlockQuotation(id, user.id) })
+  safeHandle('quotation:heartbeat', async (event, id) => { const user = requireSession(event); return db.quotationHeartbeat(id, user.id) })
   safeHandle('quotation:forceUnlock', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.forceUnlockQuotation(id) })
   safeHandle('quotation:getLock', (event, id) => { requireSession(event); return db.getQuotationLock(id) })
   safeHandle('db:addQuotation', async (event, q) => {

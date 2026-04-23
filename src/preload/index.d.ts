@@ -607,6 +607,7 @@ export interface Api {
   getQuotation: (id: string) => Promise<Quotation | null>
   quotationLock: (id: string) => Promise<{ success: boolean; lockedBy?: string; lockedByName?: string }>
   quotationUnlock: (id: string) => Promise<void>
+  quotationHeartbeat: (id: string) => Promise<{ success: boolean }>
   quotationForceUnlock: (id: string) => Promise<void>
   quotationGetLock: (id: string) => Promise<{ lockedBy: string | null; lockedByName: string | null; lockedAt: string | null }>
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
