@@ -36,7 +36,7 @@ interface FlatItem {
 
 export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSearchProps) {
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
   const [loading, setLoading] = useState(false)

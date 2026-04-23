@@ -100,7 +100,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     const { showSuccess, showError } = useToast()
     const canManage = hasPermission('renewals:manage')
     const canNotes = hasPermission('renewals:notes') || canManage
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
     const now = new Date()
     const [selectedYear, setSelectedYear] = useState(now.getFullYear())
     const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1) // 1-based

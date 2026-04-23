@@ -153,7 +153,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   const { showSuccess, showError } = useToast()
   const { theme } = useTheme()
   const { hasPermission, user } = useAuth()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const loadIdRef = useRef(0)
 
   // Column preferences

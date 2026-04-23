@@ -30,7 +30,7 @@ export default function ReminderCenter({ onNavigateToVessel }: { onNavigateToVes
   const canManage = hasPermission('reminders:manage')
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
 
   const loadData = async () => {
     setIsLoading(true)

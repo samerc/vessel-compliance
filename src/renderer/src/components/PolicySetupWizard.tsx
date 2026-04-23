@@ -54,7 +54,7 @@ interface WizardData {
 
 export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
 
   const [currentStep, setCurrentStep] = useState(0)

@@ -32,7 +32,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
 
     // Pagination State
     const [page, setPage] = useState(1)

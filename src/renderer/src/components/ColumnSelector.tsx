@@ -51,7 +51,7 @@ export function useColumnPrefs(pageKey: string, allColumns: ColumnDef[]): {
 export default function ColumnSelector({ allColumns, visibleColumns, onChange }: ColumnSelectorProps) {
   const [open, setOpen] = useState(false)
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const ref = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 

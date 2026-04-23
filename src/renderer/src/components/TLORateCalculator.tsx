@@ -6,7 +6,7 @@ export default function TLORateCalculator() {
   const [premium, setPremium] = useState('')
   const [newValue, setNewValue] = useState('')
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
 
   const calculation = useMemo(() => {
     const cv = parseFloat(currentValue) || 0

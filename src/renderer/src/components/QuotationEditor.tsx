@@ -130,7 +130,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
     const currentStep = allWorkflowSteps.find(s => s.id === q.workflowStepId)
     const stepCanEdit = currentStep ? currentStep.canEdit !== false : true
     const stepCanExport = currentStep ? currentStep.canExport !== false : true

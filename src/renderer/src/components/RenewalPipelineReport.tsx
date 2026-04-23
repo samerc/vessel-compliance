@@ -112,7 +112,7 @@ function KPI({ icon, gradient, label, value, sub }: {
 
 export default function RenewalPipelineReport() {
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
 
   const now = new Date()

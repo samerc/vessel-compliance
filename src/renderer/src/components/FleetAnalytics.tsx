@@ -398,7 +398,7 @@ const tdStyle = (idx: number): React.CSSProperties => ({
 
 export default function FleetAnalytics() {
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
   useAuth()
 

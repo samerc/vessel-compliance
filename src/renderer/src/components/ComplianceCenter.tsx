@@ -95,7 +95,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
     const canReview = hasPermission('compliance:review')
 
     // Sanctions compliance state

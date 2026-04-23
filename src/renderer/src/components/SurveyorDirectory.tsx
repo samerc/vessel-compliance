@@ -23,7 +23,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
 
 export default function SurveyorDirectory() {
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
   const { hasPermission } = useAuth()
   const canManage = hasPermission('surveys:manage')

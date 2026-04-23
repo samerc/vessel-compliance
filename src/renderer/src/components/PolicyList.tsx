@@ -95,7 +95,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const { showError, showSuccess } = useToast()
     const { hasPermission } = useAuth()
     const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
     const { visibleColumns, setVisibleColumns } = useColumnPrefs('policies', POLICY_COLUMNS)
     const visibleSet = new Set(visibleColumns)
 

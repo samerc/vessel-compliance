@@ -66,7 +66,7 @@ export default function QuotationSettings() {
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
     const canSettings = hasPermission('quotations:settings')
 
     const handleCategoryChange = (cat: SettingsCategory) => {
@@ -2278,7 +2278,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
     const [editText, setEditText] = useState('')
     const [showAdd, setShowAdd] = useState(false)
     const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
 
     useEffect(() => { loadData() }, [])
 
@@ -2431,7 +2431,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
     const [editText, setEditText] = useState('')
     const [showAdd, setShowAdd] = useState(false)
     const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
 
     useEffect(() => { loadData() }, [])
 
@@ -2556,7 +2556,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
     const [editName, setEditName] = useState('')
     const [editText, setEditText] = useState('')
     const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
 
     useEffect(() => { loadData() }, [])
 
@@ -3071,7 +3071,7 @@ function StandardTextsTab({ showSuccess }: TabProps) {
     const [loaded, setLoaded] = useState(false)
     const [activeSection, setActiveSection] = useState(STANDARD_TEXT_SECTIONS[0])
     const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
 
     useEffect(() => { loadData() }, [])
 
@@ -4990,7 +4990,7 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
     const [showBulkImport, setShowBulkImport] = useState(false)
     const [bulkText, setBulkText] = useState('')
     const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
 
     // Institute Clauses state (only used when section === 'conditions')
     const [instituteClauses, setInstituteClauses] = useState<any[]>([])

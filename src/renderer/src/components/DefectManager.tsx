@@ -35,7 +35,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [expandedDefectIds, setExpandedDefectIds] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
 
   // Confirmation modal state
   const [confirmation, setConfirmation] = useState<{

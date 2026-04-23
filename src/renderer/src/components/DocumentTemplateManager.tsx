@@ -47,7 +47,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
   const { showSuccess, showError } = useToast()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
   const canManage = hasPermission('admin:settings')
 
   const [templates, setTemplates] = useState<DocumentTemplate[]>([])

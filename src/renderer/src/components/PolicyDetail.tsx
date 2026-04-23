@@ -293,7 +293,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const { showError, showSuccess } = useToast()
   const { hasPermission, user } = useAuth()
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -3391,7 +3391,7 @@ function RevisionHistorySection({ policyNumber, currentPolicyId, onViewRevision 
   const [revisions, setRevisions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+  const isLight = theme === 'light' || theme === 'aurora'
 
   useEffect(() => {
     if (!policyNumber) { setLoading(false); return }

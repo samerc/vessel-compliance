@@ -29,7 +29,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     const dragExcRef = useRef<number | null>(null)
     const dragCustomRef = useRef<number | null>(null)
     const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
+    const isLight = theme === 'light' || theme === 'aurora'
 
     useEffect(() => { loadData() }, [])
 
