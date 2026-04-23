@@ -111,6 +111,7 @@ export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolic
             {view === 'settings' && canSettings && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
                 <QuotationEditor
+                    key={editingQuotation.id}
                     quotation={editingQuotation}
                     onBack={handleBackToList}
                     onOpenQuotation={handleOpenEditor}
