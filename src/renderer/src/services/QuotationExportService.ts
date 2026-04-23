@@ -504,25 +504,47 @@ function vesselName(data: QuotationData): string {
 }
 
 function getFileName(data: QuotationData, ext: string): string {
-  const ref = data.quotation.referenceNumber || 'Quotation'
-  const rev = data.quotation.revisionNumber ? `-R${data.quotation.revisionNumber}` : ''
-  let name = 'Quotation'
-  if (data.quotationVessels.length > 0) {
-    // Check if all quotation vessels belong to the same fleet
-    const fleetIds = data.quotationVessels
+  const year = new Date().getFullYear()
+  const typeName = data.quotation.quotationTypeName || 'P&I'
+  const broker = data.quotation.customerName || data.quotation.coName || getBrokerName(data) || ''
+  const rev = data.quotation.revisionNumber ? ` - R${data.quotation.revisionNumber}` : ''
+
+  // Determine subject: fleet name, vessel name(s), or managers
+  let subject = ''
+  const vessels = data.quotationVessels
+  if (vessels.length > 0) {
+    // Check if all vessels belong to the same fleet
+    const fleetIds = vessels
       .map(qv => qv.vesselId ? data.allVessels.find(v => v.id === qv.vesselId)?.fleetId : undefined)
       .filter(Boolean) as string[]
     const uniqueFleetIds = [...new Set(fleetIds)]
-    if (uniqueFleetIds.length === 1 && fleetIds.length === data.quotationVessels.length) {
+    if (uniqueFleetIds.length === 1 && fleetIds.length === vessels.length) {
       const fleet = data.fleets.find(f => f.id === uniqueFleetIds[0])
-      if (fleet) name = fleet.name
-      else name = getVesselInfo(data.quotationVessels[0], data.allVessels, data.flagStates).name
-    } else {
-      name = getVesselInfo(data.quotationVessels[0], data.allVessels, data.flagStates).name
+      if (fleet) subject = fleet.name
+    }
+    if (!subject) {
+      if (vessels.length === 1) {
+        subject = getVesselInfo(vessels[0], data.allVessels, data.flagStates).name
+      } else if (vessels.length === 2) {
+        subject = vessels.map(qv => getVesselInfo(qv, data.allVessels, data.flagStates).name).join(' & ')
+      } else {
+        // 3+ vessels, no fleet — try common manager
+        const managers = data.assureds.filter(a => a.role?.toLowerCase().includes('manager'))
+        const uniqueManagers = [...new Set(managers.map(m => m.name))]
+        if (uniqueManagers.length === 1) {
+          subject = uniqueManagers[0]
+        } else {
+          subject = getVesselInfo(vessels[0], data.allVessels, data.flagStates).name + ' and others'
+        }
+      }
     }
   }
-  name = name.replace(/[^a-zA-Z0-9]/g, '_')
-  return `${ref}${rev}_${name}.${ext}`
+
+  // Build: Subject - Type Quote Year - Broker
+  const parts = [subject, `${typeName} Quote ${year}`]
+  if (broker) parts.push(broker)
+  const filename = parts.filter(Boolean).join(' - ') + rev
+  return filename.replace(/[<>:"/\\|?*]/g, '_') + '.' + ext
 }
 
 function getExclusionTexts(data: QuotationData): string[] {
