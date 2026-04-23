@@ -1145,101 +1145,6 @@ Prevents concurrent editing of the same quotation:
 - **MoneyInput component**: Shows thousand separators when not focused, raw number while editing
 - **Applied to**: Sum insured amount, per-vessel amounts, Section 2 amount, premium, deductible amounts
 
-### Quotation Registry
-
-Excel-based quotation numbering system for formal reference tracking:
-
-- **Path**: Configurable in Admin Panel → File Paths section
-- **Reference format**: `Q/{R|N}/{branch}/{YY}/{serial}` (R=renewal, N=new)
-- **Serial**: Reads last serial from column D of current year sheet in the Excel workbook
-- **Row written**: Date, Type, Branch, Serial, Reference, Managers, Vessel, IMO, Type, Broker, Remarks
-- **Cancellation**: Cancelled numbers marked as CANCELLED in Remarks column (K)
-- **Year sheets**: Creates new year sheet if needed (copies header from existing sheet)
-- **Fallback**: DB counter used if no registry path configured
-- **IPC**: `quotationRegistry:getPath`, `quotationRegistry:setPath`, `quotationRegistry:browse`
-
-### Quotation Workflow
-
-Approval workflow with step-based constraints:
-
-- **Tables**: `quotation_workflow_steps` (name, order_index, can_edit, can_export, is_initial, color), `quotation_workflow_log` (quotation_id, from_step_id, to_step_id, user_id, note, created_at)
-- **Auto-assign**: New quotations auto-assigned to the initial workflow step
-- **Constraints**: `canEdit`/`canExport` per step enforced in editor (approved quotations are read-only with green banner and `pointer-events: none` overlay)
-- **Step deletion**: Blocked when quotations currently have that step assigned
-- **Single initial**: Only one step can be marked `is_initial`
-- **Transaction**: Workflow move wrapped in DB transaction (update step + insert log)
-- **History**: Workflow log displayed in editor via History button
-- **Status flow**: `draft` → `approved` (on approval step) → `exported` (on first export) → `converted`
-- **Status badges**: Colored badges in QuotationList (draft=gray, approved=green, exported=blue, converted=purple)
-- **Export gating**: Draft export for users without approve permission (toast notification); Approve & Export modal for users with permission
-- **IPC**: `quotationWorkflow:*` prefix
-
-### Quotation Export Enhancements
-
-- **Revision display**: Centered "Rev.N" below title (not in title text)
-- **Reference**: Includes `/RN` suffix for revisions
-- **Export date**: Always today (not quotation creation date)
-- **Filename**: `{subject} - {type} Quote {year} - {broker}`
-- **TBA owners**: "TBA" shown as Registered Owners when no assureds defined
-- **IACS classification**: Always listed first when vessel has dual classification
-
-### Pro-Rata Premium (Quotation)
-
-Automatic pro-rata calculation for short-period quotations:
-
-- **Auto-detect**: Period < 12 months detected from `periodText` field
-- **Calculation**: User enters annual premium; pro-rata auto-calculates based on months
-- **Toggle**: Manual enable/disable override
-- **Editable months**: Months field editable for fine-tuning
-- **Export**: Annual amount "per annum" + "Pro-rata premium: {amount}" line
-
-### Outstanding Premium Notice
-
-- **Toggle**: Checkbox + configurable text + bold/underline toggles per quotation
-- **Default text**: Configurable in Policy Settings → Premium Intro
-- **Export**: Rendered in both quotation and policy DOCX exports
-
-### Full Premium in Case of Loss
-
-- **Toggle**: Checkbox + configurable text (no bold/underline toggles)
-- **Default text**: Configurable in Policy Settings → Premium Intro
-- **Export**: Rendered in both quotation and policy DOCX exports
-
-### Entity Classification (IACS Priority)
-
-- **IACS first**: When a vessel has dual classification societies, IACS member is always displayed first
-- **Applied to**: VesselDetail display, quotation exports, policy exports
-
-### Cargo Quotation Specifics
-
-- **Rate-based premium**: Rate % input → calculated premium amount (no "p.a." suffix, no previous premium display)
-- **TBA vessel**: Checkbox (cargo-only) to mark vessel as TBA
-- **Cargo clause**: Cargo warranties and exclusions only visible when a cargo clause is selected
-
-### User Management Enhancements
-
-- **Editable username**: Username can be changed (uniqueness enforced server-side)
-- **Full name**: Optional `full_name` field on `users` table
-
-### File Path Resolution (Remote/VPN Users)
-
-Configurable local↔network path mapping for users connecting via VPN:
-
-- **Admin Settings**: File Paths section with Local Path (server, e.g. `C:\folder1`) and Network Path (UNC, e.g. `\\192.168.10.1\folder1`)
-- **Auto-detection**: Reads `db-config.json` host — `localhost`/`127.0.0.1` = server user, other = remote user
-- **`resolveFilePath(dbPath)`**: Replaces local prefix with network prefix for remote users (used in `fs:open`, `shell:showItemInFolder`)
-- **`canonicalizeFilePath(userPath)`**: Replaces network prefix with local prefix before saving to DB (used in `dialog:openFileAny`)
-- **Upload blocking**: Remote users blocked from uploading files not on the shared folder (`isSharedPath` check)
-- **`fileTypesValidateFile`**: Returns `canonicalPath` alongside validation for drag-drop uploads
-- **Settings stored in**: `app_settings` key `filePathSettings` (JSON: `{ localPath, networkPath }`)
-- **IPC**: `filePath:getSettings`, `filePath:setSettings`, `filePath:canonicalize`, `filePath:resolve`
-
-### Abandoned Draft Quotation Cleanup
-
-- **QuotationEditor**: Tracks edits via `hasEdited` ref, set `true` on any `updateField` call
-- **Back navigation**: If draft + no edits + created <60s ago + no vessels → auto-deleted
-- **Applies to**: Renewal quotations from PolicyRenewals, new quotations — prevents orphaned empty drafts
-
 ### Quotation Registry (Excel-Based Numbering)
 
 Excel registry file for quotation numbering and logging:
@@ -1260,10 +1165,11 @@ Excel registry file for quotation numbering and logging:
 - **canEdit/canExport**: Step constraints enforced — `canEdit=false` disables editing with blue banner, `canExport=false` blocks Approve & Export (draft export always allowed)
 - **Step deletion**: Blocked when quotations exist on the step
 - **Single initial**: Setting a step as initial unsets all others
-- **Transaction**: Workflow move (update + log insert) wrapped in transaction
+- **Transaction**: Workflow move (update + log insert) wrapped in transaction, validates transition exists
 - **Workflow log**: History button in editor shows transition log dropdown
 - **Approved = read-only**: Green banner + pointer-events overlay blocks all interaction. "Create a new revision from the Actions menu"
 - **Status flow**: `draft` → `approved` (on approval) → `exported` (on export) → `converted` (on policy conversion)
+- **Status badges**: Colored badges in QuotationList (draft=gray, approved=green, exported=teal, converted=purple)
 - **Locked quotations**: Blocked from opening entirely (not read-only, error toast)
 
 ### Quotation Lock Heartbeat
@@ -1272,13 +1178,14 @@ Excel registry file for quotation numbering and logging:
 - **Inactivity**: After 10 min idle (no mouse/keyboard), heartbeat stops
 - **Lock expiry**: 5 min (reduced from 30 min)
 - **Re-lock**: When user returns from idle, attempts to re-acquire lock
-- **Admin force-unlock**: ✕ button next to lock icon in QuotationList (admin only)
+- **Admin force-unlock**: Unlock button in QuotationList actions column (admin only), lock badge with username next to reference
 - **IPC**: `quotation:heartbeat`
 
 ### Quotation Export Enhancements
 
-- **Date**: Always today's date (not quotation creation date)
-- **Revision**: Centered "Rev.N" below title, reference suffix `/RN`
+- **Revision display**: Centered "Rev.N" below title (not in title text)
+- **Reference**: Includes `/RN` suffix for revisions
+- **Export date**: Always today (not quotation creation date)
 - **Filename**: `{subject} - {type} Quote {year} - {broker}` — 1 vessel=name, 2=Name1 & Name2, 2+ same fleet=fleet, 3+ same manager=manager, else first and others
 - **Draft export**: Users without `quotations:approve` get toast "Exporting as draft"; users with permission get Approve & Export modal
 - **TBA**: When no assureds defined, shows "TBA" as Registered Owners
@@ -1303,17 +1210,70 @@ Two checkbox-based notices in PremiumTab (non-cargo):
 - **Settings**: Defaults in Policy Settings → Premium Intro
 - **Export**: Rendered after instalments in quotation (PDF/DOCX) and policy exports
 
-### Survey Warranty Template Enhancements
+### Entity Classification (IACS Priority)
 
-- **Title**: Optional title field for easy reference in template list and editor picker
-- **New placeholders**: `{surveyor}` (green) and `{dateofsurvey}` (amber)
-- **Schema**: `title` on `survey_warranty_templates`, `surveyor_value`/`date_of_survey_value` on `quotation_survey_warranties`
-- **UI sections**: Templates and selected warranties visually separated with headers
+- **IACS first**: When a vessel has dual classification societies, IACS member is always displayed first
+- **Applied to**: VesselDetail display, quotation exports, policy exports
 
 ### Cargo Quotation Specifics
 
-- **Premium**: Rate (%) input with auto-calculated premium from insuredValue × rate. No "p.a." suffix, no previous premium
-- **TBA vessel**: "Any other vessel(s) to be agreed" checkbox (cargo only, updates local state via `setQ`)
+- **Rate-based premium**: Rate % input → calculated premium amount (no "p.a." suffix, no previous premium display)
+- **TBA vessel**: "Any other vessel(s) to be agreed" checkbox (cargo-only, updates local state via `setQ`)
+- **Cargo clause**: Cargo warranties and exclusions only visible when cargo quotation type OR cargo clause selected in P&I conditions
+
+### User Management Enhancements
+
+- **Editable username**: Username can be changed (uniqueness enforced server-side)
+- **Full name**: Optional `full_name` field on `users` table
+
+### Vessel Classification Change
+
+- **Confirmation modal**: When selecting a new class and one exists, asks "Replace" or "Add Alongside"
+- **Prevents accidental dual-class**: Users who meant to change class won't accidentally add a second one
+
+### File Path Resolution (Remote/VPN Users)
+
+Configurable local↔network path mapping for users connecting via VPN:
+
+- **Admin Settings**: File Paths section with Local Path (server, e.g. `C:\folder1`) and Network Path (UNC, e.g. `\\192.168.10.1\folder1`)
+- **Auto-detection**: Reads `db-config.json` host — `localhost`/`127.0.0.1` = server user, other = remote user
+- **`resolveFilePath(dbPath)`**: Replaces local prefix with network prefix for remote users (used in `fs:open`, `shell:showItemInFolder`)
+- **`canonicalizeFilePath(userPath)`**: Replaces network prefix with local prefix before saving to DB (used in `dialog:openFileAny`)
+- **Upload blocking**: Remote users blocked from uploading files not on the shared folder (`isSharedPath` check)
+- **`fileTypesValidateFile`**: Returns `canonicalPath` alongside validation for drag-drop uploads
+- **Settings stored in**: `app_settings` key `filePathSettings` (JSON: `{ localPath, networkPath }`)
+- **IPC**: `filePath:getSettings`, `filePath:setSettings`, `filePath:canonicalize`, `filePath:resolve`
+
+### Abandoned Draft Quotation Cleanup
+
+- **QuotationEditor**: Tracks edits via `hasEdited` ref, set `true` on any `updateField` call
+- **Back navigation**: If draft + no edits + created <60s ago + no vessels → auto-deleted
+- **Applies to**: Renewal quotations from PolicyRenewals, new quotations — prevents orphaned empty drafts
+
+### Survey Warranty Templates for Quotations
+
+- **Templates** (`survey_warranty_templates`): Text with {deadline}, {days}, {event}, {surveyor}, {dateofsurvey} placeholders. Title field for easy reference.
+- **Placeholders**: {deadline} (blue), {days} (purple), {event} (red), {surveyor} (green), {dateofsurvey} (amber)
+- **Sets** (`survey_warranty_template_sets`): Named groups for batch-apply
+- **Editor Tab**: "Survey Warranties" in all quotation types. Templates and selected items visually separated.
+- **Placeholder Inputs**: Dropdown presets for deadline, number input for days, text for event/surveyor/dateofsurvey
+
+### Conditions Sub-Tabs
+
+- **P&I Conditions**: Split into "Clauses" and "Additional Clauses" sub-tabs with count badges
+- **Hull Conditions**: Split into "Conditions", "Additional Conditions", and "Custom" sub-tabs with count badges
+
+### Deductible MoneyInput
+
+- **MoneyInput**: Shared component in `shared.tsx` — shows thousand separators when not focused, raw number while editing
+- **Applied to**: All deductible amount fields (primary, secondary, previous, per-vessel)
+- **Layout**: Previous amounts on dedicated second row below main amounts
+
+### Theme System
+
+- **Light themes**: `light`, `aurora` — use light backgrounds, dark text, visible borders
+- **Dark themes**: `dark`, `premium` (Frost) — use dark backgrounds, light text
+- **`isLight` check**: `theme === 'light' || theme === 'aurora'` — used across all 48+ components for conditional styling
 - **Cargo warranties/exclusions**: Only visible when cargo quotation type OR cargo clause selected in P&I conditions
 
 ### User Management Enhancements

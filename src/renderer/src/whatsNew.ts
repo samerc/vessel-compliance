@@ -17,6 +17,30 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    version: '7.6.0',
+    date: '2026-04-23',
+    items: [
+      { tag: 'New', text: 'Configurable entity document types — add/edit document types for companies and persons in Admin Panel' },
+      { tag: 'New', text: 'Quotation registry — Excel-based numbering with configurable path, cancelled numbers tracked' },
+      { tag: 'New', text: 'Pro-rata premium with auto-detection from period text and manual override' },
+      { tag: 'New', text: 'Outstanding premium and full premium loss notices with configurable text' },
+      { tag: 'New', text: 'Quotation workflow enforcement — approval locks, status badges, heartbeat locking' },
+      { tag: 'New', text: 'File path resolution for VPN/remote users with auto-detection' },
+      { tag: 'New', text: 'Survey warranty template titles and {surveyor}/{dateofsurvey} placeholders' },
+      { tag: 'Improved', text: 'AssuredManager redesigned with table + slide-in panel layout' },
+      { tag: 'Improved', text: 'P&I Conditions and Hull Conditions split into sub-tabs' },
+      { tag: 'Improved', text: 'Credit advice: broker header, configurable commission wording' },
+      { tag: 'Improved', text: 'Quotation export: revision display, smart filenames, TBA owners, IACS first' },
+      { tag: 'Improved', text: 'Deductible amounts show thousand separators' },
+      { tag: 'Improved', text: 'Classification change confirmation (Replace or Add Alongside)' },
+      { tag: 'Improved', text: 'Dashboard widget grid and card borders fixed for light themes' },
+      { tag: 'Fixed', text: 'Aurora and Frost themes: proper light/dark detection across all components' },
+      { tag: 'Fixed', text: 'War excess export: missing interest, sum insured, and premium values' },
+      { tag: 'Fixed', text: 'Cargo warranties only visible when cargo clause is selected' },
+      { tag: 'Fixed', text: 'Renewal quotations now visible in quotation list (quotationDate set)' },
+    ]
+  },
+  {
     version: '7.3.0',
     date: '2026-04-17',
     items: [
