@@ -718,13 +718,14 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   doc.setTextColor(0, 0, 0)
   const isCargoPdf = data.quotation.quotationTypeCode === 'C'
   const typeLabel = isCargoPdf ? 'Marine Cargo' : data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'
+  const revSuffix = data.quotation.revisionNumber ? ` - Rev.${data.quotation.revisionNumber}` : ''
   const pdfTitleText = isCargoPdf
-    ? `${typeLabel} Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}`
-    : `${typeLabel} QUOTATION FOR ${docTitle}`
+    ? `${typeLabel} Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}${revSuffix}`
+    : `${typeLabel} QUOTATION FOR ${docTitle}${revSuffix}`
   doc.text(pdfTitleText, pageWidth / 2, startY, { align: 'center' })
   doc.setFontSize(11)
   doc.setFont('helvetica', 'normal')
-  const refWithRev = (data.quotation.referenceNumber || '-') + (data.quotation.revisionNumber ? `-R${data.quotation.revisionNumber}` : '')
+  const refWithRev = (data.quotation.referenceNumber || '-') + (data.quotation.revisionNumber ? `/R${data.quotation.revisionNumber}` : '')
   doc.text(dateStr, pageWidth - margin, startY + 10, { align: 'right' })
   doc.text(`Ref: ${refWithRev}`, margin, startY + 18)
 
@@ -4034,8 +4035,28 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const rows: TableRow[] = []
           rows.push(premRow(lines.length > 1 ? 'Technical Premium' : '', ''))
           for (const l of lines) {
-            const prevText = wq.previousPremiumAmount != null && wq.previousPremiumAmount !== l.tech && lines.length === 1 ? ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})` : ''
-            rows.push(premRow(l.label || 'Technical Premium', `${formatCurrency(l.tech, wq.premiumCurrency)}${prevText}`))
+            const hasPrev = wq.previousPremiumAmount != null && wq.previousPremiumAmount !== l.tech && lines.length === 1
+            if (hasPrev) {
+              // Custom row with red previous amount
+              rows.push(new TableRow({
+                children: [
+                  premCell(l.label || 'Technical Premium', true, undefined, premLabelW),
+                  new TableCell({
+                    borders: noBorders(),
+                    width: { size: premAmtW, type: WidthType.DXA },
+                    children: [new Paragraph({
+                      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                      children: [
+                        new TextRun({ text: formatCurrency(l.tech, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' }),
+                        new TextRun({ text: ` (previously ${formatCurrency(wq.previousPremiumAmount!, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED })
+                      ]
+                    })]
+                  })
+                ]
+              }))
+            } else {
+              rows.push(premRow(l.label || 'Technical Premium', formatCurrency(l.tech, wq.premiumCurrency)))
+            }
           }
           rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', ''))
           for (const l of lines) {
@@ -4363,9 +4384,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       alignment: AlignmentType.CENTER,
       spacing: { after: 100 },
       children: [
-        new TextRun({ text: data.quotation.quotationTypeCode === 'C'
+        new TextRun({ text: (data.quotation.quotationTypeCode === 'C'
           ? `Marine Cargo Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}`
-          : `${data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`, bold: true, size: 26, font: 'Arial', color: '000000' })
+          : `${data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`) + (data.quotation.revisionNumber ? ` - Rev.${data.quotation.revisionNumber}` : ''), bold: true, size: 26, font: 'Arial', color: '000000' })
       ]
     }),
     new Paragraph({
@@ -4375,7 +4396,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }),
     new Paragraph({
       spacing: { after: 200 },
-      children: [new TextRun({ text: `Ref: ${data.quotation.referenceNumber || '-'}${data.quotation.revisionNumber ? `-R${data.quotation.revisionNumber}` : ''}`, size: 22, font: 'Arial', color: '000000' })]
+      children: [new TextRun({ text: `Ref: ${data.quotation.referenceNumber || '-'}${data.quotation.revisionNumber ? `/R${data.quotation.revisionNumber}` : ''}`, size: 22, font: 'Arial', color: '000000' })]
     }),
     mainTable,
     ...afterTable
