@@ -576,9 +576,18 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     void statusColors
 
     const handleBack = async () => {
-        // If draft quotation with no edits, delete it (abandoned renewal/creation)
+        // If draft quotation with no edits, created very recently, and has no vessels — delete it (abandoned creation)
         if (isDraft && !hasEdited.current) {
-            try { await window.api.deleteQuotation(q.id) } catch { /* ignore */ }
+            const createdAt = q.createdAt ? new Date(q.createdAt).getTime() : 0
+            const ageSeconds = (Date.now() - createdAt) / 1000
+            if (ageSeconds < 60) {
+                try {
+                    const vess = await window.api.getQuotationVessels(q.id)
+                    if (!Array.isArray(vess) || vess.length === 0) {
+                        await window.api.deleteQuotation(q.id)
+                    }
+                } catch { /* ignore */ }
+            }
         }
         onBack()
     }
