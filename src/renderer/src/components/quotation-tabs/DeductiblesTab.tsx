@@ -193,12 +193,12 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         {d.title && <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{d.title}</span>}
                         <input type="text" defaultValue={d.currency} onBlur={e => handleUpdate(d.id, { currency: e.target.value })} style={{ width: '60px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         {!(qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts)) && (
-                            <MoneyInput value={d.amount || undefined} onChange={() => {}} onBlur={val => handleUpdate(d.id, { amount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                            <MoneyInput value={d.amount || undefined} onChange={val => setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, amount: val || 0 } : dd))} onBlur={val => handleUpdate(d.id, { amount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         )}
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
-                                <MoneyInput value={d.secondaryAmount || undefined} onChange={() => {}} onBlur={val => handleUpdate(d.id, { secondaryAmount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
+                                <MoneyInput value={d.secondaryAmount || undefined} onChange={val => setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, secondaryAmount: val || 0 } : dd))} onBlur={val => handleUpdate(d.id, { secondaryAmount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                             </>
                         )}
                         {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>custom</span>}
@@ -210,12 +210,12 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingLeft: '24px', marginBottom: '4px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous:</span>
-                            <MoneyInput value={d.previousAmount} onChange={() => {}} onBlur={val => handleUpdate(d.id, { previousAmount: val || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
+                            <MoneyInput value={d.previousAmount} onChange={val => setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, previousAmount: val ?? null } : dd))} onBlur={val => handleUpdate(d.id, { previousAmount: val || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
                         </div>
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous 2nd:</span>
-                                <MoneyInput value={d.previousSecondaryAmount} onChange={() => {}} onBlur={val => handleUpdate(d.id, { previousSecondaryAmount: val || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
+                                <MoneyInput value={d.previousSecondaryAmount} onChange={val => setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, previousSecondaryAmount: val ?? null } : dd))} onBlur={val => handleUpdate(d.id, { previousSecondaryAmount: val || null })} placeholder="—" style={{ width: '90px', padding: '3px 6px', fontSize: '0.75rem', color: 'var(--danger)', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))' }} />
                             </div>
                         )}
                     </div>
