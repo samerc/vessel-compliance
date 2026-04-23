@@ -829,10 +829,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                         top: (stepMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
                                         left: stepMenuRef.current?.getBoundingClientRect().left || 0,
                                         zIndex: 9999,
-                                        background: isLight ? '#ffffff' : '#1a1d28', border: `1px solid ${isLight ? '#e0e0e0' : 'var(--glass-border)'}`,
-                                        borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.3)'
+                                        backgroundColor: isLight ? '#ffffff' : '#1a1d28',
+                                        border: `1px solid ${isLight ? '#d0d0d0' : 'rgba(255,255,255,0.1)'}`,
+                                        borderRadius: '10px', padding: '6px', minWidth: '220px',
+                                        boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.15)' : '0 8px 24px rgba(0,0,0,0.3)',
+                                        colorScheme: isLight ? 'light' : 'dark'
                                     }}>
-                                        <div style={{ padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, color: isLight ? '#888' : 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Move to...</div>
+                                        <div style={{ padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, color: isLight ? '#777' : '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Move to...</div>
                                         {reachableSteps.map(step => (
                                             <button
                                                 key={step.id}
@@ -840,12 +843,12 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
                                                     padding: '8px 12px', border: 'none', borderRadius: '6px',
-                                                    background: 'transparent', color: isLight ? '#333' : 'var(--text-primary)',
+                                                    backgroundColor: 'transparent', color: isLight ? '#222' : '#e0e0e0',
                                                     cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left'
                                                 }}
                                                 className="hover-effect"
                                             >
-                                                <span style={{ width: 10, height: 10, borderRadius: '50%', background: step.color, flexShrink: 0 }} />
+                                                <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: step.color, flexShrink: 0 }} />
                                                 {step.name}
                                                 {step.isLockPoint && <Lock size={12} style={{ opacity: 0.4, marginLeft: 'auto' }} />}
                                             </button>
