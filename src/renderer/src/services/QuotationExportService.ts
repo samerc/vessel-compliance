@@ -718,16 +718,16 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   doc.setTextColor(0, 0, 0)
   const isCargoPdf = data.quotation.quotationTypeCode === 'C'
   const typeLabel = isCargoPdf ? 'Marine Cargo' : data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'
-  const revSuffix = data.quotation.revisionNumber ? ` - Rev.${data.quotation.revisionNumber}` : ''
   const pdfTitleText = isCargoPdf
-    ? `${typeLabel} Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}${revSuffix}`
-    : `${typeLabel} QUOTATION FOR ${docTitle}${revSuffix}`
+    ? `${typeLabel} Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}`
+    : `${typeLabel} QUOTATION FOR ${docTitle}`
   doc.text(pdfTitleText, pageWidth / 2, startY, { align: 'center' })
   doc.setFontSize(11)
   doc.setFont('helvetica', 'normal')
   const refWithRev = (data.quotation.referenceNumber || '-') + (data.quotation.revisionNumber ? `/R${data.quotation.revisionNumber}` : '')
   doc.text(dateStr, pageWidth - margin, startY + 10, { align: 'right' })
   doc.text(`Ref: ${refWithRev}`, margin, startY + 18)
+  if (data.quotation.revisionNumber) doc.text(`Rev.${data.quotation.revisionNumber}`, pageWidth / 2, startY + 18, { align: 'center' })
 
   // Build two-column sections into a map keyed by section ID
   const sectionMap = new Map<string, [string, string]>()
@@ -4384,9 +4384,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       alignment: AlignmentType.CENTER,
       spacing: { after: 100 },
       children: [
-        new TextRun({ text: (data.quotation.quotationTypeCode === 'C'
+        new TextRun({ text: data.quotation.quotationTypeCode === 'C'
           ? `Marine Cargo Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}`
-          : `${data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`) + (data.quotation.revisionNumber ? ` - Rev.${data.quotation.revisionNumber}` : ''), bold: true, size: 26, font: 'Arial', color: '000000' })
+          : `${data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`, bold: true, size: 26, font: 'Arial', color: '000000' })
       ]
     }),
     new Paragraph({
@@ -4395,9 +4395,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       children: [new TextRun({ text: dateStr, size: 22, font: 'Arial', color: '000000' })]
     }),
     new Paragraph({
-      spacing: { after: 200 },
+      spacing: { after: data.quotation.revisionNumber ? 0 : 200 },
       children: [new TextRun({ text: `Ref: ${data.quotation.referenceNumber || '-'}${data.quotation.revisionNumber ? `/R${data.quotation.revisionNumber}` : ''}`, size: 22, font: 'Arial', color: '000000' })]
     }),
+    ...(data.quotation.revisionNumber ? [new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [new TextRun({ text: `Rev.${data.quotation.revisionNumber}`, size: 22, font: 'Arial', color: '000000' })]
+    })] : []),
     mainTable,
     ...afterTable
   )
