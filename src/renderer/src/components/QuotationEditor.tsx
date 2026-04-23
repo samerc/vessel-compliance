@@ -196,7 +196,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         }
     }, [quotation.id])
 
-    const canEdit = hasPermission('quotations:edit') && !isLockedByOther && stepCanEdit
+    const isApproved = q.status === 'approved' || q.status === 'converted'
+    const canEdit = hasPermission('quotations:edit') && !isLockedByOther && stepCanEdit && !isApproved
 
     useEffect(() => {
         loadMasterData()
@@ -725,7 +726,21 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 </div>
             )}
 
-            {!stepCanEdit && !isLockedByOther && (
+            {isApproved && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 16px', marginBottom: '12px', borderRadius: '8px',
+                    background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(0,200,100,0.1)',
+                    border: '1px solid rgba(0,200,100,0.3)',
+                    color: isLight ? '#006630' : '#00c864',
+                    fontSize: '0.85rem', fontWeight: 600
+                }}>
+                    <Shield size={16} />
+                    This quotation is approved and read-only. To make changes, create a new revision from the Actions menu.
+                </div>
+            )}
+
+            {!stepCanEdit && !isLockedByOther && !isApproved && (
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
                     padding: '10px 16px', marginBottom: '12px', borderRadius: '8px',
