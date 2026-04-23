@@ -601,14 +601,12 @@ function App(): React.JSX.Element {
               {hasPermission('vessels:view') && navItem('vessels', <Ship size={18} />, 'Vessels')}
               {hasPermission('vessels:view') && navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
               {hasPermission('fleets:view') && navItem('fleets', <LayoutDashboard size={18} />, 'Fleets')}
-              {hasPermission('analytics:view') && navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
             </NavGroup>
 
             <NavGroup id="compliance" label="Compliance" icon={<ShieldAlert size={14} />}
               groupCollapsed={collapsedGroups.has('compliance')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
               {hasPermission('compliance:view') && navItem('compliance', <ShieldAlert size={18} />, 'Compliance Center')}
-              {hasPermission('policies:view') && navItem('renewals', <Calendar size={18} />, 'Renewals')}
               {hasPermission('sanctions:search') && navItem('sanctions-search', <Search size={18} />, 'Sanctions Search')}
               {hasPermission('reminders:view') && navItem('reminders', <Bell size={18} />, 'Reminders')}
             </NavGroup>
@@ -616,9 +614,9 @@ function App(): React.JSX.Element {
             <NavGroup id="business" label="Business" icon={<FileText size={14} />}
               groupCollapsed={collapsedGroups.has('business')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
+              {hasPermission('policies:view') && navItem('renewals', <Calendar size={18} />, 'Renewals')}
               {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
               {hasPermission('policies:view') && navItem('policies-list', <FileCheck size={18} />, 'Policies')}
-              {navItem('calculators', <Calculator size={18} />, 'Calculators')}
             </NavGroup>
 
             <NavGroup id="operations" label="Operations" icon={<Layers size={14} />}
@@ -628,13 +626,14 @@ function App(): React.JSX.Element {
               {hasPermission('surveys:view') && navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
               {hasPermission('surveys:view') && navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
               {navItem('templates', <Mail size={18} />, 'Templates')}
-              {hasPermission('fileManager:view') && navItem('file-manager', <FolderOpen size={18} />, 'File Manager')}
+              {navItem('calculators', <Calculator size={18} />, 'Calculators')}
             </NavGroup>
 
             <NavGroup id="reports" label="Reports" icon={<BarChart2 size={14} />}
               groupCollapsed={collapsedGroups.has('reports')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
               {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
+              {hasPermission('analytics:view') && navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
               {hasPermission('admin:activityLog') && navItem('activity-log', <ScrollText size={18} />, 'Activity Log')}
             </NavGroup>
 
@@ -643,6 +642,7 @@ function App(): React.JSX.Element {
             >
               {hasPermission('admin:settings') && navItem('admin', <Settings size={18} />, 'Settings')}
               {hasPermission('admin:users') && navItem('users', <UserCog size={18} />, 'User Management')}
+              {hasPermission('fileManager:view') && navItem('file-manager', <FolderOpen size={18} />, 'File Manager')}
             </NavGroup>
           </nav>
 
