@@ -433,12 +433,22 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     }
 
     const handleExportWithDraftCheck = async (format: 'pdf' | 'word') => {
-        if (isDraft && hasPermission('quotations:approve')) {
+        const canApprove = hasPermission('quotations:approve')
+        if (isDraft && canApprove) {
+            // User can approve — show choice: draft or approve & export
             const ok = await runExportWithValidation(q, format, 'approve')
             if (ok) setShowDraftExportModal(format)
             return
         }
-        // If draft but no approve permission, just export as-is with draft number
+        if (isDraft && !canApprove) {
+            // User cannot approve — export as draft with notification
+            const ok = await runExportWithValidation(q, format, 'draft')
+            if (!ok) return
+            showSuccess('Exporting as draft — approval required for final version')
+            await handleExportAsDraft(format)
+            return
+        }
+        // Not a draft — export directly
         const ok = await runExportWithValidation(q, format, 'direct')
         if (!ok) return
         try {
