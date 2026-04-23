@@ -152,7 +152,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         }
     }, [quotation.periodText])
 
-    const proRataMonths = quotation.proRataMonths || parsePeriodMonths(quotation.periodText) || 0
+    const proRataMonths = Math.max(0, quotation.proRataMonths || parsePeriodMonths(quotation.periodText) || 0)
     const computeProRata = (annual: number) => proRataMonths > 0 ? Math.round(annual / 12 * proRataMonths * 100) / 100 : 0
 
     const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled

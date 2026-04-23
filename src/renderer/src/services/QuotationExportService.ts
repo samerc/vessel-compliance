@@ -404,7 +404,7 @@ function fmtPct(val: number | string): string {
 }
 
 function formatCurrency(amount: number | undefined, currency: string | undefined): string {
-  if (amount == null) return '-'
+  if (amount == null || isNaN(amount)) return '-'
   const c = currency || 'USD'
   const isWhole = Number.isInteger(amount)
   return `${c} ${amount.toLocaleString('en-US', { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`

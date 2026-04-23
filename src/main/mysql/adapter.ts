@@ -12455,6 +12455,11 @@ export class MySQLAdapter {
             await conn.beginTransaction()
             const [qRows] = await conn.query('SELECT workflow_step_id FROM quotations WHERE id = ?', [quotationId])
             const fromStepId = (qRows as any[])[0]?.workflow_step_id || null
+            // Validate a transition exists from current step to target step
+            if (fromStepId) {
+                const [transRows] = await conn.query('SELECT id FROM quotation_workflow_transitions WHERE from_step_id = ? AND to_step_id = ?', [fromStepId, toStepId])
+                if ((transRows as any[]).length === 0) throw new Error('No valid transition from current step to target step')
+            }
             const updates: string[] = ['workflow_step_id = ?']
             const params: any[] = [toStepId]
             if (isLockPoint) { updates.push('is_locked = TRUE') }

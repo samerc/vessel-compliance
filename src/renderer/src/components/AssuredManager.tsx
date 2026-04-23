@@ -320,6 +320,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                 showSuccess('Assured removed successfully')
                 setIsAddingAssured(false)
                 setIsAddingUBO(false)
+                if (selectedAssuredId === deleteConfirmation.id) setSelectedAssuredId(null)
                 loadData()
             } catch (error: any) {
                 showError(error.message || 'Failed to remove assured. You may need admin privileges.')
