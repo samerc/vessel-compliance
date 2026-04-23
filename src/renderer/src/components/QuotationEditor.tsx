@@ -829,10 +829,10 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                         top: (stepMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
                                         left: stepMenuRef.current?.getBoundingClientRect().left || 0,
                                         zIndex: 9999,
-                                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
-                                        borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                                        background: isLight ? '#ffffff' : '#1a1d28', border: `1px solid ${isLight ? '#e0e0e0' : 'var(--glass-border)'}`,
+                                        borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.3)'
                                     }}>
-                                        <div style={{ padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Move to...</div>
+                                        <div style={{ padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, color: isLight ? '#888' : 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Move to...</div>
                                         {reachableSteps.map(step => (
                                             <button
                                                 key={step.id}
@@ -840,7 +840,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
                                                     padding: '8px 12px', border: 'none', borderRadius: '6px',
-                                                    background: 'transparent', color: 'var(--text-primary)',
+                                                    background: 'transparent', color: isLight ? '#333' : 'var(--text-primary)',
                                                     cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left'
                                                 }}
                                                 className="hover-effect"
