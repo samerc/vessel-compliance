@@ -696,10 +696,11 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                   : '#00aac8'
             }}
           >
-            {q.lockedBy && <>
-              <span title={`Locked by ${q.lockedByName || 'user'}`}><Lock size={12} style={{ marginRight: '4px', color: '#ffb020' }} /></span>
-              {hasPermission('admin:settings') && <button onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ffb020', padding: '0 2px', fontSize: '0.6rem', verticalAlign: 'middle' }} title="Force unlock">✕</button>}
-            </>}
+            {q.lockedBy && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '6px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,176,32,0.1)', border: '1px solid rgba(255,176,32,0.25)' }}>
+              <Lock size={13} color="#ffb020" />
+              <span style={{ fontSize: '0.68rem', color: '#ffb020', fontWeight: 600, maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Locked by ${q.lockedByName || 'user'}`}>{q.lockedByName || 'user'}</span>
+              {hasPermission('admin:settings') && <button onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }} style={{ background: 'rgba(255,176,32,0.15)', border: '1px solid rgba(255,176,32,0.3)', borderRadius: '4px', cursor: 'pointer', color: '#ffb020', padding: '1px 5px', fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.2, display: 'flex', alignItems: 'center' }} title="Force unlock">Unlock</button>}
+            </span>}
             {q.referenceNumber || (
               <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>
             )}
