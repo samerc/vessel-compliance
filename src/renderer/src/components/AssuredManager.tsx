@@ -53,7 +53,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [editingVesselAssuredId, setEditingVesselAssuredId] = useState<string | null>(null)
     const [editRoleValue, setEditRoleValue] = useState('')
     const [isUpdatingRole, setIsUpdatingRole] = useState(false)
-
+    const [editingEntityId, setEditingEntityId] = useState<string | null>(null)
+    const [editEntityName, setEditEntityName] = useState('')
 
     // Loading states
     const [isAddingAssured, setIsAddingAssured] = useState(false)
@@ -244,6 +245,18 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
             showError(error.message || 'Failed to update role.')
         } finally {
             setIsUpdatingRole(false)
+        }
+    }
+
+    const handleRenameEntity = async (entityId: string) => {
+        if (!editEntityName.trim()) return
+        try {
+            await window.api.updateEntity(entityId, { name: editEntityName.trim() })
+            showSuccess('Name updated')
+            setEditingEntityId(null)
+            loadData()
+        } catch (error: any) {
+            showError(error.message || 'Failed to rename')
         }
     }
 
@@ -719,7 +732,18 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                                 {selectedEntity.type === 'company' ? <Building2 size={20} color="var(--accent-primary)" /> : <User size={20} color="var(--accent-primary)" />}
                             </div>
                             <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{selectedEntity.name}</div>
+                                {editingEntityId === selectedEntity.id ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <input type="text" value={editEntityName} onChange={e => setEditEntityName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleRenameEntity(selectedEntity.id); if (e.key === 'Escape') setEditingEntityId(null) }} autoFocus style={{ fontWeight: 700, fontSize: '0.95rem', padding: '2px 6px', width: '100%' }} />
+                                        <button onClick={() => handleRenameEntity(selectedEntity.id)} style={{ background: 'transparent', color: 'var(--success)', border: 'none', cursor: 'pointer', padding: '2px' }} title="Save"><Save size={14} /></button>
+                                        <button onClick={() => setEditingEntityId(null)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', padding: '2px' }} title="Cancel"><X size={14} /></button>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{selectedEntity.name}</span>
+                                        {canManageAssureds && <button onClick={() => { setEditingEntityId(selectedEntity.id); setEditEntityName(selectedEntity.name) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px', opacity: 0.5 }} title="Rename"><Pencil size={12} /></button>}
+                                    </div>
+                                )}
                                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     {selectedVA.role} <span style={{ opacity: 0.4 }}>|</span> {selectedEntity.type}
                                 </div>
