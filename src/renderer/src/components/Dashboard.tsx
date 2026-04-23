@@ -454,9 +454,9 @@ export default function Dashboard({
   const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const sizeToSpan = (size: string) => {
-    if (size === 'full') return 'span 3'
-    if (size === 'half') return 'span 2'
-    return 'span 1'
+    if (size === 'full') return 'span 6'
+    if (size === 'half') return 'span 3'
+    return 'span 2'
   }
 
   const categories = [
@@ -688,7 +688,7 @@ export default function Dashboard({
       {/* ── Widget Grid ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateColumns: 'repeat(6, 1fr)',
         gap: '16px'
       }}>
         {enabledWidgets.map(w => {
