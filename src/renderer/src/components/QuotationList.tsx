@@ -22,7 +22,8 @@ import {
   Edit3,
   Users,
   User,
-  Lock
+  Lock,
+  Unlock
 } from 'lucide-react'
 import { Quotation, QuotationType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -696,10 +697,8 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                   : '#00aac8'
             }}
           >
-            {q.lockedBy && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '6px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,176,32,0.1)', border: '1px solid rgba(255,176,32,0.25)' }}>
-              <Lock size={13} color="#ffb020" />
-              <span style={{ fontSize: '0.68rem', color: '#ffb020', fontWeight: 600, maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Locked by ${q.lockedByName || 'user'}`}>{q.lockedByName || 'user'}</span>
-              {hasPermission('admin:settings') && <button onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }} style={{ background: 'rgba(255,176,32,0.15)', border: '1px solid rgba(255,176,32,0.3)', borderRadius: '4px', cursor: 'pointer', color: '#ffb020', padding: '1px 5px', fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.2, display: 'flex', alignItems: 'center' }} title="Force unlock">Unlock</button>}
+            {q.lockedBy && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginRight: '6px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,176,32,0.1)', border: '1px solid rgba(255,176,32,0.25)', fontSize: '0.68rem', color: '#ffb020', fontWeight: 600 }} title={`Locked by ${q.lockedByName || 'user'}`}>
+              <Lock size={11} /> {q.lockedByName || 'user'}
             </span>}
             {q.referenceNumber || (
               <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>
@@ -904,6 +903,16 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
           </td>
         )}
         <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          {q.lockedBy && hasPermission('admin:settings') && (
+            <button
+              onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }}
+              className="btn-secondary"
+              style={{ padding: '3px 8px', marginRight: '4px', fontSize: '0.72rem', color: '#ffb020', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+              title={`Force unlock (locked by ${q.lockedByName || 'user'})`}
+            >
+              <Unlock size={13} /> Unlock
+            </button>
+          )}
           {hasPermission('quotations:create') && (
             <button
               onClick={(e) => handleDuplicate(q, e)}
