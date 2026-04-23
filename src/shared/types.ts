@@ -1010,7 +1010,7 @@ export interface QuotationType {
   createdAt?: string
 }
 
-export type QuotationStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'converted'
+export type QuotationStatus = 'draft' | 'sent' | 'approved' | 'exported' | 'rejected' | 'converted'
 
 export interface WorkflowStep {
   id: string

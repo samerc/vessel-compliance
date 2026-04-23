@@ -36,6 +36,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
   sent: { bg: 'rgba(0, 150, 255, 0.15)', text: '#0096ff' },
   approved: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
+  exported: { bg: 'rgba(0, 170, 200, 0.15)', text: '#00aac8' },
   rejected: { bg: 'rgba(255, 77, 77, 0.15)', text: '#ff4d4d' },
   converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
 }
@@ -1103,6 +1104,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
           { label: 'Draft', key: 'draft', color: '#999' },
           { label: 'Sent', key: 'sent', color: '#0096ff' },
           { label: 'Approved', key: 'approved', color: '#00c864' },
+          { label: 'Exported', key: 'exported', color: '#00aac8' },
           { label: 'Rejected', key: 'rejected', color: '#ff4d4d' },
         ].map(s => {
           const count = data.stats.byStatus?.[s.key] || 0

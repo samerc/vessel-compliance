@@ -196,7 +196,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         }
     }, [quotation.id])
 
-    const isApproved = q.status === 'approved' || q.status === 'converted' || (q.referenceNumber && !q.referenceNumber.startsWith('DRAFT-'))
+    const isApproved = q.status === 'approved' || q.status === 'exported' || q.status === 'converted' || (q.referenceNumber && !q.referenceNumber.startsWith('DRAFT-'))
     const canEdit = hasPermission('quotations:edit') && !isLockedByOther && stepCanEdit && !isApproved
 
     useEffect(() => {
@@ -460,6 +460,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
     const doExport = async (quotation: Quotation, _format: 'pdf' | 'word', successMsg: string) => {
         await exportQuotationToWord(quotation)
+        // Mark as exported if approved
+        if (quotation.status === 'approved' || (quotation.referenceNumber && !quotation.referenceNumber.startsWith('DRAFT-'))) {
+            try {
+                await window.api.updateQuotation(quotation.id, { status: 'exported' } as any)
+                setQ(prev => ({ ...prev, status: 'exported' }))
+            } catch {}
+        }
         showSuccess(successMsg)
     }
 
