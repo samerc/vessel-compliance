@@ -485,8 +485,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
     const handleExportWithDraftCheck = async (format: 'pdf' | 'word') => {
         const canApprove = hasPermission('quotations:approve')
-        if (isDraft && canApprove && stepCanExport) {
-            // User can approve and step allows final export — show choice: draft or approve & export
+        if (isDraft && canApprove) {
+            // User can approve — show choice: draft or approve & export
             const ok = await runExportWithValidation(q, format, 'approve')
             if (ok) setShowDraftExportModal(format)
             return
@@ -1006,7 +1006,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                             <button className="btn-secondary" onClick={() => setShowDraftExportModal(null)}>Cancel</button>
                             <button className="btn-secondary" onClick={() => handleExportAsDraft(showDraftExportModal)}>Export as Draft</button>
-                            <button className="btn-primary" onClick={() => handleApproveAndExport(showDraftExportModal)}>Approve &amp; Export</button>
+                            {stepCanExport && <button className="btn-primary" onClick={() => handleApproveAndExport(showDraftExportModal)}>Approve &amp; Export</button>}
                         </div>
                     </div>
                 </div>
