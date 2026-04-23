@@ -133,7 +133,6 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const isLight = theme === 'light' || theme === 'aurora'
     const currentStep = allWorkflowSteps.find(s => s.id === q.workflowStepId)
     const stepCanEdit = currentStep ? currentStep.canEdit !== false : true
-    const stepCanExport = currentStep ? currentStep.canExport !== false : true
     const canExport = hasPermission('quotations:export')
 
     // Lock quotation on mount, heartbeat while active, unlock on unmount
@@ -1009,7 +1008,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                             <button className="btn-secondary" onClick={() => setShowDraftExportModal(null)}>Cancel</button>
                             <button className="btn-secondary" onClick={() => handleExportAsDraft(showDraftExportModal)}>Export as Draft</button>
-                            {stepCanExport && <button className="btn-primary" onClick={() => handleApproveAndExport(showDraftExportModal)}>Approve &amp; Export</button>}
+                            {hasPermission('quotations:approve') && <button className="btn-primary" onClick={() => handleApproveAndExport(showDraftExportModal)}>Approve &amp; Export</button>}
                         </div>
                     </div>
                 </div>
