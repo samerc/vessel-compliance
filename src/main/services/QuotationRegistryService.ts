@@ -12,7 +12,7 @@ const BRANCH_MAP: Record<string, string> = {
   Y: 'Y:Yacht',
 }
 
-const HEADERS = ['Date', 'Quotation Type', 'Branch', 'Seq. Number', 'Reference', 'Managers', 'Vessel', 'IMO', 'Type', 'Broker', 'Status']
+const HEADERS = ['Date', 'Quotation Type', 'Branch', 'Seq. Number', 'Reference', 'Managers', 'Vessel', 'IMO', 'Type', 'Broker', 'Remarks']
 
 function getYearSheet(filePath: string): { wb: XLSX.WorkBook; ws: XLSX.WorkSheet; sheetName: string } {
   const year = String(new Date().getFullYear())
@@ -119,16 +119,16 @@ export function markRegistryCancelled(filePath: string, reference: string): void
   if (!existsSync(filePath)) return
   const { wb, ws } = getYearSheet(filePath)
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-  const STATUS_COL = 10 // Column K
+  const REMARKS_COL = 10 // Column K — Remarks
 
   // Find the row with this reference (column E = index 4)
   for (let r = 2; r <= range.e.r; r++) {
     const refCell = ws[XLSX.utils.encode_cell({ r, c: 4 })]
     if (refCell && refCell.v === reference) {
-      ws[XLSX.utils.encode_cell({ r, c: STATUS_COL })] = { v: 'CANCELLED', t: 's' }
+      ws[XLSX.utils.encode_cell({ r, c: REMARKS_COL })] = { v: 'CANCELLED', t: 's' }
       // Extend range if needed
-      if (range.e.c < STATUS_COL) {
-        ws['!ref'] = XLSX.utils.encode_range({ s: range.s, e: { r: range.e.r, c: STATUS_COL } })
+      if (range.e.c < REMARKS_COL) {
+        ws['!ref'] = XLSX.utils.encode_range({ s: range.s, e: { r: range.e.r, c: REMARKS_COL } })
       }
       XLSX.writeFile(wb, filePath)
       return
