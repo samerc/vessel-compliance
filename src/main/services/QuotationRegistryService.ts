@@ -12,7 +12,7 @@ const BRANCH_MAP: Record<string, string> = {
   Y: 'Y:Yacht',
 }
 
-const HEADERS = ['Date', 'Quotation Type', 'Branch', 'Seq. Number', 'Reference', 'Managers', 'Vessel', 'IMO', 'Type', 'Broker']
+const HEADERS = ['Date', 'Quotation Type', 'Branch', 'Seq. Number', 'Reference', 'Managers', 'Vessel', 'IMO', 'Type', 'Broker', 'Status']
 
 function getYearSheet(filePath: string): { wb: XLSX.WorkBook; ws: XLSX.WorkSheet; sheetName: string } {
   const year = String(new Date().getFullYear())
@@ -112,4 +112,26 @@ export function getLastRegistrySerial(filePath: string): number {
   if (!existsSync(filePath)) return 0
   const { ws } = getYearSheet(filePath)
   return getLastSerial(ws)
+}
+
+/** Mark a registry entry as cancelled by finding the reference in the current year sheet */
+export function markRegistryCancelled(filePath: string, reference: string): void {
+  if (!existsSync(filePath)) return
+  const { wb, ws } = getYearSheet(filePath)
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+  const STATUS_COL = 10 // Column K
+
+  // Find the row with this reference (column E = index 4)
+  for (let r = 2; r <= range.e.r; r++) {
+    const refCell = ws[XLSX.utils.encode_cell({ r, c: 4 })]
+    if (refCell && refCell.v === reference) {
+      ws[XLSX.utils.encode_cell({ r, c: STATUS_COL })] = { v: 'CANCELLED', t: 's' }
+      // Extend range if needed
+      if (range.e.c < STATUS_COL) {
+        ws['!ref'] = XLSX.utils.encode_range({ s: range.s, e: { r: range.e.r, c: STATUS_COL } })
+      }
+      XLSX.writeFile(wb, filePath)
+      return
+    }
+  }
 }

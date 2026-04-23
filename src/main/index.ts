@@ -11,7 +11,7 @@ import { FileManagerService } from './services/FileManagerService'
 import { DailyAlertScheduler } from './services/DailyAlertScheduler'
 import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
-import { assignRegistryNumber } from './services/QuotationRegistryService'
+import { assignRegistryNumber, markRegistryCancelled } from './services/QuotationRegistryService'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
@@ -3676,10 +3676,20 @@ app.whenReady().then(() => {
     // Get the current step info to check if we're moving FROM "Approved"
     const fromStep = steps.find(s => s.id === currentStepId)
     if (fromStep && fromStep.name.toLowerCase() === 'approved' && toStep && toStep.name.toLowerCase() !== 'approved') {
-      // Moving away from Approved — release the number and revert status
+      // Moving away from Approved — release the number, mark cancelled in registry, revert status
       try {
+        // Get reference before releasing
+        const qData = await db.getQuotation(quotationId)
+        const releasedRef = qData?.referenceNumber
         await db.releaseQuotationNumber(quotationId)
         await db.updateQuotation(quotationId, { status: 'draft' } as any)
+        // Mark as cancelled in registry
+        if (releasedRef && !releasedRef.startsWith('DRAFT-')) {
+          const registryPath = await db.getSetting('quotationRegistryPath')
+          if (registryPath) {
+            try { markRegistryCancelled(resolveFilePath(registryPath), releasedRef) } catch {}
+          }
+        }
       } catch (e) { console.error('Failed to release quotation number:', e) }
     }
 
