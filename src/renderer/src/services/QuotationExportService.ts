@@ -773,6 +773,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         insuredText += '\n'
       }
     }
+    if (!insuredText.trim()) {
+      insuredText = 'TBA\n"as Registered Owners"\n'
+    }
     if (st(data, 'insuredFooter')) insuredText += stripHtml(st(data, 'insuredFooter'))
     const coName = data.quotation.coName || getBrokerName(data)
     if (coName) insuredText += `\n\nc/o ${coName}`
@@ -2483,6 +2486,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           }))
         }
       }
+    }
+    if (insuredContent.length === 0) {
+      insuredContent.push(new Table({
+        width: { size: BODY_W, type: WidthType.DXA },
+        layout: TableLayoutType.FIXED,
+        rows: [new TableRow({
+          children: [
+            new TableCell({ borders: noBorders(), width: { size: Math.round(BODY_W * 0.60), type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: 'TBA', size: 22, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ borders: noBorders(), width: { size: Math.round(BODY_W * 0.40), type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: '"as Registered Owners"', size: 22, font: 'Arial', color: '000000' })] })] })
+          ]
+        })]
+      }))
     }
     if (st(data, 'insuredFooter')) {
       insuredContent.push(emptyP())
