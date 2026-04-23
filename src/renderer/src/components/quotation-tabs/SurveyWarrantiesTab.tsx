@@ -160,6 +160,7 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                                 background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
                                 color: 'var(--text-primary)', fontSize: '0.82rem', lineHeight: 1.4
                             }}>
+                                {t.title && <div style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--accent-primary)', marginBottom: '2px' }}>{t.title}</div>}
                                 <div>{t.text.length > 100 ? t.text.slice(0, 100) + '...' : t.text}</div>
                                 {t.placeholders.length > 0 && (
                                     <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
