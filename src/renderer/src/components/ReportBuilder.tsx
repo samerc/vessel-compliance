@@ -518,7 +518,7 @@ const CHART_METRICS: Record<string, { value: string; label: string; field?: stri
 
 export default function ReportBuilder() {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const { showError, showSuccess } = useToast()
 
   // State

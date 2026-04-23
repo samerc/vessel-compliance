@@ -22,7 +22,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
     const { showError, showSuccess } = useToast()
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const { hasPermission } = useAuth()
     const canManageAssureds = hasPermission('assureds:manage')
     const canUploadDocs = hasPermission('documents:upload')

@@ -17,7 +17,7 @@ function InstituteClauseDropdown({ clauses, selectedId, onChange }: {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const bg = isLight ? '#ffffff' : '#1a1d28'
     const selected = clauses.find(c => c.id === selectedId)
 
@@ -113,7 +113,7 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
     showError: (msg: string) => void
 }) {
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const [allClauses, setAllClauses] = useState<CargoClause[]>([])
     const [selectedClauses, setSelectedClauses] = useState<QuotationCargoClause[]>([])
     const [customClauses, setCustomClauses] = useState<QuotationCargoCustomClause[]>([])

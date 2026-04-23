@@ -23,7 +23,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const { hasPermission } = useAuth()
     const canManageFleets = hasPermission('fleets:manage')
 

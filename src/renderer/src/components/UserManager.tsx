@@ -13,7 +13,7 @@ export default function UserManager() {
     const canManageUsers = hasPermission('admin:users')
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const [users, setUsers] = useState<User[]>([])
     const [resettingUser, setResettingUser] = useState<string | null>(null)
     const [editingUserId, setEditingUserId] = useState<string | null>(null)

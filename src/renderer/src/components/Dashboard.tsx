@@ -163,7 +163,7 @@ export default function Dashboard({
 }) {
   const { theme } = useTheme()
   const { user } = useAuth()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const { showError } = useToast()
 
   // ── Data state ──

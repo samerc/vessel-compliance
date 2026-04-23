@@ -84,7 +84,7 @@ export function PickerDropdown({ placeholder, options, onSelect, fontSize = '0.8
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
     useEffect(() => {
         if (!open) return

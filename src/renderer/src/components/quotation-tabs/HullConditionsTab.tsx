@@ -15,7 +15,7 @@ function HullClauseDropdown({ clauses, selectedId, onChange, description, hideLa
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const bg = isLight ? '#ffffff' : '#1a1d28'
     const selected = clauses.find(c => c.id === selectedId)
 
@@ -127,7 +127,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const bg = isLight ? '#ffffff' : '#1a1d28'
     const selectedItems = items.filter(i => selectedIds.has(i.id))
     const selectedCount = selectedItems.length
@@ -264,7 +264,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     showError: (m: string) => void
 }) {
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const [hullClauses, setHullClauses] = useState<HullClause[]>([])
     const [allConditions, setAllConditions] = useState<HullClauseCondition[]>([])
     const [allAdditional, setAllAdditional] = useState<HullAdditionalCondition[]>([])

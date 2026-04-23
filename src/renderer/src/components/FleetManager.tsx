@@ -36,7 +36,7 @@ interface CustomerGroup {
 
 export default function FleetManager() {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const { showSuccess } = useToast()
   const { hasPermission } = useAuth()
   const canManageFleets = hasPermission('fleets:manage')

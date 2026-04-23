@@ -372,7 +372,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
 
 export default function LossRecordReport() {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [data, setData] = useState<LossUWY[] | null>(null)

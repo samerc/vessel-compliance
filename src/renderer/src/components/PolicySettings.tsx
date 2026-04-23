@@ -109,7 +109,7 @@ export default function PolicySettings() {
   const { showSuccess, showError } = useToast()
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const canSettings = hasPermission('admin:settings')
 
   const handleCategoryChange = (cat: PolicySettingsCategory) => {
@@ -936,7 +936,7 @@ const BC_CONTACT_FIELDS: BcTextFieldDef[] = [
 
 function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const [values, setValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 

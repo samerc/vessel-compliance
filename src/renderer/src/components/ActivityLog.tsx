@@ -59,7 +59,7 @@ export default function ActivityLog() {
   const { hasPermission, user } = useAuth()
   const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
   if (!hasPermission('admin:activityLog')) {
     return (

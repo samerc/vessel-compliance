@@ -34,7 +34,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
   const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
   const { user } = useAuth()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
   useEffect(() => {
     loadQuotations()

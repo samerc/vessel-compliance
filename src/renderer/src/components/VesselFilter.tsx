@@ -234,7 +234,7 @@ const _cache = {
 export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) {
     const { showError } = useToast()
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])

@@ -17,7 +17,7 @@ interface FlagStateDirectoryProps {
 
 export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const { showSuccess, showError } = useToast()
   const { hasPermission } = useAuth()
   const canManage = hasPermission('admin:settings')

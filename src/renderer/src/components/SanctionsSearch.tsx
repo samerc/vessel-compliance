@@ -7,7 +7,7 @@ import { useTheme } from '../contexts/ThemeContext'
 export default function SanctionsSearch() {
     const { user } = useAuth()
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
     const [query, setQuery] = useState('')
     const [threshold, setThreshold] = useState(user?.sanctionsThreshold || 60)

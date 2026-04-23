@@ -162,7 +162,7 @@ function TreeNode({
 
 export default function FileManager() {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const { showSuccess, showError, showToast } = useToast()
 
   // Core state

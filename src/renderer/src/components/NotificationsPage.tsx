@@ -95,7 +95,7 @@ function relativeTime(dateStr: string): string {
 
 export default function NotificationsPage({ onNavigate }: NotificationsPageProps): React.JSX.Element {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')

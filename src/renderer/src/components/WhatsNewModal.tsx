@@ -69,7 +69,7 @@ function parseNotes(notes: string): ParsedItem[] {
 
 export default function WhatsNewModal({ onClose, onViewChangelog }: WhatsNewModalProps) {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
   // Remote data from GitHub
   const [version, setVersion] = useState('')

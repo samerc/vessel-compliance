@@ -267,7 +267,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
 
     // Two-panel layout state
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const [searchTerm, setSearchTerm] = useState('')
     const [collapsedSetGroups, setCollapsedSetGroups] = useState<Set<string>>(new Set())
 

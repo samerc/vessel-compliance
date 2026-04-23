@@ -19,7 +19,7 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
     const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
     const [customText, setCustomText] = useState('')
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
     useEffect(() => { loadData() }, [quotation.id])
 

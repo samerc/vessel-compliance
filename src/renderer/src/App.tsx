@@ -77,7 +77,7 @@ function App(): React.JSX.Element {
   const [density, setDensity] = useState<'compact' | 'normal' | 'spacious'>(() => {
     return (localStorage.getItem('tableDensity') as 'compact' | 'normal' | 'spacious') || 'normal'
   })
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
   // Force password reset state
   const [forcePasswordReset, setForcePasswordReset] = useState(false)

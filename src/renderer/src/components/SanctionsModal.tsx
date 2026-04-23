@@ -14,7 +14,7 @@ interface SanctionsModalProps {
 
 export default function SanctionsModal({ searchedName, matches, onClose, onMarkClean, onConfirmMatch }: SanctionsModalProps) {
   const { theme } = useTheme()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

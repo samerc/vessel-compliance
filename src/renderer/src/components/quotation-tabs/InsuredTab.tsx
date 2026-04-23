@@ -6,7 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 export default function InsuredTab({ quotation, vessels: _vessels = [], showSuccess, showError, updateField }: { quotation: Quotation; vessels?: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
     void _vessels
     const { theme } = useTheme()
-    const isLight = theme === 'light'
+    const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
     const [assureds, setAssureds] = useState<QuotationAssured[]>([])
     const [roles, setRoles] = useState<AssuredRole[]>([])
     const [entities, setEntities] = useState<Entity[]>([])

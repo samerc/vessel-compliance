@@ -84,7 +84,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
-  const isLight = theme === 'light'
+  const isLight = theme === 'light' || theme === 'aurora' || theme === 'premium'
 
   const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
