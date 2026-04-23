@@ -33,13 +33,21 @@ import { formatDateOrDash } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
-const statusColors: Record<string, { bg: string; text: string }> = {
+const statusColorsDark: Record<string, { bg: string; text: string }> = {
   draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
   sent: { bg: 'rgba(0, 150, 255, 0.15)', text: '#0096ff' },
   approved: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
   exported: { bg: 'rgba(0, 170, 200, 0.15)', text: '#00aac8' },
   rejected: { bg: 'rgba(255, 77, 77, 0.15)', text: '#ff4d4d' },
   converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
+}
+const statusColorsLight: Record<string, { bg: string; text: string }> = {
+  draft: { bg: 'rgba(100, 100, 100, 0.12)', text: '#666' },
+  sent: { bg: 'rgba(0, 100, 200, 0.12)', text: '#0064c8' },
+  approved: { bg: 'rgba(0, 140, 70, 0.12)', text: '#006630' },
+  exported: { bg: 'rgba(0, 120, 150, 0.12)', text: '#00788c' },
+  rejected: { bg: 'rgba(200, 0, 0, 0.1)', text: '#c00000' },
+  converted: { bg: 'rgba(120, 60, 180, 0.12)', text: '#6b2fa0' }
 }
 
 type SortField =
@@ -636,6 +644,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   }
 
   const renderRow = (q: any, showFavStar = true) => {
+    const statusColors = isLight ? statusColorsLight : statusColorsDark
     const sc = statusColors[q.status] || statusColors.draft
     const isFav = favorites.has(q.id)
     return (
@@ -697,7 +706,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                   : '#00aac8'
             }}
           >
-            {q.lockedBy && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginRight: '6px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,176,32,0.1)', border: '1px solid rgba(255,176,32,0.25)', fontSize: '0.68rem', color: '#ffb020', fontWeight: 600 }} title={`Locked by ${q.lockedByName || 'user'}`}>
+            {q.lockedBy && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginRight: '6px', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(180,120,0,0.1)' : 'rgba(255,176,32,0.1)', border: isLight ? '1px solid rgba(180,120,0,0.3)' : '1px solid rgba(255,176,32,0.25)', fontSize: '0.68rem', color: isLight ? '#8a6500' : '#ffb020', fontWeight: 600 }} title={`Locked by ${q.lockedByName || 'user'}`}>
               <Lock size={11} /> {q.lockedByName || 'user'}
             </span>}
             {q.referenceNumber || (
@@ -907,7 +916,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
             <button
               onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }}
               className="btn-secondary"
-              style={{ padding: '3px 8px', marginRight: '4px', fontSize: '0.72rem', color: '#ffb020', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+              style={{ padding: '3px 8px', marginRight: '4px', fontSize: '0.72rem', color: isLight ? '#8a6500' : '#ffb020', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
               title={`Force unlock (locked by ${q.lockedByName || 'user'})`}
             >
               <Unlock size={13} /> Unlock
