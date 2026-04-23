@@ -4706,8 +4706,10 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
     const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
     const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
     const [newText, setNewText] = useState('')
+    const [newTitle, setNewTitle] = useState('')
     const [editId, setEditId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
+    const [editTitle, setEditTitle] = useState('')
     const [addingSet, setAddingSet] = useState(false)
     const [editSetId, setEditSetId] = useState<string | null>(null)
     const [setName, setSetName] = useState('')
@@ -4736,9 +4738,10 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
     const handleAdd = async () => {
         if (!newText.trim()) return
         try {
-            const result = await window.api.surveyWarrantyTemplateAdd(newText.trim()) as any
+            const result = await window.api.surveyWarrantyTemplateAdd(newText.trim(), newTitle.trim() || undefined) as any
             if (result?.error) { showError(result.message); return }
             setNewText('')
+            setNewTitle('')
             showSuccess('Template added')
             loadData()
         } catch (e: any) { showError(e.message) }
@@ -4747,7 +4750,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
     const handleUpdate = async () => {
         if (!editId || !editText.trim()) return
         try {
-            await window.api.surveyWarrantyTemplateUpdate(editId, editText.trim())
+            await window.api.surveyWarrantyTemplateUpdate(editId, editText.trim(), editTitle.trim() || undefined)
             setEditId(null)
             showSuccess('Template updated')
             loadData()
@@ -4834,18 +4837,17 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                         )}
                         <div style={{ flex: 1 }}>
                             {editId === t.id ? (
-                                <div style={{ display: 'flex', gap: '6px' }}>
-                                    <textarea
-                                        value={editText}
-                                        onChange={e => setEditText(e.target.value)}
-                                        rows={2}
-                                        style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }}
-                                    />
-                                    <button onClick={handleUpdate} style={{ background: 'none', border: 'none', color: '#00aac8', cursor: 'pointer' }}><Save size={15} /></button>
-                                    <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={15} /></button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title (optional)" style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={2} style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }} />
+                                        <button onClick={handleUpdate} style={{ background: 'none', border: 'none', color: '#00aac8', cursor: 'pointer' }}><Save size={15} /></button>
+                                        <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={15} /></button>
+                                    </div>
                                 </div>
                             ) : (
                                 <>
+                                    {t.title && <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: '2px' }}>{t.title}</div>}
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{t.text}</div>
                                     {t.placeholders.length > 0 && (
                                         <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
@@ -4862,7 +4864,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                         </div>
                         {!readOnly && editId !== t.id && (
                             <div style={{ display: 'flex', gap: '4px' }}>
-                                <button onClick={() => { setEditId(t.id); setEditText(t.text) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
+                                <button onClick={() => { setEditId(t.id); setEditText(t.text); setEditTitle(t.title || '') }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
                                 <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                             </div>
                         )}
@@ -4871,17 +4873,14 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
 
                 {/* Add template */}
                 {!readOnly && (
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                        <textarea
-                            value={newText}
-                            onChange={e => setNewText(e.target.value)}
-                            placeholder="Enter survey warranty template text..."
-                            rows={2}
-                            style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }}
-                        />
-                        <button onClick={handleAdd} disabled={!newText.trim()} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px', opacity: !newText.trim() ? 0.5 : 1 }}>
-                            <Plus size={14} /> Add
-                        </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+                        <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (optional, for easy reference)" style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Enter survey warranty template text..." rows={2} style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }} />
+                            <button onClick={handleAdd} disabled={!newText.trim()} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px', opacity: !newText.trim() ? 0.5 : 1 }}>
+                                <Plus size={14} /> Add
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

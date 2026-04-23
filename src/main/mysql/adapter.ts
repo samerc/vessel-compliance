@@ -3091,6 +3091,14 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN pro_rata_months DECIMAL(5,1) NULL")
                 }
             } catch {}
+            // Migration: title on survey_warranty_templates
+            try {
+                const [swtCol] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_templates LIKE 'title'") as any[]
+                if ((swtCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE survey_warranty_templates ADD COLUMN title VARCHAR(255) DEFAULT NULL AFTER id")
+                }
+            } catch {}
+
             // Migration: full_name on users
             try {
                 const [fnCol] = await this.pool.query("SHOW COLUMNS FROM users LIKE 'full_name'") as any[]
@@ -12511,6 +12519,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query('SELECT * FROM survey_warranty_templates ORDER BY order_index, created_at')
         return (rows as any[]).map(r => ({
             id: r.id,
+            title: r.title || null,
             text: r.text,
             placeholders: this.extractPlaceholders(r.text),
             order: r.order_index
@@ -12522,21 +12531,21 @@ export class MySQLAdapter {
         return matches ? [...new Set(matches)] : []
     }
 
-    async addSurveyWarrantyTemplate(text: string): Promise<any> {
+    async addSurveyWarrantyTemplate(text: string, title?: string): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM survey_warranty_templates')
         const order = (maxRow as any[])[0].next_order
         await this.pool.execute(
-            'INSERT INTO survey_warranty_templates (id, text, order_index) VALUES (?, ?, ?)',
-            [id, text, order]
+            'INSERT INTO survey_warranty_templates (id, title, text, order_index) VALUES (?, ?, ?, ?)',
+            [id, title || null, text, order]
         )
-        return { id, text, placeholders: this.extractPlaceholders(text), order }
+        return { id, title: title || null, text, placeholders: this.extractPlaceholders(text), order }
     }
 
-    async updateSurveyWarrantyTemplate(id: string, text: string): Promise<void> {
+    async updateSurveyWarrantyTemplate(id: string, text: string, title?: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE survey_warranty_templates SET text = ? WHERE id = ?', [text, id])
+        await this.pool.execute('UPDATE survey_warranty_templates SET text = ?, title = ? WHERE id = ?', [text, title || null, id])
     }
 
     async deleteSurveyWarrantyTemplate(id: string): Promise<void> {

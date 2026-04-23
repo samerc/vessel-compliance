@@ -783,8 +783,8 @@ const api = {
 
   // Survey Warranty Templates (Quotation Settings)
   surveyWarrantyTemplateGetAll: () => ipcRenderer.invoke('surveyWarrantyTemplate:getAll'),
-  surveyWarrantyTemplateAdd: (text: string) => ipcRenderer.invoke('surveyWarrantyTemplate:add', text),
-  surveyWarrantyTemplateUpdate: (id: string, text: string) => ipcRenderer.invoke('surveyWarrantyTemplate:update', id, text),
+  surveyWarrantyTemplateAdd: (text: string, title?: string) => ipcRenderer.invoke('surveyWarrantyTemplate:add', text, title),
+  surveyWarrantyTemplateUpdate: (id: string, text: string, title?: string) => ipcRenderer.invoke('surveyWarrantyTemplate:update', id, text, title),
   surveyWarrantyTemplateDelete: (id: string) => ipcRenderer.invoke('surveyWarrantyTemplate:delete', id),
   surveyWarrantyTemplateReorder: (ids: string[]) => ipcRenderer.invoke('surveyWarrantyTemplate:reorder', ids),
 

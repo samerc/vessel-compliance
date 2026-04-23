@@ -743,8 +743,8 @@ export interface Api {
 
   // Survey Warranty Templates (Quotation Settings)
   surveyWarrantyTemplateGetAll: () => Promise<SurveyWarrantyTemplate[]>
-  surveyWarrantyTemplateAdd: (text: string) => Promise<SurveyWarrantyTemplate>
-  surveyWarrantyTemplateUpdate: (id: string, text: string) => Promise<void>
+  surveyWarrantyTemplateAdd: (text: string, title?: string) => Promise<SurveyWarrantyTemplate>
+  surveyWarrantyTemplateUpdate: (id: string, text: string, title?: string) => Promise<void>
   surveyWarrantyTemplateDelete: (id: string) => Promise<void>
   surveyWarrantyTemplateReorder: (ids: string[]) => Promise<void>
 

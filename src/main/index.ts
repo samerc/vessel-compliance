@@ -3760,8 +3760,8 @@ app.whenReady().then(() => {
 
   // Survey Warranty Templates (Quotation Settings)
   safeHandle('surveyWarrantyTemplate:getAll', (event) => { requireSession(event); return db.getSurveyWarrantyTemplates() })
-  safeHandle('surveyWarrantyTemplate:add', async (event, text: string) => { await requirePermission(event, 'quotations:settings'); return db.addSurveyWarrantyTemplate(text) })
-  safeHandle('surveyWarrantyTemplate:update', async (event, id: string, text: string) => { await requirePermission(event, 'quotations:settings'); return db.updateSurveyWarrantyTemplate(id, text) })
+  safeHandle('surveyWarrantyTemplate:add', async (event, text: string, title?: string) => { await requirePermission(event, 'quotations:settings'); return db.addSurveyWarrantyTemplate(text, title) })
+  safeHandle('surveyWarrantyTemplate:update', async (event, id: string, text: string, title?: string) => { await requirePermission(event, 'quotations:settings'); return db.updateSurveyWarrantyTemplate(id, text, title) })
   safeHandle('surveyWarrantyTemplate:delete', async (event, id: string) => { await requirePermission(event, 'quotations:settings'); return db.deleteSurveyWarrantyTemplate(id) })
   safeHandle('surveyWarrantyTemplate:reorder', async (event, ids: string[]) => { await requirePermission(event, 'quotations:settings'); return db.reorderSurveyWarrantyTemplates(ids) })
 

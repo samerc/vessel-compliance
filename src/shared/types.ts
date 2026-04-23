@@ -1556,6 +1556,7 @@ export interface ReportSettings {
 
 export interface SurveyWarrantyTemplate {
   id: string
+  title?: string
   text: string
   placeholders: string[] // e.g. ['{deadline}', '{days}']
   order: number
