@@ -540,7 +540,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         if (!editName.trim() || !editImo.trim()) return
         // Derive classification text from junction table selection
         const classText = vesselClassificationIds.size > 0
-            ? classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(' / ')
+            ? classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0)).map(cs => cs.abbreviation || cs.name).join(' / ')
             : (editClassification || null)
         await window.api.updateVessel(vessel.id, {
             name: editName,
@@ -813,7 +813,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
                                                 {vesselClassificationIds.size === 0
                                                     ? 'None'
-                                                    : classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(', ')}
+                                                    : classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0)).map(cs => cs.abbreviation || cs.name).join(', ')}
                                             </span>
                                             <ChevronDown size={13} style={{ flexShrink: 0, transform: classDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                                         </button>
@@ -965,7 +965,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
                                         (vessel.vesselTypeId || vessel.vesselType) && (() => { const vt = vessel.vesselTypeId ? vesselTypes.find(t => t.id === vessel.vesselTypeId) : vesselTypes.find(t => t.name === vessel.vesselType); return vt?.description ? `${vt.name} (${vt.description})` : vt?.name || vessel.vesselType })(),
                                         vesselClassificationIds.size > 0
-                                            ? `Class: ${classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).map(cs => cs.abbreviation || cs.name).join(' / ')}`
+                                            ? `Class: ${classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0)).map(cs => cs.abbreviation || cs.name).join(' / ')}`
                                             : (vessel.classificationSociety && `Class: ${vessel.classificationSociety}`),
                                         vessel.callSign && `Call Sign: ${vessel.callSign}`
                                     ].filter(Boolean).join(' · ')}

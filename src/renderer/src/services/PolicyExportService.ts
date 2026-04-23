@@ -924,7 +924,14 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       try {
         const classIds = await window.api.getVesselClassifications(qv.vesselId)
         if (Array.isArray(classIds) && classIds.length > 0) {
-          const names = classIds.map((c: any) => {
+          // Sort IACS first
+          const iacsIds = new Set(classSocieties.filter((s: any) => s.isIacs).map((s: any) => s.id))
+          const sorted = [...classIds].sort((a: any, b: any) => {
+            const aId = typeof a === 'string' ? a : a.classificationSocietyId
+            const bId = typeof b === 'string' ? b : b.classificationSocietyId
+            return (iacsIds.has(bId) ? 1 : 0) - (iacsIds.has(aId) ? 1 : 0)
+          })
+          const names = sorted.map((c: any) => {
             const cid = typeof c === 'string' ? c : c.classificationSocietyId
             const cs = classSocieties.find((s: any) => s.id === cid)
             if (!cs) return null

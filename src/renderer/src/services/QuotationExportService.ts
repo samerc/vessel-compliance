@@ -284,8 +284,9 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
         const safeVcs = Array.isArray(vcs) ? vcs : []
         const hasIacs = safeVcs.some((vc: any) => iacsIds.has(vc.classificationSocietyId))
         if (hasIacs) { vesselIacsMap[qv.id] = true }
-        // Resolve classification names from junction table
-        const classNames = safeVcs.map((vc: any) => vc.classificationSocietyName || vc.abbreviation).filter(Boolean)
+        // Resolve classification names from junction table — IACS first
+        const sortedVcs = [...safeVcs].sort((a: any, b: any) => (iacsIds.has(b.classificationSocietyId) ? 1 : 0) - (iacsIds.has(a.classificationSocietyId) ? 1 : 0))
+        const classNames = sortedVcs.map((vc: any) => vc.abbreviation || vc.classificationSocietyName).filter(Boolean)
         if (classNames.length > 0) {
           vesselClassificationNames[qv.vesselId] = classNames.join(', ')
           continue // Junction table is authoritative — don't fall through to stale text field
