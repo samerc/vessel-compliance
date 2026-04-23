@@ -3091,6 +3091,15 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN pro_rata_months DECIMAL(5,1) NULL")
                 }
             } catch {}
+            // Migration: surveyor_value + date_of_survey_value on quotation_survey_warranties
+            try {
+                const [svCol] = await this.pool.query("SHOW COLUMNS FROM quotation_survey_warranties LIKE 'surveyor_value'") as any[]
+                if ((svCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_survey_warranties ADD COLUMN surveyor_value VARCHAR(255) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotation_survey_warranties ADD COLUMN date_of_survey_value VARCHAR(255) DEFAULT NULL")
+                }
+            } catch {}
+
             // Migration: title on survey_warranty_templates
             try {
                 const [swtCol] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_templates LIKE 'title'") as any[]
@@ -12629,6 +12638,8 @@ export class MySQLAdapter {
             deadlineValue: r.deadline_value,
             daysValue: r.days_value,
             eventValue: r.event_value,
+            surveyorValue: r.surveyor_value,
+            dateOfSurveyValue: r.date_of_survey_value,
             customText: r.custom_text,
             order: r.order_index,
             vesselScope: r.vessel_scope ? JSON.parse(r.vessel_scope) : null,
@@ -12645,12 +12656,13 @@ export class MySQLAdapter {
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
                 await conn.execute(
-                    `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, surveyor_value, date_of_survey_value, custom_text, order_index, vessel_scope, alternative_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         item.id || uuidv4(), quotationId, item.templateId || null,
                         item.text, item.deadlineValue || null, item.daysValue || null,
-                        item.eventValue || null, item.customText || null, i,
+                        item.eventValue || null, item.surveyorValue || null, item.dateOfSurveyValue || null,
+                        item.customText || null, i,
                         item.vesselScope ? JSON.stringify(item.vesselScope) : null,
                         item.alternativeId || null
                     ]
@@ -12674,12 +12686,13 @@ export class MySQLAdapter {
         try {
             await conn.execute('SET FOREIGN_KEY_CHECKS=0')
             await conn.execute(
-                `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, surveyor_value, date_of_survey_value, custom_text, order_index, vessel_scope, alternative_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     id, data.quotationId, data.templateId || null,
                     data.text, data.deadlineValue || null, data.daysValue || null,
-                    data.eventValue || null, data.customText || null, order,
+                    data.eventValue || null, data.surveyorValue || null, data.dateOfSurveyValue || null,
+                    data.customText || null, order,
                     data.vesselScope ? JSON.stringify(data.vesselScope) : null,
                     data.alternativeId || null
                 ]
@@ -12699,6 +12712,8 @@ export class MySQLAdapter {
         if (data.deadlineValue !== undefined) { fields.push('deadline_value = ?'); values.push(data.deadlineValue) }
         if (data.daysValue !== undefined) { fields.push('days_value = ?'); values.push(data.daysValue) }
         if (data.eventValue !== undefined) { fields.push('event_value = ?'); values.push(data.eventValue) }
+        if (data.surveyorValue !== undefined) { fields.push('surveyor_value = ?'); values.push(data.surveyorValue) }
+        if (data.dateOfSurveyValue !== undefined) { fields.push('date_of_survey_value = ?'); values.push(data.dateOfSurveyValue) }
         if (data.customText !== undefined) { fields.push('custom_text = ?'); values.push(data.customText) }
         if (data.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(data.vesselScope ? JSON.stringify(data.vesselScope) : null) }
         if (data.alternativeId !== undefined) { fields.push('alternative_id = ?'); values.push(data.alternativeId) }

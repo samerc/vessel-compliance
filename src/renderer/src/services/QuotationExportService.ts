@@ -358,6 +358,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
         .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
         .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
         .replace(/\{event\}/g, sw.eventValue || '{event}')
+        .replace(/\{surveyor\}/g, sw.surveyorValue || '{surveyor}')
+        .replace(/\{dateofsurvey\}/g, sw.dateOfSurveyValue || '{dateofsurvey}')
     })),
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: resolvedAllWarConditions,

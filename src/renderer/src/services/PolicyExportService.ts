@@ -1036,6 +1036,8 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
         .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
         .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
         .replace(/\{event\}/g, sw.eventValue || '{event}')
+        .replace(/\{surveyor\}/g, sw.surveyorValue || '{surveyor}')
+        .replace(/\{dateofsurvey\}/g, sw.dateOfSurveyValue || '{dateofsurvey}')
     })),
     companyName: reportSettings.companyName || 'Insurance Company',
     assuredGroups: Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : [],

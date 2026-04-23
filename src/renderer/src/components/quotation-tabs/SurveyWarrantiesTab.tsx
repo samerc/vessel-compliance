@@ -46,6 +46,8 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
         if (item.deadlineValue) resolved = resolved.replace(/\{deadline\}/g, item.deadlineValue)
         if (item.daysValue) resolved = resolved.replace(/\{days\}/g, item.daysValue)
         if (item.eventValue) resolved = resolved.replace(/\{event\}/g, item.eventValue)
+        if ((item as any).surveyorValue) resolved = resolved.replace(/\{surveyor\}/g, (item as any).surveyorValue)
+        if ((item as any).dateOfSurveyValue) resolved = resolved.replace(/\{dateofsurvey\}/g, (item as any).dateOfSurveyValue)
         return resolved
     }
 
@@ -128,6 +130,8 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
         if (p === '{deadline}') return { bg: 'rgba(0,170,200,0.15)', text: '#00aac8' }
         if (p === '{days}') return { bg: 'rgba(100,100,255,0.15)', text: '#6464ff' }
         if (p === '{event}') return { bg: 'rgba(255,100,200,0.15)', text: '#ff64c8' }
+        if (p === '{surveyor}') return { bg: 'rgba(0,200,100,0.15)', text: '#00c864' }
+        if (p === '{dateofsurvey}') return { bg: 'rgba(255,180,0,0.15)', text: '#ffb400' }
         return { bg: 'rgba(180,180,180,0.15)', text: 'var(--text-secondary)' }
     }
 
@@ -148,10 +152,10 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                 </div>
             )}
 
-            {/* Add from template dropdown */}
+            {/* Templates section */}
             {availableTemplates.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Add from template:</div>
+                <div style={{ marginBottom: '20px', padding: '14px', borderRadius: '10px', border: '1px dashed var(--table-border)', background: isLight ? 'rgba(0,0,0,0.01)' : 'rgba(255,255,255,0.01)' }}>
+                    <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>Available Templates</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {availableTemplates.map(t => (
                             <button key={t.id} onClick={() => addFromTemplate(t)} style={{
@@ -176,6 +180,10 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                 </div>
             )}
 
+            {/* Selected survey warranties */}
+            {items.length > 0 && (
+                <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>Selected ({items.length})</div>
+            )}
             {/* Selected survey warranties list */}
             {items.length === 0 && (
                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
@@ -246,12 +254,36 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                                         )}
                                         {placeholders.includes('{event}') && (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span style={{ fontSize: '0.72rem', color: '#ff64c8', fontWeight: 600, minWidth: '65px' }}>{'{event}'}:</span>
+                                                <span style={{ fontSize: '0.72rem', color: '#ff64c8', fontWeight: 600, minWidth: '90px' }}>{'{event}'}:</span>
                                                 <input
                                                     type="text"
                                                     value={item.eventValue || ''}
                                                     onChange={e => updateItem(item.id, { eventValue: e.target.value })}
                                                     placeholder="e.g. prior sailing"
+                                                    style={{ flex: 1, padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                                                />
+                                            </div>
+                                        )}
+                                        {placeholders.includes('{surveyor}') && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '0.72rem', color: '#00c864', fontWeight: 600, minWidth: '90px' }}>{'{surveyor}'}:</span>
+                                                <input
+                                                    type="text"
+                                                    value={(item as any).surveyorValue || ''}
+                                                    onChange={e => updateItem(item.id, { surveyorValue: e.target.value } as any)}
+                                                    placeholder="e.g. Lloyd's Register"
+                                                    style={{ flex: 1, padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                                                />
+                                            </div>
+                                        )}
+                                        {placeholders.includes('{dateofsurvey}') && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '0.72rem', color: '#ffb400', fontWeight: 600, minWidth: '90px' }}>{'{dateofsurvey}'}:</span>
+                                                <input
+                                                    type="text"
+                                                    value={(item as any).dateOfSurveyValue || ''}
+                                                    onChange={e => updateItem(item.id, { dateOfSurveyValue: e.target.value } as any)}
+                                                    placeholder="e.g. January 2026"
                                                     style={{ flex: 1, padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
                                                 />
                                             </div>

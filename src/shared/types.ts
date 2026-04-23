@@ -1577,6 +1577,8 @@ export interface QuotationSurveyWarranty {
   deadlineValue?: string
   daysValue?: string
   eventValue?: string
+  surveyorValue?: string
+  dateOfSurveyValue?: string
   customText?: string // for fully custom entries
   order: number
   vesselScope?: string[] | null
