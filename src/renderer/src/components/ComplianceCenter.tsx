@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2 } from 'lucide-react'
-import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule } from '../../../shared/types'
+import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2, List, Layers } from 'lucide-react'
+import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -84,14 +84,25 @@ const EMPTY_RULE_FORM = {
 
 interface ComplianceCenterProps {
     onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
+    initialTab?: 'documents' | 'policies' | 'sanctions' | 'dataQuality'
+    onTabChange?: (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => void
 }
 
-export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCenterProps) {
+export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTabChange }: ComplianceCenterProps) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [docs, setDocs] = useState<VesselDocument[]>([])
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
+    const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
+    const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
+    const [allAssureds, setAllAssureds] = useState<any[]>([])
     const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
-    const [activeTab, setActiveTab] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>('documents')
+    const [groupByVessel, setGroupByVessel] = useState(true)
+    const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
+    const [activeTab, setActiveTabRaw] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>(initialTab || 'documents')
+    const setActiveTab = (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => {
+        setActiveTabRaw(tab)
+        onTabChange?.(tab)
+    }
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
@@ -102,6 +113,9 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
     const [checkLogs, setCheckLogs] = useState<ComplianceCheckLog[]>([])
     const [policyAlerts, setPolicyAlerts] = useState<any[]>([])
+    const [policyExpiringSoon, setPolicyExpiringSoon] = useState<any[]>([])
+    const [policyFilter, setPolicyFilter] = useState<'expired' | 'expiring'>('expired')
+    const [selectedSanctions, setSelectedSanctions] = useState<Set<string>>(new Set())
     const [expandedResult, setExpandedResult] = useState<string | null>(null)
     const [resultsPage, setResultsPage] = useState(1)
     const [resultsLimit, setResultsLimit] = useState(10)
@@ -141,14 +155,20 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
 
     const loadData = async () => {
         try {
-            const [vData, dData, tData] = await Promise.all([
+            const [vData, dData, tData, edtData, edData, assuredData] = await Promise.all([
                 window.api.getVessels(),
                 window.api.getVesselDocuments(),
-                window.api.getDocumentTypes()
+                window.api.getDocumentTypes(),
+                window.api.getEntityDocumentTypes(),
+                window.api.getEntityDocuments(),
+                window.api.getVesselAssureds()
             ])
             setVessels(Array.isArray(vData) ? vData.filter((v: any) => v.isActive !== false) : [])
             setDocs(Array.isArray(dData) ? dData : [])
             setDocTypes(Array.isArray(tData) ? tData : [])
+            setEntityDocTypes(Array.isArray(edtData) ? edtData.filter((t: any) => t.isActive) : [])
+            setEntityDocs(Array.isArray(edData) ? edData : [])
+            setAllAssureds(Array.isArray(assuredData) ? assuredData : [])
         } catch (error) {
             console.error('ComplianceCenter: Failed to load data:', error)
             setVessels([])
@@ -183,10 +203,15 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
 
     const loadPolicyAlerts = async () => {
         try {
-            const alerts = await window.api.getExpiredActivePolicies()
-            setPolicyAlerts(Array.isArray(alerts) ? alerts : [])
+            const [expired, expiring] = await Promise.all([
+                window.api.getExpiredActivePolicies(),
+                window.api.getExpiringSoonPolicies(90)
+            ])
+            setPolicyAlerts(Array.isArray(expired) ? expired : [])
+            setPolicyExpiringSoon(Array.isArray(expiring) ? expiring : [])
         } catch {
             setPolicyAlerts([])
+            setPolicyExpiringSoon([])
         }
     }
 
@@ -271,6 +296,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
             setEditingRuleId(null)
             setRuleForm(EMPTY_RULE_FORM)
             loadCustomRules()
+            loadDataValidation()
         } catch (e: any) {
             showError(e?.message || 'Failed to save rule')
         }
@@ -281,6 +307,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
             await window.api.validationRulesDelete(id)
             showSuccess('Rule deleted')
             loadCustomRules()
+            loadDataValidation()
         } catch (e: any) {
             showError(e?.message || 'Failed to delete rule')
         }
@@ -290,6 +317,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
         try {
             await window.api.validationRulesUpdate(rule.id, { isEnabled: !rule.isEnabled })
             loadCustomRules()
+            loadDataValidation()
         } catch (e: any) {
             showError(e?.message || 'Failed to toggle rule')
         }
@@ -327,49 +355,78 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
         const alerts: any[] = []
 
         vessels.forEach(v => {
+            // Vessel document alerts
             docTypes.forEach(t => {
                 const doc = docs.find(d => d.vesselId === v.id && d.documentTypeId === t.id)
                 const isRequired = doc ? doc.required : t.required
                 const hasFile = !!doc?.filePath
 
-                // 1. Missing Required File
                 if (isRequired && !hasFile) {
                     alerts.push({
-                        id: `${v.id}-${t.id}-missing`,
-                        vessel: v.name,
-                        document: t.name,
-                        type: 'missing',
-                        severity: 'high',
-                        message: 'Required file missing',
-                        date: '-'
+                        id: `${v.id}-${t.id}-missing`, vesselId: v.id, vessel: v.name,
+                        document: t.name, category: 'vessel',
+                        type: 'missing', severity: 'high', message: 'Required file missing', date: '-'
                     })
                 }
 
-                // 2. Expiry Checks
                 if (hasFile && doc?.expiryDate) {
                     const expiry = new Date(doc.expiryDate)
                     if (expiry < today) {
                         alerts.push({
-                            id: `${v.id}-${t.id}-expired`,
-                            vessel: v.name,
-                            document: t.name,
-                            type: 'expired',
-                            severity: 'critical',
-                            message: 'Document expired',
-                            date: doc.expiryDate
+                            id: `${v.id}-${t.id}-expired`, vesselId: v.id, vessel: v.name,
+                            document: t.name, category: 'vessel',
+                            type: 'expired', severity: 'critical', message: 'Document expired', date: doc.expiryDate
                         })
                     } else if (expiry < thirtyDaysFromNow) {
                         alerts.push({
-                            id: `${v.id}-${t.id}-soon`,
-                            vessel: v.name,
-                            document: t.name,
-                            type: 'soon',
-                            severity: 'medium',
-                            message: 'Expiring soon',
-                            date: doc.expiryDate
+                            id: `${v.id}-${t.id}-soon`, vesselId: v.id, vessel: v.name,
+                            document: t.name, category: 'vessel',
+                            type: 'soon', severity: 'medium', message: 'Expiring soon', date: doc.expiryDate
                         })
                     }
                 }
+            })
+
+            // Entity document alerts for this vessel's assureds
+            const vesselAssureds = allAssureds.filter(a => a.vesselId === v.id)
+            const seenEntities = new Set<string>()
+            vesselAssureds.forEach(a => {
+                if (!a.entityId || seenEntities.has(a.entityId)) return
+                seenEntities.add(a.entityId)
+                const entityType = a.entityType === 'person' ? 'person' : 'company'
+                const applicableTypes = entityDocTypes.filter(t =>
+                    t.entityScope === 'both' || t.entityScope === entityType
+                )
+                applicableTypes.forEach(t => {
+                    if (!t.isRequired) return
+                    const ed = entityDocs.find(d => d.entityId === a.entityId && d.documentTypeId === t.id)
+                    const hasFile = !!ed?.filePath
+
+                    if (!hasFile) {
+                        alerts.push({
+                            id: `${v.id}-entity-${a.entityId}-${t.id}-missing`, vesselId: v.id, vessel: v.name,
+                            document: `${t.name} (${a.entityName || a.name})`, category: 'entity',
+                            type: 'missing', severity: 'high', message: 'Required entity document missing', date: '-'
+                        })
+                    }
+
+                    if (hasFile && ed?.expiryDate) {
+                        const expiry = new Date(ed.expiryDate)
+                        if (expiry < today) {
+                            alerts.push({
+                                id: `${v.id}-entity-${a.entityId}-${t.id}-expired`, vesselId: v.id, vessel: v.name,
+                                document: `${t.name} (${a.entityName || a.name})`, category: 'entity',
+                                type: 'expired', severity: 'critical', message: 'Entity document expired', date: ed.expiryDate
+                            })
+                        } else if (expiry < thirtyDaysFromNow) {
+                            alerts.push({
+                                id: `${v.id}-entity-${a.entityId}-${t.id}-soon`, vesselId: v.id, vessel: v.name,
+                                document: `${t.name} (${a.entityName || a.name})`, category: 'entity',
+                                type: 'soon', severity: 'medium', message: 'Entity document expiring soon', date: ed.expiryDate
+                            })
+                        }
+                    }
+                })
             })
         })
 
@@ -377,6 +434,24 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
     }
 
     const alerts = getAllAlerts()
+
+    // Group alerts by vessel
+    const alertsByVessel = alerts.reduce<Record<string, { vesselId: string; vessel: string; alerts: any[] }>>((acc, a) => {
+        if (!acc[a.vesselId]) acc[a.vesselId] = { vesselId: a.vesselId, vessel: a.vessel, alerts: [] }
+        acc[a.vesselId].alerts.push(a)
+        return acc
+    }, {})
+    const vesselGroups = Object.values(alertsByVessel).sort((a, b) => b.alerts.length - a.alerts.length)
+
+    const handleChangePolicyStatus = async (policyId: string, newStatus: string) => {
+        try {
+            await window.api.updateVesselDynamicPolicy(policyId, { status: newStatus } as any)
+            showSuccess(`Policy status changed to ${newStatus}`)
+            loadPolicyAlerts()
+        } catch (e: any) {
+            showError(e.message || 'Failed to update policy status')
+        }
+    }
 
     return (
         <div className="fade-in">
@@ -438,9 +513,9 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                     >
                         <FileWarning size={16} />
                         Policy Alerts
-                        {policyAlerts.length > 0 && (
+                        {(policyAlerts.length + policyExpiringSoon.length) > 0 && (
                             <span style={{ background: 'rgba(255, 165, 0, 0.2)', color: '#ffa500', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
-                                {policyAlerts.length}
+                                {policyAlerts.length + policyExpiringSoon.length}
                             </span>
                         )}
                     </button>
@@ -476,7 +551,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                         role="tab"
                         aria-selected={activeTab === 'dataQuality'}
                         aria-controls="panel-dataQuality"
-                        onClick={() => { setActiveTab('dataQuality'); if (validationRules.length === 0) loadDataValidation() }}
+                        onClick={() => { setActiveTab('dataQuality'); loadDataValidation() }}
                         style={{
                             padding: '10px 24px',
                             borderRadius: '8px',
@@ -498,136 +573,204 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
 
             {activeTab === 'documents' && (
                 <div role="tabpanel" id="panel-documents" aria-labelledby="tab-documents">
-                    <div style={{ display: 'flex', gap: '8px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px', marginBottom: '20px', width: 'fit-content' }}>
-                        <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={getAllAlerts().length} />
-                        <FilterButton active={filter === 'missing'} onClick={() => setFilter('missing')} label="Missing" color="var(--danger)" />
-                        <FilterButton active={filter === 'expired'} onClick={() => setFilter('expired')} label="Expired" color="#ff4d4d" />
-                        <FilterButton active={filter === 'soon'} onClick={() => setFilter('soon')} label="Expiring Soon" color="#ffcc00" />
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px', width: 'fit-content' }}>
+                            <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={alerts.length} />
+                            <FilterButton active={filter === 'missing'} onClick={() => setFilter('missing')} label="Missing" color="var(--danger)" />
+                            <FilterButton active={filter === 'expired'} onClick={() => setFilter('expired')} label="Expired" color="#ff4d4d" />
+                            <FilterButton active={filter === 'soon'} onClick={() => setFilter('soon')} label="Expiring Soon" color="#ffcc00" />
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px' }}>
+                            <button onClick={() => setGroupByVessel(true)} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: groupByVessel ? 'var(--bg-card)' : 'transparent', color: groupByVessel ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: groupByVessel ? 600 : 400, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Layers size={13} /> Grouped</button>
+                            <button onClick={() => setGroupByVessel(false)} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: !groupByVessel ? 'var(--bg-card)' : 'transparent', color: !groupByVessel ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: !groupByVessel ? 600 : 400, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><List size={13} /> Flat</button>
+                        </div>
                     </div>
 
-                    <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <caption className="sr-only">Document compliance alerts</caption>
-                            <thead>
-                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th scope="col" style={{ padding: '16px' }}>Vessel</th>
-                                    <th scope="col" style={{ padding: '16px' }}>Document Type</th>
-                                    <th scope="col" style={{ padding: '16px' }}>Alert Type</th>
-                                    <th scope="col" style={{ padding: '16px' }}>Details / Date</th>
-                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Severity</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {alerts.map(alert => {
-                                    const rowBorder = alert.type === 'expired' ? 'var(--danger)' : alert.type === 'missing' ? 'var(--danger)' : alert.type === 'soon' ? '#e6a800' : 'transparent'
-                                    return (
-                                    <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}` }}>
-                                        <td style={{ padding: '16px', fontWeight: '600' }}>{alert.vessel}</td>
-                                        <td style={{ padding: '16px' }}>{alert.document}</td>
-                                        <td style={{ padding: '16px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {alert.type === 'missing' && <ShieldAlert size={16} color="var(--danger)" />}
-                                                {alert.type === 'expired' && <AlertCircle size={16} color="#ff4d4d" />}
-                                                {alert.type === 'soon' && <Clock size={16} color="#ffcc00" />}
-                                                <span style={{ textTransform: 'capitalize' }}>{alert.type.replace('-', ' ')}</span>
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                                            {alert.message} {alert.date !== '-' && `(${alert.date})`}
-                                        </td>
-                                        <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <span style={{
-                                                padding: '4px 10px',
-                                                borderRadius: '20px',
-                                                fontSize: '0.7rem',
-                                                fontWeight: '700',
-                                                textTransform: 'uppercase',
-                                                background: alert.severity === 'critical' ? 'rgba(255, 77, 77, 0.2)' :
-                                                    alert.severity === 'high' ? 'rgba(255, 120, 77, 0.2)' : 'rgba(255, 204, 0, 0.15)',
-                                                color: alert.severity === 'critical' ? '#ff4d4d' :
-                                                    alert.severity === 'high' ? '#ff784d' : '#ffcc00',
-                                                border: `1px solid ${alert.severity === 'critical' ? 'rgba(255, 77, 77, 0.3)' : 'rgba(255, 120, 77, 0.3)'}`
-                                            }}>
-                                                {alert.severity}
-                                            </span>
-                                        </td>
+                    {groupByVessel ? (
+                        /* Grouped by vessel view */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {vesselGroups.map(group => {
+                                const isExpanded = expandedVessels.has(group.vesselId)
+                                return (
+                                <div key={group.vesselId} className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                                    <div
+                                        style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none', background: 'var(--table-header-bg)', cursor: 'pointer' }}
+                                        onClick={() => setExpandedVessels(prev => { const next = new Set(prev); if (next.has(group.vesselId)) next.delete(group.vesselId); else next.add(group.vesselId); return next })}
+                                    >
+                                        <ChevronDownIcon size={14} style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', flexShrink: 0, color: 'var(--text-secondary)' }} />
+                                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.vessel}</span>
+                                        <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, background: 'rgba(255,77,77,0.15)', color: 'var(--danger)', marginLeft: 'auto' }}>{group.alerts.length}</span>
+                                    </div>
+                                    {isExpanded && <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <tbody>
+                                            {group.alerts.map(alert => {
+                                                const rowBorder = alert.type === 'expired' || alert.type === 'missing' ? 'var(--danger)' : '#e6a800'
+                                                return (
+                                                    <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}` }}>
+                                                        <td style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
+                                                            {alert.category === 'entity' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(139,92,246,0.1)', color: isLight ? '#7a3db8' : '#b464ff', marginRight: '6px' }}>Entity</span>}
+                                                            {alert.document}
+                                                        </td>
+                                                        <td style={{ padding: '10px 16px', width: '120px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
+                                                                {alert.type === 'missing' && <ShieldAlert size={14} color="var(--danger)" />}
+                                                                {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
+                                                                {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                                                                <span style={{ textTransform: 'capitalize' }}>{alert.type === 'soon' ? 'Expiring' : alert.type}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>
+                                                            {alert.date !== '-' && alert.date}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>}
+                                </div>
+                                )
+                            })}
+                            {vesselGroups.length === 0 && (
+                                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+                                    <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
+                                    <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
+                                    <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        /* Flat list view */
+                        <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <caption className="sr-only">Document compliance alerts</caption>
+                                <thead>
+                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Vessel</th>
+                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Document</th>
+                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Type</th>
+                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Date</th>
+                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'right' }}>Severity</th>
                                     </tr>
-                                    )
-                                })}
-                                {alerts.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} style={{ padding: '64px', textAlign: 'center' }}>
-                                            <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
-                                            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
-                                            <p style={{ color: 'var(--text-secondary)' }}>No alerts found for the selected filter.</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    {alerts.map(alert => {
+                                        const rowBorder = alert.type === 'expired' || alert.type === 'missing' ? 'var(--danger)' : '#e6a800'
+                                        return (
+                                        <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}` }}>
+                                            <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{alert.vessel}</td>
+                                            <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                                                {alert.category === 'entity' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(139,92,246,0.1)', color: isLight ? '#7a3db8' : '#b464ff', marginRight: '6px' }}>Entity</span>}
+                                                {alert.document}
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                                                    {alert.type === 'missing' && <ShieldAlert size={14} color="var(--danger)" />}
+                                                    {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
+                                                    {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                                                    <span style={{ textTransform: 'capitalize' }}>{alert.type === 'soon' ? 'Expiring' : alert.type}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                                                {alert.date !== '-' ? alert.date : ''}
+                                            </td>
+                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                                <span style={{
+                                                    padding: '3px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase',
+                                                    background: alert.severity === 'critical' ? 'rgba(255,77,77,0.15)' : alert.severity === 'high' ? 'rgba(255,120,77,0.15)' : 'rgba(255,204,0,0.12)',
+                                                    color: alert.severity === 'critical' ? '#ff4d4d' : alert.severity === 'high' ? '#ff784d' : '#e6a800'
+                                                }}>
+                                                    {alert.severity}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        )
+                                    })}
+                                    {alerts.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} style={{ padding: '64px', textAlign: 'center' }}>
+                                                <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
+                                                <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
+                                                <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {activeTab === 'policies' && (
+            {activeTab === 'policies' && (() => {
+                const activePolicies = policyFilter === 'expired' ? policyAlerts : policyExpiringSoon
+                return (
                 <div role="tabpanel" id="panel-policies" aria-labelledby="tab-policies">
+                    <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px', marginBottom: '20px', width: 'fit-content' }}>
+                        <FilterButton active={policyFilter === 'expired'} onClick={() => setPolicyFilter('expired')} label="Expired" color="var(--danger)" count={policyAlerts.length} />
+                        <FilterButton active={policyFilter === 'expiring'} onClick={() => setPolicyFilter('expiring')} label="Expiring Soon (90 days)" color="#ffa500" count={policyExpiringSoon.length} />
+                    </div>
                     <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <caption className="sr-only">Policy expiry alerts</caption>
+                            <caption className="sr-only">Policy alerts</caption>
                             <thead>
                                 <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th scope="col" style={{ padding: '16px' }}>Vessel</th>
-                                    <th scope="col" style={{ padding: '16px' }}>IMO</th>
-                                    <th scope="col" style={{ padding: '16px' }}>Policy Type</th>
-                                    <th scope="col" style={{ padding: '16px' }}>Policy Number</th>
-                                    <th scope="col" style={{ padding: '16px' }}>End Date</th>
-                                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Days Overdue</th>
-                                    <th scope="col" style={{ padding: '16px', textAlign: 'center' }}>Actions</th>
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Vessel</th>
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Policy Type</th>
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Policy Number</th>
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>End Date</th>
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'right' }}>{policyFilter === 'expired' ? 'Days Overdue' : 'Days Left'}</th>
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'center' }}>Status</th>
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'center' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {policyAlerts.map((alert: any, idx: number) => {
+                                {activePolicies.map((alert: any, idx: number) => {
                                     const endDate = alert.endDate ? new Date(alert.endDate) : null
                                     const today = new Date()
-                                    const daysOverdue = endDate ? Math.floor((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
+                                    const diffDays = endDate ? Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : 0
+                                    const isExpired = diffDays < 0
+                                    const absDays = Math.abs(diffDays)
                                     return (
-                                        <tr key={alert.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                                            <td style={{ padding: '16px', fontWeight: '600' }}>{alert.vesselName}</td>
-                                            <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{alert.imoNumber}</td>
-                                            <td style={{ padding: '16px' }}>{alert.policyTypeName}</td>
-                                            <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{alert.policyNumber || '-'}</td>
-                                            <td style={{ padding: '16px', color: '#ff784d' }}>{alert.endDate || '-'}</td>
-                                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                                        <tr key={alert.id || idx} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${isExpired ? 'var(--danger)' : absDays <= 30 ? '#ffa500' : '#e6a800'}` }}>
+                                            <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{alert.vesselName}</td>
+                                            <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>{alert.policyTypeName}</td>
+                                            <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{alert.policyNumber || '-'}</td>
+                                            <td style={{ padding: '12px 16px', color: isExpired ? 'var(--danger)' : '#e6a800', fontSize: '0.85rem' }}>{alert.endDate || '-'}</td>
+                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                                 <span style={{
-                                                    padding: '4px 10px',
-                                                    borderRadius: '20px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: '700',
-                                                    background: daysOverdue > 30 ? 'rgba(255, 77, 77, 0.2)' : 'rgba(255, 165, 0, 0.2)',
-                                                    color: daysOverdue > 30 ? '#ff4d4d' : '#ffa500'
+                                                    padding: '3px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700,
+                                                    background: isExpired ? 'rgba(255,77,77,0.15)' : absDays <= 30 ? 'rgba(255,165,0,0.15)' : 'rgba(255,204,0,0.1)',
+                                                    color: isExpired ? '#ff4d4d' : absDays <= 30 ? '#ffa500' : '#e6a800'
                                                 }}>
-                                                    {daysOverdue > 0 ? `${daysOverdue} days` : 'Today'}
+                                                    {isExpired ? `${absDays}d overdue` : absDays === 0 ? 'Today' : `${absDays}d left`}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '16px', textAlign: 'center' }}>
-                                                <button
-                                                    onClick={() => onNavigateToVessel?.(alert.vesselId, 'policies')}
-                                                    className="btn-secondary"
-                                                    style={{ padding: '4px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                <select
+                                                    value={alert.status || 'active'}
+                                                    onChange={e => handleChangePolicyStatus(alert.id, e.target.value)}
+                                                    style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', cursor: 'pointer' }}
                                                 >
-                                                    <Eye size={14} />
-                                                    View
+                                                    <option value="active">Active</option>
+                                                    <option value="expired">Expired</option>
+                                                    <option value="cancelled">Cancelled</option>
+                                                    <option value="inactive">Inactive</option>
+                                                </select>
+                                            </td>
+                                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                <button onClick={() => onNavigateToVessel?.(alert.vesselId, 'policies')} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Eye size={13} /> View
                                                 </button>
                                             </td>
                                         </tr>
                                     )
                                 })}
-                                {policyAlerts.length === 0 && (
+                                {activePolicies.length === 0 && (
                                     <tr>
                                         <td colSpan={7} style={{ padding: '64px', textAlign: 'center' }}>
                                             <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
                                             <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>No policy alerts</div>
-                                            <p style={{ color: 'var(--text-secondary)' }}>All active policies have valid end dates.</p>
+                                            <p style={{ color: 'var(--text-secondary)' }}>{policyFilter === 'expired' ? 'No expired active policies.' : 'No policies expiring within 90 days.'}</p>
                                         </td>
                                     </tr>
                                 )}
@@ -635,7 +778,8 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                         </table>
                     </div>
                 </div>
-            )}
+                )
+            })()}
 
             {activeTab === 'dataQuality' && (
                 <div role="tabpanel" id="panel-dataQuality" aria-labelledby="tab-dataQuality">
@@ -1145,15 +1289,38 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                 <ShieldAlert size={20} color="#ffc107" />
                                 <h3 style={{ margin: 0 }}>Pending Review</h3>
                                 {resultsTotal > 0 && (
-                                    <span style={{ background: 'rgba(255, 193, 7, 0.2)', color: '#ffc107', padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem', marginLeft: 'auto' }}>
+                                    <span style={{ background: 'rgba(255, 193, 7, 0.2)', color: '#ffc107', padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem' }}>
                                         {resultsTotal} pending
                                     </span>
+                                )}
+                                {selectedSanctions.size > 0 && canReview && (
+                                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{selectedSanctions.size} selected</span>
+                                        <button onClick={async () => {
+                                            for (const id of selectedSanctions) await handleDecideMatch(id, 'cleared')
+                                            setSelectedSanctions(new Set())
+                                        }} style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <CheckCircle size={13} /> Clear All
+                                        </button>
+                                        <button onClick={async () => {
+                                            for (const id of selectedSanctions) await handleDecideMatch(id, 'sanctioned')
+                                            setSelectedSanctions(new Set())
+                                        }} style={{ background: 'rgba(255,77,77,0.1)', border: '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <ShieldAlert size={13} /> Sanction All
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <caption className="sr-only">Pending sanctions reviews</caption>
                                 <thead>
                                     <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                                        {canReview && <th scope="col" style={{ padding: '12px 8px 12px 16px', width: '32px' }}>
+                                            <input type="checkbox" checked={pendingResults.length > 0 && selectedSanctions.size === pendingResults.length} onChange={e => {
+                                                if (e.target.checked) setSelectedSanctions(new Set(pendingResults.map(r => r.id)))
+                                                else setSelectedSanctions(new Set())
+                                            }} />
+                                        </th>}
                                         <th scope="col" style={{ padding: '12px 16px' }}>Name</th>
                                         <th scope="col" style={{ padding: '12px 16px' }}>Type</th>
                                         <th scope="col" style={{ padding: '12px 16px' }}>Match Score</th>
@@ -1165,6 +1332,13 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                     {pendingResults.map(result => (
                                         <>
                                             <tr key={result.id} style={{ borderBottom: expandedResult === result.id ? 'none' : '1px solid var(--table-border)' }}>
+                                                {canReview && <td style={{ padding: '14px 8px 14px 16px', width: '32px' }}>
+                                                    <input type="checkbox" checked={selectedSanctions.has(result.id)} onChange={e => {
+                                                        const next = new Set(selectedSanctions)
+                                                        if (e.target.checked) next.add(result.id); else next.delete(result.id)
+                                                        setSelectedSanctions(next)
+                                                    }} />
+                                                </td>}
                                                 <td style={{ padding: '14px 16px', fontWeight: '600' }}>{result.entityName}</td>
                                                 <td style={{ padding: '14px 16px' }}>
                                                     <span style={{
@@ -1224,7 +1398,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                             </tr>
                                             {expandedResult === result.id && (
                                                 <tr>
-                                                    <td colSpan={5} style={{ padding: '0 16px 16px 16px', background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)' }}>
+                                                    <td colSpan={canReview ? 6 : 5} style={{ padding: '0 16px 16px 16px', background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)' }}>
                                                         <div style={{ padding: '12px', background: 'var(--bg-card)', borderRadius: '8px', fontSize: '0.85rem' }}>
                                                             <div style={{ fontWeight: '600', marginBottom: '8px' }}>Match Details:</div>
                                                             {(() => {
@@ -1249,7 +1423,7 @@ export default function ComplianceCenter({ onNavigateToVessel }: ComplianceCente
                                     ))}
                                     {pendingResults.length === 0 && (
                                         <tr>
-                                            <td colSpan={5} style={{ padding: '48px', textAlign: 'center' }}>
+                                            <td colSpan={canReview ? 6 : 5} style={{ padding: '48px', textAlign: 'center' }}>
                                                 <CheckCircle size={40} color="var(--success)" style={{ marginBottom: '12px', opacity: 0.5 }} />
                                                 <div style={{ fontWeight: '600' }}>No pending reviews</div>
                                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>All sanctions matches have been reviewed.</p>

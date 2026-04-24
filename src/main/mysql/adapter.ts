@@ -11105,6 +11105,30 @@ export class MySQLAdapter {
         )
         return rows as any[]
     }
+    async getExpiringSoonPolicies(daysAhead = 90): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
+                    pt.name as policyTypeName, vdp.policy_number as policyNumber, vdp.status,
+                    vpv.value_date as endDate
+             FROM vessel_dynamic_policies vdp
+             JOIN vessels v ON vdp.vessel_id = v.id
+             JOIN policy_types pt ON vdp.policy_type_id = pt.id
+             JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
+             JOIN policy_type_characteristics ptc ON vpv.characteristic_id = ptc.id
+             WHERE vdp.status = 'active'
+               AND v.is_active = TRUE
+               AND ptc.field_type = 'date'
+               AND LOWER(ptc.name) LIKE '%end%'
+               AND vpv.value_date IS NOT NULL
+               AND vpv.value_date >= CURDATE()
+               AND vpv.value_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+             ORDER BY vpv.value_date ASC`,
+            [daysAhead]
+        )
+        return rows as any[]
+    }
+
     // --- Policy Renewals by Month ---
     async getPolicyRenewalsByMonth(year: number, month: number): Promise<any[]> {
         if (!this.pool) return []

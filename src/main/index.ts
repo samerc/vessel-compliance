@@ -3033,6 +3033,7 @@ app.whenReady().then(() => {
 
   // Policy Expiry Alerts
   safeHandle('policies:getExpiredActive', (event) => { requireSession(event); return db.getExpiredActivePolicies() })
+  safeHandle('policies:getExpiringSoon', (event, days?: number) => { requireSession(event); return db.getExpiringSoonPolicies(days || 90) })
   safeHandle('policies:getRenewalsByMonth', (event, year: number, month: number) => { requireSession(event); return db.getPolicyRenewalsByMonth(year, month) })
   safeHandle('policies:setQuotationSentDate', async (event, policyId: string, date: string | null) => { await requirePermission(event, 'policies:manage'); return db.setQuotationSentDate(policyId, date) })
   safeHandle('renewals:getPipeline', (event, dateFrom: string, dateTo: string) => { requireSession(event); return db.getRenewalPipeline(dateFrom, dateTo) })
