@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, FolderOpen, Sparkles, Eye, EyeOff } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, FolderOpen, Sparkles, Eye, EyeOff, Download } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -81,6 +81,8 @@ function App(): React.JSX.Element {
 
   // Hot-update notification
   const [hotUpdateAvailable, setHotUpdateAvailable] = useState(false)
+  const [hotBuildNumber, setHotBuildNumber] = useState(0)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
 
   // Force password reset state
   const [forcePasswordReset, setForcePasswordReset] = useState(false)
@@ -212,6 +214,7 @@ function App(): React.JSX.Element {
     window.api.updateGetCurrentVersion().then(setAppVersion)
     window.api.onDbStatus((status) => { setDbConnected(status.connected) })
     window.api.onHotUpdateAvailable(() => { setHotUpdateAvailable(true) })
+    window.api.hotUpdateGetInfo().then(info => { setHotBuildNumber(info.currentBuild) }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -662,9 +665,21 @@ function App(): React.JSX.Element {
           <div style={{ paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: sc ? 'center' : 'space-between', gap: '4px' }}>
             {!sc && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: 'var(--text-secondary)', opacity: 0.5 }}>
-                v{appVersion}
+                v{appVersion}{hotBuildNumber > 0 ? `b${hotBuildNumber}` : ''}
                 <button onClick={() => setShowChangelog(true)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.63rem', padding: '1px 3px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '2px' }} className="hover-effect" title="View Changelog">
-                  <RefreshCw size={9} /> Changelog
+                  <RefreshCw size={9} />
+                </button>
+                <button onClick={async () => {
+                  setCheckingUpdate(true)
+                  try {
+                    const result = await window.api.hotUpdateCheck()
+                    if (result.updated) {
+                      setHotUpdateAvailable(true)
+                    }
+                  } catch { /* silent */ }
+                  setCheckingUpdate(false)
+                }} disabled={checkingUpdate} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: checkingUpdate ? 'wait' : 'pointer', fontSize: '0.63rem', padding: '1px 3px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '2px', opacity: checkingUpdate ? 0.5 : 1 }} className="hover-effect" title="Check for updates">
+                  <Download size={9} />
                 </button>
               </div>
             )}
