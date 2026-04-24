@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2, List, Layers } from 'lucide-react'
+import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2, List, Layers, Search, FileText } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -96,8 +96,9 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
     const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
     const [allAssureds, setAllAssureds] = useState<any[]>([])
     const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
-    const [groupByVessel, setGroupByVessel] = useState(true)
+    const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat'>('vessel')
     const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
+    const [docSearch, setDocSearch] = useState('')
     const [activeTab, setActiveTabRaw] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>(initialTab || 'documents')
     const setActiveTab = (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => {
         setActiveTabRaw(tab)
@@ -430,7 +431,12 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
             })
         })
 
-        return alerts.filter(a => filter === 'all' || a.type === filter)
+        let filtered = alerts.filter(a => filter === 'all' || a.type === filter)
+        if (docSearch.trim()) {
+            const q = docSearch.toLowerCase()
+            filtered = filtered.filter(a => a.vessel.toLowerCase().includes(q) || a.document.toLowerCase().includes(q))
+        }
+        return filtered
     }
 
     const alerts = getAllAlerts()
@@ -442,6 +448,15 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
         return acc
     }, {})
     const vesselGroups = Object.values(alertsByVessel).sort((a, b) => b.alerts.length - a.alerts.length)
+
+    // Group alerts by document type
+    const alertsByDocument = alerts.reduce<Record<string, { document: string; alerts: any[] }>>((acc, a) => {
+        const docKey = a.document.replace(/\s*\(.*\)$/, '') // Strip entity name for grouping
+        if (!acc[docKey]) acc[docKey] = { document: docKey, alerts: [] }
+        acc[docKey].alerts.push(a)
+        return acc
+    }, {})
+    const documentGroups = Object.values(alertsByDocument).sort((a, b) => b.alerts.length - a.alerts.length)
 
     const handleChangePolicyStatus = async (policyId: string, newStatus: string) => {
         try {
@@ -581,12 +596,25 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                             <FilterButton active={filter === 'soon'} onClick={() => setFilter('soon')} label="Expiring Soon" color="#ffcc00" />
                         </div>
                         <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px' }}>
-                            <button onClick={() => setGroupByVessel(true)} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: groupByVessel ? 'var(--bg-card)' : 'transparent', color: groupByVessel ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: groupByVessel ? 600 : 400, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Layers size={13} /> Grouped</button>
-                            <button onClick={() => setGroupByVessel(false)} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: !groupByVessel ? 'var(--bg-card)' : 'transparent', color: !groupByVessel ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: !groupByVessel ? 600 : 400, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><List size={13} /> Flat</button>
+                            {(['vessel', 'document', 'flat'] as const).map(mode => (
+                                <button key={mode} onClick={() => setDocViewMode(mode)} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: docViewMode === mode ? 'var(--bg-card)' : 'transparent', color: docViewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: docViewMode === mode ? 600 : 400, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    {mode === 'vessel' && <><Layers size={13} /> Vessel</>}
+                                    {mode === 'document' && <><FileText size={13} /> Document</>}
+                                    {mode === 'flat' && <><List size={13} /> Flat</>}
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                            <input
+                                type="text" value={docSearch} onChange={e => setDocSearch(e.target.value)}
+                                placeholder="Search vessels or documents..."
+                                style={{ padding: '7px 12px 7px 30px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '240px' }}
+                            />
                         </div>
                     </div>
 
-                    {groupByVessel ? (
+                    {docViewMode === 'vessel' ? (
                         /* Grouped by vessel view */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {vesselGroups.map(group => {
@@ -631,6 +659,56 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                 )
                             })}
                             {vesselGroups.length === 0 && (
+                                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+                                    <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
+                                    <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
+                                    <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : docViewMode === 'document' ? (
+                        /* Grouped by document type view */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {documentGroups.map(group => {
+                                const isExpanded = expandedVessels.has(group.document)
+                                return (
+                                <div key={group.document} className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                                    <div
+                                        style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none', background: 'var(--table-header-bg)', cursor: 'pointer' }}
+                                        onClick={() => setExpandedVessels(prev => { const next = new Set(prev); if (next.has(group.document)) next.delete(group.document); else next.add(group.document); return next })}
+                                    >
+                                        <ChevronDownIcon size={14} style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', flexShrink: 0, color: 'var(--text-secondary)' }} />
+                                        <FileText size={15} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.document}</span>
+                                        <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, background: 'rgba(255,77,77,0.15)', color: 'var(--danger)', marginLeft: 'auto' }}>{group.alerts.length}</span>
+                                    </div>
+                                    {isExpanded && <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <tbody>
+                                            {group.alerts.map(alert => {
+                                                const rowBorder = alert.type === 'expired' || alert.type === 'missing' ? 'var(--danger)' : '#e6a800'
+                                                return (
+                                                    <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}`, cursor: 'pointer' }} onClick={() => onNavigateToVessel?.(alert.vesselId)}>
+                                                        <td style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{alert.vessel}</td>
+                                                        <td style={{ padding: '10px 16px', width: '120px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
+                                                                {alert.type === 'missing' && <ShieldAlert size={14} color="var(--danger)" />}
+                                                                {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
+                                                                {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                                                                <span style={{ textTransform: 'capitalize' }}>{alert.type === 'soon' ? 'Expiring' : alert.type}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>
+                                                            {alert.date !== '-' && alert.date}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>}
+                                </div>
+                                )
+                            })}
+                            {documentGroups.length === 0 && (
                                 <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
                                     <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
                                     <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
