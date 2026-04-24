@@ -1,6 +1,7 @@
 import XLSX from 'xlsx-js-style'
-import { existsSync } from 'fs'
+import { existsSync, writeFileSync } from 'fs'
 import { execSync } from 'child_process'
+import { join } from 'path'
 
 const BRANCH_MAP: Record<string, string> = {
   P: 'P:P&I',
@@ -13,9 +14,29 @@ const BRANCH_MAP: Record<string, string> = {
   Y: 'Y:Yacht',
 }
 
+const HEADERS = ['Date', 'Quotation Type', 'Branch', 'Seq. Number', 'Reference', 'Managers', 'Vessel', 'IMO', 'Type', 'Broker', 'Remarks']
+
+// ── Excel COM availability check ──────────────────────────────────────────────
+
+let excelComAvailable: boolean | null = null
+
+function checkExcelCom(): boolean {
+  if (excelComAvailable !== null) return excelComAvailable
+  try {
+    execSync(
+      'powershell -NoProfile -Command "New-Object -ComObject Excel.Application | ForEach-Object { $_.Quit() }"',
+      { stdio: 'pipe', timeout: 10000 }
+    )
+    excelComAvailable = true
+  } catch {
+    excelComAvailable = false
+  }
+  return excelComAvailable
+}
+
 // ── Read helpers (xlsx-js-style, non-destructive) ─────────────────────────────
 
-function getYearSheet(filePath: string): { wb: XLSX.WorkBook; ws: XLSX.WorkSheet; sheetName: string } {
+function getYearSheetReadOnly(filePath: string): { ws: XLSX.WorkSheet; sheetName: string } {
   const year = String(new Date().getFullYear())
   if (!existsSync(filePath)) throw new Error('Registry file not found')
 
@@ -23,12 +44,11 @@ function getYearSheet(filePath: string): { wb: XLSX.WorkBook; ws: XLSX.WorkSheet
   const ws = wb.Sheets[year]
   if (!ws) throw new Error(`No sheet found for year ${year}`)
 
-  return { wb, ws, sheetName: year }
+  return { ws, sheetName: year }
 }
 
 function getLastSerial(ws: XLSX.WorkSheet): number {
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-  // Scan from bottom up in column D (index 3) to find last serial
   for (let r = range.e.r; r >= 2; r--) {
     const cell = ws[XLSX.utils.encode_cell({ r, c: 3 })]
     if (cell && typeof cell.v === 'number' && cell.v > 0) return cell.v
@@ -36,55 +56,53 @@ function getLastSerial(ws: XLSX.WorkSheet): number {
   return 0
 }
 
-// ── Write helpers (PowerShell + Excel COM, preserves tables/formulas) ─────────
+// ── Write via Excel COM (preserves tables/formulas) ───────────────────────────
 
-function runExcelPowerShell(script: string): string {
-  // Escape single quotes in the script for PowerShell
-  const escaped = script.replace(/'/g, "''")
+function runPowerShellScript(script: string): string {
+  const { tmpdir } = require('os')
+  const tempFile = join(tmpdir(), `vc-registry-${Date.now()}.ps1`)
   try {
+    writeFileSync(tempFile, script, 'utf-8')
     return execSync(
-      `powershell -NoProfile -Command "${escaped}"`,
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempFile}"`,
       { encoding: 'utf-8', timeout: 30000 }
     ).trim()
   } catch (err: any) {
-    throw new Error(`Excel operation failed: ${err.stderr || err.message}`)
+    throw new Error(`Excel COM failed: ${err.stderr || err.message}`)
+  } finally {
+    try { require('fs').unlinkSync(tempFile) } catch { /* ignore */ }
   }
 }
 
-function appendRowViaExcel(
+function appendRowViaCom(
   filePath: string,
   sheetName: string,
-  rowData: (string | number)[]
+  values: { quotationType: string; branch: string; serial: number; reference: string; managers: string; vessel: string; imo: string; vesselType: string; broker: string }
 ): void {
-  // Build PowerShell script that opens Excel, finds the sheet, appends a row, saves
-  // Skip col 1 (date) — handled separately below
-  const cellAssignments = rowData.slice(1).map((val, i) => {
-    const col = i + 2 // starts at column 2 (B)
-    if (typeof val === 'number') {
-      return `$ws.Cells.Item($newRow, ${col}).Value2 = ${val}`
-    }
-    const escaped = String(val).replace(/'/g, "''")
-    return `$ws.Cells.Item($newRow, ${col}).Value2 = '${escaped}'`
-  }).join('\n')
-
-  // Column 1 (A) = today's date with dd/mm/yyyy format
-  const dateAssignment = `$ws.Cells.Item($newRow, 1).Value2 = Get-Date
-$ws.Cells.Item($newRow, 1).NumberFormat = 'dd/mm/yyyy'`
-
+  const esc = (s: string) => s.replace(/'/g, "''")
   const ps = `
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 try {
-  $wb = $excel.Workbooks.Open('${filePath.replace(/'/g, "''")}')
-  $ws = $wb.Sheets.Item('${sheetName}')
+  $wb = $excel.Workbooks.Open('${esc(filePath)}')
+  $ws = $wb.Sheets.Item('${esc(sheetName)}')
   $usedRange = $ws.UsedRange
   $newRow = $usedRange.Row + $usedRange.Rows.Count
-  ${dateAssignment}
-  ${cellAssignments}
+  $ws.Cells.Item($newRow, 1).Value2 = Get-Date
+  $ws.Cells.Item($newRow, 1).NumberFormat = 'dd/mm/yyyy'
+  $ws.Cells.Item($newRow, 2).Value2 = '${esc(values.quotationType)}'
+  $ws.Cells.Item($newRow, 3).Value2 = '${esc(values.branch)}'
+  $ws.Cells.Item($newRow, 4).Value2 = ${values.serial}
+  $ws.Cells.Item($newRow, 5).Value2 = '${esc(values.reference)}'
+  $ws.Cells.Item($newRow, 6).Value2 = '${esc(values.managers)}'
+  $ws.Cells.Item($newRow, 7).Value2 = '${esc(values.vessel)}'
+  $ws.Cells.Item($newRow, 8).Value2 = '${esc(values.imo)}'
+  $ws.Cells.Item($newRow, 9).Value2 = '${esc(values.vesselType)}'
+  $ws.Cells.Item($newRow, 10).Value2 = '${esc(values.broker)}'
   $wb.Save()
   $wb.Close()
-  Write-Output "OK:$newRow"
+  Write-Output "OK"
 } catch {
   Write-Output "ERR:$($_.Exception.Message)"
 } finally {
@@ -92,27 +110,25 @@ try {
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
 }
 `
-  const result = runExcelPowerShell(ps)
+  const result = runPowerShellScript(ps)
   if (result.startsWith('ERR:')) {
     throw new Error(result.substring(4))
   }
+  if (!result.startsWith('OK')) {
+    throw new Error(`Unexpected Excel COM result: ${result}`)
+  }
 }
 
-function setCellViaExcel(
-  filePath: string,
-  sheetName: string,
-  row: number,
-  col: number,
-  value: string
-): void {
+function setCellViaCom(filePath: string, sheetName: string, row: number, col: number, value: string): void {
+  const esc = (s: string) => s.replace(/'/g, "''")
   const ps = `
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 try {
-  $wb = $excel.Workbooks.Open('${filePath.replace(/'/g, "''")}')
-  $ws = $wb.Sheets.Item('${sheetName}')
-  $ws.Cells.Item(${row}, ${col}).Value2 = '${value.replace(/'/g, "''")}'
+  $wb = $excel.Workbooks.Open('${esc(filePath)}')
+  $ws = $wb.Sheets.Item('${esc(sheetName)}')
+  $ws.Cells.Item(${row}, ${col}).Value2 = '${esc(value)}'
   $wb.Save()
   $wb.Close()
   Write-Output 'OK'
@@ -123,10 +139,48 @@ try {
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
 }
 `
-  const result = runExcelPowerShell(ps)
+  const result = runPowerShellScript(ps)
   if (result.startsWith('ERR:')) {
     throw new Error(result.substring(4))
   }
+}
+
+// ── Write via xlsx-js-style (fallback when Excel not installed) ───────────────
+
+function appendRowViaXlsx(filePath: string, sheetName: string, values: { quotationType: string; branch: string; serial: number; reference: string; managers: string; vessel: string; imo: string; vesselType: string; broker: string }): void {
+  const wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
+  const ws = wb.Sheets[sheetName]
+  if (!ws) throw new Error(`Sheet ${sheetName} not found`)
+
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+  const newRow = range.e.r + 1
+
+  const dateSerial = (Date.now() - new Date(1899, 11, 30).getTime()) / (24 * 60 * 60 * 1000)
+  const cells: [number, any][] = [
+    [0, { v: dateSerial, t: 'n', z: 'dd/mm/yyyy' }],
+    [1, { v: values.quotationType, t: 's' }],
+    [2, { v: values.branch, t: 's' }],
+    [3, { v: values.serial, t: 'n' }],
+    [4, { v: values.reference, t: 's' }],
+    [5, { v: values.managers, t: 's' }],
+    [6, { v: values.vessel, t: 's' }],
+    [7, { v: values.imo, t: 's' }],
+    [8, { v: values.vesselType, t: 's' }],
+    [9, { v: values.broker, t: 's' }],
+  ]
+  cells.forEach(([c, cell]) => {
+    ws[XLSX.utils.encode_cell({ r: newRow, c })] = cell
+  })
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: newRow, c: HEADERS.length - 1 } })
+  XLSX.writeFile(wb, filePath)
+}
+
+function setCellViaXlsx(filePath: string, sheetName: string, row0based: number, col0based: number, value: string): void {
+  const wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
+  const ws = wb.Sheets[sheetName]
+  if (!ws) return
+  ws[XLSX.utils.encode_cell({ r: row0based, c: col0based })] = { v: value, t: 's' }
+  XLSX.writeFile(wb, filePath)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -143,7 +197,7 @@ export function assignRegistryNumber(
     broker: string
   }
 ): { reference: string; serial: number } {
-  const { ws, sheetName } = getYearSheet(filePath)
+  const { ws, sheetName } = getYearSheetReadOnly(filePath)
   const lastSerial = getLastSerial(ws)
   const nextSerial = lastSerial + 1
 
@@ -153,20 +207,17 @@ export function assignRegistryNumber(
   const branch = BRANCH_MAP[data.typeCode] || `${data.typeCode}:${data.typeCode}`
   const reference = `Q/${quotationTypeCode}/${data.typeCode}/${yearShort}/${nextSerial}`
 
-  // Row data: skip col 1 (date handled separately in appendRowViaExcel)
-  // Cols: A=Date, B=QuotationType, C=Branch, D=Serial, E=Reference, F=Managers, G=Vessel, H=IMO, I=Type, J=Broker
-  appendRowViaExcel(filePath, sheetName, [
-    0, // placeholder for date (handled by PowerShell)
-    quotationType,
-    branch,
-    nextSerial,
-    reference,
-    data.managers || '',
-    data.vessel || '',
-    data.imo || '',
-    data.vesselType || '',
-    data.broker || '',
-  ])
+  const values = {
+    quotationType, branch, serial: nextSerial, reference,
+    managers: data.managers || '', vessel: data.vessel || '',
+    imo: data.imo || '', vesselType: data.vesselType || '', broker: data.broker || ''
+  }
+
+  if (checkExcelCom()) {
+    appendRowViaCom(filePath, sheetName, values)
+  } else {
+    appendRowViaXlsx(filePath, sheetName, values)
+  }
 
   return { reference, serial: nextSerial }
 }
@@ -174,23 +225,24 @@ export function assignRegistryNumber(
 /** Read the last serial number without writing (for preview) */
 export function getLastRegistrySerial(filePath: string): number {
   if (!existsSync(filePath)) return 0
-  const { ws } = getYearSheet(filePath)
+  const { ws } = getYearSheetReadOnly(filePath)
   return getLastSerial(ws)
 }
 
-/** Mark a registry entry as cancelled by finding the reference in the current year sheet */
+/** Mark a registry entry as cancelled */
 export function markRegistryCancelled(filePath: string, reference: string): void {
   if (!existsSync(filePath)) return
-  const { ws, sheetName } = getYearSheet(filePath)
+  const { ws, sheetName } = getYearSheetReadOnly(filePath)
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-  const REMARKS_COL = 11 // Column K in Excel (1-based)
 
-  // Find the row with this reference (column E = index 4, 0-based)
   for (let r = 2; r <= range.e.r; r++) {
     const refCell = ws[XLSX.utils.encode_cell({ r, c: 4 })]
     if (refCell && refCell.v === reference) {
-      // Excel rows are 1-based, xlsx-js-style rows are 0-based
-      setCellViaExcel(filePath, sheetName, r + 1, REMARKS_COL, 'CANCELLED')
+      if (checkExcelCom()) {
+        setCellViaCom(filePath, sheetName, r + 1, 11, 'CANCELLED') // 1-based row, col K=11
+      } else {
+        setCellViaXlsx(filePath, sheetName, r, 10, 'CANCELLED') // 0-based row, col K=10
+      }
       return
     }
   }
