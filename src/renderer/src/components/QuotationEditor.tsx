@@ -195,7 +195,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         }
     }, [quotation.id])
 
-    const isApproved = q.status === 'approved' || q.status === 'exported' || q.status === 'converted' || (q.referenceNumber && !q.referenceNumber.startsWith('DRAFT-'))
+    const isApproved = q.status === 'approved' || q.status === 'exported' || q.status === 'converted'
     const canEdit = hasPermission('quotations:edit') && !isLockedByOther && stepCanEdit && !isApproved
 
     useEffect(() => {
