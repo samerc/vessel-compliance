@@ -390,13 +390,21 @@ function createWindow(): void {
         initFilePathSettings()
         await loadFilePathSettings()
 
-        // Start hot-update background checks (GitHub-based)
+        // Hot-update: check + auto-apply on startup, then periodic checks
         try {
+          const startupResult = await hotUpdateService.checkAndStage()
+          if (startupResult.updated) {
+            // Update downloaded — restart to load it
+            app.relaunch()
+            app.exit(0)
+            return
+          }
+          // Start periodic checks for updates deployed while the app is running
           hotUpdateService.startPeriodicCheck((version) => {
             mainWindow.webContents.send('hotUpdate:available', version)
           })
         } catch {
-          // Hot-update init is non-fatal
+          // Hot-update is non-fatal
         }
 
         // Cleanup old activity log entries based on retention setting

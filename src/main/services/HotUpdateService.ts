@@ -253,23 +253,11 @@ class HotUpdateService {
     }
   }
 
-  /** Start periodic background checks (call after app is ready) */
+  /** Start periodic background checks for updates deployed while app is running */
   startPeriodicCheck(onUpdateAvailable: (version: HotUpdateVersion) => void): void {
     if (this.checkInterval) return
 
-    // Initial check after 60 seconds (let the app finish loading)
-    setTimeout(async () => {
-      try {
-        const remote = await this.getRemoteVersion()
-        const local = this.getLocalVersion()
-        const localBuild = local?.buildNumber ?? 0
-        if (remote && remote.buildNumber > localBuild) {
-          onUpdateAvailable(remote)
-        }
-      } catch { /* silent */ }
-    }, 60 * 1000)
-
-    // Then check every 30 minutes
+    // Check every 30 minutes (startup already checked once)
     this.checkInterval = setInterval(async () => {
       try {
         const remote = await this.getRemoteVersion()
