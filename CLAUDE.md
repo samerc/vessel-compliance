@@ -18,6 +18,7 @@ npm run build        # Full production build (typecheck + electron-vite build)
 npm run build:win    # Build Windows executable
 npm run build:mac    # Build macOS dmg
 npm run build:linux  # Build Linux packages
+npm run deploy       # Build + upload code-update.zip to GitHub as hot-update (see Hot-Update System)
 ```
 
 ## Code Quality Commands
@@ -35,6 +36,7 @@ npm run format          # Prettier formatting
 This is an Electron desktop application for maritime vessel compliance management using IPC-based architecture:
 
 ### Process Structure
+- **Bootstrap** (`src/main/bootstrap.ts`) - Entry point (`package.json` main = `./out/main/bootstrap.js`); checks for hot-updates before loading main process
 - **Main Process** (`src/main/`) - Handles MySQL database operations, file I/O, authentication, and OFAC screening
 - **Preload Script** (`src/preload/`) - Bridges main and renderer via IPC, exposing `window.api`
 - **Renderer Process** (`src/renderer/src/`) - React UI with Context API for state management
@@ -230,13 +232,18 @@ For `annualRenewal = true` document types, the effective expiry is inherited fro
 - **Auto-Restore**: User's window preferences applied on login via `setBounds`
 
 ### Compliance Center
-Centralized compliance monitoring with two tabs:
-- **Document Alerts Tab**: Missing required files, expired documents, expiring soon (30 days)
-- **Policy Alerts Tab**: View button navigates to vessel's policies section
+
+Centralized compliance monitoring with four tabs:
+
+- **Document Alerts Tab**: Missing required files, expired documents, expiring soon (30 days). Includes entity documents (CoI, AoA, KYC, passport) per vessel's assureds with purple "Entity" badge. Three view modes: Vessel (grouped, collapsed by default), Document (grouped by doc type), Flat. Search input filters by vessel name or document name.
+- **Policy Alerts Tab**: Expired + Expiring Soon (90 days) sub-filters, status dropdown to change policy status directly. View button navigates to vessel's policies section. New IPC: `policies:getExpiringSoon` with `getExpiringSoonPolicies(daysAhead)` adapter method.
 - **Sanctions Screening Tab**:
   - Pending reviews table with expandable match details
+  - Batch select with checkboxes, select-all, "Clear All" / "Sanction All" bulk action buttons
   - Mark as reviewed action updates result status
   - Check history sidebar showing all compliance runs with status/counts
+- **Data Quality Tab**: Auto-refreshes after rule save/delete/toggle
+- **Tab persistence**: Active sub-tab remembered when navigating away and back (`complianceSubTab` state in `App.tsx`)
 
 ### Document Reminders
 
@@ -667,6 +674,29 @@ Auto-shown modal after each update displaying the changelog:
 4. Create GitHub release tagged `vX.Y.Z`, paste `RELEASE_NOTES.md` as the release body
 5. `RELEASE_NOTES.md` has a `!RELEASE_NOTES.md` exception in `.gitignore` (the file itself uses `*.md` exclusion)
 
+### UpdateService
+
+Electron-updater configuration (`src/main/services/UpdateService.ts`):
+
+- **`allowPrerelease = false`**: Full installer updates only check stable releases, ignoring `code-latest` prerelease
+- **Error handler**: Silently ignores errors related to `code-latest` tag (prevents false error notifications)
+- **Changelog API**: Filters out `code-latest` releases when fetching changelogs for What's New modal
+
+### Hot-Update System
+
+Bootstrap + overlay architecture for code-only deployments without full installer rebuilds:
+
+- **Entry point**: `src/main/bootstrap.ts` is the app entry (`package.json` main = `./out/main/bootstrap.js`)
+- **Startup check**: On launch, checks `%APPDATA%/vessel-compliance/hot-update/out/` for cached code; if found, loads that instead of bundled code
+- **HotUpdateService** (`src/main/services/HotUpdateService.ts`): Checks GitHub `code-latest` prerelease tag for newer builds
+- **Auto-apply**: Downloads and applies updates on startup (before window shows), restarts automatically
+- **Background check**: Every 30 min while running; shows notification bar in renderer if update found
+- **Deploy command**: `npm run deploy` builds + uploads `code-update.zip` to GitHub via `gh` CLI
+- **Deploy script**: `scripts/deploy-update.js` — uses temp `.ps1` files, `--prerelease` flag, `--notes-file` for GitHub release
+- **Build numbers**: Auto-incrementing, version shown as `v7.6.7b3` format in sidebar
+- **Admin visibility**: Admin Panel → File Paths → Hot Updates section shows source/build/status
+- **Isolation**: `electron-updater` configured with `allowPrerelease = false` + error handler ignores `code-latest`, so hot-updates and full updates do not interfere
+
 ### Code Style
 - Prettier: Single quotes, no semicolons, 100 char width, no trailing commas
 - Path alias: `@renderer/*` maps to `src/renderer/src/*`
@@ -1071,7 +1101,7 @@ Draft quotation references include the policy type code:
 - `quotation_pi_alternatives` - P&I alternatives per quotation
 - `survey_warranty_templates`, `survey_warranty_template_sets` - Survey warranty templates (title, {surveyor}/{dateofsurvey} placeholders)
 - `quotation_survey_warranties` - Per-quotation survey warranty selections (surveyor_value, date_of_survey_value columns)
-- `quotation_workflow_steps` - Workflow step definitions with can_edit/can_export/is_initial flags
+- `quotation_workflow_steps` - Workflow step definitions with can_edit/is_initial flags (can_export removed)
 - `quotation_workflow_log` - Workflow transition history per quotation
 - `premium_text_templates` - NCB/UPCC text templates
 - `trading_custom_texts` - Custom trading warranty replacement texts
@@ -1156,13 +1186,17 @@ Excel registry file for quotation numbering and logging:
 - **Year sheets**: Auto-created when year changes
 - **Fallback**: DB counter used if no registry path configured
 - **File locked**: Approval fails with error if Excel is open
+- **Write method**: Uses Excel COM via PowerShell to preserve tables/formulas/formatting. Falls back to `xlsx-js-style` if Excel is not installed. Reads still use `xlsx-js-style`.
 - **IPC**: `quotationRegistry:getPath`, `quotationRegistry:setPath`, `quotationRegistry:browse`
 - **Service**: `src/main/services/QuotationRegistryService.ts`
 
 ### Quotation Workflow Enforcement
 
 - **Initial step**: New quotations auto-assigned the `isInitial` workflow step
-- **canEdit/canExport**: Step constraints enforced — `canEdit=false` disables editing with blue banner, `canExport=false` blocks Approve & Export (draft export always allowed)
+- **canEdit**: Step constraint enforced — `canEdit=false` disables editing with blue banner
+- **Approve & Export**: Gated by `hasPermission('quotations:approve')`, not by workflow step's `canExport` (dead column removed from workflow settings)
+- **Create Revision**: Visible for approved quotations, gated by `hasPermission('quotations:edit')` not `canEdit`
+- **isApproved**: Checks `status` field only — no longer checks reference number format
 - **Step deletion**: Blocked when quotations exist on the step
 - **Single initial**: Setting a step as initial unsets all others
 - **Transaction**: Workflow move (update + log insert) wrapped in transaction, validates transition exists
