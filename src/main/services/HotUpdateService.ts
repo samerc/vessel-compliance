@@ -201,12 +201,14 @@ class HotUpdateService {
         'User-Agent': 'vessel-compliance-updater'
       })
 
-      // Extract to staging directory
+      // Extract to staging directory (zip contains main/, preload/, renderer/)
+      // Bootstrap expects hot-update/out/main/index.js, so extract into staging/out/
       const stagingDir = join(USER_DATA, 'hot-update-staging')
       if (existsSync(stagingDir)) {
         rmSync(stagingDir, { recursive: true, force: true })
       }
-      mkdirSync(stagingDir, { recursive: true })
+      const extractDir = join(stagingDir, 'out')
+      mkdirSync(extractDir, { recursive: true })
 
       // Use JSZip (already a dependency) to extract
       const JSZip = require('jszip')
@@ -216,12 +218,12 @@ class HotUpdateService {
       for (const entryPath of entries) {
         const entry = zip.files[entryPath]
         if (entry.dir) {
-          mkdirSync(join(stagingDir, entryPath), { recursive: true })
+          mkdirSync(join(extractDir, entryPath), { recursive: true })
         } else {
-          const dir = join(stagingDir, entryPath, '..')
+          const dir = join(extractDir, entryPath, '..')
           mkdirSync(dir, { recursive: true })
           const content = await entry.async('nodebuffer')
-          writeFileSync(join(stagingDir, entryPath), content)
+          writeFileSync(join(extractDir, entryPath), content)
         }
       }
 
