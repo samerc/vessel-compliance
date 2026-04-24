@@ -12,6 +12,7 @@ import { DailyAlertScheduler } from './services/DailyAlertScheduler'
 import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
 import { assignRegistryNumber, markRegistryCancelled } from './services/QuotationRegistryService'
+import { hotUpdateService } from './services/HotUpdateService'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
@@ -388,6 +389,26 @@ function createWindow(): void {
         // Load file path resolution settings
         initFilePathSettings()
         await loadFilePathSettings()
+
+        // Initialize hot-update service — load path from DB, persist locally
+        try {
+          const savedPath = await db.getSetting('hotUpdatePath')
+          if (savedPath) {
+            hotUpdateService.saveSettings(savedPath)
+          } else {
+            hotUpdateService.loadSettings()
+          }
+          // Start background checks for new updates
+          hotUpdateService.startPeriodicCheck((version) => {
+            // Notify renderer that an update is available
+            const result = hotUpdateService.checkAndStage()
+            if (result.updated) {
+              mainWindow.webContents.send('hotUpdate:available', version)
+            }
+          })
+        } catch {
+          // Hot-update init is non-fatal
+        }
 
         // Cleanup old activity log entries based on retention setting
         try {
@@ -1723,6 +1744,42 @@ app.whenReady().then(() => {
     await db.setSetting('filePathSettings', JSON.stringify({ localPath: filePathLocal, networkPath: filePathNetwork }))
     initFilePathSettings()
     return { success: true }
+  })
+
+  // ── Hot-Update ────────────────────────────────────────────────────────────────
+  safeHandle('hotUpdate:getInfo', (event) => {
+    requireSession(event)
+    return hotUpdateService.getInfo()
+  })
+
+  safeHandle('hotUpdate:getPath', (event) => {
+    requireSession(event)
+    return hotUpdateService.getNetworkPath() || ''
+  })
+
+  safeHandle('hotUpdate:setPath', async (event, networkPath: string) => {
+    await requirePermission(event, 'admin:settings')
+    hotUpdateService.saveSettings(networkPath)
+    // Also persist to DB for cross-machine consistency
+    await db.setSetting('hotUpdatePath', networkPath)
+    return { success: true }
+  })
+
+  safeHandle('hotUpdate:check', (event) => {
+    requireSession(event)
+    return hotUpdateService.checkAndStage()
+  })
+
+  safeHandle('hotUpdate:clearCache', async (event) => {
+    await requirePermission(event, 'admin:settings')
+    hotUpdateService.clearCache()
+    return { success: true }
+  })
+
+  safeHandle('hotUpdate:restart', (event) => {
+    requireSession(event)
+    app.relaunch()
+    app.exit(0)
   })
 
   safeHandle('shell:showItemInFolder', (event, filePath: string) => {

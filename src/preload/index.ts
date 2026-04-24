@@ -55,6 +55,14 @@ const api = {
   filePathGetSettings: () => ipcRenderer.invoke('filePath:getSettings'),
   filePathSetSettings: (settings: { localPath: string; networkPath: string }) => ipcRenderer.invoke('filePath:setSettings', settings),
 
+  // Hot-Update
+  hotUpdateGetInfo: () => ipcRenderer.invoke('hotUpdate:getInfo'),
+  hotUpdateGetPath: () => ipcRenderer.invoke('hotUpdate:getPath'),
+  hotUpdateSetPath: (path: string) => ipcRenderer.invoke('hotUpdate:setPath', path),
+  hotUpdateCheck: () => ipcRenderer.invoke('hotUpdate:check'),
+  hotUpdateClearCache: () => ipcRenderer.invoke('hotUpdate:clearCache'),
+  hotUpdateRestart: () => ipcRenderer.invoke('hotUpdate:restart'),
+
   // Quotation Registry
   quotationRegistryGetPath: () => ipcRenderer.invoke('quotationRegistry:getPath'),
   quotationRegistrySetPath: (path: string) => ipcRenderer.invoke('quotationRegistry:setPath', path),
@@ -143,6 +151,7 @@ const api = {
   setupLoadConfigFromDir: (directory: string) => ipcRenderer.invoke('setup:loadConfigFromDir', directory),
   setupLoadConfigFromFile: (filePath: string) => ipcRenderer.invoke('setup:loadConfigFromFile', filePath),
   onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status)),
+  onHotUpdateAvailable: (callback) => ipcRenderer.on('hotUpdate:available', (_, version) => callback(version)),
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),

@@ -2,7 +2,7 @@
   "name": "vessel-compliance",
   "version": "7.6.2",
   "description": "An application to manage compliance for vessels ",
-  "main": "./out/main/index.js",
+  "main": "./out/main/bootstrap.js",
   "author": "Samer Cheaib",
   "homepage": "https://fancyshark.com/",
   "repository": {
@@ -25,7 +25,8 @@
     "build:linux": "electron-vite build && electron-builder --linux",
     "release:patch": "npm version patch && git push && git push --tags && npm run build && electron-builder --win --publish always",
     "release:minor": "npm version minor && git push && git push --tags && npm run build && electron-builder --win --publish always",
-    "release:major": "npm version major && git push && git push --tags && npm run build && electron-builder --win --publish always"
+    "release:major": "npm version major && git push && git push --tags && npm run build && electron-builder --win --publish always",
+    "deploy": "npm run build && node scripts/deploy-update.js"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

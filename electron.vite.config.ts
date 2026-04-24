@@ -8,6 +8,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          bootstrap: resolve(__dirname, 'src/main/bootstrap.ts'),
           index: resolve(__dirname, 'src/main/index.ts'),
           parser: resolve(__dirname, 'src/main/workers/parser.ts')
         },

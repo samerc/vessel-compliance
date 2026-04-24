@@ -26,6 +26,7 @@ export interface Api {
   setupLoadConfigFromDir: (directory: string) => Promise<{ success: boolean; message?: string }>
   setupLoadConfigFromFile: (filePath: string) => Promise<{ success: boolean; message?: string }>
   onDbStatus: (callback: (status: { connected: boolean }) => void) => void
+  onHotUpdateAvailable: (callback: (version: any) => void) => void
   getDocumentTypes: () => Promise<DocumentType[]>
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>
   updateDocumentType: (id: string, updates: Partial<DocumentType>) => Promise<void>
@@ -77,6 +78,21 @@ export interface Api {
   filePathResolve: (filePath: string) => Promise<string>
   filePathGetSettings: () => Promise<{ localPath: string; networkPath: string; isRemoteUser: boolean }>
   filePathSetSettings: (settings: { localPath: string; networkPath: string }) => Promise<{ success: boolean }>
+
+  // Hot-Update
+  hotUpdateGetInfo: () => Promise<{
+    currentBuild: number
+    currentVersion: string
+    source: 'asar' | 'hot-update'
+    networkPath: string | null
+    availableBuild: number | null
+    updateReady: boolean
+  }>
+  hotUpdateGetPath: () => Promise<string>
+  hotUpdateSetPath: (path: string) => Promise<{ success: boolean }>
+  hotUpdateCheck: () => Promise<{ updated: boolean; version?: any; error?: string }>
+  hotUpdateClearCache: () => Promise<{ success: boolean }>
+  hotUpdateRestart: () => Promise<void>
 
   // Quotation Registry
   quotationRegistryGetPath: () => Promise<string>

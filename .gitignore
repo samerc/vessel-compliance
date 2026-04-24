@@ -107,3 +107,4 @@ Thumbs.db
 !.claude/lessons-learned.md
 db/db-config.json
 documents
+.deploy-config.json

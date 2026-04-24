@@ -79,6 +79,9 @@ function App(): React.JSX.Element {
   })
   const isLight = theme === 'light' || theme === 'aurora'
 
+  // Hot-update notification
+  const [hotUpdateAvailable, setHotUpdateAvailable] = useState(false)
+
   // Force password reset state
   const [forcePasswordReset, setForcePasswordReset] = useState(false)
   const [resetPassword, setResetPassword] = useState('')
@@ -208,6 +211,7 @@ function App(): React.JSX.Element {
     window.api.setupCheckConnection().then(setDbConnected)
     window.api.updateGetCurrentVersion().then(setAppVersion)
     window.api.onDbStatus((status) => { setDbConnected(status.connected) })
+    window.api.onHotUpdateAvailable(() => { setHotUpdateAvailable(true) })
   }, [])
 
   useEffect(() => {
@@ -668,6 +672,29 @@ function App(): React.JSX.Element {
         </aside>
 
         <main id="main-content" className="main-content">
+          {hotUpdateAvailable && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+              padding: '8px 20px', fontSize: '0.82rem',
+              background: 'linear-gradient(90deg, rgba(0,170,200,0.12), rgba(0,170,200,0.06))',
+              borderBottom: '1px solid rgba(0,170,200,0.2)',
+              color: 'var(--text-primary)'
+            }}>
+              <span>A new update is ready.</span>
+              <button
+                className="btn-primary"
+                onClick={() => window.api.hotUpdateRestart()}
+                style={{ padding: '3px 14px', fontSize: '0.78rem', borderRadius: '6px' }}
+              >
+                Restart to apply
+              </button>
+              <button
+                onClick={() => setHotUpdateAvailable(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', fontSize: '1rem', lineHeight: 1 }}
+                title="Dismiss"
+              >&times;</button>
+            </div>
+          )}
           {breadcrumbs.length >= 2 && (
             <nav aria-label="Breadcrumb" style={{
               display: 'flex', alignItems: 'center', gap: '6px',
