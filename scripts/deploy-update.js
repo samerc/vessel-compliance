@@ -1,108 +1,105 @@
 /**
- * Deploy a hot-update to the network share.
+ * Deploy a hot-update to GitHub as a code-only release.
  *
  * Usage:
- *   npm run deploy                        # uses path from .deploy-config.json
- *   npm run deploy -- --path "\\server\shared\app-updates"
+ *   npm run deploy          # builds + uploads code-update.zip to GitHub
  *
  * What it does:
- *   1. Reads current version from the network share (or starts at build 0)
- *   2. Increments the build number
- *   3. Copies the out/ directory to the share
- *   4. Writes version.json
+ *   1. Runs npm run build (via the "deploy" npm script)
+ *   2. Zips the out/ directory
+ *   3. Uploads to a pinned GitHub release tagged "code-latest"
+ *   4. Auto-increments the build number
+ *
+ * Requires: gh CLI authenticated (https://cli.github.com)
  */
 const fs = require('fs')
 const path = require('path')
+const { execSync } = require('child_process')
 
 const OUT_DIR = path.join(__dirname, '..', 'out')
-const CONFIG_FILE = path.join(__dirname, '..', '.deploy-config.json')
 const PKG = require('../package.json')
+const REPO = 'samerc/vessel-compliance'
+const TAG = 'code-latest'
+const ZIP_NAME = 'code-update.zip'
+const ZIP_PATH = path.join(__dirname, '..', 'dist', ZIP_NAME)
 
-function getNetworkPath() {
-  // Check --path argument
-  const pathArg = process.argv.indexOf('--path')
-  if (pathArg !== -1 && process.argv[pathArg + 1]) {
-    return process.argv[pathArg + 1]
-  }
+function exec(cmd, opts = {}) {
+  console.log(`> ${cmd}`)
+  return execSync(cmd, { stdio: 'inherit', cwd: path.join(__dirname, '..'), ...opts })
+}
 
-  // Check config file
-  if (fs.existsSync(CONFIG_FILE)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
-      if (config.networkPath) return config.networkPath
-    } catch { /* ignore */ }
-  }
-
-  return null
+function execOutput(cmd) {
+  return execSync(cmd, { cwd: path.join(__dirname, '..'), encoding: 'utf-8' }).trim()
 }
 
 function main() {
-  const networkPath = getNetworkPath()
-  if (!networkPath) {
-    console.error('No network path configured.')
-    console.error('')
-    console.error('Either:')
-    console.error('  1. Create .deploy-config.json with: { "networkPath": "\\\\server\\\\shared\\\\app-updates" }')
-    console.error('  2. Pass --path "\\\\server\\\\shared\\\\app-updates" as an argument')
-    process.exit(1)
-  }
-
-  // Verify out/ exists (must build first)
+  // Verify out/ exists
   if (!fs.existsSync(path.join(OUT_DIR, 'main', 'index.js'))) {
-    console.error('out/main/index.js not found. Run "npm run build" first.')
+    console.error('out/main/index.js not found. Build failed or not run.')
     process.exit(1)
   }
 
-  console.log(`Deploying to: ${networkPath}`)
+  // Verify gh CLI is available
+  try {
+    execSync('gh --version', { stdio: 'pipe' })
+  } catch {
+    console.error('gh CLI not found. Install from https://cli.github.com')
+    process.exit(1)
+  }
 
-  // Read current version from share (or default)
-  const remoteVersionFile = path.join(networkPath, 'version.json')
+  // Get current build number from existing release (if any)
   let currentBuild = 0
-  if (fs.existsSync(remoteVersionFile)) {
-    try {
-      const existing = JSON.parse(fs.readFileSync(remoteVersionFile, 'utf-8'))
-      currentBuild = existing.buildNumber || 0
-    } catch { /* start fresh */ }
+  try {
+    const body = execOutput(`gh release view ${TAG} --repo ${REPO} --json body -q .body`)
+    const match = body.match(/\{[^}]*"buildNumber"\s*:\s*(\d+)/)
+    if (match) currentBuild = parseInt(match[1], 10)
+  } catch {
+    // No existing release — start at 0
   }
 
   const newBuild = currentBuild + 1
-  const version = {
+  const versionInfo = JSON.stringify({
     buildNumber: newBuild,
     version: PKG.version,
-    timestamp: new Date().toISOString(),
-    notes: ''
+    timestamp: new Date().toISOString()
+  })
+
+  console.log(`\nPreparing build ${newBuild} (v${PKG.version})...\n`)
+
+  // Ensure dist/ exists for the zip
+  const distDir = path.join(__dirname, '..', 'dist')
+  if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true })
+
+  // Create zip of out/ directory
+  if (fs.existsSync(ZIP_PATH)) fs.unlinkSync(ZIP_PATH)
+
+  // Use PowerShell to create zip (available on all Windows machines)
+  const outAbsolute = path.resolve(OUT_DIR)
+  const zipAbsolute = path.resolve(ZIP_PATH)
+  exec(`powershell -Command "Compress-Archive -Path '${outAbsolute}\\*' -DestinationPath '${zipAbsolute}' -Force"`)
+
+  const zipSize = (fs.statSync(ZIP_PATH).size / (1024 * 1024)).toFixed(1)
+  console.log(`\nCreated ${ZIP_NAME} (${zipSize} MB)`)
+
+  // Create or update the code-latest release
+  const releaseBody = `${versionInfo}\n\nCode-only update. Build ${newBuild} — v${PKG.version}\nDeployed: ${new Date().toISOString()}`
+
+  try {
+    // Try to delete existing release first (gh release edit can't replace assets)
+    execSync(`gh release delete ${TAG} --repo ${REPO} --yes --cleanup-tag`, { stdio: 'pipe' })
+  } catch {
+    // Release doesn't exist yet — fine
   }
 
-  // Ensure destination exists
-  const destOut = path.join(networkPath, 'out')
-  if (!fs.existsSync(networkPath)) {
-    fs.mkdirSync(networkPath, { recursive: true })
-  }
+  // Create fresh release with the zip
+  exec(`gh release create ${TAG} "${zipAbsolute}" --repo ${REPO} --title "Code Update (build ${newBuild})" --notes "${releaseBody.replace(/"/g, '\\"')}" --prerelease`)
 
-  // Remove old out/ on share
-  if (fs.existsSync(destOut)) {
-    console.log('Removing old files...')
-    fs.rmSync(destOut, { recursive: true, force: true })
-  }
+  console.log(`\n✓ Deployed build ${newBuild} (v${PKG.version})`)
+  console.log('  Users will see "Update available" within 30 minutes.')
+  console.log('  Or they can check manually in Admin Panel → File Paths → Check Now.')
 
-  // Copy out/ to share
-  console.log(`Copying out/ to ${destOut} ...`)
-  fs.cpSync(OUT_DIR, destOut, { recursive: true })
-
-  // Write version.json
-  fs.writeFileSync(remoteVersionFile, JSON.stringify(version, null, 2), 'utf-8')
-
-  console.log('')
-  console.log(`Deployed build ${newBuild} (v${PKG.version})`)
-  console.log(`Timestamp: ${version.timestamp}`)
-  console.log('')
-  console.log('Users will receive the update on next app restart.')
-
-  // Save path to config for next time
-  if (!fs.existsSync(CONFIG_FILE)) {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ networkPath }, null, 2), 'utf-8')
-    console.log(`Saved path to ${CONFIG_FILE}`)
-  }
+  // Clean up zip
+  fs.unlinkSync(ZIP_PATH)
 }
 
 main()

@@ -3907,24 +3907,21 @@ function FilePathSettingsSection({ showSuccess, showError }: { showSuccess: (m: 
     const [networkPath, setNetworkPath] = useState('')
     const [isRemote, setIsRemote] = useState(false)
     const [registryPath, setRegistryPath] = useState('')
-    const [hotUpdatePath, setHotUpdatePath] = useState('')
     const [hotUpdateInfo, setHotUpdateInfo] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         ;(async () => {
             try {
-                const [s, regPath, huPath, huInfo] = await Promise.all([
+                const [s, regPath, huInfo] = await Promise.all([
                     window.api.filePathGetSettings(),
                     window.api.quotationRegistryGetPath(),
-                    window.api.hotUpdateGetPath(),
                     window.api.hotUpdateGetInfo()
                 ])
                 setLocalPath(s.localPath || '')
                 setNetworkPath(s.networkPath || '')
                 setIsRemote(s.isRemoteUser)
                 setRegistryPath(regPath || '')
-                setHotUpdatePath(huPath || '')
                 setHotUpdateInfo(huInfo)
             } catch {}
             finally { setLoading(false) }
@@ -4009,32 +4006,26 @@ function FilePathSettingsSection({ showSuccess, showError }: { showSuccess: (m: 
             <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--table-border)' }}>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px' }}>Hot Updates</h4>
                 <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    Path to a shared network folder where code updates are deployed. Users receive updates automatically on app restart — no reinstall needed.
+                    Code-only updates are delivered via GitHub automatically. The app checks for new builds every 30 minutes. No reinstall needed — just restart to apply.
                 </p>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', maxWidth: '600px' }}>
-                    <input type="text" value={hotUpdatePath} onChange={e => setHotUpdatePath(e.target.value)} placeholder="e.g. \\192.168.10.1\shared\app-updates" style={{ flex: 1 }} />
-                    <button className="btn-primary" onClick={async () => {
-                        try {
-                            await window.api.hotUpdateSetPath(hotUpdatePath.trim())
-                            showSuccess('Hot update path saved')
-                        } catch (e: any) { showError(e.message || 'Failed') }
-                    }} style={{ padding: '6px 16px', fontSize: '0.8rem' }}>Save</button>
-                </div>
                 {hotUpdateInfo && (
-                    <div style={{ marginTop: '12px', display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                        <span>Source: <strong style={{ color: 'var(--text-primary)' }}>{hotUpdateInfo.source === 'hot-update' ? 'Hot Update Cache' : 'Built-in (ASAR)'}</strong></span>
-                        <span>Build: <strong style={{ color: 'var(--text-primary)' }}>{hotUpdateInfo.currentBuild || 'N/A'}</strong></span>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                        <span>Source: <strong style={{ color: 'var(--text-primary)' }}>{hotUpdateInfo.source === 'hot-update' ? 'Hot Update' : 'Built-in'}</strong></span>
+                        <span>Build: <strong style={{ color: 'var(--text-primary)' }}>{hotUpdateInfo.currentBuild || 'Base'}</strong></span>
                         {hotUpdateInfo.availableBuild !== null && hotUpdateInfo.availableBuild > hotUpdateInfo.currentBuild && (
                             <span style={{ color: '#22c55e' }}>Update available (build {hotUpdateInfo.availableBuild})</span>
                         )}
+                        {hotUpdateInfo.availableBuild !== null && hotUpdateInfo.availableBuild <= hotUpdateInfo.currentBuild && (
+                            <span style={{ color: '#22c55e' }}>Up to date</span>
+                        )}
                     </div>
                 )}
-                <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
                     <button className="btn-secondary" onClick={async () => {
                         try {
                             const result = await window.api.hotUpdateCheck()
                             if (result.updated) {
-                                showSuccess(`Update staged (build ${result.version?.buildNumber}). Restart to apply.`)
+                                showSuccess(`Update downloaded (build ${result.version?.buildNumber}). Restart to apply.`)
                                 setHotUpdateInfo(await window.api.hotUpdateGetInfo())
                             } else if (result.error) {
                                 showError(result.error)

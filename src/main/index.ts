@@ -390,21 +390,10 @@ function createWindow(): void {
         initFilePathSettings()
         await loadFilePathSettings()
 
-        // Initialize hot-update service — load path from DB, persist locally
+        // Start hot-update background checks (GitHub-based)
         try {
-          const savedPath = await db.getSetting('hotUpdatePath')
-          if (savedPath) {
-            hotUpdateService.saveSettings(savedPath)
-          } else {
-            hotUpdateService.loadSettings()
-          }
-          // Start background checks for new updates
           hotUpdateService.startPeriodicCheck((version) => {
-            // Notify renderer that an update is available
-            const result = hotUpdateService.checkAndStage()
-            if (result.updated) {
-              mainWindow.webContents.send('hotUpdate:available', version)
-            }
+            mainWindow.webContents.send('hotUpdate:available', version)
           })
         } catch {
           // Hot-update init is non-fatal
@@ -1746,26 +1735,13 @@ app.whenReady().then(() => {
     return { success: true }
   })
 
-  // ── Hot-Update ────────────────────────────────────────────────────────────────
-  safeHandle('hotUpdate:getInfo', (event) => {
+  // ── Hot-Update (GitHub-based) ─────────────────────────────────────────────────
+  safeHandle('hotUpdate:getInfo', async (event) => {
     requireSession(event)
     return hotUpdateService.getInfo()
   })
 
-  safeHandle('hotUpdate:getPath', (event) => {
-    requireSession(event)
-    return hotUpdateService.getNetworkPath() || ''
-  })
-
-  safeHandle('hotUpdate:setPath', async (event, networkPath: string) => {
-    await requirePermission(event, 'admin:settings')
-    hotUpdateService.saveSettings(networkPath)
-    // Also persist to DB for cross-machine consistency
-    await db.setSetting('hotUpdatePath', networkPath)
-    return { success: true }
-  })
-
-  safeHandle('hotUpdate:check', (event) => {
+  safeHandle('hotUpdate:check', async (event) => {
     requireSession(event)
     return hotUpdateService.checkAndStage()
   })

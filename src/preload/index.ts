@@ -55,10 +55,8 @@ const api = {
   filePathGetSettings: () => ipcRenderer.invoke('filePath:getSettings'),
   filePathSetSettings: (settings: { localPath: string; networkPath: string }) => ipcRenderer.invoke('filePath:setSettings', settings),
 
-  // Hot-Update
+  // Hot-Update (GitHub-based)
   hotUpdateGetInfo: () => ipcRenderer.invoke('hotUpdate:getInfo'),
-  hotUpdateGetPath: () => ipcRenderer.invoke('hotUpdate:getPath'),
-  hotUpdateSetPath: (path: string) => ipcRenderer.invoke('hotUpdate:setPath', path),
   hotUpdateCheck: () => ipcRenderer.invoke('hotUpdate:check'),
   hotUpdateClearCache: () => ipcRenderer.invoke('hotUpdate:clearCache'),
   hotUpdateRestart: () => ipcRenderer.invoke('hotUpdate:restart'),

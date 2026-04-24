@@ -79,17 +79,14 @@ export interface Api {
   filePathGetSettings: () => Promise<{ localPath: string; networkPath: string; isRemoteUser: boolean }>
   filePathSetSettings: (settings: { localPath: string; networkPath: string }) => Promise<{ success: boolean }>
 
-  // Hot-Update
+  // Hot-Update (GitHub-based)
   hotUpdateGetInfo: () => Promise<{
     currentBuild: number
     currentVersion: string
     source: 'asar' | 'hot-update'
-    networkPath: string | null
     availableBuild: number | null
     updateReady: boolean
   }>
-  hotUpdateGetPath: () => Promise<string>
-  hotUpdateSetPath: (path: string) => Promise<{ success: boolean }>
   hotUpdateCheck: () => Promise<{ updated: boolean; version?: any; error?: string }>
   hotUpdateClearCache: () => Promise<{ success: boolean }>
   hotUpdateRestart: () => Promise<void>
