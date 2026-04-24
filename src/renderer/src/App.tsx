@@ -216,7 +216,15 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     if (isAuthenticated && appVersion) {
-      window.api.updateUserAppVersion(appVersion).catch(() => { })
+      // Include hot-update build number if available
+      window.api.hotUpdateGetInfo().then(info => {
+        const fullVersion = info.currentBuild > 0
+          ? `${appVersion} (build ${info.currentBuild})`
+          : appVersion
+        window.api.updateUserAppVersion(fullVersion)
+      }).catch(() => {
+        window.api.updateUserAppVersion(appVersion)
+      })
     }
   }, [isAuthenticated, appVersion])
 
