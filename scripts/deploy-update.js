@@ -83,6 +83,8 @@ function main() {
 
   // Create or update the code-latest release
   const releaseBody = `${versionInfo}\n\nCode-only update. Build ${newBuild} — v${PKG.version}\nDeployed: ${new Date().toISOString()}`
+  const notesFile = path.join(distDir, 'release-notes.txt')
+  fs.writeFileSync(notesFile, releaseBody, 'utf-8')
 
   try {
     // Try to delete existing release first (gh release edit can't replace assets)
@@ -91,8 +93,9 @@ function main() {
     // Release doesn't exist yet — fine
   }
 
-  // Create fresh release with the zip
-  exec(`gh release create ${TAG} "${zipAbsolute}" --repo ${REPO} --title "Code Update (build ${newBuild})" --notes "${releaseBody.replace(/"/g, '\\"')}" --prerelease`)
+  // Create fresh release with the zip (prerelease so electron-updater ignores it)
+  exec(`gh release create ${TAG} "${zipAbsolute}" --repo ${REPO} --title "Code Update (build ${newBuild})" --notes-file "${notesFile}" --prerelease`)
+  fs.unlinkSync(notesFile)
 
   console.log(`\n✓ Deployed build ${newBuild} (v${PKG.version})`)
   console.log('  Users will see "Update available" within 30 minutes.')
