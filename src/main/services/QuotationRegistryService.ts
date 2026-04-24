@@ -19,7 +19,7 @@ function getYearSheet(filePath: string): { wb: XLSX.WorkBook; ws: XLSX.WorkSheet
   let wb: XLSX.WorkBook
 
   if (existsSync(filePath)) {
-    wb = XLSX.readFile(filePath)
+    wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
   } else {
     wb = XLSX.utils.book_new()
   }
