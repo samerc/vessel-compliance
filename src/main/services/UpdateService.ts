@@ -87,6 +87,12 @@ export class UpdateService {
 
         // Error occurred
         autoUpdater.on('error', (error) => {
+            // Silently ignore errors from the code-latest hot-update release
+            if (error?.message?.includes('code-latest')) {
+                log.info('Ignoring code-latest release (hot-update, not an EXE release)')
+                this.updateCheckInProgress = false
+                return
+            }
             log.error('Update error:', error)
             this.sendToRenderer('update:error', {
                 message: error.message || 'Unknown error occurred during update'
@@ -157,7 +163,7 @@ export class UpdateService {
                 throw new Error(`Failed to fetch releases: ${response.statusText}`)
             }
             const releases = await response.json() as any[]
-            return releases.map(r => ({
+            return releases.filter(r => r.tag_name !== 'code-latest').map(r => ({
                 version: r.tag_name,
                 name: r.name,
                 date: r.published_at,
