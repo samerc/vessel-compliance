@@ -24,6 +24,7 @@ export class UpdateService {
         // Configure auto-updater
         autoUpdater.autoDownload = true // Automatically download updates
         autoUpdater.autoInstallOnAppQuit = true // Install on app quit
+        autoUpdater.allowPrerelease = false // Skip prerelease (code-latest hot-updates)
 
         this.setupEventListeners()
     }
