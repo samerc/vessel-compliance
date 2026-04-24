@@ -1,6 +1,6 @@
 {
   "name": "vessel-compliance",
-  "version": "7.6.2",
+  "version": "7.6.3",
   "description": "An application to manage compliance for vessels ",
   "main": "./out/main/bootstrap.js",
   "author": "Samer Cheaib",
