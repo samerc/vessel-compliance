@@ -92,7 +92,8 @@ async function assignQuotationNumberViaRegistry(quotationId: string): Promise<st
   // Load quotation data for registry entry
   const q = await db.getQuotation(quotationId)
   if (!q) throw new Error('Quotation not found')
-  if (q.referenceNumber && !q.referenceNumber.startsWith('DRAFT-')) return q.referenceNumber
+  // If already approved/exported with a real number, don't reassign
+  if (q.status !== 'draft' && q.referenceNumber && !q.referenceNumber.startsWith('DRAFT-')) return q.referenceNumber
 
   // Get vessels, assureds, customer info
   const vessels = await db.getQuotationVessels(quotationId)
