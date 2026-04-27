@@ -1908,7 +1908,9 @@ app.whenReady().then(() => {
     requireSession(event)
     return new Promise((resolve) => {
       // In production/dev, the worker file will be in the same output directory
-      const workerPath = join(__dirname, 'parser.js')
+      // Always load parser from ASAR to ensure node_modules (pdf-parse) are accessible
+      const asarParserPath = join(app.getAppPath(), 'out', 'main', 'parser.js')
+      const workerPath = existsSync(asarParserPath) ? asarParserPath : join(__dirname, 'parser.js')
       const worker = new Worker(workerPath)
 
       worker.postMessage({ filePath })
