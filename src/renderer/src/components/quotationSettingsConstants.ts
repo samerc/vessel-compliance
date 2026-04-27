@@ -96,7 +96,7 @@ Cancel cover provided under this Policy by notice in writing to the Insured. Suc
 Continue the Policy on such terms and conditions as it may determine.`,
     warrantiesNote: 'NOTE: The Insured\'s attention is drawn to the provisions of the {quotation_type} Terms and Conditions, which also include Warranties.',
     deductiblesAggregate: 'When one incident gives rise to a claim of a different nature, the aggregate of all claims shall be subject to the highest deductible applicable to anyone such claim.',
-    subjectivitiesIntro: 'The following documents to be provided within 7 days prior inception:',
+    subjectivitiesIntro: 'The following documents to be provided {subjectivity_days}:',
     subjectivitiesNote: 'NOTE: Failure to supply satisfactory information on any subjectivity may result in this quote being withdrawn and/or cover being cancelled and/or claims being excluded.',
     ncbDefaultText: 'Subject to {ncb_amount}, which is repayable to the insurer in case of claim.',
     upccDefaultText: '',
