@@ -368,7 +368,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         }
     }
 
-    const isDraft = (q.referenceNumber || '').startsWith('DRAFT-')
+    const isDraft = q.status === 'draft'
 
     const validateBeforeExport = async (quotation: Quotation): Promise<string[]> => {
         const warnings: string[] = []
