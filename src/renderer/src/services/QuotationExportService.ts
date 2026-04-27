@@ -1771,8 +1771,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       // Replace timing phrase based on subjectivityDays
       const days = data.subjectivityDays ?? 0
       const timing = days === 0 ? 'prior inception' : `within ${days} days prior inception`
-      introText = introText.replace(/within \d+ days? prior inception/i, timing)
-      introText = introText.replace(/prior inception/i, timing)
+      // Try specific patterns first, then fallback
+      const replaced = introText.replace(/within \d+ days?\s*(of|prior)\s*inception/i, timing)
+      introText = replaced !== introText ? replaced : introText.replace(/prior\s+inception/i, timing)
       subjText += introText + '\n\n'
     }
     for (const s of data.subjectivities) { const sScope = vesselScopeSuffix(s.vesselScope, data.quotationVessels); subjText += `- ${s.text}${sScope}\n` }
@@ -3859,7 +3860,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (subjIntroDocx) {
       const sDays = data.subjectivityDays ?? 0
       const sTiming = sDays === 0 ? 'prior inception' : `within ${sDays} days prior inception`
-      let fixedIntro = subjIntroDocx.replace(/within \d+ days? prior inception/i, sTiming).replace(/prior inception/i, sTiming)
+      const sReplaced = subjIntroDocx.replace(/within \d+ days?\s*(of|prior)\s*inception/i, sTiming)
+      const fixedIntro = sReplaced !== subjIntroDocx ? sReplaced : subjIntroDocx.replace(/prior\s+inception/i, sTiming)
       subjContent.push(...mp(fixedIntro))
     }
     for (const s of data.subjectivities) {
