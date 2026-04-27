@@ -346,6 +346,7 @@ function createWindow(): void {
     if (saveStateTimeout) clearTimeout(saveStateTimeout)
     saveStateTimeout = setTimeout(async () => {
       try {
+        if (mainWindow.isDestroyed()) return
         const bounds = mainWindow.getBounds()
         store.set('windowState', bounds)
 
@@ -402,7 +403,7 @@ function createWindow(): void {
           }
           // Start periodic checks for updates deployed while the app is running
           hotUpdateService.startPeriodicCheck((version) => {
-            mainWindow.webContents.send('hotUpdate:available', version)
+            if (!mainWindow.isDestroyed()) mainWindow.webContents.send('hotUpdate:available', version)
           })
         } catch {
           // Hot-update is non-fatal
