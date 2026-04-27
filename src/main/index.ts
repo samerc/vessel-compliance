@@ -3182,7 +3182,7 @@ app.whenReady().then(() => {
     const user = await requirePermission(event, 'quotations:delete')
     const existing = await db.getQuotation(id)
     const ref = existing?.referenceNumber || id
-    const result = await db.deleteQuotation(id)
+    const result = await db.deleteQuotation(id, user.id)
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -3191,9 +3191,27 @@ app.whenReady().then(() => {
       entityType: 'quotation',
       entityId: id,
       entityName: ref,
-      details: `Deleted quotation ${ref}`
+      details: `Moved quotation ${ref} to recycle bin`
     }).catch(() => {})
     return result
+  })
+  safeHandle('db:restoreQuotation', async (event, id: string) => {
+    const user = await requirePermission(event, 'quotations:delete')
+    await db.restoreQuotation(id)
+    db.logActivity({
+      userId: user.id, username: user.username,
+      action: 'UPDATE', module: 'Quotations',
+      entityType: 'quotation', entityId: id,
+      details: 'Restored quotation from recycle bin'
+    }).catch(() => {})
+  })
+  safeHandle('db:permanentlyDeleteQuotation', async (event, id: string) => {
+    await requirePermission(event, 'quotations:bulkDelete')
+    await db.permanentlyDeleteQuotation(id)
+  })
+  safeHandle('db:getDeletedQuotations', async (event) => {
+    requireSession(event)
+    return db.getDeletedQuotations()
   })
   safeHandle('db:getQuotationRevisionCount', async (event, revisionGroupId) => {
     requireSession(event)

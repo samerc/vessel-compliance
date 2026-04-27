@@ -627,6 +627,9 @@ export interface Api {
   addQuotation: (q: Partial<Quotation>) => Promise<Quotation>
   updateQuotation: (id: string, updates: Partial<Quotation>) => Promise<void>
   deleteQuotation: (id: string) => Promise<void>
+  restoreQuotation: (id: string) => Promise<void>
+  permanentlyDeleteQuotation: (id: string) => Promise<void>
+  getDeletedQuotations: () => Promise<any[]>
   getQuotationRevisionCount: (revisionGroupId: string) => Promise<number>
   deleteQuotationGroup: (revisionGroupId: string) => Promise<void>
   createQuotationRevision: (sourceId: string) => Promise<Quotation>

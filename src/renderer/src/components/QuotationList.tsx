@@ -23,7 +23,9 @@ import {
   Users,
   User,
   Lock,
-  Unlock
+  Unlock,
+  RotateCcw,
+  Trash
 } from 'lucide-react'
 import { Quotation, QuotationType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -101,7 +103,9 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [renewalFilter, setRenewalFilter] = useState<string>('all')
-  const [viewFilter, setViewFilter] = useState<'all' | 'registry' | 'drafts' | 'active' | 'converted'>('active')
+  const [viewFilter, setViewFilter] = useState<'all' | 'registry' | 'drafts' | 'active' | 'converted' | 'deleted'>('active')
+  const [deletedQuotations, setDeletedQuotations] = useState<any[]>([])
+  const [deletedLoading, setDeletedLoading] = useState(false)
   const [createdByFilter, setCreatedByFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -253,7 +257,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
         dateFrom: isSearchActive ? undefined : (dateFrom || undefined),
         dateTo: isSearchActive ? undefined : (dateTo || undefined),
         renewalFilter: renewalFilter !== 'all' ? renewalFilter : undefined,
-        viewFilter: isSearchActive ? undefined : (viewFilter !== 'all' ? viewFilter : undefined),
+        viewFilter: isSearchActive ? undefined : (viewFilter !== 'all' && viewFilter !== 'deleted' ? viewFilter : undefined),
         groupId: activeGroupId || undefined,
         favoriteIds: showFavoritesOnly ? [...favorites] : undefined,
         sortField,
@@ -294,6 +298,33 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const loadDeletedQuotations = async () => {
+    setDeletedLoading(true)
+    try {
+      const result = await window.api.getDeletedQuotations()
+      setDeletedQuotations(Array.isArray(result) ? result : [])
+    } catch { setDeletedQuotations([]) }
+    finally { setDeletedLoading(false) }
+  }
+
+  const handleRestore = async (id: string) => {
+    try {
+      await window.api.restoreQuotation(id)
+      showSuccess('Quotation restored')
+      loadDeletedQuotations()
+      loadData()
+    } catch (e: any) { showError(e.message || 'Failed to restore') }
+  }
+
+  const handlePermanentDelete = async (id: string) => {
+    if (!confirm('Permanently delete this quotation? This cannot be undone.')) return
+    try {
+      await window.api.permanentlyDeleteQuotation(id)
+      showSuccess('Quotation permanently deleted')
+      loadDeletedQuotations()
+    } catch (e: any) { showError(e.message || 'Failed to delete') }
+  }
 
   // Grouping
   const groupedRows = useMemo(() => {
@@ -1058,6 +1089,10 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
             </button>
           )
         })}
+        <button onClick={() => { setViewFilter('deleted'); loadDeletedQuotations() }}
+          style={{ padding: '8px 16px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: viewFilter === 'deleted' ? 700 : 400, background: viewFilter === 'deleted' ? 'var(--bg-card)' : 'transparent', color: viewFilter === 'deleted' ? 'var(--danger)' : 'var(--text-secondary)', borderBottom: viewFilter === 'deleted' ? '2px solid var(--danger)' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+          <Trash size={13} /> Recycle Bin {deletedQuotations.length > 0 && `(${deletedQuotations.length})`}
+        </button>
         {savedFilters.map(sf => (
           <button key={sf.id} onClick={() => applyFilter(sf.filters)}
             style={{ padding: '8px 12px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 400, background: 'transparent', color: 'var(--text-secondary)', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1079,6 +1114,55 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
         )}
       </div>
 
+      {viewFilter === 'deleted' ? (
+        /* ═══ Recycle Bin View ═══ */
+        <div className="glass-card" style={{ padding: '0', overflow: 'hidden', marginTop: '12px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Reference</th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Type</th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Title</th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Deleted</th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Deleted By</th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deletedLoading && (
+                <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={24} className="spin" style={{ opacity: 0.5 }} /></td></tr>
+              )}
+              {!deletedLoading && deletedQuotations.map(q => (
+                <tr key={q.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{q.referenceNumber || '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>{q.quotationTypeName || '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{q.title || q.coName || '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{q.deletedAt ? new Date(q.deletedAt).toLocaleDateString() : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{q.deletedByName || '—'}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                      <button onClick={() => handleRestore(q.id)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)' }}>
+                        <RotateCcw size={13} /> Restore
+                      </button>
+                      {hasPermission('quotations:bulkDelete') && (
+                        <button onClick={() => handlePermanentDelete(q.id)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}>
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!deletedLoading && deletedQuotations.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <Trash size={36} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                  <div style={{ fontWeight: 600 }}>Recycle bin is empty</div>
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : <>
       {/* ═══ Search + Month Nav ═══ */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
@@ -2268,6 +2352,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
           to { transform: translateY(-50%) rotate(360deg); }
         }
       `}</style>
+      </>}
     </div>
   )
 }

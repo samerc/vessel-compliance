@@ -3169,6 +3169,15 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('Migration warning (entity_document_types seed):', e) }
 
+            // Migration: quotations.deleted_at for soft delete / recycle bin
+            try {
+                const [delCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'deleted_at'") as any[]
+                if ((delCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN deleted_at DATETIME DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN deleted_by VARCHAR(36) DEFAULT NULL")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7334,9 +7343,11 @@ export class MySQLAdapter {
         // First get the latest revision IDs efficiently
         const [latestIds] = await this.pool.query(`
             SELECT id FROM quotations q
-            WHERE revision_number = (
+            WHERE q.deleted_at IS NULL
+              AND revision_number = (
                 SELECT MAX(revision_number) FROM quotations q2
                 WHERE q2.revision_group_id = q.revision_group_id
+                  AND q2.deleted_at IS NULL
             )
         `)
         const idSet = new Set((latestIds as any[]).map(r => r.id))
@@ -7357,6 +7368,7 @@ export class MySQLAdapter {
             LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
             LEFT JOIN policy_types pt ON q.policy_type_id = pt.id
             LEFT JOIN quotation_workflow_steps qws ON q.workflow_step_id = qws.id
+            WHERE q.deleted_at IS NULL
             ORDER BY q.created_at DESC
         `)
         // Filter to latest revisions in JS (faster than correlated subquery)
@@ -8190,9 +8202,45 @@ export class MySQLAdapter {
         }
     }
 
-    async deleteQuotation(id: string): Promise<void> {
+    async deleteQuotation(id: string, userId?: string): Promise<void> {
+        if (!this.pool) return
+        // Soft delete — move to recycle bin
+        await this.pool.execute(
+            'UPDATE quotations SET deleted_at = NOW(), deleted_by = ?, is_locked = FALSE, locked_by = NULL WHERE id = ?',
+            [userId || null, id]
+        )
+    }
+
+    async restoreQuotation(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'UPDATE quotations SET deleted_at = NULL, deleted_by = NULL WHERE id = ?',
+            [id]
+        )
+    }
+
+    async permanentlyDeleteQuotation(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM quotations WHERE id = ?', [id])
+    }
+
+    async getDeletedQuotations(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT q.id, q.reference_number as referenceNumber,
+                qt.name as quotationTypeName, qt.code as quotationTypeCode,
+                q.is_renewal as isRenewal, q.status,
+                q.co_name as coName, q.title,
+                q.revision_number as revisionNumber,
+                q.deleted_at as deletedAt, u.username as deletedByName,
+                q.created_at as createdAt
+            FROM quotations q
+            LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
+            LEFT JOIN users u ON q.deleted_by = u.id
+            WHERE q.deleted_at IS NOT NULL
+            ORDER BY q.deleted_at DESC
+        `)
+        return rows as any[]
     }
 
     /** Assign a real quotation reference number (Q/{type}/{seq}) to a draft quotation */
